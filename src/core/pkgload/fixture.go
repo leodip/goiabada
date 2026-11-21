@@ -103,16 +103,32 @@ func fixtureGoVersion(modules []fixtureModule) (string, error) {
 	return goVersion()
 }
 
-// syntheticVersion is the version a fixture module is required at: v0.0.0, or vN.0.0 for a path
-// whose last element is the major version suffix /vN, which the go command holds the version to.
+// syntheticVersion is the version a fixture module is required at: the major its path's version
+// suffix names, which the go command holds the version to, or v0.0.0 for a path without one. The
+// suffix is /vN, from v2, or, for a gopkg.in path, .vN with an optional -unstable, where .v0 and .v1
+// are majors too (go.dev/ref/mod#major-version-suffixes).
 func syntheticVersion(modulePath string) string {
-	last := path.Base(modulePath)
-	if n, ok := strings.CutPrefix(last, "v"); ok && n != "" && n != "0" && n != "1" && n[0] != '0' {
-		if _, err := strconv.Atoi(n); err == nil {
-			return last + ".0.0"
+	if strings.HasPrefix(modulePath, "gopkg.in/") {
+		suffix := strings.TrimSuffix(modulePath, "-unstable")
+		if i := strings.LastIndex(suffix, ".v"); i >= 0 && isMajor(suffix[i+2:]) {
+			return "v" + suffix[i+2:] + ".0.0"
 		}
+		return "v0.0.0"
+	}
+	if n, ok := strings.CutPrefix(path.Base(modulePath), "v"); ok && isMajor(n) && n != "0" && n != "1" {
+		return "v" + n + ".0.0"
 	}
 	return "v0.0.0"
+}
+
+// isMajor reports whether n is a major version number as a suffix writes it: digits, with no
+// leading zero unless it is 0 itself.
+func isMajor(n string) bool {
+	if n == "" || (n[0] == '0' && n != "0") {
+		return false
+	}
+	_, err := strconv.ParseUint(n, 10, 64)
+	return err == nil
 }
 
 // quoteIfNeeded quotes a go.mod argument the go command would otherwise read as more than one

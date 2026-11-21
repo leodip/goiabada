@@ -1709,6 +1709,19 @@ func TestSymbolOwnership_ATestOnlyDeclarationIsNoEvidenceForItsNamesake(t *testi
 	assertFindings(t, findings, "records core/shared.Probe as test-support, but nothing names it")
 }
 
+// TestSymbolOwnership_AnImportedDeclarationAfterATestFileLineDirectiveIsStillEvidence: the
+// auth server's test is the only one naming Helper, which a production file declares after a
+// //line directive mapping it to a _test.go name. The auth server's load reads core from export
+// data, whose positions carry the mapped name, so a declaration's own position cannot say whether
+// a test declared it (#420).
+func TestSymbolOwnership_AnImportedDeclarationAfterATestFileLineDirectiveIsStillEvidence(t *testing.T) {
+	files := symbolBaselineFiles()
+	files["core/shared/shared.go"] = strings.Replace(files["core/shared/shared.go"],
+		"type Helper struct{}", "//line generated_test.go:1\ntype Helper struct{}", 1)
+
+	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
+}
+
 // TestSymbolOwnership_ALineDirectiveDoesNotMoveATestReference: the only reference to Unused is in a
 // test file, after a //line directive mapping it to a file that is not one. Which build compiles a
 // reference is decided by the file it is in, so it is still a test's (#420).

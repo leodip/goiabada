@@ -11,10 +11,11 @@ package guard
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,9 +39,7 @@ var notCalledTestifyModules = []string{
 func requireTestify(t *testing.T, root, mod string) {
 	t.Helper()
 	core := filepath.Join(SourceRoot(t), "core")
-	goMod, err := os.ReadFile(filepath.Join(core, "go.mod"))
-	require.NoError(t, err)
-	versions := requiredVersions(string(goMod))
+	versions := requiredVersions(t, filepath.Join(core, "go.mod"))
 
 	requires := "\nrequire (\n"
 	for _, path := range notCalledTestifyModules {
@@ -57,38 +56,37 @@ func requireTestify(t *testing.T, root, mod string) {
 	writeFixture(t, root, mod+"/go.sum", string(sum))
 }
 
-// requiredVersions reads the version of each module a go.mod requires, from a one-line require or a
-// require block, with any comment removed.
-func requiredVersions(goMod string) map[string]string {
+// requiredVersions reads the version of each module the go.mod at goMod requires, as the go
+// command parses it, so a one-line require, a require block, a quoted path and a comment all read
+// as go.mod's own grammar says.
+func requiredVersions(t *testing.T, goMod string) map[string]string {
+	t.Helper()
+	out, err := exec.Command("go", "mod", "edit", "-json", goMod).Output()
+	require.NoError(t, err, "go mod edit -json %s", goMod)
+	var parsed struct {
+		Require []struct{ Path, Version string }
+	}
+	require.NoError(t, json.Unmarshal(out, &parsed))
 	versions := map[string]string{}
-	inBlock := false
-	for _, line := range strings.Split(goMod, "\n") {
-		if i := strings.Index(line, "//"); i >= 0 {
-			line = line[:i]
-		}
-		fields := strings.Fields(line)
-		switch {
-		case len(fields) == 2 && fields[0] == "require" && fields[1] == "(":
-			inBlock = true
-		case inBlock && len(fields) == 1 && fields[0] == ")":
-			inBlock = false
-		case len(fields) == 3 && fields[0] == "require":
-			versions[fields[1]] = fields[2]
-		case inBlock && len(fields) == 2:
-			versions[fields[0]] = fields[1]
-		}
+	for _, r := range parsed.Require {
+		versions[r.Path] = r.Version
 	}
 	return versions
 }
 
 func TestRequiredVersions_ReadsBothRequireFormsWithTheirComments(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "go.mod", "module example.com/mod\n\ngo 1.24\n\n"+
+		"require (\n\tgithub.com/stretchr/testify v1.12.1\n\tgo.yaml.in/yaml/v3 v3.0.6 // indirect\n)\n\n"+
+		"require github.com/stretchr/objx v0.8.0 // indirect\n\n"+
+		"require \"golang.org/x/mod\" v0.43.0 // indirect\n")
+
 	assert.Equal(t, map[string]string{
 		"github.com/stretchr/testify": "v1.12.1",
 		"github.com/stretchr/objx":    "v0.8.0",
 		"go.yaml.in/yaml/v3":          "v3.0.6",
-	}, requiredVersions("module example.com/mod\n\ngo 1.24\n\n"+
-		"require (\n\tgithub.com/stretchr/testify v1.12.1\n\tgo.yaml.in/yaml/v3 v3.0.6 // indirect\n)\n\n"+
-		"require github.com/stretchr/objx v0.8.0 // indirect\n"))
+		"golang.org/x/mod":            "v0.43.0",
+	}, requiredVersions(t, filepath.Join(root, "go.mod")))
 }
 
 // notCalledFixtureModule writes the module every rule-table case shares: a package of generated

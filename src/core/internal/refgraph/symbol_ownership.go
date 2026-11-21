@@ -650,8 +650,9 @@ func buildSymbolCensus(root string) (*symbolCensus, error) {
 			census.readProductionReferences(lp, linked[lp.dir])
 		}
 	}
+	testOnly := testOnlyDeclarations(tests)
 	for _, lp := range tests {
-		census.readTestReferences(lp)
+		census.readTestReferences(lp, testOnly)
 	}
 	return census, nil
 }
@@ -1057,16 +1058,36 @@ func (c *symbolCensus) readProductionReferences(lp loadedPackage, linked bool) {
 // declaring package's own tests count, internal and external alike: an internal test names a symbol
 // unqualified, an external one through the import, and both resolve to the symbol's object. An
 // internal test's own declaration of an exported name is no production symbol, even where a
-// release build's file declares the same name, so a reference to it is evidence for nothing.
-func (c *symbolCensus) readTestReferences(lp loadedPackage) {
+// release build's file declares the same name, so a reference to it, one of testOnly, is evidence
+// for nothing.
+func (c *symbolCensus) readTestReferences(lp loadedPackage, testOnly map[types.Object]bool) {
 	for ident, obj := range lp.pkg.TypesInfo.Uses {
 		if !inTestFile(lp.pkg.Fset, ident.Pos()) {
 			continue
 		}
-		if key, ok := c.symbolOf(obj); ok && !inTestFile(lp.pkg.Fset, obj.Pos()) {
+		if key, ok := c.symbolOf(obj); ok && !testOnly[obj] {
 			c.tests[key] = true
 		}
 	}
+}
+
+// testOnlyDeclarations returns the package-level objects the test build's test files declare, read
+// from each package's parsed source. An object's own position cannot say this: one another module
+// imports comes from export data, whose positions carry the file a //line directive names, so a
+// production declaration mapped to a _test.go name would read as a test's. A test-only declaration
+// is only ever visible to its own package and that package's external test, both in the same load,
+// so the object is the one their references resolve to.
+func testOnlyDeclarations(pkgs []loadedPackage) map[types.Object]bool {
+	testOnly := map[types.Object]bool{}
+	for _, lp := range pkgs {
+		scope := lp.pkg.Types.Scope()
+		for ident, obj := range lp.pkg.TypesInfo.Defs {
+			if obj != nil && obj.Parent() == scope && inTestFile(lp.pkg.Fset, ident.Pos()) {
+				testOnly[obj] = true
+			}
+		}
+	}
+	return testOnly
 }
 
 // inTestFile reports whether pos is in a _test.go file: the file itself, not one a //line directive
