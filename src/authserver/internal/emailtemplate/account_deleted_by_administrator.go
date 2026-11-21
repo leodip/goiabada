@@ -52,6 +52,17 @@ Si vous ne vous y attendiez pas, contactez votre administrateur.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Administrator telah menghapus akun Anda",
+			Body: `Halo {{name}},
+
+Administrator telah menghapus akun {{app_name}} Anda. Anda tidak dapat lagi masuk dengan akun tersebut.
+
+Jika Anda tidak mengharapkan hal ini, hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		//nolint:misspell // the it text: "eliminato" is Italian, not a misspelling of "elimination"
 		"it": {
 			Subject: "Un amministratore ha eliminato il tuo account",

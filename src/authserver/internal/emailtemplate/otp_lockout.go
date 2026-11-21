@@ -52,6 +52,17 @@ L’application d’authentification de votre compte {{app_name}} a été bloqu�
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Aplikasi autentikator Anda dinonaktifkan setelah terlalu banyak kode salah",
+			Body: `Halo {{name}},
+
+Aplikasi autentikator akun {{app_name}} Anda telah dinonaktifkan setelah terlalu banyak kode salah dimasukkan berturut-turut saat masuk. Kodenya tidak lagi diterima, termasuk kode yang benar.
+
+**Kode tersebut hanya dapat dimasukkan setelah kata sandi Anda, jadi orang lain mungkin mengetahuinya.** Masuk dengan salah satu kode pemulihan Anda, ubah kata sandi Anda di pengaturan akun, lalu nonaktifkan autentikasi dua faktor dan siapkan aplikasi autentikator baru. Jika kode pemulihan Anda sudah habis, hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "La tua app di autenticazione è stata bloccata dopo troppi codici errati",
 			Body: `Ciao {{name}},

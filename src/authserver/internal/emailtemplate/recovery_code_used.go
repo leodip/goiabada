@@ -61,6 +61,19 @@ Si c’était vous et que vous n’avez plus votre application d’authentificat
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Kode pemulihan digunakan untuk masuk",
+			Body: `Halo {{name}},
+
+Salah satu kode pemulihan Anda digunakan untuk masuk ke akun {{app_name}} Anda, sebagai pengganti kode dari aplikasi autentikator Anda. Setiap kode pemulihan hanya berlaku sekali, jadi kode tersebut tidak dapat digunakan lagi. Sisa kode pemulihan yang belum digunakan: {{codes_left}}.
+
+Jika itu Anda dan Anda tidak lagi memiliki aplikasi autentikator, nonaktifkan autentikasi dua faktor di pengaturan akun Anda dan siapkan aplikasi autentikator baru, yang disertai satu set kode pemulihan baru. Jika Anda masih memiliki aplikasi tersebut, buat satu set kode pemulihan baru di sana, agar Anda tetap dapat masuk jika aplikasi itu hilang.
+
+**Jika bukan Anda, orang lain mungkin mengetahui kata sandi Anda dan memiliki kode pemulihan Anda.** Pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk, nonaktifkan autentikasi dua faktor dan siapkan aplikasi autentikator baru, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "È stato usato un codice di recupero per accedere",
 			Body: `Ciao {{name}},

@@ -56,6 +56,8 @@ func TestRenderEmail_ThePasswordResetLinkFollowsTheRecipient(t *testing.T) {
 		{"de-AT", "de", "Passwort zurücksetzen", "Öffnen Sie diesen Link, um Ihr Passwort zurückzusetzen:"},
 		{"es-MX", "es", "Restablecimiento de contraseña", "Para restablecer tu contraseña, abre este enlace:"},
 		{"fr-CA", "fr", "Réinitialisation du mot de passe", "Pour réinitialiser votre mot de passe"},
+		{"id-ID", "id", "Atur ulang kata sandi", "Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:"},
+		{"in", "id", "Atur ulang kata sandi", "Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:"},
 		{"it-CH", "it", "Reimpostazione della password", "Per reimpostare la password, apri questo link:"},
 		{"pt", "pt-BR", "Redefinição de senha", "Você pode redefinir sua senha clicando no link abaixo:"},
 		{"nl", "en", "Password reset", "You can reset your password by clicking the link below:"},

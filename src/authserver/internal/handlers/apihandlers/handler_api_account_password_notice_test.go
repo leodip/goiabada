@@ -114,6 +114,8 @@ func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {
 		{"a Spanish user", "", "es", "es", "Tu contraseña ha cambiado"},
 		{"an Italian user", "", "it", "it", "La tua password è stata cambiata"},
 		{"a user who chose French, over a German locale", "fr", "de", "fr", "Votre mot de passe a été modifié"},
+		{"an Indonesian user", "", "id-ID", "id-ID", "Kata sandi Anda telah diubah"},
+		{"a user who chose Indonesian, over a German locale", "id", "de", "id", "Kata sandi Anda telah diubah"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)

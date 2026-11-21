@@ -61,6 +61,19 @@ Si vous l’avez configurée, vous n’avez rien à faire. Conservez vos codes d
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Autentikasi dua faktor telah disiapkan",
+			Body: `Halo {{name}},
+
+Autentikasi dua faktor telah disiapkan di akun {{app_name}} Anda. Saat masuk ke aplikasi yang menggunakan autentikasi dua faktor, kini Anda diminta memasukkan kode dari aplikasi autentikator yang disiapkan. Bersamaan dengan itu dibuat satu set kode pemulihan baru, yang dapat Anda gunakan untuk masuk jika aplikasi tersebut hilang.
+
+Jika Anda yang menyiapkannya, Anda tidak perlu melakukan apa pun. Simpan kode pemulihan Anda di tempat yang aman.
+
+**Jika bukan Anda, orang lain mungkin mengetahui kata sandi Anda.** Pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan periksa pengaturan autentikasi dua faktor Anda, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "L'autenticazione a due fattori è stata configurata",
 			Body: `Ciao {{name}},

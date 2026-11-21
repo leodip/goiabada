@@ -254,6 +254,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndAVanishedOneIsAutomatic(t *t
 		{Tag: "de", Name: "German"},
 		{Tag: "es", Name: "Spanish"},
 		{Tag: "fr", Name: "French"},
+		{Tag: "id", Name: "Indonesian"},
 		{Tag: "it", Name: "Italian"},
 		{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 	}, bind["pageLanguages"])
@@ -271,6 +272,7 @@ func TestHandleProfilePost_SendsThePageLanguageAndCopiesTheSavedOne(t *testing.T
 		wantCopy    string
 	}{
 		{"a language chosen", url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, ptr("es"), "es"},
+		{"Indonesian chosen", url.Values{"username": {"jane-doe"}, "pageLanguage": {"id"}}, ptr("id"), "id"},
 		{"Automatic chosen", url.Values{"username": {"jane-doe"}, "pageLanguage": {""}}, ptr(""), ""},
 		{"no field posted", url.Values{"username": {"jane-doe"}}, nil, "it"},
 	} {

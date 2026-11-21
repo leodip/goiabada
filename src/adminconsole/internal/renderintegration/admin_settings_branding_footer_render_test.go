@@ -20,7 +20,7 @@ import (
 
 var renderFooterLanguages = []adminsettingshandlers.FooterLanguage{
 	{Tag: "en", Name: "English"}, {Tag: "de", Name: "German"}, {Tag: "es", Name: "Spanish"},
-	{Tag: "fr", Name: "French"}, {Tag: "it", Name: "Italian"}, {Tag: "pt-BR", Name: "Portuguese (Brazil)"},
+	{Tag: "fr", Name: "French"}, {Tag: "id", Name: "Indonesian"}, {Tag: "it", Name: "Italian"}, {Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 }
 
 // renderFooterForm draws a stored brand's form holding two links and the whole contact, refused at

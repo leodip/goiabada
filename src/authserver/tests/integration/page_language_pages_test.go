@@ -413,6 +413,7 @@ func TestPageLanguage_TheSignInsUserOnAutomaticReplacesTheSessionsUsersChoice(t 
 		{"Automatic", "", "Tu cuenta de usuario está desactivada.", "es"},
 		{"a catalog that has gone", "ja", "Tu cuenta de usuario está desactivada.", "es"},
 		{"chosen de", "de", "Ihr Benutzerkonto ist deaktiviert.", "de"},
+		{"chosen id", "id", "Akun pengguna Anda dinonaktifkan.", "id"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -60,6 +60,19 @@ Si vous avez effectué cette modification, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Kata sandi Anda telah diubah",
+			Body: `Halo {{name}},
+
+Kata sandi akun {{app_name}} Anda telah diubah dari pengaturan akun Anda.
+
+Jika Anda yang melakukan perubahan ini, Anda tidak perlu melakukan apa pun.
+
+**Jika bukan Anda, orang lain mungkin sedang menggunakan akun Anda.** Pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan periksa pengaturan autentikasi dua faktor Anda, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "La tua password è stata cambiata",
 			Body: `Ciao {{name}},

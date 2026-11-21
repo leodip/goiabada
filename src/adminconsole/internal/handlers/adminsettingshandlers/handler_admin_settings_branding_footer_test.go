@@ -60,7 +60,7 @@ func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
 	for _, language := range languages {
 		tags = append(tags, language.Tag)
 	}
-	assert.Equal(t, []string{"en", "de", "es", "fr", "it", "pt-BR"}, tags)
+	assert.Equal(t, []string{"en", "de", "es", "fr", "id", "it", "pt-BR"}, tags)
 }
 
 // A new brand's form starts with its three rows and its contact empty, and offers a language label

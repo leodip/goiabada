@@ -37,6 +37,7 @@ func TestAPIUserDelete_TellsTheUserAnAdministratorDeletedTheirAccount(t *testing
 		{"en", adminDeletedSubjectEn, "If you didn't expect this, contact your administrator."},
 		{"it", "Un amministratore ha eliminato il tuo account", //nolint:misspell // the it catalog's text: "eliminato" is Italian
 			"Se non te lo aspettavi, contatta il tuo amministratore."},
+		{"id", "Administrator telah menghapus akun Anda", "Jika Anda tidak mengharapkan hal ini, hubungi administrator Anda."},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
 			user := adminNoticeUser(t, tc.locale, "the-hash")

@@ -11,7 +11,7 @@ import (
 )
 
 // The built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
+var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "pt-BR"}
 
 func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
@@ -63,6 +63,8 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Para restablecer tu contraseña, abre este enlace:", "El enlace caduca en 5 minutos."},
 		{"fr", "Réinitialisation du mot de passe", "Réinitialiser le mot de passe", "Bonjour Ana,",
 			"Pour réinitialiser votre mot de passe, cliquez sur le lien ci-dessous :", "Le lien expire dans 5 minutes."},
+		{"id", "Atur ulang kata sandi", "Atur ulang kata sandi", "Halo Ana,",
+			"Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:", "Tautan ini kedaluwarsa dalam 5 menit."},
 		{"it", "Reimpostazione della password", "Reimposta la password", "Ciao Ana,",
 			"Per reimpostare la password, apri questo link:", "Il link scade tra 5 minuti."},
 		{"pt-BR", "Redefinição de senha", "Redefinir senha", "Olá Ana,",
@@ -112,6 +114,11 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"fr", time.Minute, "1 minute"},
 		{"fr", 24 * time.Hour, "24 heures"},
 		{"fr", time.Hour, "1 heure"},
+		{"id", 5 * time.Minute, "5 menit"},
+		{"id", time.Minute, "1 menit"},
+		{"id", 24 * time.Hour, "24 jam"},
+		{"id", time.Hour, "1 jam"},
+		{"id", 90 * time.Minute, "90 menit"},
 		{"it", 5 * time.Minute, "5 minuti"},
 		{"it", time.Minute, "1 minuto"},
 		{"it", 24 * time.Hour, "24 ore"},
@@ -137,7 +144,7 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 	for locale, want := range map[string]string{
 		"en": "en", "en-GB": "en", "de": "de", "de-AT": "de", "es-MX": "es", "fr-CA": "fr", "fr-CH": "fr",
-		"it-CH": "it", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
+		"it-CH": "it", "id": "id", "id-ID": "id", "in": "id", "ms": "en", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
 		"pt-PT": "pt-BR",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.
