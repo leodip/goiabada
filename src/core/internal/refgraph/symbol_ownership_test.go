@@ -212,10 +212,10 @@ func TestSymbolOwnership_TheBaselineTreeResolves(t *testing.T) {
 	computed := computedOver(t, symbolBaselineFiles())
 
 	assert.Equal(t, map[string]string{
-		"core/shared.Widget":     JustificationBothApps,
-		"core/shared.New":        JustificationBothApps,
-		"core/shared.Colour":     JustificationBothApps,
-		"core/shared.Kernelled":  JustificationKernel,
+		"core/shared.Widget":     justificationBothApps,
+		"core/shared.New":        justificationBothApps,
+		"core/shared.Colour":     justificationBothApps,
+		"core/shared.Kernelled":  justificationKernel,
 		"core/shared.Limit":      justificationOwnPackage,
 		"core/shared.Cog":        justificationReachable,
 		"core/shared.ColourRed":  justificationReachable,
@@ -282,7 +282,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Tint"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Tint"])
 	assert.Equal(t, justificationReachable, computed["core/shared.TintRed"],
 		"a const whose type comes from a conversion is a const of that type")
 	assert.Equal(t, justificationReachable, computed["core/shared.TintBlue"],
@@ -340,7 +340,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Describe"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Describe"])
 	assert.Equal(t, justificationReachable, computed["core/ring.Level"],
 		"Describe's signature is the evidence; LevelLow's own conversion is not")
 	assert.Equal(t, justificationReachable, computed["core/ring.LevelLow"])
@@ -532,7 +532,7 @@ var (
 	})
 
 	computed := computedOver(t, files)
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Level"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Level"])
 	// The two constants follow, now that the type whose method names them has a seed. The
 	// constructor does not: NewLevel names Level, which is the arrow pointing the other way, and
 	// nothing in production calls it. So it still owes a written word, which is the rule working
@@ -626,8 +626,8 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Box"])
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Pair"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Box"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Pair"])
 	assert.Equal(t, justificationReachable, computed["core/ring.Crank"],
 		"a one-parameter generic method's signature is its receiver's declaration")
 	assert.Equal(t, justificationOwnPackage, computed["core/ring.Flange"],
@@ -682,36 +682,35 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Orphan"], "the local spelled Orphan is not a reference to the type")
 }
 
-// TestSymbolOwnership_ALocalShadowingAPackageNameIsNotAReference is the same rule across
-// packages: a parameter spelled like the package it shadows. `shared.Unused` there selects the
-// parameter's field, and a reader matching the selector's spelling would take it for the package's
-// symbol and let a production file name a symbol it never touched. Resolved by object, it is the
-// field (#420).
-func TestSymbolOwnership_ALocalShadowingAPackageNameIsNotAReference(t *testing.T) {
+// TestSymbolOwnership_ADotImportIsAReference is the same rule across packages: a file that
+// dot-imports a core package names its symbols with no selector at all, so a reader matching
+// selectors would read both applications naming Spoke here as nobody naming it. Resolved by
+// object, a dot import is an import like any other (#420).
+func TestSymbolOwnership_ADotImportIsAReference(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
-		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
-		"authserver/shadow.go": `package main
+		"core/shared/spoke.go": "package shared\n\ntype Spoke struct{}\n",
+		"authserver/dot.go": `package main
 
-import "example.test/core/shared"
+import . "example.test/core/shared"
 
-var _ = shared.Widget{}
+var _ = Spoke{}
+`,
+		"adminconsole/dot.go": `package main
 
-func describe(shared struct{ Unused int }) int {
-	return shared.Unused
-}
+import . "example.test/core/shared"
 
-var _ = describe
+var _ = Spoke{}
 `,
 	})
-	rows := append(symbolBaselineRows(), "core/shared Unused test-support Nothing names it.")
 
-	findings := checkSymbols(t, files, rows)
+	computed := computedOver(t, files)
 
-	assertFindings(t, findings, "records core/shared.Unused as test-support, but nothing names it")
+	assert.Equal(t, justificationBothApps, computed["core/shared.Spoke"],
+		"a dot-imported symbol named by both applications is named by both applications")
 }
 
 // TestSymbolOwnership_OneNameInAValueSpecDoesNotVouchForItsSiblings: `var Ready, discarded = true,
@@ -755,7 +754,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Ready"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Ready"])
 	assert.Empty(t, computed["core/shared.Orphan"],
 		"only discarded's initializer names Orphan, and nothing justifies discarded")
 }
@@ -804,7 +803,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Loaded"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Loaded"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Tupled"],
 		"Loaded reaches pair, whose signature names Tupled")
 }
@@ -854,7 +853,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Rearmed"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Rearmed"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tick"],
 		"Rearmed repeats the expression above it, and that expression names Tick")
 }
@@ -902,7 +901,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Repeated"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Repeated"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Repeated inherits the 1; only alsoDiscarded inherits the expression naming Tick")
 }
@@ -952,7 +951,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset is its type's zero value; it repeats nothing and names nothing")
 }
@@ -1002,7 +1001,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Rearmed"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Rearmed"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Tick"],
 		"Rearmed inherits the type slot as well as the expression, and a type slot is a declaration")
 }
@@ -1053,7 +1052,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset inherits the untyped 2 above it, which carries no type slot with it")
 }
@@ -1099,7 +1098,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Registry"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Registry"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Slotted"],
 		"Registry's declared type names Slotted, and a declaration is reachable")
 }
@@ -1145,7 +1144,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"a value never justifies the type it is declared with, whichever slot that type is spelled in")
 }
@@ -1195,7 +1194,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
 	assert.Empty(t, computed["core/shared.Box"],
 		"an instantiated generic type slot spells the value's own type as surely as a bare one")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
@@ -1260,8 +1259,8 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Generated"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Generated"])
 	assert.Empty(t, computed["core/shared.Pair"],
 		"a two-argument instantiation spells the value's own type, in the slot and at the head of an initializer alike")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
@@ -1318,7 +1317,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"a composite literal at the head of an initializer is the value's own type, not a use of it")
 }
@@ -1372,8 +1371,8 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneCool"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCool"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"an asserted type is the value's own type, not a use of it, in either form of the assertion")
 }
@@ -1425,7 +1424,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneCoolOk"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCoolOk"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
 		"the bool was not declared with Tone, so its declaration names Tone like any other")
 }
@@ -1476,7 +1475,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
 		"the type slot is the excluded occurrence; the slice the initializer builds is a use of Tone")
 }
@@ -1524,7 +1523,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Box"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Box"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Bounded"],
 		"Box's type parameter list names Bounded")
 }
@@ -1547,7 +1546,7 @@ func elsewhere() Cog
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Widget"],
+	assert.Equal(t, justificationBothApps, computed["core/shared.Widget"],
 		"the walk reached the rest of the package")
 }
 
@@ -1749,6 +1748,21 @@ var _ = shared.Helper{}
 	findings := checkSymbols(t, files, symbolBaselineRows())
 
 	assertFindings(t, findings, "records core/shared.Helper as test-support, but authserver names it in production and a binary links that package")
+}
+
+// TestSymbolOwnership_ATestSupportRowLinkedAndNamedInDifferentBuildsPasses is that case's other
+// side: linkage and the reference have to hold in the same release build. authserver/relay names
+// Helper only in a file a Windows build compiles, and only a Linux build's main imports relay, so
+// no shipped binary both links relay and compiles the reference. Joining every build's linked
+// packages before reading the references would contradict the row anyway (#420).
+func TestSymbolOwnership_ATestSupportRowLinkedAndNamedInDifferentBuildsPasses(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/relay/relay.go":         "package relay\n\nvar Pass = 1\n",
+		"authserver/relay/relay_windows.go": "package relay\n\nimport \"example.test/core/shared\"\n\nvar _ = shared.Helper{}\n",
+		"authserver/main_linux.go":          "package main\n\nimport \"example.test/authserver/relay\"\n\nvar _ = relay.Pass\n",
+	})
+
+	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
 }
 
 // ---- the finder the guard reports ----------------------------------------------------------------

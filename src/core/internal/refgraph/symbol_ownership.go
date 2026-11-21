@@ -19,22 +19,22 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// The justifications a row of ARCHITECTURE.md's core constants table may carry, strongest first,
-// which core/guard's constants guard checks. A row states the strongest claim the tree backs,
-// which is what keeps contract honest: it is reachable only when none of the other three holds, so
-// writing it is a claim a reviewer can argue with rather than a shrug.
+// Four of the seven justifications, the ones that answer whether a symbol belongs in core at all,
+// strongest first. A row states the strongest claim the tree backs, which is what keeps contract
+// honest: it is reachable only when none of the other three holds, so writing it is a claim a
+// reviewer can argue with rather than a shrug.
 const (
-	// JustificationKernel: a kernel core package references it in production, so rule 2 forbids it
+	// justificationKernel: a kernel core package references it in production, so rule 2 forbids it
 	// leaving whatever the applications do.
-	JustificationKernel = "kernel"
-	// JustificationBothApps: both applications reference it in production.
-	JustificationBothApps = "both-apps"
-	// JustificationMoving: the only core packages referencing it are ones on their way out of core,
+	justificationKernel = "kernel"
+	// justificationBothApps: both applications reference it in production.
+	justificationBothApps = "both-apps"
+	// justificationMoving: the only core packages referencing it are ones on their way out of core,
 	// so the answer expires with them. The issue cell names the move that ends it.
-	JustificationMoving = "moving"
-	// JustificationContract: none of the above, but it is an intentionally stable cross-process
+	justificationMoving = "moving"
+	// justificationContract: none of the above, but it is an intentionally stable cross-process
 	// value. Nothing can check this, which is exactly why somebody has to write the word.
-	JustificationContract = "contract"
+	justificationContract = "contract"
 )
 
 // The fifth table, and the first one that is not in ARCHITECTURE.md: one row per exported symbol
@@ -58,10 +58,7 @@ const ownershipDoc = "core/OWNERSHIP.md"
 // it is free to change without touching the parser. Same arrangement as the four in ARCHITECTURE.md.
 const symbolOwnershipHeading = "### Core symbol ownership"
 
-// The three justifications this table adds to the constants table's four above.
-// JustificationKernel, JustificationBothApps, JustificationContract and JustificationMoving are
-// shared with that table deliberately: the two answer the same question at two grains, and a
-// reader should not have to learn two vocabularies to read them.
+// The other three, which answer whether a symbol belongs to the package declaring it.
 const (
 	// justificationOwnPackage: the declaring package's own production code names it, from a
 	// declaration that is itself justified. The table asks why core declares a symbol, which is
@@ -92,22 +89,22 @@ const (
 // legal only where the tree offers no computed answer at all.
 var assertedJustifications = map[string]bool{
 	justificationTestSupport: true,
-	JustificationContract:    true,
-	JustificationMoving:      true,
+	justificationContract:    true,
+	justificationMoving:      true,
 }
 
 // justificationStrength orders the computed words. A row states the strongest the tree backs,
 // which is what keeps the weaker ones honest: reachable is reachable only where own-package does
 // not hold.
 var justificationStrength = map[string]int{
-	JustificationKernel:     4,
-	JustificationBothApps:   3,
+	justificationKernel:     4,
+	justificationBothApps:   3,
 	justificationOwnPackage: 2,
 	justificationReachable:  1,
 }
 
-// issueInNote matches the "#385" form a moving note has to carry. issueRef is anchored because the
-// constants table's issue cell holds nothing else; a note is prose with an issue somewhere in it.
+// issueInNote matches the "#385" form a moving note has to carry. It is not anchored, because a
+// note is prose with an issue somewhere in it.
 var issueInNote = regexp.MustCompile(`#\d+`)
 
 // symbolKey identifies one row: the declaring package as a directory relative to the source root,
@@ -140,12 +137,13 @@ type symbolCensus struct {
 	corePkgs map[symbolKey]map[string]bool
 	apps     map[symbolKey]map[string]bool
 	tests    map[symbolKey]bool
-	// linkedApps records, per symbol, the modules naming it in production from a package one of
-	// their binaries actually links. It is the same evidence as apps, narrowed, and only a
-	// test-support row reads it.
+	// linkedCore and linkedApps record, per symbol, the core packages and the modules naming it
+	// in production from a package a binary of the same release build links. They are the same
+	// evidence as corePkgs and apps, narrowed, and only a test-support row reads them. Linkage and
+	// reference are paired build by build: a package one platform links and a reference only
+	// another platform compiles ship together in no binary.
+	linkedCore map[symbolKey]map[string]bool
 	linkedApps map[symbolKey]map[string]bool
-	// linked is every package directory a shipped binary reaches through production imports.
-	linked map[string]bool
 	// pkgs carries each package's internal shape: what it declares, what each top-level
 	// declaration names, and the type of each package-level const and var.
 	pkgs map[string]*packageSymbols
@@ -351,7 +349,7 @@ func checkSymbolRow(row symbolRow, census *symbolCensus, computed string) []stri
 		return []string{fmt.Sprintf(
 			"core symbols: %s:%d records %s as %s, but nothing in the tree backs a computed justification for it: %s; either move the symbol out of core or assert %s, %s or %s with a note",
 			ownershipDoc, row.line, row.key(), row.justification, census.evidenceFor(row.key(), ""),
-			justificationTestSupport, JustificationContract, JustificationMoving)}
+			justificationTestSupport, justificationContract, justificationMoving)}
 	}
 
 	var findings []string
@@ -361,11 +359,11 @@ func checkSymbolRow(row symbolRow, census *symbolCensus, computed string) []stri
 			ownershipDoc, row.line, row.justification, row.key()))
 	}
 	switch row.justification {
-	case JustificationMoving:
+	case justificationMoving:
 		if !issueInNote.MatchString(row.note) {
 			findings = append(findings, fmt.Sprintf(
 				"core symbols: %s:%d records %s as %s but its note names no issue; a justification that expires has to say when",
-				ownershipDoc, row.line, row.key(), JustificationMoving))
+				ownershipDoc, row.line, row.key(), justificationMoving))
 		}
 	case justificationTestSupport:
 		if linked := census.linkedReferrers(row.key()); len(linked) > 0 {
@@ -411,10 +409,8 @@ func (c *symbolCensus) productionReferrersOutside(key symbolKey) []string {
 // a shipped binary is shipped.
 func (c *symbolCensus) linkedReferrers(key symbolKey) []string {
 	var out []string
-	for pkg := range c.corePkgs[key] {
-		if c.linked[pkg] {
-			out = append(out, pkg)
-		}
+	for pkg := range c.linkedCore[key] {
+		out = append(out, pkg)
 	}
 	for app := range c.linkedApps[key] {
 		out = append(out, app)
@@ -489,9 +485,9 @@ func (c *symbolCensus) computeJustifications() map[symbolKey]string {
 	for _, key := range c.declared {
 		switch {
 		case len(c.corePkgs[key]) > 0:
-			best[key] = JustificationKernel
+			best[key] = justificationKernel
 		case c.apps[key]["authserver"] && c.apps[key]["adminconsole"]:
-			best[key] = JustificationBothApps
+			best[key] = justificationBothApps
 		}
 	}
 
@@ -585,6 +581,7 @@ func buildSymbolCensus(root string) (*symbolCensus, error) {
 		corePkgs:   map[symbolKey]map[string]bool{},
 		apps:       map[symbolKey]map[string]bool{},
 		tests:      map[symbolKey]bool{},
+		linkedCore: map[symbolKey]map[string]bool{},
 		linkedApps: map[symbolKey]map[string]bool{},
 		pkgs:       map[string]*packageSymbols{},
 		dirs:       map[string]string{},
@@ -640,10 +637,10 @@ func buildSymbolCensus(root string) (*symbolCensus, error) {
 		return census.declared[i].name < census.declared[j].name
 	})
 
-	census.linked = linkedPackages(release)
 	for _, pkgs := range release {
+		linked := linkedPackages(pkgs)
 		for _, lp := range pkgs {
-			census.readProductionReferences(lp)
+			census.readProductionReferences(lp, linked[lp.dir])
 		}
 	}
 	for _, lp := range tests {
@@ -1018,34 +1015,29 @@ func (c *symbolCensus) symbolOf(obj types.Object) (symbolKey, bool) {
 }
 
 // readProductionReferences files every core symbol one production package names from outside the
-// symbol's own package under the core package or the module that named it. A reference from inside
+// symbol's own package under the core package or the module that named it, and also as linked
+// evidence when a binary of the build that loaded the package links it. A reference from inside
 // the declaring package is the internal graph's, which readDecl has read.
-func (c *symbolCensus) readProductionReferences(lp loadedPackage) {
+func (c *symbolCensus) readProductionReferences(lp loadedPackage, linked bool) {
 	for _, obj := range lp.pkg.TypesInfo.Uses {
 		key, ok := c.symbolOf(obj)
 		if !ok || key.pkg == lp.dir {
 			continue
 		}
 		if isCoreDir(lp.dir) {
-			if c.corePkgs[key] == nil {
-				c.corePkgs[key] = map[string]bool{}
+			addTo(c.corePkgs, key, lp.dir)
+			if linked {
+				addTo(c.linkedCore, key, lp.dir)
 			}
-			c.corePkgs[key][lp.dir] = true
 			continue
 		}
 		module := moduleOfDir(lp.dir)
 		if module == "" {
 			continue
 		}
-		if c.apps[key] == nil {
-			c.apps[key] = map[string]bool{}
-		}
-		c.apps[key][module] = true
-		if c.linked[lp.dir] {
-			if c.linkedApps[key] == nil {
-				c.linkedApps[key] = map[string]bool{}
-			}
-			c.linkedApps[key][module] = true
+		addTo(c.apps, key, module)
+		if linked {
+			addTo(c.linkedApps, key, module)
 		}
 	}
 }
@@ -1065,40 +1057,46 @@ func (c *symbolCensus) readTestReferences(lp loadedPackage) {
 	}
 }
 
-// linkedPackages returns every package directory a shipped binary reaches, as directories relative
-// to the source root: each main package of the four modules as a release build selects it,
-// developer commands included, and every first-party package its imports reach transitively in
-// that same build.
+// addTo records value in the set evidence holds for key.
+func addTo(evidence map[symbolKey]map[string]bool, key symbolKey, value string) {
+	if evidence[key] == nil {
+		evidence[key] = map[string]bool{}
+	}
+	evidence[key][value] = true
+}
+
+// linkedPackages returns every package directory a binary of one release build reaches, as
+// directories relative to the source root: each main package of the four modules as that build
+// selects it, developer commands included, and every first-party package its imports reach
+// transitively in the same build.
 //
 // Only a test-support row reads this, and it is what lets the word mean what ARCHITECTURE.md's
 // package table already says about core/guard -- "test support compiled into no binary". Test
 // support in this tree is written in files with no _test.go suffix, so "a production file names
 // it" and "a binary ships it" are genuinely different questions, and only the second one is the one
 // test-support asks.
-func linkedPackages(release [][]loadedPackage) map[string]bool {
+func linkedPackages(pkgs []loadedPackage) map[string]bool {
 	linked := map[string]bool{}
-	for _, pkgs := range release {
-		byID := make(map[string]loadedPackage, len(pkgs))
-		var queue []string
-		for _, lp := range pkgs {
-			byID[lp.pkg.ID] = lp
-			if lp.pkg.Name == "main" {
-				queue = append(queue, lp.pkg.ID)
-			}
+	byID := make(map[string]loadedPackage, len(pkgs))
+	var queue []string
+	for _, lp := range pkgs {
+		byID[lp.pkg.ID] = lp
+		if lp.pkg.Name == "main" {
+			queue = append(queue, lp.pkg.ID)
 		}
-		seen := map[string]bool{}
-		for len(queue) > 0 {
-			id := queue[0]
-			queue = queue[1:]
-			lp, firstParty := byID[id]
-			if !firstParty || seen[id] {
-				continue
-			}
-			seen[id] = true
-			linked[lp.dir] = true
-			for _, imported := range lp.pkg.Imports {
-				queue = append(queue, imported.ID)
-			}
+	}
+	seen := map[string]bool{}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		lp, firstParty := byID[id]
+		if !firstParty || seen[id] {
+			continue
+		}
+		seen[id] = true
+		linked[lp.dir] = true
+		for _, imported := range lp.pkg.Imports {
+			queue = append(queue, imported.ID)
 		}
 	}
 	return linked

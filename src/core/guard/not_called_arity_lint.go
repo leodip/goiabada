@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"errors"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -160,6 +161,11 @@ func findNotCalledArity(root string, dirs []string) ([]notCalledFinding, []notCa
 	seen := map[token.Position]bool{}
 	for _, modRoot := range order {
 		pkgs, lErr := pkgload.Load(modRoot, pkgload.Build{Tests: true})
+		// A module the build selects no package of holds no site; the site count reports an empty
+		// walk once every module has been read.
+		if errors.Is(lErr, pkgload.ErrNoPackages) {
+			continue
+		}
 		if lErr != nil {
 			return nil, nil, len(seen), lErr
 		}

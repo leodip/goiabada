@@ -341,6 +341,43 @@ func TestNoDeadInterfaces_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	assert.Contains(t, report.Fatal, "mod/empty", "the fatal names the dirs that covered nothing")
 }
 
+// TestNoDeadInterfaces_ABuildSelectingNoPackageIsAnEmptyWalk: a module whose only file a custom
+// build tag selects holds no package the test build reads. That is an empty walk, reported as one,
+// and not a load failure.
+func TestNoDeadInterfaces_ABuildSelectingNoPackageIsAnEmptyWalk(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", "//go:build customtag\n\npackage handlers\n\ntype Hidden interface{ A() }\n")
+	makeLoadable(t, root)
+
+	report := Run(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no Go files under")
+	assert.NotContains(t, report.Fatal, "selects no package", "an empty build is no load failure")
+}
+
+// TestNoDeadInterfaces_AModuleSelectingNoPackageDoesNotStopTheOthers: a module the build selects no
+// package of contributes nothing, and the modules beside it are still read and reported.
+func TestNoDeadInterfaces_AModuleSelectingNoPackageDoesNotStopTheOthers(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "first/go.mod", "module example.com/first\n\ngo 1.24\n")
+	writeFixture(t, root, "first/handlers/interfaces.go", "//go:build customtag\n\npackage handlers\n\ntype Hidden interface{ A() }\n")
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", "package handlers\n\ntype Abandoned interface{ A() }\n")
+	makeLoadable(t, root)
+
+	report := Run(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"first/handlers", "mod/handlers"})
+	})
+
+	require.False(t, report.Stopped, "an empty module stopped the walk: %s", report.Fatal)
+	assert.Contains(t, report.Text(), "mod/handlers/interfaces.go:3")
+	assert.Contains(t, report.Text(), "example.com/mod/handlers.Abandoned")
+}
+
 // TestNoDeadInterfaces_TheGuardIsFatalOnAPackageThatDoesNotCompile holds decision 3 of #420. The
 // module is read type-checked, and a package that does not compile would leave its references
 // unread, so an interface only it names would be reported dead. The guard stops instead, naming the

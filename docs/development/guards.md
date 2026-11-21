@@ -31,12 +31,14 @@ module with nothing going red -- which is what blinding `AssertNoDeadInterfaces`
 
 A guard that must know which object a name refers to reads the tree through `core/pkgload`, which
 returns a module's type-checked packages, and does not load types its own way. Where a file it
-missed would pass silently, it reads production code as every one of `pkgload.ReleaseBuilds` and
-the test machine's default build select it, and merges what they find; otherwise it reads the test
-machine's test build. A package that does not load or type-check stops it with one message naming the package, so
-every fixture tree compiles, made loadable with `pkgload.MakeLoadable`. A guard that reads only
-syntax, such as an import list, parses with `go/parser` rather than matching text: an alias binds a
-different name to the same path.
+missed would pass silently, it reads production code as every one of `pkgload.ReleaseBuilds`
+selects it. The context-value, discarded-error and request-field guards also read the test
+machine's default build and merge what they find; the ownership census reads its test references
+from the test machine's test build. Any other guard on the loader reads only the test machine's
+test build. A package that does not load or type-check stops it with one message naming the
+package, so every fixture tree compiles, made loadable with `pkgload.MakeLoadable`. A guard that
+reads only syntax, such as an import list, parses with `go/parser` rather than matching text: an
+alias binds a different name to the same path.
 
 Before writing a guard, look for a `golangci-lint` check that already holds the rule, as #443 did
 when it turned on staticcheck's ST1000 for package comments; `.golangci.yml` lists what is enabled
@@ -161,9 +163,11 @@ The census reads the tree through `core/pkgload`, type-checked, and a reference 
 identifier resolves to, whatever the file spells: a dot import counts, and a local spelled like a
 symbol does not. Production references, and the packages a binary links from every production
 `main`, are read as each release build selects them, so a file only one platform compiles still
-counts; test references come from the test machine's test build. A package that does not
-type-check stops the guard and `ownershipdump` with one message naming it. Every fixture tree of
-the census therefore compiles, and its helper makes the tree loadable with `pkgload.MakeLoadable`.
+counts. A production reference contradicts a `test-support` row only where a binary of the same
+build links its package. Test references come from the test machine's test build. A package that
+does not type-check stops the guard and `ownershipdump` with one message naming it. Every fixture
+tree of the census therefore compiles, and its helper makes the tree loadable with
+`pkgload.MakeLoadable`.
 
 ## Generated mocks
 

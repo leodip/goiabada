@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"errors"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -270,8 +271,15 @@ func interfaceKey(pkg, name string) string {
 //
 // A declaration inside a function body is left alone: it is unreachable from outside that body by
 // construction, so "nothing references it" is not a finding about the package's surface.
+//
+// A module the build selects no package of declares nothing and reads no file, so it contributes
+// an empty result: the caller's file count reports an empty walk, and the other modules are still
+// read.
 func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInterface, int, error) {
 	pkgs, err := pkgload.Load(modRoot, pkgload.Build{Tests: true})
+	if errors.Is(err, pkgload.ErrNoPackages) {
+		return nil, 0, nil
+	}
 	if err != nil {
 		return nil, 0, err
 	}

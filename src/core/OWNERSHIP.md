@@ -772,10 +772,6 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `ExemptByBuildConstraint` | kernel | — |
 | `core/internal/refgraph` | `Flatten` | kernel | — |
 | `core/internal/refgraph` | `ImportGraph` | kernel | — |
-| `core/internal/refgraph` | `JustificationBothApps` | own-package | — |
-| `core/internal/refgraph` | `JustificationContract` | own-package | — |
-| `core/internal/refgraph` | `JustificationKernel` | own-package | — |
-| `core/internal/refgraph` | `JustificationMoving` | own-package | — |
 | `core/internal/refgraph` | `ModulePath` | kernel | — |
 | `core/internal/refgraph` | `OwnershipCheck` | own-package | — |
 | `core/internal/refgraph` | `RenderSymbolOwnership` | kernel | — |

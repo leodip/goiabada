@@ -457,6 +457,54 @@ func TestNotCalledArity_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	assert.Contains(t, report.Fatal, "mod/empty", "the fatal names the dirs that covered nothing")
 }
 
+// TestNotCalledArity_ABuildSelectingNoPackageIsAnEmptyWalk: a module whose only file a custom
+// build tag selects holds no package the test build reads. That is an empty walk, reported as one,
+// and not a load failure.
+func TestNotCalledArity_ABuildSelectingNoPackageIsAnEmptyWalk(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/tests/rules_test.go", "//go:build customtag\n\npackage tests\n")
+	makeLoadable(t, root)
+
+	report := Run(func(r Reporter) {
+		assertNotCalledArity(r, root, []string{"mod/tests"})
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no AssertNotCalled call under")
+	assert.NotContains(t, report.Fatal, "selects no package", "an empty build is no load failure")
+}
+
+// TestNotCalledArity_AModuleSelectingNoPackageDoesNotStopTheOthers: a module the build selects no
+// package of contributes nothing, and the modules beside it are still read and reported.
+func TestNotCalledArity_AModuleSelectingNoPackageDoesNotStopTheOthers(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "first/go.mod", "module example.com/first\n\ngo 1.24\n")
+	writeFixture(t, root, "first/tests/rules_test.go", "//go:build customtag\n\npackage tests\n")
+	notCalledFixtureModule(t, root)
+	writeFixture(t, root, "mod/tests/rules_test.go", `package tests
+
+import (
+	"testing"
+
+	"example.com/mod/doubles"
+)
+
+func TestRules(t *testing.T) {
+	database := doubles.NewDatabase()
+	database.AssertNotCalled(t, "CreateUser")
+}
+`)
+
+	report := Run(func(r Reporter) {
+		assertNotCalledArity(r, root, []string{"first/tests", "mod/tests"})
+	})
+
+	require.False(t, report.Stopped, "an empty module stopped the walk: %s", report.Fatal)
+	assert.Contains(t, report.Text(), "mod/tests/rules_test.go:11")
+	assert.Contains(t, report.Text(), "passes 0 matcher(s) to *doubles.Database.CreateUser, which takes 3")
+}
+
 // TestNotCalledArity_TheGuardReportsAMethodNamedThroughAVariable holds the other half of the
 // reporting: a shape no walk can hold to an arity is an error of its own rather than a silent
 // narrowing. The shape here is the one the tree actually had -- a helper looping over method names its callers

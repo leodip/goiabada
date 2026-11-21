@@ -75,8 +75,9 @@ type discardedErrorMethod struct {
 // value its consumers hold (#434), so its calls are spelled c.Decrypt, s.dataCipher.Encrypt or
 // anything else a receiver can be named. They are matched by the method object called instead: an
 // unrelated type's Decrypt is not one, and a promoted method or a method expression is. So is the
-// method of that name of an interface the receiver's type implements, since the value behind it may
-// be the cipher (#420).
+// method of that name called through an interface the cipher's type implements, since the value
+// behind it may be the cipher (#420). The interface is the one the call goes through, which may
+// embed the one declaring the method and ask for more than the cipher has.
 var discardedErrorMethods = []discardedErrorMethod{
 	{"github.com/leodip/goiabada/authserver/internal/encryption", "DataCipher", "Encrypt"},
 	{"github.com/leodip/goiabada/authserver/internal/encryption", "DataCipher", "Decrypt"},
@@ -205,11 +206,15 @@ func discardedErrorsIn(
 			return
 		}
 		var callee *ast.Ident
+		var through types.Type
 		switch fun := ast.Unparen(call.Fun).(type) {
 		case *ast.Ident:
 			callee = fun
 		case *ast.SelectorExpr:
 			callee = fun.Sel
+			if sel, ok := info.Selections[fun]; ok {
+				through = discardedErrorDispatchType(sel)
+			}
 		default:
 			return
 		}
@@ -217,7 +222,7 @@ func discardedErrorsIn(
 		if !ok {
 			return
 		}
-		if name, ok := discardedErrorCalled(fn, listed, methods, listedTypes); ok {
+		if name, ok := discardedErrorCalled(fn, through, listed, methods, listedTypes); ok {
 			found = append(found, discardedErrorSite{pos: pos, fn: name})
 		}
 	}
@@ -238,11 +243,34 @@ func discardedErrorsIn(
 	return found
 }
 
+// discardedErrorDispatchType returns the type whose method a selection calls: the receiver
+// expression's own type, or the embedded field the method is promoted from. For a method of an
+// interface it is the interface the call goes through, which may embed the interface that
+// declared the method and ask for more.
+func discardedErrorDispatchType(sel *types.Selection) types.Type {
+	t := sel.Recv()
+	index := sel.Index()
+	for _, i := range index[:len(index)-1] {
+		if ptr, ok := t.Underlying().(*types.Pointer); ok {
+			t = ptr.Elem()
+		}
+		st, ok := t.Underlying().(*types.Struct)
+		if !ok {
+			return nil
+		}
+		t = st.Field(i).Type()
+	}
+	return t
+}
+
 // discardedErrorCalled reports whether fn is a listed function, a listed method found by its
 // receiver's named type whether declared on the type or its pointer, or the method of a listed
-// method's name of an interface a listed type implements, and names it.
+// method's name of an interface a listed type implements, and names it. through is the type the
+// call dispatches on, when the call is a selection: a method of an interface is judged by the
+// interface it is called through, not by the one that declared it.
 func discardedErrorCalled(
-	fn *types.Func, listed map[string][]string, methods []discardedErrorMethod, listedTypes map[int]*types.Named,
+	fn *types.Func, through types.Type,
+	listed map[string][]string, methods []discardedErrorMethod, listedTypes map[int]*types.Named,
 ) (string, bool) {
 	sig, _ := fn.Type().(*types.Signature)
 	if sig == nil || fn.Pkg() == nil {
@@ -258,7 +286,14 @@ func discardedErrorCalled(
 	}
 
 	recv := sig.Recv().Type()
-	if iface, ok := recv.Underlying().(*types.Interface); ok {
+	if _, ok := recv.Underlying().(*types.Interface); ok {
+		if through != nil {
+			recv = through
+		}
+		iface, ok := recv.Underlying().(*types.Interface)
+		if !ok {
+			return "", false
+		}
 		for i, m := range methods {
 			named := listedTypes[i]
 			if named == nil || fn.Name() != m.name {
@@ -647,8 +682,8 @@ func stored(c *encryption.DataCipher, ct []byte) string {
 }
 
 // discardedErrorSealingFixture declares, in a package other than the cipher's, an interface the
-// data cipher implements and one it does not: Opener's Decrypt takes a string, the cipher's a
-// slice of bytes.
+// data cipher implements and two it does not: Opener's Decrypt takes a string, the cipher's a
+// slice of bytes, and SizedSealer embeds Sealer but also asks for a Size the cipher lacks.
 const discardedErrorSealingFixture = `package sealing
 
 type Sealer interface {
@@ -658,6 +693,11 @@ type Sealer interface {
 
 type Opener interface {
 	Decrypt(ciphertext string) (string, error)
+}
+
+type SizedSealer interface {
+	Sealer
+	Size() int
 }
 `
 
@@ -699,6 +739,30 @@ import "github.com/leodip/goiabada/authserver/internal/sealing"
 
 func stored(o sealing.Opener, ct string) string {
 	seed, _ := o.Decrypt(ct)
+	return seed
+}
+`)
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertNoDiscardedErrors(r, root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	})
+
+	assert.False(t, report.Failed(), "a method of an interface the cipher does not implement failed the guard: %s", report.Text())
+}
+
+// The interface a method is called through is the receiver's own, not the one that declared the
+// method: SizedSealer gets Decrypt from Sealer, which the cipher implements, but SizedSealer itself
+// cannot hold the cipher, so its discard is not this rule's.
+func TestDiscardedErrors_Guard_PassesAMethodThroughAnInterfaceEmbeddingOneTheCipherImplements(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/sealing/sealing.go", discardedErrorSealingFixture)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/otpcredential/seed.go", `package otpcredential
+
+import "github.com/leodip/goiabada/authserver/internal/sealing"
+
+func stored(s sealing.SizedSealer, ct []byte) string {
+	seed, _ := s.Decrypt(ct)
 	return seed
 }
 `)
