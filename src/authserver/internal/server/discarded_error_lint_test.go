@@ -18,8 +18,10 @@ package server
 // every deliberate `_ = f.Close()` in the tree, which is why this rule is a list and not a switch.
 //
 // It reads the auth server's module type-checked through core/pkgload and nothing else: no
-// database and no git. The go command the loader runs reaches the network only to download a
-// dependency missing from the module cache, as any build of the module would.
+// database, and no git of its own. The go command the loader runs reaches the network only to
+// download a dependency missing from the module cache, as any build of the module would: from the
+// module proxy, or, where GOPROXY says direct, from the dependency's own repository, through git or
+// whichever version-control tool hosts it.
 
 import (
 	"fmt"

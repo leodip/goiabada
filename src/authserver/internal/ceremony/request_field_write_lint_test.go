@@ -21,8 +21,10 @@ package ceremony
 // write through that copy reaches the context unseen. Every other request field is a string.
 //
 // It reads the auth server's module type-checked through core/pkgload and nothing else: no
-// database and no git. The go command the loader runs reaches the network only to download a
-// dependency missing from the module cache, as any build of the module would.
+// database, and no git of its own. The go command the loader runs reaches the network only to
+// download a dependency missing from the module cache, as any build of the module would: from the
+// module proxy, or, where GOPROXY says direct, from the dependency's own repository, through git or
+// whichever version-control tool hosts it.
 
 import (
 	"go/ast"
