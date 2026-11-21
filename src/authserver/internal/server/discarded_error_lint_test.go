@@ -86,9 +86,17 @@ type discardedError struct {
 	file string
 	line int
 	// fn is the function or method called, as package.Name, (*package.Type).Name, or
-	// package.Interface.Name with the listed type implementing it.
+	// package.Interface.Name with the listed type implementing it, or discardedErrorUnnamed.
 	fn string
+	// unread marks a discard whose function the guard cannot name, reported as unreadable.
+	unread bool
 }
+
+// discardedErrorUnnamed is what a discard names when its call's function is written neither as a name
+// nor as a selector: an explicit instantiation, f[T](x), an indexed function value, a literal called
+// at once. The guard tells a listed function by the name a call writes, so it reports such a discard
+// as one it cannot read rather than passing it.
+const discardedErrorUnnamed = "a call whose function is not written as a name or a selector"
 
 // findDiscardedErrors reads the module at root/scope and reports every assignment or var
 // declaration in a production file whose single right-hand side calls a listed function or method
@@ -139,7 +147,7 @@ func findDiscardedErrors(
 					if rErr != nil {
 						return nil, 0, rErr
 					}
-					found = append(found, discardedError{file: filepath.ToSlash(rel), line: at.Line, fn: d.fn})
+					found = append(found, discardedError{file: filepath.ToSlash(rel), line: at.Line, fn: d.fn, unread: d.unread})
 				}
 			}
 		}
@@ -187,8 +195,9 @@ func discardedErrorQualifier(p *types.Package) string { return p.Name() }
 // discardedErrorSite is one discard of a listed call within a file, before its position is made
 // relative.
 type discardedErrorSite struct {
-	pos token.Pos
-	fn  string
+	pos    token.Pos
+	fn     string
+	unread bool
 }
 
 // discardedErrorsIn applies the rule to one type-checked file.
@@ -222,6 +231,7 @@ func discardedErrorsIn(
 				through = discardedErrorDispatchType(sel)
 			}
 		default:
+			found = append(found, discardedErrorSite{pos: pos, fn: discardedErrorUnnamed, unread: true})
 			return
 		}
 		fn, ok := info.Uses[callee].(*types.Func)
@@ -360,12 +370,28 @@ func assertNoDiscardedErrors(
 		r.Fatalf("read no production Go files under %s", scope)
 	}
 
-	if len(found) > 0 {
+	var discards, unread []discardedError
+	for _, f := range found {
+		if f.unread {
+			unread = append(unread, f)
+		} else {
+			discards = append(discards, f)
+		}
+	}
+	if len(discards) > 0 {
 		r.Errorf("%d call(s) under %s discard the error of a hash, an encryption or a key generation:\n\t%s\n\n"+
 			"Each of these returns a zero value beside its error, and every one of those zero values is a "+
 			"valid thing to store: an empty hash, an empty ciphertext, a key of no bytes. Handle the error. "+
 			"The seeder stored its first admin with an empty password hash exactly this way (#409).",
-			len(found), scope, discardedErrorLines(found))
+			len(discards), scope, discardedErrorLines(discards))
+	}
+	if len(unread) > 0 {
+		r.Errorf("%d call(s) under %s discard an error from a function this guard cannot name:\n\t%s\n\n"+
+			"The guard tells a hash, an encryption or a key generation by the function a call names, so a "+
+			"call written another way, as an explicit instantiation such as f[T](x), an indexed function "+
+			"value or a literal called at once, could discard one unseen. Call the function by its name, "+
+			"letting its type arguments be inferred, or keep the error.",
+			len(unread), scope, discardedErrorLines(unread))
 	}
 }
 
@@ -901,6 +927,51 @@ func seed(p string) (string, int) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"authserver/internal/data/seeder.go:9: passwordhash.Hash"}, discardedErrorStrings(found))
+}
+
+// A discarded error from a call whose function is written neither as a name nor as a selector is
+// reported as one the guard cannot read, since a listed function could be called that way unseen: an
+// explicit instantiation, an indexed function value and a literal called at once. A listed name
+// called with its type arguments inferred is read as before, and a kept error is no finding.
+func TestDiscardedErrors_Guard_RefusesACallWhoseFunctionItCannotName(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/passwordhash/generic.go", `package passwordhash
+
+func HashAs[T ~string](password T) (string, error) { return "", nil }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/seeder.go", `package data
+
+import "github.com/leodip/goiabada/authserver/internal/passwordhash"
+
+var hashers = []func(string) (string, error){passwordhash.Hash}
+
+func seed(p string) error {
+	a, _ := passwordhash.HashAs[string](p)
+	b, _ := hashers[0](p)
+	c, _ := func() (string, error) { return passwordhash.Hash(p) }()
+	d, _ := passwordhash.HashAs(p)
+	e, err := passwordhash.HashAs[string](p)
+	_, _, _, _, _ = a, b, c, d, e
+	return err
+}
+`)
+
+	listed := map[string][]string{"github.com/leodip/goiabada/authserver/internal/passwordhash": {"Hash", "HashAs"}}
+	found, _, err := findDiscardedErrors(root, discardedErrorScope, listed, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"authserver/internal/data/seeder.go:8: " + discardedErrorUnnamed,
+		"authserver/internal/data/seeder.go:9: " + discardedErrorUnnamed,
+		"authserver/internal/data/seeder.go:10: " + discardedErrorUnnamed,
+		"authserver/internal/data/seeder.go:11: passwordhash.HashAs",
+	}, discardedErrorStrings(found))
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertNoDiscardedErrors(r, root, discardedErrorScope, listed, nil)
+	})
+	assert.Contains(t, report.Text(), "1 call(s) under authserver discard the error of a hash")
+	assert.Contains(t, report.Text(), "3 call(s) under authserver discard an error from a function this guard cannot name")
 }
 
 // A listed name may return an error in only some builds, which the list check allows. Where its last
