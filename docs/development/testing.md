@@ -54,6 +54,19 @@ A test that sends a DPoP proof builds it with `authserver/internal/dpop/dpoptest
 library and importing nothing from `dpop`, each key's `Thumbprint` a literal worked out apart from
 Go, so an assertion on `cnf.jkt` does not recompute what the server computes (#42).
 
+A test or guard that holds a docs page or a development guide to the code reads its sections and
+tables through `core/docsreader`, a leaf the setup wizard's tests reach too. `Section` reads the
+section a heading opens from a file and `SectionText` from a page already read; a heading inside a
+code fence opens and ends nothing. `Tables` reads each table's header, its data rows with every cell
+trimmed and an escaped pipe kept in its cell, and the line each data row is on. A fenced line is
+never a row, and the header is the row the first delimiter row follows, so a table with no delimiter
+row has no header. `Columns` reads named columns from one table, `Rows` the data rows of every
+table, and `BlankColumn` empties one column's data cells, for a check that reads a section's names
+without that column. The check keeps its expectations, reporting and failure messages in its own
+package. A reading the reader lacks is added to the reader with a rule test beside its others, not
+written beside the check: each hand-rolled section finder or row splitter decided for itself what a
+row, a header or a cell was, and disagreed with the reader (#536).
+
 **Settings row in the integration tier**: every integration test runs against one server and one
 settings row, which the server reads on every request, so a value a test leaves there is what every
 later test runs against. A test that changes the row, through the admin API or directly, calls

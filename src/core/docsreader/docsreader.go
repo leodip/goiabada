@@ -20,22 +20,22 @@ import (
 
 // SectionText is the text of the section heading opens in an already-read page: the lines after
 // the heading up to the next heading of the same or higher level outside a code fence, the fenced
-// lines among them, and a deeper heading's line too. A heading inside a fence opens and ends
-// nothing. An empty heading reads the whole page. found is false when the page has no such section,
-// and the text is empty with it.
+// lines among them, and a deeper heading's line too. A heading inside a fence, as fence reads one,
+// opens and ends nothing. An empty heading reads the whole page. found is false when the page has
+// no such section, and the text is empty with it.
 func SectionText(page, heading string) (text string, found bool) {
 	if heading == "" {
 		return page, true
 	}
 	level := headingLevel(heading)
-	var section strings.Builder
-	inSection, inFence := false, false
+	var (
+		section   strings.Builder
+		inSection bool
+		code      fence
+	)
 	for _, line := range strings.Split(page, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-		}
-		if !inFence {
+		if !code.fenced(trimmed) {
 			if lineLevel := headingLevel(line); lineLevel > 0 {
 				if inSection && lineLevel <= level {
 					break
@@ -72,10 +72,12 @@ func Section(root, page, heading string) (string, error) {
 
 // Table is one Markdown table: its header row and the data rows under it, every cell trimmed, its
 // code spans keeping their backticks. A table whose header row no delimiter row follows has no
-// header, and every row of it is a data row.
+// header, and every row of it is a data row. Lines holds, for each data row, the 1-based line of
+// the text Tables read it from, so a guard reporting a page's lines reads the whole page.
 type Table struct {
 	Header []string
 	Rows   [][]string
+	Lines  []int
 }
 
 // Columns returns the cells of every data row in the named columns, in the order headers names
@@ -107,34 +109,137 @@ func (t Table) Columns(headers ...string) ([][]string, error) {
 }
 
 // Tables returns every table in text, in the order the page reads them. Fenced code holds no
-// table: a line inside a code fence is never a row, and a fence line ends the table before it. The
-// delimiter row under a header is neither a header nor a data row, and the header is the row the
-// first delimiter row follows.
+// table: a line inside a code fence, as fence reads one, is never a row, and a fence line ends the
+// table before it. The delimiter row under a header is neither a header nor a data row, and the
+// header is the row the first delimiter row follows.
 func Tables(text string) []Table {
-	var (
-		tables  []Table
-		rows    [][]string
-		inFence bool
-	)
-	for _, line := range strings.Split(text, "\n") {
-		trimmed := strings.TrimSpace(line)
-		fence := strings.HasPrefix(trimmed, "```")
-		if fence {
-			inFence = !inFence
+	return tables(strings.Split(text, "\n"))
+}
+
+// tables is the one read of a text's split lines that Tables and BlankColumn share: each run of
+// table rows, told into its header and its data rows by classify.
+func tables(lines []string) []Table {
+	var found []Table
+	for _, run := range runs(lines) {
+		found = append(found, classify(run))
+	}
+	return found
+}
+
+// BlankColumn returns text with every data cell of the column headed header emptied, in every
+// table that has it, the tables read as Tables reads them: the column is the first header cell
+// equal to header, and a table whose header no delimiter row follows has none. The column stays;
+// a data row that reaches it is rewritten with that cell empty, its escaped pipes still escaped,
+// so the result reads through Tables as the same tables with that column's data cells empty. Every
+// other line comes back as written, the header and delimiter rows, a row too short to reach the
+// column and fenced lines among them, so a text in which no table has the column is unchanged.
+//
+// A check that reads a section's names without one column, such as the audit log's alert tables
+// without the Details column whose payload keys are spelled like events, reads through it (#536).
+func BlankColumn(text, header string) string {
+	lines := strings.Split(text, "\n")
+	for _, table := range tables(lines) {
+		column := slices.Index(table.Header, header)
+		if column < 0 {
+			continue
 		}
-		if fence || inFence || !strings.HasPrefix(trimmed, "|") {
-			if len(rows) > 0 {
-				tables = append(tables, classify(rows))
-				rows = nil
+		for i, row := range table.Rows {
+			if column >= len(row) {
+				continue
+			}
+			index := table.Lines[i] - 1
+			line := lines[index]
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			lines[index] = indent + spell(row, column)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// run is one table as the walk finds it, before its header is told from its data rows: each row's
+// cells, and the index of the line each row is on.
+type run struct {
+	rows  [][]string
+	lines []int
+}
+
+// runs is the one walk over a text's lines that tables reads: each run of table rows in the order
+// the page reads them. A row is a line that opens with a pipe outside a code fence, as fence reads
+// one; a fence line, a fenced line and any other line end the run before it.
+func runs(lines []string) []run {
+	var (
+		found   []run
+		current run
+		code    fence
+	)
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if code.fenced(trimmed) || !strings.HasPrefix(trimmed, "|") {
+			if len(current.rows) > 0 {
+				found = append(found, current)
+				current = run{}
 			}
 			continue
 		}
-		rows = append(rows, cells(trimmed))
+		current.rows = append(current.rows, cells(trimmed))
+		current.lines = append(current.lines, i)
 	}
-	if len(rows) > 0 {
-		tables = append(tables, classify(rows))
+	if len(current.rows) > 0 {
+		found = append(found, current)
 	}
-	return tables
+	return found
+}
+
+// fence is the code fence a walk over a page's lines is in, the one rule every walk in this package
+// reads fenced code by, so a section and its tables agree on which lines are code. A fence opens on
+// a line that starts with a run of at least three backticks or at least three tildes, whatever
+// follows the run, and it closes on a line that is a run of the same character, at least as long
+// as the one that opened it, with nothing but whitespace after it. While it is open every line is
+// code, a line that would open a fence among them: a run of the other character, a shorter run or
+// a run with text after it closes nothing. A fence still open at the end of the page holds every
+// line after its opening one. The zero fence is closed.
+type fence struct {
+	marker byte
+	length int
+}
+
+// fenced reads one line, trimmed, and says whether it is code: the line that opens a fence, a line
+// inside one, or the line that closes it.
+func (f *fence) fenced(trimmed string) bool {
+	marker, length := fenceRun(trimmed)
+	if f.length == 0 {
+		f.marker, f.length = marker, length
+		return length > 0
+	}
+	if marker == f.marker && length >= f.length && length == len(trimmed) {
+		*f = fence{}
+	}
+	return true
+}
+
+// fenceRun is the character and the length of the run of at least three backticks or at least
+// three tildes a trimmed line starts with, and a zero length for any other line.
+func fenceRun(trimmed string) (marker byte, length int) {
+	if trimmed == "" || (trimmed[0] != '`' && trimmed[0] != '~') {
+		return 0, 0
+	}
+	length = len(trimmed) - len(strings.TrimLeft(trimmed, trimmed[:1]))
+	if length < 3 {
+		return 0, 0
+	}
+	return trimmed[0], length
+}
+
+// spell writes row as a table row with the cell at column empty, escaping each pipe a cell holds,
+// so cells reads it back as the same cells but that one.
+func spell(row []string, column int) string {
+	written := make([]string, len(row))
+	for i, cell := range row {
+		if i != column {
+			written[i] = strings.ReplaceAll(cell, "|", `\|`)
+		}
+	}
+	return "| " + strings.Join(written, " | ") + " |"
 }
 
 // Rows returns the data rows of every table in text, in the order the page reads them. A header
@@ -147,37 +252,35 @@ func Rows(text string) [][]string {
 	return rows
 }
 
-// Row splits one table row into its cells, the way Tables reads every row of a table: a pipe
-// escaped inside a cell stays in it, any other backslash keeps the character after it, and every
-// cell is trimmed. A guard that walks a page line by line for its own structure, such as one
-// holding a page to a line-numbered catalog, reads each line's cells through it, so the one
-// splitter lives here too (#536).
-func Row(line string) []string {
-	return cells(line)
-}
-
-// classify splits one table's rows into its header and its data rows: the row the first delimiter
-// row follows is the header, and with no delimiter row every row is a data row. Only that one
-// delimiter row is skipped: a row of dashes further down is a data row, as the page renders it.
-func classify(rows [][]string) Table {
-	delimiter := -1
-	for i := 1; i < len(rows); i++ {
-		if isDelimiterRow(rows[i]) {
-			delimiter = i
-			break
-		}
-	}
+// classify splits one run's rows into its header and its data rows, each data row with the
+// 1-based line it is on: the row the first delimiter row follows is the header, and with no
+// delimiter row every row is a data row. Only that one delimiter row is skipped: a row of dashes
+// further down is a data row, as the page renders it.
+func classify(found run) Table {
+	delimiter := delimiterRow(found.rows)
 	var table Table
-	for i, row := range rows {
+	for i, row := range found.rows {
 		switch i {
 		case delimiter:
 		case delimiter - 1:
 			table.Header = row
 		default:
 			table.Rows = append(table.Rows, row)
+			table.Lines = append(table.Lines, found.lines[i]+1)
 		}
 	}
 	return table
+}
+
+// delimiterRow is the index of the first delimiter row among a table's rows, one that has a row
+// above it to be the header, and -1 when there is none.
+func delimiterRow(rows [][]string) int {
+	for i := 1; i < len(rows); i++ {
+		if isDelimiterRow(rows[i]) {
+			return i
+		}
+	}
+	return -1
 }
 
 // isDelimiterRow says whether a row is shaped as the one under a table's header: every cell

@@ -130,6 +130,27 @@ func TestCheckMetricsCatalog_ARowWithNoFamily(t *testing.T) {
 	assert.Contains(t, findings[0].Reason, "does not register")
 }
 
+// A finding about a row names the page line the row is on, so a reader goes straight to it: the
+// fixture's go_goroutines row is its twelfth line, and a stale row's finding names its line too.
+func TestCheckMetricsCatalog_AFindingNamesItsRowsPageLine(t *testing.T) {
+	findings := checkFake(t, replaceCatalogLine(t, "| `go_goroutines` |",
+		"| `go_goroutines` | counter | none | both | Goroutines. |"), fakeAuthServerFamilies())
+
+	require.Len(t, findings, 1, "%v", findings)
+	assert.Equal(t, "site/monitoring.mdx:12 says counter and the code registers a gauge", findings[0].Reason)
+
+	var families []metrics.Family
+	for _, family := range fakeAuthServerFamilies() {
+		if family.Name != "goiabada_tokens_issued_total" {
+			families = append(families, family)
+		}
+	}
+	findings = checkFake(t, fakeCatalog(), families)
+
+	require.Len(t, findings, 1, "%v", findings)
+	assert.Contains(t, findings[0].Reason, "site/monitoring.mdx:10 says the auth server exposes this family")
+}
+
 func TestCheckMetricsCatalog_LabelDrift(t *testing.T) {
 	cases := []struct {
 		name, line, want string

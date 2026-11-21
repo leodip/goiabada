@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/docsreader"
 )
 
 // AssertAgentDocs keeps the instruction entry points small and consistent: AGENTS.md is the
@@ -112,7 +114,7 @@ func checkAgentDocs(root string) []string {
 		return findings
 	}
 
-	section, ok := agentDocsSection(string(authGuide))
+	section, ok := docsreader.SectionText(string(authGuide), agentDocsHeading)
 	if !ok {
 		findings = append(findings, fmt.Sprintf("%s has no %q section", agentDocsAuthGuide, agentDocsHeading))
 		return findings
@@ -238,44 +240,16 @@ func declaredAuthStates(path string) (map[string]bool, []string, error) {
 	return states, variables, nil
 }
 
-// agentDocsSection returns the lines between the heading and the next heading at
-// the same level or above, which is where the roster has to live.
-func agentDocsSection(doc string) ([]string, bool) {
-	lines := strings.Split(doc, "\n")
-	start := -1
-	for i, line := range lines {
-		if strings.TrimRight(line, " \t") == agentDocsHeading {
-			start = i + 1
-			break
-		}
-	}
-	if start < 0 {
-		return nil, false
-	}
-	for i := start; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "### ") || strings.HasPrefix(lines[i], "## ") || strings.HasPrefix(lines[i], "# ") {
-			return lines[start:i], true
-		}
-	}
-	return lines[start:], true
-}
-
-// rosterStates reads the first cell of every table row in the section. The
-// header and separator rows contribute nothing because their first cells are not
-// backticked tokens, and a continuation row's empty first cell contributes
-// nothing either.
-func rosterStates(section []string) map[string]bool {
+// rosterStates reads the roster from the section's tables as docsreader reads them: a state is the
+// first cell of a data row when that cell is one backticked state. A header row, its delimiter row
+// and fenced lines are no data rows, and a continuation row's empty first cell contributes nothing.
+func rosterStates(section string) map[string]bool {
 	states := map[string]bool{}
-	for _, line := range section {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "|") {
+	for _, row := range docsreader.Rows(section) {
+		if len(row) == 0 {
 			continue
 		}
-		cells := strings.Split(trimmed, "|")
-		if len(cells) < 2 {
-			continue
-		}
-		if m := agentDocsStateCell.FindStringSubmatch(strings.TrimSpace(cells[1])); m != nil {
+		if m := agentDocsStateCell.FindStringSubmatch(row[0]); m != nil {
 			states[m[1]] = true
 		}
 	}
