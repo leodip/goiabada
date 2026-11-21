@@ -103,6 +103,16 @@ func TestCheck_RefusesWhatIsNotTheNamedImagesAsWholePNGs(t *testing.T) {
 	}
 }
 
+// Two names that differ only in letter case are refused before the stream is read, though the stream
+// holds both as files of their own: on a disk that ignores case they are one file.
+func TestCheck_RefusesNamesThatDifferOnlyInCase(t *testing.T) {
+	good := onePixel(t, true)
+	r := stream(t, entry{"screenshot-a.png", tar.TypeReg, good}, entry{"screenshot-A.png", tar.TypeReg, good})
+	err := check(r, []string{"screenshot-a.png", "screenshot-A.png"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "screenshot-a.png and screenshot-A.png differ only in letter case")
+}
+
 func TestCheck_RefusesAnImageWhoseHeaderClaimsAVastSize(t *testing.T) {
 	b := []byte("\x89PNG\r\n\x1a\n")
 	b = append(b, pngChunk("IHDR", []byte{0, 1, 0, 0, 0, 1, 0, 0, 8, 0, 0, 0, 0})...)

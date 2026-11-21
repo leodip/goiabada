@@ -4,9 +4,9 @@
 //
 //	tar -cf - -C <capture folder> <name>... | go run ./cmd/screenshotcheck <name>...
 //
-// It exits non-zero, naming the image, unless the stream holds each name once, as a regular file,
-// and nothing else, and each is a PNG that Go's decoder reads whole with no byte after its IEND
-// chunk. The script runs it in the Go image the release Dockerfiles build in, with no network, rather
+// It exits non-zero, naming the image, unless no two names differ only in letter case, the stream
+// holds each name once, as a regular file, and nothing else, and each is a PNG that Go's decoder reads
+// whole with no byte after its IEND chunk. The script runs it in the Go image the release Dockerfiles build in, with no network, rather
 // than on the host or in the browser's image, whose output it checks: the host needs Docker alone,
 // and a check in the image that wrote the files would prove nothing about them.
 package main
@@ -19,6 +19,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -43,9 +44,16 @@ func check(r io.Reader, names []string) error {
 	if len(names) == 0 {
 		return errs.New("no image named")
 	}
+	// On a disk that ignores letter case, as macOS's does by default, two such names are one file,
+	// which the script would replace twice and could not put back.
 	want := map[string]bool{}
+	folded := map[string]string{}
 	for _, name := range names {
 		want[name] = true
+		if other, ok := folded[strings.ToLower(name)]; ok && other != name {
+			return errs.Errorf("%s and %s differ only in letter case", other, name)
+		}
+		folded[strings.ToLower(name)] = name
 	}
 	seen := map[string]bool{}
 	archive := tar.NewReader(r)

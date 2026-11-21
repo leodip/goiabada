@@ -348,6 +348,11 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 			[]string{"FAIL_MV=screenshot-b.png.new", "FULL_AFTER_RENAME=1"}, "replacing the committed images", nil},
 		{"the last replacement fails", screenshotsFixture, screenshotsLines(screenshotsFixture...),
 			[]string{"FAIL_MV=screenshot-c.png.new"}, "replacing the committed images", nil},
+		// One file on a disk that ignores letter case, which the run would replace twice: putting
+		// the first back, it would then remove what it had put back, as the second's.
+		{"the capture lists two names that differ only in case",
+			[]string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-A.png"},
+			screenshotsLines("screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-A.png"), nil, "checking the images captured", nil},
 		// docker cp keeps a link the capture made, which the host would follow to a file of its own
 		// and commit: here a valid PNG outside the capture's folder, which a check of the bytes alone
 		// would take.
