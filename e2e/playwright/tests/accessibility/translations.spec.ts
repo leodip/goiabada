@@ -65,6 +65,16 @@ for (const translation of translations) {
           if (url === `${env.adminUrl}/`) {
             expect((await page.locator(".identity-row-who").boundingBox())!.width).toBeGreaterThanOrEqual(128);
           }
+          if (url === `${env.adminUrl}/admin/settings/branding`) {
+            await expect(page.locator(".tag-note").first()).toHaveText(wording.defaultBrandTag);
+          }
+          if (url === `${env.adminUrl}/admin/settings/turnstile`) {
+            await expect(page.locator('label[for="turnstileSiteKey"]')).toHaveText(wording.siteKey);
+            await expect(page.locator('label[for="turnstileSecretKey"]')).toContainText(wording.secretKey);
+          }
+          if (url === `${env.adminUrl}/admin/settings/audit-log-viewer`) {
+            await expect(page.locator('button[type="submit"]').filter({ hasText: wording.filter })).toBeVisible();
+          }
         });
       }
 

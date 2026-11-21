@@ -41,3 +41,25 @@ func TestIndonesian_RegionalTagsUseTheBuiltInCatalog(t *testing.T) {
 		})
 	}
 }
+
+// The console's ordinary labels read in Indonesian, as the other translations localize them, and
+// the instructions to replace recovery codes use the wording of the button they lead to (#668).
+func TestIndonesian_OrdinaryConsoleLabels(t *testing.T) {
+	ctx := WithLocale(context.Background(), true, "id", "en")
+	for key, want := range map[string]string{
+		"adminconsole.admin_branding.list.default_tag":               "Bawaan",
+		"adminconsole.admin_branding.brand.make_default_button":      "Jadikan bawaan",
+		"adminconsole.admin_settings.turnstile.field.site_key":       "Kunci situs",
+		"adminconsole.admin_settings.turnstile.field.secret_key":     "Kunci rahasia",
+		"adminconsole.admin_settings.turnstile.clear_secret_key":     "Hapus kunci rahasia yang tersimpan",
+		"handler.settings_turnstile.site_key_required":               "Masukkan kunci situs untuk mengaktifkan tantangan Turnstile.",
+		"adminconsole.admin_settings.audit_log_viewer.filter_button": "Saring",
+		"adminconsole.admin_settings.audit_log_viewer.clear_link":    "Hapus saringan",
+		"adminconsole.account.otp.recovery_codes.new_set_button":     "Buat kode pemulihan baru",
+		"adminconsole.account.otp.recovery_codes.new_set_lead":       "Jika kode Anda hilang atau sudah habis terpakai, buat kode pemulihan baru. Masukkan kata sandi Anda untuk memastikan bahwa ini memang Anda.",
+		"adminconsole.account.otp.recovery_codes.remaining_none":     "Anda tidak memiliki kode pemulihan yang belum digunakan. Buat kode pemulihan baru, agar Anda tetap dapat masuk jika aplikasi autentikator Anda hilang.",
+		"auth.recovery_codes.shown_lead":                             "Kode ini hanya ditampilkan sekali. Jika Anda belum menyimpannya, buat kode pemulihan baru di konsol admin, di Akun, Autentikasi dua faktor.",
+	} {
+		assert.Equal(t, want, T(ctx, key), key)
+	}
+}

@@ -26,6 +26,12 @@ export type Translation<Tag extends string = string> = {
     wholeSecondsRefusal: string;
     deleteResource: string;
     wrongResourceIdentifier: string;
+    // The default brand's tag on the Branding list, the Turnstile key labels and the audit log
+    // viewer's Filter button.
+    defaultBrandTag: string;
+    siteKey: string;
+    secretKey: string;
+    filter: string;
   };
   // Sign-in, two-factor, consent and the auth server's public pages.
   signIn: {
@@ -100,6 +106,10 @@ export const translations: readonly Translation[] = [
       wholeSecondsRefusal: "Geben Sie eine ganze Anzahl von Sekunden ein.",
       deleteResource: "Ressource löschen",
       wrongResourceIdentifier: "Das ist nicht die Kennung dieser Ressource.",
+      defaultBrandTag: "Standard",
+      siteKey: "Websiteschlüssel",
+      secretKey: "Geheimer Schlüssel",
+      filter: "Filtern",
     },
     signIn: {
       signIn: "Anmelden",
@@ -162,6 +172,10 @@ export const translations: readonly Translation[] = [
       wholeSecondsRefusal: "Saisissez un nombre entier de secondes.",
       deleteResource: "Supprimer la ressource",
       wrongResourceIdentifier: "Ce n’est pas l’identifiant de cette ressource.",
+      defaultBrandTag: "Par défaut",
+      siteKey: "Clé de site",
+      secretKey: "Clé secrète",
+      filter: "Filtrer",
     },
     signIn: {
       signIn: "Se connecter",
@@ -224,6 +238,10 @@ export const translations: readonly Translation[] = [
       wholeSecondsRefusal: "Inserisci un numero intero di secondi.",
       deleteResource: "Elimina risorsa",
       wrongResourceIdentifier: "Questo non è l'identificatore della risorsa.",
+      defaultBrandTag: "Predefinito",
+      siteKey: "Chiave del sito",
+      secretKey: "Chiave segreta",
+      filter: "Filtra",
     },
     signIn: {
       signIn: "Accedi",
@@ -286,6 +304,10 @@ export const translations: readonly Translation[] = [
       wholeSecondsRefusal: "Masukkan bilangan bulat dalam detik.",
       deleteResource: "Hapus sumber daya",
       wrongResourceIdentifier: "Itu bukan pengenal sumber daya ini.",
+      defaultBrandTag: "Bawaan",
+      siteKey: "Kunci situs",
+      secretKey: "Kunci rahasia",
+      filter: "Saring",
     },
     signIn: {
       signIn: "Masuk",
