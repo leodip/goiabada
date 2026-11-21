@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,6 +42,8 @@ func TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart(t *testing.T) {
 	assert.Contains(t, refusal["remedy"], "backup")
 	assert.Contains(t, refusal["remedy"], "the last key the stored data was encrypted under",
 		"after a rotation, the key the database was set up with no longer opens it")
+	assert.Contains(t, refusal["remedy"], "put GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS back, start, and run goiabada-authserver reencrypt",
+		"a previous key removed before reencrypt reached its end is the mid-rotation case of the same refusal (#492 decision 6)")
 	messages := messagesOf(records)
 	assert.NotContains(t, messages, "unable to create the database connection", "nor reported as a connection failure")
 	assert.NotContains(t, messages, "starting the http listener", "and it never listens")
@@ -65,4 +72,41 @@ func TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase(t *testing.T) 
 	assert.Equal(t, "openssl rand -hex 32", refusal["generate_with"])
 	assert.NoFileExists(t, path, "no database was opened")
 	assert.NotContains(t, messagesOf(records), "starting the http listener", "and it never listens")
+}
+
+// stillUnderPreviousRecord is the Warn record a start writes when the stored data is still under
+// the previous data key (#492 decision 6).
+const stillUnderPreviousRecord = "the stored data is still under the previous data encryption key: " +
+	"run goiabada-authserver reencrypt before removing GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS"
+
+// TestMain_AStartUnderThePreviousKeyServesAndSaysSo is the start between the swap and the end of
+// reencrypt, at the process (#492 decision 6): the database is under the old key, which is now the
+// previous one. The start serves, writes one Warn record naming the command that moves the data,
+// and moves nothing itself (#492 decision 3): the signing key is still under the old key alone.
+func TestMain_AStartUnderThePreviousKeyServesAndSaysSo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "k.db")
+	oldKey := bytes.Repeat([]byte{0xab}, 32) // the key runMainSignalledAt seeds under
+
+	code, records := runMainSignalledAt(t, path, "starting the http listener")
+	require.Equalf(t, 0, code, "the first start seeds the database under its key\n%s", dump(records))
+	assert.Nil(t, recordNamed(records, stillUnderPreviousRecord), "a start with one key warns of nothing")
+
+	swapped := append(append([]string{}, singleStepEnv...),
+		"GOIABADA_AES_ENCRYPTION_KEY="+strings.Repeat("cd", 32),
+		"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS="+strings.Repeat("ab", 32))
+	code, records = runMainSignalledAtWith(t, path, "starting the http listener", swapped)
+
+	require.Equalf(t, 0, code, "the swapped keys start the server\n%s", dump(records))
+	assert.Equal(t, 1, count(messagesOf(records), stillUnderPreviousRecord), "one record says so\n%s", dump(records))
+	warned := recordNamed(records, stillUnderPreviousRecord)
+	require.NotNil(t, warned)
+	assert.Equal(t, "WARN", warned["level"])
+
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
+	require.NoError(t, err)
+	defer func() { _ = db.DB.Close() }()
+	signingKey, err := db.GetCurrentSigningKey(context.Background(), nil)
+	require.NoError(t, err)
+	_, err = encryption.DecryptText(signingKey.PrivateKeyPEM, oldKey)
+	assert.NoError(t, err, "the start re-encrypted nothing: the signing key is still under the old key")
 }

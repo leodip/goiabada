@@ -129,7 +129,7 @@ A stop signal (SIGTERM, which Kubernetes and Compose send, or SIGINT) that reach
 
 - A wait ends at once: for the database connection, for the database to be created, or for the migration lock.
 - A migration file already running runs to its end, and the next one doesn't start. The lock is released and the schema is left clean at the version it reached, which the next start carries on from, so a start stopped again and again still moves forward file by file.
-- The AES key's re-encryption and a first start's seed each commit whole: one under way completes, and one not yet begun doesn't begin.
+- A first start's seed commits whole: one under way completes, and one not yet begun doesn't begin.
 
 The auth server then writes `shutdown signal received`, `database migration stopped` if migrations were under way, and `auth server stopped`, and exits 0. In `database migration stopped`, `reached_version` is where the schema now is, and `remaining` how many files the next start will run.
 

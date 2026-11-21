@@ -53,11 +53,6 @@ type Database interface {
 	// comparison is the caller's (#351). It replaced BackfillLowercaseEmails, which repaired
 	// the data at startup rather than refusing to migrate it.
 	ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error)
-	// ReencryptToKey re-encrypts every secret stored at rest, and every RSA private key, from
-	// oldKey to newKey, both 32 bytes, in one RunInTransaction: a failure leaves everything
-	// under oldKey. It decides nothing. Whether the data is under oldKey at all is the startup
-	// task's question, answered from a canary before this is called (#83, #438 decision 8).
-	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
 	// ReencryptStoredSecrets is the re-encryption sweep, which runs beside serving auth servers
 	// (#492 decisions 4 to 6). It moves every stored secret under previousKey to currentKey, row
 	// by row: it reads each column in bounded batches with no transaction across a table, and
@@ -870,7 +865,7 @@ type Database interface {
 	// the current one's, and admit is asked again under both, so two pods can never both take the
 	// last slot, whichever of two adjacent windows each is charging. A key that already has a row
 	// for a later window is ErrRateLimitWindowMoved, with nothing charged. A refusal writes
-	// nothing. It owns its transaction, as ReencryptToKey does, because creating a window's row
+	// nothing. It owns its transaction rather than taking one, because creating a window's row
 	// can lose a race on the key, which on PostgreSQL aborts the transaction it ran in. expiresAt
 	// is when the current window's row stops counting.
 	ReserveRateLimitHit(ctx context.Context, keyHash string, current, previous, expiresAt time.Time,

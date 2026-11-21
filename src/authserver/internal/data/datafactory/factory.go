@@ -11,7 +11,8 @@
 // It is one of the four places that names the whole data.Database, and the one that produces
 // it: OpenDatabase and NewDatabase hand it out, and Migratable embeds it. The two functions here
 // that read through a database take ports like every other consumer, the email case pre-flight
-// one read and the startup task the signing keys and the re-key (#386 decision 8, #438 decision 8).
+// one read and the startup task the signing keys and the shared identifiers (#386 decision 8, #438
+// decision 8, #492).
 package datafactory
 
 import (
@@ -241,13 +242,14 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // ctx is the start's, and its end is a shutdown signal (#390 decision 9): it cancels a wait, for
 // the engine, its creation or the migration lock, at once; a migration file already running runs
 // to its end and no further one starts, and the start says where the schema stopped; the
-// data-key rotation finishes if it is under way and does not start otherwise. What NewDatabase
+// data key check does not start, and one under way is a read the stop ends. What NewDatabase
 // answers after a stop then matches context.Canceled, which is how main tells it from a failure.
 //
 // The two data-encryption keys are parameters rather than reads of a configuration singleton, so
 // that the refusal below is one call away from a test rather than unreachable (#351). aesKey is
 // required and must be 32 bytes; previousAESKey is optional and is acted on only at that length,
-// by the env-to-env rotation inside runStartupDataTasks.
+// by the data key check inside runStartupDataTasks, which accepts stored data under either key and
+// re-encrypts nothing (#492 decision 3).
 func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []byte, previousAESKey []byte, logSQL bool) (data.Database, error) {
 	database, err := OpenDatabase(ctx, dbConfig, logSQL)
 	if err != nil {

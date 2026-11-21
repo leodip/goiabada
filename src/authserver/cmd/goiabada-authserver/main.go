@@ -192,9 +192,9 @@ func run() int {
 	}
 
 	// Validate the data-encryption key EARLY and build the data cipher from it
-	// before the database is opened: NewDatabase runs the at-rest re-encryption
-	// migration, which needs the key. The key is supplied from the environment
-	// and never co-located with the ciphertext (issue #83).
+	// before the database is opened: NewDatabase checks the keys against the stored
+	// data, and the seed seals under the current one. The key is supplied from the
+	// environment and never co-located with the ciphertext (issue #83).
 	currentDataKey, previousDataKey, aesKeyErr := cfg.DataKeys()
 	if aesKeyErr != nil {
 		// One record where three used to be, for the same reason decision 6 collapses the
@@ -236,10 +236,10 @@ func run() int {
 	// Everything it reaches takes a context rather than opening one where it lands (#386), and
 	// reads its end as a stop rather than a failure: a wait (connecting, creating the database,
 	// the migration lock) is cancelled at once; a migration file already running runs to its end
-	// and the next does not start, leaving the schema clean at the version it reached; the
-	// data-key rotation and the seed, each one transaction, complete if they are under way and do
-	// not start otherwise (#390 decision 9). A step stopped that way answers an error matching
-	// context.Canceled, and the start then exits 0, as it does after a drain.
+	// and the next does not start, leaving the schema clean at the version it reached; the seed,
+	// one transaction, completes if it is under way and does not start otherwise (#390 decision
+	// 9). A step stopped that way answers an error matching context.Canceled, and the start then
+	// exits 0, as it does after a drain.
 	database, err := datafactory.NewDatabase(startupCtx, &cfg.Database,
 		currentDataKey, previousDataKey, cfg.AuthServer.LogSQL)
 	if err != nil {
@@ -250,7 +250,9 @@ func run() int {
 			slog.Error("the data encryption key does not decrypt the stored data, so the auth server cannot start",
 				"error", err,
 				"remedy", "set GOIABADA_AES_ENCRYPTION_KEY to the last key the stored data was encrypted under, from your backup of it: "+
-					"the key the database was set up with, or after a rotation the key it was rotated to")
+					"the key the database was set up with, or after a rotation the key it was rotated to; "+
+					"if GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS was removed before goiabada-authserver reencrypt exited 0, "+
+					"put GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS back, start, and run goiabada-authserver reencrypt")
 			return 1
 		}
 		slog.Error("unable to create the database connection", "error", err)

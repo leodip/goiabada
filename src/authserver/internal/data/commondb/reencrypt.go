@@ -1,18 +1,9 @@
 package commondb
 
-import (
-	"bytes"
-	"context"
-	"database/sql"
-
-	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/core/errs"
-)
-
 // aesProtectedColumns lists the (table, column) pairs holding AES-GCM ciphertext
-// of string secrets that must be re-keyed when the data-encryption key changes
-// (issue #83). ReencryptToKey and the re-encryption sweep, ReencryptStoredSecrets,
-// both take every column through in this order.
+// of string secrets that must be re-encrypted when the data-encryption key changes
+// (issue #83). The re-encryption sweep, ReencryptStoredSecrets, takes every column
+// through in this order, and the signing keys' private_key_pem after them.
 var aesProtectedColumns = []struct{ table, column string }{
 	{"settings", "smtp_password_encrypted"},
 	{"settings", "turnstile_secret_key_encrypted"},
@@ -24,154 +15,8 @@ var aesProtectedColumns = []struct{ table, column string }{
 	{"pre_registrations", "verification_code_encrypted"},
 }
 
-// ReencryptToKey re-encrypts every secret stored at rest from oldKey to newKey and re-encrypts
-// the RSA private keys. The whole operation runs in ONE transaction: it is all-or-nothing, so a
-// failure leaves the data under oldKey and the caller can retry cleanly (fail-closed). See issue
-// #83.
-//
-// It re-keys and decides nothing. Whether the data is under oldKey at all is answered by the
-// datafactory startup task from a canary it reads first: that is policy over one read, so it sits
-// above the data layer where a mock can drive every branch of it, and this method is the write it
-// ends in (#438 decision 8). It does not blank settings.aes_encryption_key, which was the 1.5.x
-// conversion's own bookkeeping, deleted by #359 (#262).
-func (d *Database) ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
-	if len(oldKey) != 32 || len(newKey) != 32 {
-		return errs.New("re-encryption requires 32-byte old and new keys")
-	}
-
-	// Opened through RunInTransaction, so a deadlock reruns the body (#301); every read and
-	// write is inside it, so a rerun starts from the data as it was under oldKey.
-	return d.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return d.reencryptAll(ctx, tx, oldKey, newKey)
-	})
-}
-
-func (d *Database) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
-	for _, c := range aesProtectedColumns {
-		if err := d.reencryptStringColumn(ctx, tx, c.table, c.column, oldKey, newKey); err != nil {
-			return errs.Wrapf(err, "re-encrypting %s.%s", c.table, c.column)
-		}
-	}
-	if err := d.reencryptPrivateKeys(ctx, tx, oldKey, newKey); err != nil {
-		return errs.Wrap(err, "re-encrypting RSA private keys")
-	}
-	// settings.aes_encryption_key is deliberately left alone. Blanking it was the 1.5.x startup
-	// conversion's own bookkeeping ("so subsequent startups skip the migration"), and rotation
-	// only ever reached it by sharing this helper; there is no migration to skip after #359
-	// deleted the conversion (#262). rotate_test.go pins that it stays.
-	return nil
-}
-
-// reencryptStringColumn re-encrypts one string-secret column across a table. It
-// reads each row fully before writing (SQLite runs on a single connection), and
-// skips rows whose ciphertext is empty/NULL.
-func (d *Database) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
-	items, err := d.readNonEmptyColumn(ctx, tx, table, column)
-	if err != nil {
-		return err
-	}
-
-	for _, it := range items {
-		plaintext, err := encryption.DecryptText(it.value, oldKey)
-		if err != nil {
-			return errs.Wrapf(err, "decrypt %s id %d", column, it.id)
-		}
-		newCt, err := encryption.EncryptText(plaintext, newKey)
-		if err != nil {
-			return err
-		}
-		if _, err := d.ExecSQL(ctx, tx, writeProtectedColumn(table, column).text(d.Dialect), newCt, it.id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// reencryptPrivateKeys encrypts/re-encrypts the RSA private-key PEMs. A PEM held as ciphertext
-// under oldKey is decrypted and re-encrypted under newKey.
-//
-// The plaintext-PEM branch below is unreachable rather than wrong. It existed for the 1.5.x
-// startup conversion, where the PEMs were still plaintext; #359 deleted that caller (#262), and
-// the one caller left, datafactory's startup task, picks the first non-empty PrivateKeyPEM as its
-// canary and refuses before calling ReencryptToKey when it decrypts under neither key (#438
-// decision 8). So a plaintext PEM fails closed at the canary, never reaching this branch. It is kept because deleting it would
-// change a crypto path for no observable gain.
-func (d *Database) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
-	items, err := d.readNonEmptyColumn(ctx, tx, "key_pairs", "private_key_pem")
-	if err != nil {
-		return err
-	}
-
-	for _, it := range items {
-		var plaintextPEM string
-		if bytes.HasPrefix(it.value, []byte("-----BEGIN")) {
-			plaintextPEM = string(it.value) // plaintext PEM (pre-#83): encrypt it now
-		} else {
-			pt, err := encryption.DecryptText(it.value, oldKey) // ciphertext under oldKey: rotate
-			if err != nil {
-				return errs.Wrapf(err, "decrypt private key id %d", it.id)
-			}
-			plaintextPEM = pt
-		}
-		enc, err := encryption.EncryptText(plaintextPEM, newKey)
-		if err != nil {
-			return err
-		}
-		if _, err := d.ExecSQL(ctx, tx, writeProtectedColumn("key_pairs", "private_key_pem").text(d.Dialect), enc, it.id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // storedValue is one row's id and the bytes one column holds for it.
 type storedValue struct {
 	id    int64
 	value []byte
-}
-
-// readProtectedColumn is the read of every row's id and one protected column, the same text on every
-// engine. table and column are always a pair from aesProtectedColumns or the private-key column,
-// literals in this file, never input.
-func readProtectedColumn(table, column string) statement {
-	query := "SELECT id, " + column + " FROM " + table
-	return statement{sqlite: query, mysql: query, postgres: query, mssql: query}
-}
-
-// writeProtectedColumn is the write of one row's protected column, its new ciphertext and then its
-// id, for the same pairs as readProtectedColumn.
-func writeProtectedColumn(table, column string) statement {
-	return statement{
-		sqlite:   "UPDATE " + table + " SET " + column + " = ? WHERE id = ?",
-		mysql:    "UPDATE " + table + " SET " + column + " = ? WHERE id = ?",
-		postgres: "UPDATE " + table + " SET " + column + " = $1 WHERE id = $2",
-		mssql:    "UPDATE " + table + " SET " + column + " = @p1 WHERE id = @p2",
-	}
-}
-
-// readNonEmptyColumn reads every row's id and column from table, skipping the rows whose column is
-// empty or NULL. The rows are closed before it returns, because its callers write next and SQLite
-// runs on a single connection.
-func (d *Database) readNonEmptyColumn(ctx context.Context, tx *sql.Tx, table, column string) ([]storedValue, error) {
-	rows, err := d.QuerySQL(ctx, tx, readProtectedColumn(table, column).text(d.Dialect))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var items []storedValue
-	for rows.Next() {
-		var item storedValue
-		if err := rows.Scan(&item.id, &item.value); err != nil {
-			return nil, err
-		}
-		if len(item.value) == 0 {
-			continue
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
