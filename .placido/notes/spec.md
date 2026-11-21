@@ -23,7 +23,8 @@
   only tests name has no computed justification, so `ownershipdump` refuses to write
   until the slice gives it a `test-support` row with a note by hand. A `test-support`
   row fails the unit gate once no test and no code of its own package names the
-  symbol, and regenerating keeps it (`src/core/OWNERSHIP.md`, "The justifications").
+  symbol, and regenerating keeps it while the tree gives no computed justification
+  (`src/core/OWNERSHIP.md`, "The justifications").
   `mocks`: when the slice changes a mocked interface or a module's `.mockery.yaml`; a
   mocked interface's rename also changes the key that names it there, in the same
   slice. `schema`: in the slice that adds or changes a migration. The CSS: in the
