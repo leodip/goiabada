@@ -111,30 +111,94 @@ func (t Table) Columns(headers ...string) ([][]string, error) {
 // delimiter row under a header is neither a header nor a data row, and the header is the row the
 // first delimiter row follows.
 func Tables(text string) []Table {
+	var tables []Table
+	for _, run := range runs(strings.Split(text, "\n")) {
+		tables = append(tables, classify(run.rows))
+	}
+	return tables
+}
+
+// BlankColumn returns text with every data cell of the column headed header emptied, in every
+// table that has it, the tables read as Tables reads them: the column is the first header cell
+// equal to header, and a table whose header no delimiter row follows has none. The column stays;
+// a data row that reaches it is rewritten with that cell empty, its escaped pipes still escaped,
+// so the result reads through Tables as the same tables with that column's data cells empty. Every
+// other line comes back as written, the header and delimiter rows, a row too short to reach the
+// column and fenced lines among them, so a text in which no table has the column is unchanged.
+//
+// A check that reads a section's names without one column, such as the audit log's alert tables
+// without the Details column whose payload keys are spelled like events, reads through it (#536).
+func BlankColumn(text, header string) string {
+	lines := strings.Split(text, "\n")
+	for _, run := range runs(lines) {
+		delimiter := delimiterRow(run.rows)
+		if delimiter < 0 {
+			continue
+		}
+		column := slices.Index(run.rows[delimiter-1], header)
+		if column < 0 {
+			continue
+		}
+		for i, row := range run.rows {
+			if i == delimiter || i == delimiter-1 || column >= len(row) {
+				continue
+			}
+			line := lines[run.lines[i]]
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			lines[run.lines[i]] = indent + spell(row, column)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// run is one table as the walk finds it, before its header is told from its data rows: each row's
+// cells, and the index of the line each row is on.
+type run struct {
+	rows  [][]string
+	lines []int
+}
+
+// runs is the one walk over a text's lines that Tables and BlankColumn read: each run of table rows
+// in the order the page reads them. A row is a line that opens with a pipe outside a code fence; a
+// fence line, a fenced line and any other line end the run before it.
+func runs(lines []string) []run {
 	var (
-		tables  []Table
-		rows    [][]string
+		found   []run
+		current run
 		inFence bool
 	)
-	for _, line := range strings.Split(text, "\n") {
+	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		fence := strings.HasPrefix(trimmed, "```")
 		if fence {
 			inFence = !inFence
 		}
 		if fence || inFence || !strings.HasPrefix(trimmed, "|") {
-			if len(rows) > 0 {
-				tables = append(tables, classify(rows))
-				rows = nil
+			if len(current.rows) > 0 {
+				found = append(found, current)
+				current = run{}
 			}
 			continue
 		}
-		rows = append(rows, cells(trimmed))
+		current.rows = append(current.rows, cells(trimmed))
+		current.lines = append(current.lines, i)
 	}
-	if len(rows) > 0 {
-		tables = append(tables, classify(rows))
+	if len(current.rows) > 0 {
+		found = append(found, current)
 	}
-	return tables
+	return found
+}
+
+// spell writes row as a table row with the cell at column empty, escaping each pipe a cell holds,
+// so cells reads it back as the same cells but that one.
+func spell(row []string, column int) string {
+	written := make([]string, len(row))
+	for i, cell := range row {
+		if i != column {
+			written[i] = strings.ReplaceAll(cell, "|", `\|`)
+		}
+	}
+	return "| " + strings.Join(written, " | ") + " |"
 }
 
 // Rows returns the data rows of every table in text, in the order the page reads them. A header
@@ -160,13 +224,7 @@ func Row(line string) []string {
 // row follows is the header, and with no delimiter row every row is a data row. Only that one
 // delimiter row is skipped: a row of dashes further down is a data row, as the page renders it.
 func classify(rows [][]string) Table {
-	delimiter := -1
-	for i := 1; i < len(rows); i++ {
-		if isDelimiterRow(rows[i]) {
-			delimiter = i
-			break
-		}
-	}
+	delimiter := delimiterRow(rows)
 	var table Table
 	for i, row := range rows {
 		switch i {
@@ -178,6 +236,17 @@ func classify(rows [][]string) Table {
 		}
 	}
 	return table
+}
+
+// delimiterRow is the index of the first delimiter row among a table's rows, one that has a row
+// above it to be the header, and -1 when there is none.
+func delimiterRow(rows [][]string) int {
+	for i := 1; i < len(rows); i++ {
+		if isDelimiterRow(rows[i]) {
+			return i
+		}
+	}
+	return -1
 }
 
 // isDelimiterRow says whether a row is shaped as the one under a table's header: every cell

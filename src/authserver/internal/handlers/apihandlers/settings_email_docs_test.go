@@ -33,9 +33,9 @@ import (
 // openAPISpecPath is where openapi.yaml sits, relative to the repository root, as a failure names it.
 const openAPISpecPath = "src/authserver/web/openapi.yaml"
 
-// docFailureMessage is a fixed failure message as a document quotes it: in double quotes, leading a
-// table row on a docs page or a list item in openapi.yaml. No message holds a double quote.
-var docFailureMessage = regexp.MustCompile(`(?m)^\s*(?:\|\s*|- )"([^"]+)"`)
+// docFailureMessage is a fixed failure message as openapi.yaml quotes it: in double quotes, leading
+// a list item. No message holds a double quote.
+var docFailureMessage = regexp.MustCompile(`(?m)^\s*- "([^"]+)"`)
 
 // A kind or a cause past the last one declared answers the default message, so these bounds, well
 // past the last of each, reach every message the two switches hold, and a kind or a cause added
@@ -143,8 +143,8 @@ func TestSettingsEmailDocs_AResponseGivenByReferenceHasNoDescription(t *testing.
 	assert.EqualError(t, err, "openapi.yaml gives DELETE /things no 400 description of its own")
 }
 
-// The pattern reads a quoted message leading a table row or a list item, and nothing else a section
-// quotes: a JSON example's keys and values, or a quote inside a sentence.
+// The pattern reads a quoted message leading a list item, and nothing else a section quotes: a
+// table row, a JSON example's keys and values, or a quote inside a sentence.
 func TestSettingsEmailDocs_ThePatternReadsOnlyListedMessages(t *testing.T) {
 	text := "| \"Row message.\" | what to check |\n" +
 		"  - \"Item message.\"\n" +
@@ -156,7 +156,7 @@ func TestSettingsEmailDocs_ThePatternReadsOnlyListedMessages(t *testing.T) {
 	for _, match := range docFailureMessage.FindAllStringSubmatch(text, -1) {
 		read = append(read, match[1])
 	}
-	assert.Equal(t, []string{"Row message.", "Item message."}, read)
+	assert.Equal(t, []string{"Item message."}, read)
 }
 
 func TestOpenAPIDocs_AnOperationWithNoDescriptionFails(t *testing.T) {

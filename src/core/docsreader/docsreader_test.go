@@ -294,3 +294,168 @@ func TestSection_ReadsThePageAndNamesWhatItCannotRead(t *testing.T) {
 		t.Errorf("a section that is missing: %v", err)
 	}
 }
+
+// assertTables fails t unless got is want, table by table: the same headers, and the same data
+// rows with the same cells.
+func assertTables(t *testing.T, got, want []Table) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("%d tables %q, want %d %q", len(got), got, len(want), want)
+	}
+	for i := range want {
+		if !slices.Equal(got[i].Header, want[i].Header) {
+			t.Errorf("table %d header %q, want %q", i, got[i].Header, want[i].Header)
+		}
+		if !slices.EqualFunc(got[i].Rows, want[i].Rows, slices.Equal[[]string]) {
+			t.Errorf("table %d rows %q, want %q", i, got[i].Rows, want[i].Rows)
+		}
+	}
+}
+
+// assertLinesKept fails t unless every line of blanked is the line of text at the same place, but
+// for the rewritten lines, given by their 0-based index: those lines are the rewritten data rows,
+// whose spelling Tables reading the result back holds.
+func assertLinesKept(t *testing.T, text, blanked string, rewritten ...int) {
+	t.Helper()
+	before, after := strings.Split(text, "\n"), strings.Split(blanked, "\n")
+	if len(after) != len(before) {
+		t.Fatalf("%d lines came back, want %d:\n%s", len(after), len(before), blanked)
+	}
+	for i := range before {
+		if !slices.Contains(rewritten, i) && after[i] != before[i] {
+			t.Errorf("line %d came back as %q, want it as written: %q", i+1, after[i], before[i])
+		}
+	}
+}
+
+// TestBlankColumn_EmptiesEachDataCellOfTheColumn: every data cell of the named column is emptied
+// and the column stays, while the header row, the delimiter row, the prose and a table without
+// the column come back as written.
+func TestBlankColumn_EmptiesEachDataCellOfTheColumn(t *testing.T) {
+	text := "Prose names `granted_ids`.\n" +
+		"|  Event | Details  |    Why |\n" +
+		"| :--- | --- | ---: |\n" +
+		"| `a` | `key_a` | one |\n" +
+		"| `b` | `key_b` and `key_c` | two |\n" +
+		"\n" +
+		"| Event | Why it matters |\n" +
+		"|---|---|\n" +
+		"| `c` | keyed by `user_id` |\n"
+	blanked := BlankColumn(text, "Details")
+	assertLinesKept(t, text, blanked, 3, 4)
+	assertTables(t, Tables(blanked), []Table{
+		{Header: []string{"Event", "Details", "Why"}, Rows: [][]string{{"`a`", "", "one"}, {"`b`", "", "two"}}},
+		{Header: []string{"Event", "Why it matters"}, Rows: [][]string{{"`c`", "keyed by `user_id`"}}},
+	})
+}
+
+// TestBlankColumn_TheColumnIsTheFirstHeaderCellEqualToTheHeader: a header cell that only starts
+// with the header is not it, and of two equal header cells the first is the column.
+func TestBlankColumn_TheColumnIsTheFirstHeaderCellEqualToTheHeader(t *testing.T) {
+	text := "| Details here | Details | Details |\n|---|---|---|\n| one | two | three |\n"
+	assertTables(t, Tables(BlankColumn(text, "Details")), []Table{
+		{Header: []string{"Details here", "Details", "Details"}, Rows: [][]string{{"one", "", "three"}}},
+	})
+}
+
+// TestBlankColumn_AnEscapedPipeStaysInItsCell: a pipe escaped in a cell before the column does not
+// move the column, and a pipe escaped in a kept cell is still in it once the row is rewritten.
+func TestBlankColumn_AnEscapedPipeStaysInItsCell(t *testing.T) {
+	text := "| Event | Details | Note |\n" +
+		"|---|---|---|\n" +
+		"| `a\\|b` | `payload_key` | `c\\|d` |\n" +
+		"| `e` | `f\\|g` | h\\\\|\n"
+	blanked := BlankColumn(text, "Details")
+	assertLinesKept(t, text, blanked, 2, 3)
+	assertTables(t, Tables(blanked), []Table{
+		{Header: []string{"Event", "Details", "Note"}, Rows: [][]string{{"`a|b`", "", "`c|d`"}, {"`e`", "", `h\\`}}},
+	})
+	if strings.Contains(blanked, "payload_key") {
+		t.Errorf("a cell of the column is still read:\n%s", blanked)
+	}
+}
+
+// TestBlankColumn_AFencedPipeLineIsKeptAndIsNoRow: a fenced line is text, not a row, so a table
+// inside a fence is kept as written and a fence ends the table before it.
+func TestBlankColumn_AFencedPipeLineIsKeptAndIsNoRow(t *testing.T) {
+	text := "| Event | Details |\n" +
+		"|---|---|\n" +
+		"| `a` | `k` |\n" +
+		"```\n" +
+		"| `fenced` | `in_fence` |\n" +
+		"| Event | Details |\n" +
+		"|---|---|\n" +
+		"| `b` | `also_fenced` |\n" +
+		"```\n"
+	blanked := BlankColumn(text, "Details")
+	assertLinesKept(t, text, blanked, 2)
+	assertTables(t, Tables(blanked), []Table{
+		{Header: []string{"Event", "Details"}, Rows: [][]string{{"`a`", ""}}},
+	})
+}
+
+// TestBlankColumn_ATableWithNoDelimiterRowIsKeptAsWritten: the header is the row a delimiter row
+// follows, so a table without one has no column to blank.
+func TestBlankColumn_ATableWithNoDelimiterRowIsKeptAsWritten(t *testing.T) {
+	text := "| Event | Details |\n| `a` | `k` |\n"
+	if blanked := BlankColumn(text, "Details"); blanked != text {
+		t.Errorf("a table with no delimiter row came back as\n%q\nwant\n%q", blanked, text)
+	}
+}
+
+// TestBlankColumn_ATextNoTableHasTheColumnInComesBackByteForByte: prose, a fenced block, indented
+// table lines, a table without the column and a missing final newline all come back as written.
+func TestBlankColumn_ATextNoTableHasTheColumnInComesBackByteForByte(t *testing.T) {
+	text := "## Events\r\n" +
+		"\n" +
+		"   |  Event |  Why |\n" +
+		"   |:--|--:|\n" +
+		"   | `a`   | `b\\|c`|\n" +
+		"\n" +
+		"```\n" +
+		"| Details |\n" +
+		"```\n" +
+		"Details is no table here."
+	if blanked := BlankColumn(text, "Details"); blanked != text {
+		t.Errorf("a text no table has the column in came back as\n%q\nwant\n%q", blanked, text)
+	}
+}
+
+// TestBlankColumn_AShortRowIsKeptAsWritten: a data row that stops before the column has nothing to
+// empty, so it comes back as written.
+func TestBlankColumn_AShortRowIsKeptAsWritten(t *testing.T) {
+	text := "| A | B | Details |\n|---|---|---|\n|  a1 |\n| a2 | b2 | d2 |\n"
+	blanked := BlankColumn(text, "Details")
+	assertLinesKept(t, text, blanked, 3)
+	assertTables(t, Tables(blanked), []Table{
+		{Header: []string{"A", "B", "Details"}, Rows: [][]string{{"a1"}, {"a2", "b2", ""}}},
+	})
+}
+
+// TestBlankColumn_ReadsBackAsTheSameTablesWithTheColumnEmpty: no cell is removed and an emptied
+// cell does not turn a row into a delimiter row, so the result reads as the same tables even where
+// removing the column could not: a table whose only column is the named one, a data row whose only
+// cell is in it, and a row of dashes above the header.
+func TestBlankColumn_ReadsBackAsTheSameTablesWithTheColumnEmpty(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		want       []Table
+	}{
+		{
+			"the only column", "| Details |\n|---|\n| `k` |\n",
+			[]Table{{Header: []string{"Details"}, Rows: [][]string{{""}}}},
+		},
+		{
+			"a row's only cell", "| Details | Why |\n|---|---|\n| `k` |\n",
+			[]Table{{Header: []string{"Details", "Why"}, Rows: [][]string{{""}}}},
+		},
+		{
+			"a row of dashes above the header", "| a | b |\n| --- | `k` |\n| Why | Details |\n|---|---|\n| w | `d` |\n",
+			[]Table{{Header: []string{"Why", "Details"}, Rows: [][]string{{"a", ""}, {"---", ""}, {"w", ""}}}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertTables(t, Tables(BlankColumn(tc.text, "Details")), tc.want)
+		})
+	}
+}

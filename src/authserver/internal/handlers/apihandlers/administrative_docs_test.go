@@ -82,7 +82,7 @@ type docNames struct {
 	kind string
 	live map[string]bool
 	want []string
-	// skipColumn is the header of a table column whose cells pattern does not read. The alert
+	// skipColumn is the header of a table column whose data cells pattern does not read. The alert
 	// section's Details column names payload keys, which are spelled in snake_case as the events
 	// are, so read with the events' pattern they would be taken for events.
 	skipColumn string
@@ -454,7 +454,7 @@ func assertDocNames(r guard.Reporter, root string, checks []docNames) {
 func assertNamesIn(r guard.Reporter, text string, check docNames) {
 	r.Helper()
 	if check.skipColumn != "" {
-		text = withoutTableColumn(text, check.skipColumn)
+		text = docsreader.BlankColumn(text, check.skipColumn)
 	}
 	named := make(map[string]bool)
 	for _, match := range check.pattern.FindAllStringSubmatch(text, -1) {
@@ -473,32 +473,6 @@ func assertNamesIn(r guard.Reporter, text string, check docNames) {
 			r.Errorf("%s: %s does not name the %s %s", check.section.page, check.section.heading, check.kind, name)
 		}
 	}
-}
-
-// withoutTableColumn is text with the column headed header left out of every Markdown table that
-// has one, its header and delimiter cells included; every other line is kept as it is.
-func withoutTableColumn(text, header string) string {
-	lines := strings.Split(text, "\n")
-	column := -1
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "|") {
-			column = -1
-			continue
-		}
-		cells := strings.Split(strings.Trim(trimmed, "|"), "|")
-		if column == -1 {
-			column = slices.IndexFunc(cells, func(cell string) bool { return strings.TrimSpace(cell) == header })
-			if column == -1 {
-				column = len(cells) // a table with no such column: no cell is left out
-			}
-		}
-		if column < len(cells) {
-			cells = slices.Delete(cells, column, column+1)
-		}
-		lines[i] = "|" + strings.Join(cells, "|") + "|"
-	}
-	return strings.Join(lines, "\n")
 }
 
 // writeDocFixture writes content to root/name, creating its directory.
