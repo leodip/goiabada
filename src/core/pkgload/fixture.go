@@ -4,7 +4,6 @@ import (
 	"go/version"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -115,8 +114,11 @@ func syntheticVersion(modulePath string) string {
 		}
 		return "v0.0.0"
 	}
-	if n, ok := strings.CutPrefix(path.Base(modulePath), "v"); ok && isMajor(n) && n != "0" && n != "1" {
-		return "v" + n + ".0.0"
+	// The suffix follows the path's last slash: a path that is only vN, with no slash, has none.
+	if i := strings.LastIndex(modulePath, "/"); i > 0 {
+		if n, ok := strings.CutPrefix(modulePath[i+1:], "v"); ok && isMajor(n) && n != "0" && n != "1" {
+			return "v" + n + ".0.0"
+		}
 	}
 	return "v0.0.0"
 }

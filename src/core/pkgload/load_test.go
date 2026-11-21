@@ -581,12 +581,13 @@ func TestMakeLoadable_GoLinesTheFixtureWroteThatDifferAreAnError(t *testing.T) {
 
 // A module path ending in a major version suffix is required at that major, which the go command
 // holds it to, and a directory whose name has a space is quoted in the replace line. A gopkg.in
-// path's suffix is .vN, and there .v1 is a major too, so v0.0.0 would be refused for it.
+// path's suffix is .vN, and there .v1 is a major too, so v0.0.0 would be refused for it. A path that
+// is only v2 has no suffix, since the suffix follows a slash.
 func TestMakeLoadable_RequiresAVersionedModuleAtItsMajorAndQuotesADirectoryWithASpace(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"app/go.mod": "module example.test/app\n",
 		"app/main.go": "package main\n\nimport (\n\t\"example.test/lib/v2/l\"\n\t\"example.test/spaced/s\"\n" +
-			"\t\"gopkg.in/example.v1/o\"\n\t\"gopkg.in/example.v2/w\"\n)\n\nfunc main() { l.F(); s.G(); o.H(); w.I() }\n",
+			"\t\"gopkg.in/example.v1/o\"\n\t\"gopkg.in/example.v2/w\"\n\t\"v2/b\"\n)\n\nfunc main() { l.F(); s.G(); o.H(); w.I(); b.J() }\n",
 		"lib/go.mod":       "module example.test/lib/v2\n",
 		"lib/l/l.go":       "package l\n\nfunc F() {}\n",
 		"gopkg1/go.mod":    "module gopkg.in/example.v1\n",
@@ -595,6 +596,8 @@ func TestMakeLoadable_RequiresAVersionedModuleAtItsMajorAndQuotesADirectoryWithA
 		"gopkg2/w/w.go":    "package w\n\nfunc I() {}\n",
 		"local lib/go.mod": "module example.test/spaced\n",
 		"local lib/s/s.go": "package s\n\nfunc G() {}\n",
+		"bare/go.mod":      "module v2\n",
+		"bare/b/b.go":      "package b\n\nfunc J() {}\n",
 	})
 	require.NoError(t, pkgload.MakeLoadable(root))
 
@@ -606,6 +609,7 @@ func TestMakeLoadable_RequiresAVersionedModuleAtItsMajorAndQuotesADirectoryWithA
 	assert.Contains(t, string(src), "replace example.test/lib/v2 => ../lib\n")
 	assert.Contains(t, string(src), "require gopkg.in/example.v1 v1.0.0\n")
 	assert.Contains(t, string(src), "require gopkg.in/example.v2 v2.0.0\n")
+	assert.Contains(t, string(src), "require v2 v0.0.0\n", "a path that is only vN carries no suffix")
 
 	app, err := pkgload.Load(filepath.Join(root, "app"), pkgload.Build{})
 	require.NoError(t, err)
