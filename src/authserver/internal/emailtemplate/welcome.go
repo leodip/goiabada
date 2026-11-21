@@ -83,6 +83,22 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject:     "Witamy!",
+			ButtonLabel: "Zaloguj się",
+			Body: `Gratulacje! Twoje konto zostało utworzone.
+
+Możesz się zalogować, klikając poniższy link:
+
+{{button}}
+
+{{link}}
+
+Jeśli nie możesz kliknąć linku, skopiuj go i wklej w pasku adresu przeglądarki.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		//nolint:misspell // the pt-BR text: "problemas" is Portuguese, not a misspelling of "problems"
 		"pt-BR": {
 			Subject:     "Bem-vindo(a)!",

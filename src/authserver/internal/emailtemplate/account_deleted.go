@@ -73,6 +73,19 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject: "Usunięto Twoje konto",
+			Body: `Dzień dobry {{name}},
+
+Twoje konto w {{app_name}} zostało usunięte w ustawieniach konta. Nie możesz się już na nie zalogować, a aplikacje nie mają już do niego dostępu.
+
+Jeśli to Ty, nie musisz nic robić.
+
+**Jeśli nie, ktoś inny znał Twoje hasło.** Skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Sua conta foi excluída",
 			Body: `Olá {{name}},

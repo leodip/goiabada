@@ -984,7 +984,7 @@ func TestValidateProfile_PageLanguage(t *testing.T) {
 		assert.NoError(t, validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: nil}))
 	})
 
-	for _, accepted := range []string{"", "en", "pt-BR", "es", "fr", "it", "de"} {
+	for _, accepted := range []string{"", "en", "pt-BR", "es", "fr", "it", "de", "pl"} {
 		t.Run("accepted/"+accepted, func(t *testing.T) {
 			pageLanguage := accepted
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: &pageLanguage})

@@ -71,7 +71,7 @@ func emailTemplatesStore(t *testing.T) sessionstore.Store {
 // summary is one email as the list gives it, every language at the built-in text but those named.
 func summary(id string, statuses map[string]string) api.EmailTemplateSummaryResponse {
 	s := api.EmailTemplateSummaryResponse{ID: id}
-	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
+	for _, tag := range []string{"en", "de", "es", "fr", "it", "pl", "pt-BR"} {
 		status := "default"
 		if named, ok := statuses[tag]; ok {
 			status = named

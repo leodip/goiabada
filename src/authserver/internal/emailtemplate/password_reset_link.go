@@ -101,6 +101,26 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject:     "Resetowanie hasła",
+			ButtonLabel: "Zresetuj hasło",
+			Body: `Dzień dobry {{name}},
+
+Aby zresetować hasło, kliknij poniższy link:
+
+{{button}}
+
+{{link}}
+
+Link wygaśnie za {{expiry}}.
+
+Jeśli nie możesz kliknąć linku, skopiuj go i wklej w pasku adresu przeglądarki.
+
+**Jeśli prośba o zresetowanie hasła nie pochodziła od Ciebie, zignoruj tę wiadomość.**
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		//nolint:misspell // the pt-BR text: "problemas" is Portuguese, not a misspelling of "problems"
 		"pt-BR": {
 			Subject:     "Redefinição de senha",

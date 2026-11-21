@@ -73,6 +73,20 @@ Se l'avevi chiesto tu, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Administrator zmienił Twoje hasło",
+			Body: `Dzień dobry {{name}},
+
+Administrator zmienił hasło do Twojego konta w {{app_name}}.
+
+Jeśli zmiana nastąpiła na Twoją prośbę, nie musisz nic robić.
+
+**Jeśli się tego nie spodziewasz, skontaktuj się z administratorem.** Możesz też ustawić nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zalogować się i sprawdzić ustawienia uwierzytelniania dwuskładnikowego.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Um administrador alterou a sua senha",
 			Body: `Olá {{name}},

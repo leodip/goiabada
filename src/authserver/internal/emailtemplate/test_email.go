@@ -37,6 +37,12 @@ Se envió desde la configuración de correo para comprobar que se pueden enviar 
 
 È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro.`,
 		},
+		"pl": {
+			Subject: "{{app_name}} – testowa wiadomość e-mail",
+			Body: `To jest testowa wiadomość e-mail z {{app_name}}.
+
+Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.`,
+		},
 		"pt-BR": {
 			Subject: "{{app_name}} - e-mail de teste",
 			Body: `Este é um e-mail de teste enviado por {{app_name}}.

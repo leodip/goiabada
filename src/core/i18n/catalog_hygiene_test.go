@@ -102,6 +102,7 @@ var pluralCategories = map[string][]string{
 	"es":    {"one", "other"},
 	"fr":    {"one", "other"},
 	"it":    {"one", "other"},
+	"pl":    {"one", "few", "many", "other"},
 	"pt-BR": {"one", "other"},
 }
 

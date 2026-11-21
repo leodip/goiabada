@@ -215,11 +215,12 @@ func comboboxStrings(lang string) map[string]string {
 
 // A searchable select's status counts the matches in the page's language as the person types, by the
 // count's CLDR category: no match reads the singular in French and Portuguese (Brazil), the form CLDR
-// gives zero there, and the plural in the other built-in languages.
+// gives zero there, and the plural in the other built-in languages: in Polish, many for zero and few
+// for 2 to 4.
 func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 	options := []string{"Choose a zone", "Europe/Lisbon", "Europe/Paris", "America/Sao_Paulo"}
 	queries := []string{"zzz", "lisb", "europe", "o"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "pl"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -234,5 +235,6 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("es", "0 resultados", "1 resultado", "2 resultados", "4 resultados"),
 		status("it", "0 risultati", "1 risultato", "2 risultati", "4 risultati"),
 		status("de", "0 Treffer", "1 Treffer", "2 Treffer", "4 Treffer"),
+		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki"),
 	})
 }

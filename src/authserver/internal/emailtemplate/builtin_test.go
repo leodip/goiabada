@@ -13,7 +13,7 @@ import (
 )
 
 // The built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
+var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pl", "pt-BR"}
 
 func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
@@ -67,6 +67,8 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Pour réinitialiser votre mot de passe, cliquez sur le lien ci-dessous :", "Le lien expire dans 5 minutes."},
 		{"it", "Reimpostazione della password", "Reimposta la password", "Ciao Ana,",
 			"Per reimpostare la password, apri questo link:", "Il link scade tra 5 minuti."},
+		{"pl", "Resetowanie hasła", "Zresetuj hasło", "Dzień dobry Ana,",
+			"Aby zresetować hasło, kliknij poniższy link:", "Link wygaśnie za 5 minut."},
 		{"pt-BR", "Redefinição de senha", "Redefinir senha", "Olá Ana,",
 			"Você pode redefinir sua senha clicando no link abaixo:", "O link expira em 5 minutos."},
 	} {
@@ -139,6 +141,21 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"it", 0, "0 minuti"},
 		{"it", 24 * time.Hour, "24 ore"},
 		{"it", time.Hour, "1 ora"},
+		// Polish writes the unit in the accusative the expiry sentences take (#665 decision 3): one
+		// for 1, few for 2 to 4 and 22 to 24, many for 0, 5 to 21 and 25 on.
+		{"pl", time.Minute, "1 minutę"},
+		{"pl", 2 * time.Minute, "2 minuty"},
+		{"pl", 4 * time.Minute, "4 minuty"},
+		{"pl", 5 * time.Minute, "5 minut"},
+		{"pl", 12 * time.Minute, "12 minut"},
+		{"pl", 21 * time.Minute, "21 minut"},
+		{"pl", 22 * time.Minute, "22 minuty"},
+		{"pl", 0, "0 minut"},
+		{"pl", time.Hour, "1 godzinę"},
+		{"pl", 2 * time.Hour, "2 godziny"},
+		{"pl", 5 * time.Hour, "5 godzin"},
+		{"pl", 24 * time.Hour, "24 godziny"},
+		{"pl", 48 * time.Hour, "48 godzin"},
 		{"pt-BR", 5 * time.Minute, "5 minutos"},
 		{"pt-BR", time.Minute, "1 minuto"},
 		{"pt-BR", 2 * time.Minute, "2 minutos"},
@@ -187,7 +204,7 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 	for locale, want := range map[string]string{
 		"en": "en", "en-GB": "en", "de": "de", "de-AT": "de", "es-MX": "es", "fr-CA": "fr", "fr-CH": "fr",
 		"it-CH": "it", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
-		"pt-PT": "pt-BR",
+		"pt-PT": "pt-BR", "pl": "pl", "pl-PL": "pl",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.
 		"gl": "en", "eu": "en",

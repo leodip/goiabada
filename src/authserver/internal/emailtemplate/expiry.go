@@ -12,13 +12,16 @@ type expiryUnit struct{ minute, hour string }
 
 // expiryUnits are a minute's and an hour's names in each built-in language, one per CLDR cardinal
 // category the language's whole counts reach, keyed as i18n.PluralCategory names it (#665
-// decision 2), so the rule for which name a count takes is the catalogs' rule.
+// decision 2), so the rule for which name a count takes is the catalogs' rule. Polish's names are in
+// the accusative, the case its expiry sentences take ("Link wygaśnie za 5 minut.", "Link jest ważny
+// przez 24 godziny."), as an administrator's sentence is likelier to run (#665 decision 3).
 var expiryUnits = map[string]map[string]expiryUnit{
 	"en":    {"one": {"minute", "hour"}, "other": {"minutes", "hours"}},
 	"de":    {"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}},
 	"es":    {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},
 	"fr":    {"one": {"minute", "heure"}, "other": {"minutes", "heures"}},
 	"it":    {"one": {"minuto", "ora"}, "other": {"minuti", "ore"}},
+	"pl":    {"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}},
 	"pt-BR": {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},
 }
 

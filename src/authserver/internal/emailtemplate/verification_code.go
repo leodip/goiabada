@@ -78,6 +78,21 @@ Puoi inserire il codice qui: {{link}}
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject: "Weryfikacja adresu e-mail – kod {{code}}",
+			Body: `Dzień dobry {{name}},
+
+Oto Twój kod weryfikacyjny adresu e-mail:
+
+{{code}}
+
+Kod wygaśnie za {{expiry}}.
+
+Kod możesz wpisać tutaj: {{link}}
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Verificação de e-mail - código {{code}}",
 			Body: `Olá {{name}},
