@@ -895,8 +895,10 @@ func TestDiscardedErrors_EveryListedFunctionReturnsAnError(t *testing.T) {
 }
 
 // A renamed function, a renamed method, a method the type has only by embedding another, and a
-// function whose last result is no longer an error each leave an entry that guards nothing.
-// Envelope's Decrypt, on another type, stands in for none of them.
+// function whose last result is no longer an error each leave an entry that guards nothing, and the
+// entries beside them that still guard something pass. Envelope's Decrypt, on another type, stands
+// in for none of the stale ones. The case lists entries of its own, so an entry the real lists gain
+// needs nothing here.
 func TestDiscardedErrors_ListCheck_ReportsEachEntryThatGuardsNothing(t *testing.T) {
 	root := t.TempDir()
 	writeDiscardedErrorModule(t, root)
@@ -925,7 +927,19 @@ type Material struct{}
 func Generate(bits int, kid string) (Material, bool) { return Material{}, true }
 `)
 
-	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	const internal = "github.com/leodip/goiabada/authserver/internal/"
+	listed := map[string][]string{
+		internal + "passwordhash": {"Hash"},
+		internal + "encryption":   {"EncryptText", "DecryptText"},
+		internal + "rsakey":       {"Generate"},
+	}
+	methods := []discardedErrorMethod{
+		{internal + "encryption", "DataCipher", "Encrypt"},
+		{internal + "encryption", "DataCipher", "Decrypt"},
+		{internal + "encryption", "Envelope", "Decrypt"},
+	}
+
+	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, listed, methods)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
 		"encryption.DataCipher.Decrypt is listed, but no build of github.com/leodip/goiabada/authserver/internal/encryption declares it returning an error last",
