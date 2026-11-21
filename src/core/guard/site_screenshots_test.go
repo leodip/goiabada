@@ -81,7 +81,7 @@ func TestSiteScreenshots_EveryOneTheCommandWritesIsShown(t *testing.T) {
 	}
 	for _, name := range screenshotsWritten(t, readFile(t, filepath.Join(root, screenshotsList))) {
 		_, err := os.Stat(filepath.Join(root, siteAssetsFolder, name))
-		assert.NoErrorf(t, err, "%s lists %s, which is not among %s", screenshotsList, name, siteAssetsFolder)
+		require.NoErrorf(t, err, "%s lists %s, which is not among %s", screenshotsList, name, siteAssetsFolder)
 		assert.Truef(t, shown[name], "%s lists %s, which neither %s nor %s shows", screenshotsList, name, homePage, readmePage)
 	}
 }
