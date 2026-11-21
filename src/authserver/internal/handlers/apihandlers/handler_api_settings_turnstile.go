@@ -197,6 +197,14 @@ func HandleSettingsTurnstilePut(
 				if req.TurnstileEnabled && len(locked) == 0 {
 					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRequired, nil)
 				}
+				// A save that turns the challenge on checks the secret key it puts in use with
+				// Cloudflare first. This one checked none, since the challenge was on when its request
+				// read the row; another save turned it off meanwhile, so this save would turn it on
+				// with the row's secret key unchecked. It is refused instead: the secret key entered
+				// again is checked.
+				if req.TurnstileEnabled && !stored.TurnstileEnabled {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRequired, nil)
+				}
 				secret = locked
 			}
 			oldVals = turnstileSettingsAuditValues(stored)

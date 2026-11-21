@@ -48,8 +48,12 @@ var (
 	reencryptOtherKey = []byte("reencrypt-test-other-data-key-01")
 )
 
-// reencryptStopAcknowledgement is the line the command answers its first stop signal with.
-const reencryptStopAcknowledgement = "stopping: no further stored secret will be re-encrypted"
+// reencryptStopAcknowledgement is the line the command answers its first stop signal with, and
+// reencryptStopReminder the one it answers every further one with, once the stop is made.
+const (
+	reencryptStopAcknowledgement = "stopping: no further stored secret will be re-encrypted"
+	reencryptStopReminder        = "still stopping: a further Ctrl-C changes nothing"
+)
 
 // The plaintexts of the stored secrets each test database holds.
 const (
@@ -644,11 +648,12 @@ func TestReencrypt_TheEventObeysTheAuditSwitches(t *testing.T) {
 	assert.Empty(t, reencryptAuditRows(t, db))
 }
 
-// reencryptStopTrigger holds the sweep's first client write inside it until the case lets it go:
-// a trigger on the clients table calls the blocking function migrate's stop tests hold their files
-// with.
+// reencryptStopTrigger holds the sweep's first client write, client-1's, inside it until the case
+// lets it go: a trigger on the clients table calls the blocking function migrate's stop tests hold
+// their files with. It fires for that client alone, so a write to the second is left for the case
+// to find rather than meeting a hold already used.
 const reencryptStopTrigger = "CREATE TRIGGER reencrypt_test_hold AFTER UPDATE OF client_secret_encrypted ON clients " +
-	"BEGIN SELECT " + blockingFunction + "(); END"
+	"WHEN NEW.client_identifier = 'client-1' BEGIN SELECT " + blockingFunction + "(); END"
 
 // reencryptCounts reads the two counts out of a line the command printed.
 func reencryptCounts(t *testing.T, pattern, printed string) (int, int) {
@@ -672,6 +677,11 @@ func reencryptCounts(t *testing.T, pattern, printed string) (int, int) {
 // first run's count is exactly what it committed, which the second run finds already under the new
 // key, and its event is written exactly when that count is not zero (#492 decision 8). With the
 // SMTP password already under the new key, the held client write is the run's first.
+//
+// The held write is let go only once the stop is made: the acknowledgement is printed before it,
+// so the case sends the signal again and waits for the reminder, printed after it. The held write
+// may then commit or roll back, but no further one starts: the second client and the signing key
+// are as they were before the run.
 func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		for _, smtp := range []struct {
@@ -692,6 +702,9 @@ func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 				})
 				_, err := db.DB.Exec(reencryptStopTrigger)
 				require.NoError(t, err)
+				before := storedSecrets(t, db)
+				require.NotEmpty(t, before["clients.client-2"])
+				require.NotEmpty(t, before["key_pairs.current"])
 
 				var stderr bytes.Buffer
 				inv, ok := readReencryptCommand([]string{"--db-dsn=file:" + path}, sqliteBase(path), &stderr)
@@ -714,6 +727,12 @@ func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 				require.Eventually(t, func() bool {
 					return strings.Contains(out.String(), reencryptStopAcknowledgement)
 				}, 10*time.Second, 10*time.Millisecond, "the signal is answered as it arrives")
+				// The second signal is sent once the first is answered, since the kernel coalesces
+				// two identical signals still pending.
+				require.NoError(t, syscall.Kill(syscall.Getpid(), sig))
+				require.Eventually(t, func() bool {
+					return strings.Contains(out.String(), reencryptStopReminder)
+				}, 10*time.Second, 10*time.Millisecond, "the stop is made while the write is held")
 				hold.let()
 
 				var code int
@@ -723,7 +742,8 @@ func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 					t.Fatal("reencrypt did not return after the held write was let go")
 				}
 				require.Equal(t, migrateExitError, code, "%s%s", out.String(), stderr.String())
-				assert.True(t, strings.HasPrefix(out.String(), reencryptStopAcknowledgement+"\n"), out.String())
+				assert.True(t, strings.HasPrefix(out.String(), reencryptStopAcknowledgement+"\n"+reencryptStopReminder+"\n"),
+					out.String())
 				assert.NotContains(t, out.String(), "stored secrets re-encrypted to the current data key",
 					"a stop is not a finished run")
 				first, _ := reencryptCounts(t, `stopped by a signal: stored secrets re-encrypted so far: (\d+), `+
@@ -731,8 +751,14 @@ func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 				if smtp.alreadyCurrent == 0 {
 					assert.GreaterOrEqual(t, first, 1, "the SMTP password, before the clients, was re-encrypted")
 				}
-				assert.Less(t, first, 4-smtp.alreadyCurrent, "the run ended before the end")
+				assert.LessOrEqual(t, first, 2-smtp.alreadyCurrent,
+					"the run ended at the held write: the SMTP password and the held client at most")
 				assert.Empty(t, stderr.String(), "a stop is not a failure")
+				stopped := storedSecrets(t, db)
+				assert.Equal(t, before["clients.client-2"], stopped["clients.client-2"],
+					"no write starts after the stop: the second client is as it was")
+				assert.Equal(t, before["key_pairs.current"], stopped["key_pairs.current"],
+					"nor is the signing key re-encrypted")
 
 				rows := reencryptAuditRows(t, db)
 				if first == 0 {

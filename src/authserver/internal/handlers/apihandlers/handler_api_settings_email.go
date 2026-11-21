@@ -321,7 +321,7 @@ func sealKeptSecretAgain(ctx context.Context, dataCipher *encryption.DataCipher,
 
 	plaintext, err := dataCipher.Decrypt(ciphertext)
 	if err != nil {
-		slog.WarnContext(ctx, "the kept stored secret opens under neither data encryption key, so the save keeps it as stored",
+		slog.WarnContext(ctx, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
 			"secret", secret, "error", err)
 		return nil, false, nil
 	}

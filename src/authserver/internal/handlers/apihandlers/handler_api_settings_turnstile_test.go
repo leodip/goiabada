@@ -356,7 +356,7 @@ func TestHandleSettingsTurnstilePut_AKeptSecretKeyNeitherKeyOpensIsWrittenBackAs
 			records := capture.Records()
 			require.Len(t, records, 1)
 			assert.Equal(t, slog.LevelWarn, records[0].Level)
-			assert.Equal(t, "the kept stored secret opens under neither data encryption key, so the save keeps it as stored",
+			assert.Equal(t, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
 				records[0].Message)
 			assert.Equal(t, "turnstile_secret_key", records[0].Attrs["secret"])
 		})
@@ -438,6 +438,73 @@ func TestHandleSettingsTurnstilePut_AKeptSecretKeyNeitherKeyOpensNeverOverwrites
 			assert.NotEqual(t, unreadable, save.written.TurnstileSecretKeyEncrypted, "the request's stale bytes are not written")
 		})
 	}
+}
+
+// A save keeping a secret key neither data key opens, read with the challenge on, checks no secret
+// key with Cloudflare. When another save turned the challenge off meanwhile, it would turn the
+// challenge on with the row's secret key unchecked, and a key Cloudflare rejects lets every form
+// through: it is refused, and the secret key is checked once it is entered again. Turning the
+// challenge off, or keeping it off, still saves.
+func TestHandleSettingsTurnstilePut_ASaveKeepingAnUnreadableSecretKeyNeverTurnsTheChallengeOnUnchecked(t *testing.T) {
+	strangerCipher, err := encryption.NewDataCipher([]byte("ffffffffffffffffffffffffffffffff"))
+	require.NoError(t, err)
+	unreadable, err := strangerCipher.Encrypt(turnstileStoredSecretKey)
+	require.NoError(t, err)
+	replaced, err := currentKeyOnlyCipher.Encrypt(turnstileEnteredSecretKey)
+	require.NoError(t, err)
+
+	for _, lockedSecret := range []struct {
+		name  string
+		bytes []byte
+	}{
+		{name: "the same secret key", bytes: unreadable},
+		{name: "a secret key entered meanwhile", bytes: replaced},
+	} {
+		lockedOff := func() *record.Settings {
+			locked := turnstileSaveSettings(t, false, false)
+			locked.TurnstileSecretKeyEncrypted = bytes.Clone(lockedSecret.bytes)
+			return locked
+		}
+		read := turnstileSaveSettings(t, true, false)
+		read.TurnstileSecretKeyEncrypted = bytes.Clone(unreadable)
+
+		t.Run("challenge kept on, turned off meanwhile, "+lockedSecret.name, func(t *testing.T) {
+			checker := acceptingSecretKeyChecker()
+			save := serveTurnstileSaveUnder(t, rotatingDataCipher, read, lockedOff(),
+				turnstileSaveBody(t, true, turnstileTestSiteKey, nil), checker)
+
+			assert.Equal(t, http.StatusBadRequest, save.rr.Code, save.rr.Body.String())
+			code, _ := decodeErrorEnvelope(t, save.rr)
+			assert.Equal(t, "handler.settings_turnstile.secret_key_required", code)
+			assert.Nil(t, save.written, "the challenge is not turned on")
+			assert.Empty(t, checker.checked)
+		})
+
+		t.Run("challenge kept off, turned off meanwhile, "+lockedSecret.name, func(t *testing.T) {
+			save := serveTurnstileSaveUnder(t, rotatingDataCipher, read, lockedOff(),
+				turnstileSaveBody(t, false, turnstileTestSiteKey, nil), acceptingSecretKeyChecker())
+
+			require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+			require.NotNil(t, save.written)
+			assert.False(t, save.written.TurnstileEnabled)
+			assert.Equal(t, lockedSecret.bytes, save.written.TurnstileSecretKeyEncrypted, "the row's secret key, as locked")
+		})
+	}
+
+	t.Run("the secret key entered again is checked before the challenge is turned on", func(t *testing.T) {
+		read := turnstileSaveSettings(t, false, false)
+		read.TurnstileSecretKeyEncrypted = bytes.Clone(unreadable)
+		checker := acceptingSecretKeyChecker()
+
+		save := serveTurnstileSaveUnder(t, rotatingDataCipher, read, nil,
+			turnstileSaveBody(t, true, turnstileTestSiteKey, map[string]interface{}{"turnstileSecretKey": turnstileEnteredSecretKey}),
+			checker)
+
+		require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+		assert.Equal(t, []string{turnstileEnteredSecretKey}, checker.checked)
+		require.NotNil(t, save.written)
+		assert.True(t, save.written.TurnstileEnabled)
+	})
 }
 
 // A non-empty secret key replaces the stored one, whether or not one was stored and whether or not

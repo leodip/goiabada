@@ -439,7 +439,7 @@ func TestHandleSettingsEmailPut_AKeptPasswordNeitherKeyOpensIsWrittenBackAsStore
 	records := capture.Records()
 	require.Len(t, records, 1)
 	assert.Equal(t, slog.LevelWarn, records[0].Level)
-	assert.Equal(t, "the kept stored secret opens under neither data encryption key, so the save keeps it as stored",
+	assert.Equal(t, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
 		records[0].Message)
 	assert.Equal(t, "smtp_password", records[0].Attrs["secret"])
 	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
