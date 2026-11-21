@@ -1,0 +1,92 @@
+# The Compose project e2e/screenshots.sh runs: both servers built from the release Dockerfiles from
+# this checkout, on a new SQLite database in memory, Mailpit, and the browser from Playwright's image.
+# The script passes every ${...} below; run it rather than this file.
+#
+# Nothing is published: every service runs in the auth server's network namespace, so the browser
+# reaches both servers on localhost, where the auth server accepts the admin console's plain HTTP
+# address, and the auth server reaches Mailpit there too.
+services:
+  authserver:
+    build:
+      context: ../src
+      dockerfile: build/Dockerfile-authserver
+      # The stamp an unstamped build reports, so the console's footer reads "Version development
+      # (development)" on every commit: the release Dockerfiles give these no default.
+      args:
+        version: development
+        buildDate: development
+        gitCommit: development
+    environment:
+      GOIABADA_AUTHSERVER_BASEURL: http://localhost:9090
+      GOIABADA_ADMINCONSOLE_BASEURL: http://localhost:9091
+      GOIABADA_DB_TYPE: sqlite
+      GOIABADA_AES_ENCRYPTION_KEY: ${SCREENSHOTS_AES_ENCRYPTION_KEY:?run e2e/screenshots.sh}
+      GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY: ${SCREENSHOTS_AUTHSERVER_SESSION_AUTHENTICATION_KEY:?run e2e/screenshots.sh}
+      GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY: ${SCREENSHOTS_AUTHSERVER_SESSION_ENCRYPTION_KEY:?run e2e/screenshots.sh}
+      GOIABADA_ADMIN_EMAIL: admin@example.com
+      GOIABADA_ADMIN_PASSWORD: ${SCREENSHOTS_ADMIN_PASSWORD:?run e2e/screenshots.sh}
+      GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET: ${SCREENSHOTS_ADMINCONSOLE_OAUTH_CLIENT_SECRET:?run e2e/screenshots.sh}
+    # The image's own check of /health, probed every second rather than every ten.
+    healthcheck:
+      interval: 1s
+
+  adminconsole:
+    build:
+      context: ../src
+      dockerfile: build/Dockerfile-adminconsole
+      args:
+        version: development
+        buildDate: development
+        gitCommit: development
+    network_mode: service:authserver
+    depends_on:
+      authserver:
+        condition: service_healthy
+    environment:
+      GOIABADA_AUTHSERVER_BASEURL: http://localhost:9090
+      GOIABADA_ADMINCONSOLE_BASEURL: http://localhost:9091
+      GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY: ${SCREENSHOTS_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY:?run e2e/screenshots.sh}
+      GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY: ${SCREENSHOTS_ADMINCONSOLE_SESSION_ENCRYPTION_KEY:?run e2e/screenshots.sh}
+      GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET: ${SCREENSHOTS_ADMINCONSOLE_OAUTH_CLIENT_SECRET:?run e2e/screenshots.sh}
+    healthcheck:
+      interval: 1s
+
+  # Saving the email settings dials the SMTP server, localhost:1025 here, so one has to listen.
+  # tools.mailpit in src/authserver/versions.yaml, written here by ./version-manager.sh update.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    network_mode: service:authserver
+
+  # The browser: Playwright's own image at the version the e2e suite pins (e2e/playwright/
+  # package.json), for this machine's platform. It copies the suite from the read-only mount,
+  # installs its packages, checks its types, and runs screenshots.config.ts, which writes the images
+  # into /out; the script copies them from there.
+  capture:
+    image: mcr.microsoft.com/playwright:v${SCREENSHOTS_PLAYWRIGHT_VERSION:?run e2e/screenshots.sh}-noble
+    network_mode: service:authserver
+    volumes:
+      - ./playwright:/suite:ro
+    # The environment the suite's helpers read (lib/environment.ts) in place of e2e/.state. There is
+    # no test app: its addresses are under .invalid, which never resolves (RFC 6761), so a helper
+    # that reaches for one fails there.
+    environment:
+      E2E_ENVIRONMENT: process
+      E2E_TAG: development
+      E2E_AUTH_URL: http://localhost:9090
+      E2E_ADMIN_URL: http://localhost:9091
+      E2E_WEBTEST1_URL: http://webtest1.invalid
+      E2E_WEBTEST2_URL: http://webtest2.invalid
+      E2E_ADMIN_EMAIL: admin@example.com
+      E2E_ADMIN_PASSWORD: ${SCREENSHOTS_ADMIN_PASSWORD:?run e2e/screenshots.sh}
+      SCREENSHOTS_OUT: /out
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+    working_dir: /work
+    command:
+      - bash
+      - -euc
+      - |
+        tar -C /suite --exclude=./node_modules --exclude=./test-results --exclude=./playwright-report -cf - . | tar -xf -
+        npm ci --no-audit --no-fund --loglevel=error
+        npm run typecheck
+        mkdir -p /out
+        npx playwright test -c screenshots.config.ts
