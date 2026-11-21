@@ -253,7 +253,7 @@ export async function userIdIfListed(page: Page, email: string): Promise<number 
   return idInRowLink(link, `${email} on ${listUrl}`);
 }
 
-export type ResourceTab ="settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";
+export type ResourceTab = "settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";
 
 export function resourceUrl(id: number, tab: ResourceTab): string {
   return `${env.adminUrl}/admin/resources/${id}/${tab}`;
