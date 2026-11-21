@@ -38,8 +38,9 @@ CodeRabbit (`coderabbitai[bot]`) reviews every pull request, and again on each p
   `//line` directive, or `core/pkgload` setting `GOPACKAGESDRIVER=off`. When the guard
   passes such a form silently, fix it by having the guard report the form as one it
   cannot read, not by teaching it the form; when the guard reports it already, the reply
-  says so. Only a misreading of code the tree contains is significant ("Guards that
-  read code or configuration" in `docs/development/guards.md`).
+  says so. Only a misreading of code the tree contains, or a change that breaks what a
+  fixture already there holds, is significant ("Guards that read code or
+  configuration" in `docs/development/guards.md`).
 - **It knows only the diff.** It often misses a decision the agreement or the
   decisions recorded, a guard elsewhere, or an engine-specific case it did not read: a
   comment that contradicts one of them is not valid, and the reply names it.
