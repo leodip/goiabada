@@ -291,6 +291,10 @@ func TestRules(t *testing.T) {
 	// be a finding against a CreateUser of three; both are refused, in both call forms.
 	sender.AssertNotCalled(t, "Ping", []any{}...)
 	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", []any{mock.Anything, mock.Anything, mock.Anything}...)
+
+	// Row 18: the selector in parentheses, which is the same call. One matcher against a
+	// CreateUser of three is a finding.
+	(database.AssertNotCalled)(t, "CreateUser", mock.Anything)
 }
 `)
 	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
@@ -343,7 +347,7 @@ func TestSupport(t *testing.T) {
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 15, sites,
+	assert.Equal(t, 16, sites,
 		"every testify assertion is reached once, including the five the walk refuses, and "+
 			"neither call of a method merely spelled like it")
 
@@ -353,6 +357,7 @@ func TestSupport(t *testing.T) {
 		"GetUserById 1/3 on *doubles.Database",
 		"CreateUser 2/3 on *doubles.Database",
 		"Send 0/2 on *local",
+		"CreateUser 1/3 on *doubles.Database",
 		"CreateUser 1/3 on *doubles.Database",
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))

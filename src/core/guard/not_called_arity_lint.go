@@ -223,7 +223,8 @@ func notCalledSitesIn(
 		if !ok {
 			return true
 		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
+		// Parentheses around the selector, (m.AssertNotCalled)(t, ...), change nothing about the call.
+		sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
 		if !ok || !isNotCalledSite(info, sel) {
 			return true
 		}
