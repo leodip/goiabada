@@ -20,22 +20,22 @@ import (
 
 // SectionText is the text of the section heading opens in an already-read page: the lines after
 // the heading up to the next heading of the same or higher level outside a code fence, the fenced
-// lines among them, and a deeper heading's line too. A heading inside a fence opens and ends
-// nothing. An empty heading reads the whole page. found is false when the page has no such section,
-// and the text is empty with it.
+// lines among them, and a deeper heading's line too. A heading inside a fence, as fence reads one,
+// opens and ends nothing. An empty heading reads the whole page. found is false when the page has
+// no such section, and the text is empty with it.
 func SectionText(page, heading string) (text string, found bool) {
 	if heading == "" {
 		return page, true
 	}
 	level := headingLevel(heading)
-	var section strings.Builder
-	inSection, inFence := false, false
+	var (
+		section   strings.Builder
+		inSection bool
+		code      fence
+	)
 	for _, line := range strings.Split(page, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			inFence = !inFence
-		}
-		if !inFence {
+		if !code.fenced(trimmed) {
 			if lineLevel := headingLevel(line); lineLevel > 0 {
 				if inSection && lineLevel <= level {
 					break
@@ -109,9 +109,9 @@ func (t Table) Columns(headers ...string) ([][]string, error) {
 }
 
 // Tables returns every table in text, in the order the page reads them. Fenced code holds no
-// table: a line inside a code fence is never a row, and a fence line ends the table before it. The
-// delimiter row under a header is neither a header nor a data row, and the header is the row the
-// first delimiter row follows.
+// table: a line inside a code fence, as fence reads one, is never a row, and a fence line ends the
+// table before it. The delimiter row under a header is neither a header nor a data row, and the
+// header is the row the first delimiter row follows.
 func Tables(text string) []Table {
 	return tables(strings.Split(text, "\n"))
 }
@@ -163,22 +163,18 @@ type run struct {
 	lines []int
 }
 
-// runs is the one walk over a text's lines that tables reads: each run of table rows
-// in the order the page reads them. A row is a line that opens with a pipe outside a code fence; a
-// fence line, a fenced line and any other line end the run before it.
+// runs is the one walk over a text's lines that tables reads: each run of table rows in the order
+// the page reads them. A row is a line that opens with a pipe outside a code fence, as fence reads
+// one; a fence line, a fenced line and any other line end the run before it.
 func runs(lines []string) []run {
 	var (
 		found   []run
 		current run
-		inFence bool
+		code    fence
 	)
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		fence := strings.HasPrefix(trimmed, "```")
-		if fence {
-			inFence = !inFence
-		}
-		if fence || inFence || !strings.HasPrefix(trimmed, "|") {
+		if code.fenced(trimmed) || !strings.HasPrefix(trimmed, "|") {
 			if len(current.rows) > 0 {
 				found = append(found, current)
 				current = run{}
@@ -192,6 +188,46 @@ func runs(lines []string) []run {
 		found = append(found, current)
 	}
 	return found
+}
+
+// fence is the code fence a walk over a page's lines is in, the one rule every walk in this package
+// reads fenced code by, so a section and its tables agree on which lines are code. A fence opens on
+// a line that starts with a run of at least three backticks or at least three tildes, whatever
+// follows the run, and it closes on a line that is a run of the same character, at least as long
+// as the one that opened it, with nothing but whitespace after it. While it is open every line is
+// code, a line that would open a fence among them: a run of the other character, a shorter run or
+// a run with text after it closes nothing. A fence still open at the end of the page holds every
+// line after its opening one. The zero fence is closed.
+type fence struct {
+	marker byte
+	length int
+}
+
+// fenced reads one line, trimmed, and says whether it is code: the line that opens a fence, a line
+// inside one, or the line that closes it.
+func (f *fence) fenced(trimmed string) bool {
+	marker, length := fenceRun(trimmed)
+	if f.length == 0 {
+		f.marker, f.length = marker, length
+		return length > 0
+	}
+	if marker == f.marker && length >= f.length && length == len(trimmed) {
+		*f = fence{}
+	}
+	return true
+}
+
+// fenceRun is the character and the length of the run of at least three backticks or at least
+// three tildes a trimmed line starts with, and a zero length for any other line.
+func fenceRun(trimmed string) (marker byte, length int) {
+	if trimmed == "" || (trimmed[0] != '`' && trimmed[0] != '~') {
+		return 0, 0
+	}
+	length = len(trimmed) - len(strings.TrimLeft(trimmed, trimmed[:1]))
+	if length < 3 {
+		return 0, 0
+	}
+	return trimmed[0], length
 }
 
 // spell writes row as a table row with the cell at column empty, escaping each pipe a cell holds,

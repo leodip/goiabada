@@ -1,8 +1,8 @@
 package docsreader
 
-// The reader's own rules. Every docs test reads the site through this package, so what a heading
-// inside a fence, a deeper heading, a missing section and an escaped pipe in a cell read is held
-// here, where a change shows before it shows anywhere else (#536).
+// The reader's own rules. Every docs test reads the site through this package, so what a code
+// fence is, and what a heading inside one, a deeper heading, a missing section and an escaped pipe
+// in a cell read, is held here, where a change shows before it shows anywhere else (#536).
 
 import (
 	"os"
@@ -76,6 +76,23 @@ func TestSectionText_AHeadingInsideAFenceEndsNothing(t *testing.T) {
 	}
 	if strings.Contains(section, "AFTER") {
 		t.Errorf("the section read past its end:\n%s", section)
+	}
+}
+
+// TestSectionText_AHeadingInsideAnyFenceOpensNothing: the section walk reads fences by the rule
+// the table walk does, so a heading inside a tilde fence, or after a shorter run inside a longer
+// backtick fence, is code and opens no section.
+func TestSectionText_AHeadingInsideAnyFenceOpensNothing(t *testing.T) {
+	for name, page := range map[string]string{
+		"a tilde fence":               "~~~\n## Time zone\n`TZ`\n~~~\n",
+		"a four-backtick fence":       "````markdown\n```\n## Time zone\n`TZ`\n````\n",
+		"a fence a language reopened": "```\n```bash\n## Time zone\n`TZ`\n```\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if section, found := SectionText(page, "## Time zone"); found {
+				t.Errorf("a heading inside the fence opened a section:\n%s", section)
+			}
+		})
 	}
 }
 
@@ -263,6 +280,38 @@ func TestTables_AFenceLineEndsATable(t *testing.T) {
 	}
 	if got := tables[1].Header; !slices.Equal(got, []string{"B"}) {
 		t.Errorf("second header %q, want [B]", got)
+	}
+}
+
+// TestTables_AFenceClosesOnlyOnABareRunOfItsCharacterAtLeastAsLong: a fence opens on three or
+// more backticks or tildes and closes only on a line that is a run of the same character at least
+// as long, so a table in each fence below is code and the table after its closing line is the one
+// table read. BlankColumn empties that table's column and keeps every fenced line as written.
+func TestTables_AFenceClosesOnlyOnABareRunOfItsCharacterAtLeastAsLong(t *testing.T) {
+	const fenced = "| Event | Details |\n|---|---|\n| `fenced` | `in_fence` |\n"
+	const after = "\n| Event | Details |\n|---|---|\n| `real` | `payload_key` |\n"
+	for _, tc := range []struct{ name, block string }{
+		{"a tilde fence", "~~~\n" + fenced + "~~~\n"},
+		{"a tilde fence with a language", "~~~yaml\n" + fenced + "~~~\n"},
+		{"a three-backtick line inside a four-backtick fence", "````markdown\n```\n" + fenced + "```\n````\n"},
+		{"a backtick line with a language inside an open fence", "```\n```go\n" + fenced + "```\n"},
+		{"a tilde line inside a backtick fence", "```\n~~~\n" + fenced + "```\n"},
+		{"a backtick line inside a tilde fence", "~~~\n```\n" + fenced + "~~~\n"},
+		{"a tilde line with text after it inside a tilde fence", "~~~\n~~~ not a close\n" + fenced + "~~~\n"},
+		{"a longer closing run", "```\n" + fenced + "`````\n"},
+		{"whitespace after the closing run", "~~~~\n" + fenced + "~~~~ \t\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			text := "Prose.\n\n" + tc.block + after
+			assertTables(t, Tables(text), []Table{
+				{Header: []string{"Event", "Details"}, Rows: [][]string{{"`real`", "`payload_key`"}}},
+			})
+			blanked := BlankColumn(text, "Details")
+			assertLinesKept(t, text, blanked, len(strings.Split(text, "\n"))-2)
+			assertTables(t, Tables(blanked), []Table{
+				{Header: []string{"Event", "Details"}, Rows: [][]string{{"`real`", ""}}},
+			})
+		})
 	}
 }
 
