@@ -13,6 +13,10 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
+    // The long wait is the whole run, which creates the sample users one by one: a control the
+    // capture cannot find, or a page that does not load, fails within these instead.
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
     browserName: "chromium",
     locale: "en-US",
     timezoneId: "UTC",
