@@ -288,7 +288,8 @@ The guard reports findings by these names.
 3. **process isolation** — `adminconsole` may not import an `authserver`-owned package, and vice
    versa. `cmd/goiabada-setup` may import neither.
 4. **dead package** — a `delete` package must have no importer anywhere, production or test. If one
-   appears, the row is wrong and the package is not dead.
+   appears, the row is wrong and the package is not dead: a mocks package one test keeps alive is the
+   shape #333 deleted.
 5. **foreign closure** — the modules in
    [Foreign modules](#foreign-modules-the-admin-console-must-not-compile) must be reachable from the
    admin console's production packages exactly as declared there.
@@ -311,11 +312,13 @@ The guard reports findings by these names.
    setup wizard. Each is walked from its `main` package, and the guard fails when one of the three is
    not where it looks, so a renamed main cannot drop out of the rule unnoticed (#331).
 
-Rules 2, 3, 4 and 7 read production files only. A test may import a mock, a fixture or a helper from
+Rules 2 and 3 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
-`core/guard` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
-above. Rule 5 reads production files because it is about what lands in a shipped binary, and rule
-7's `test-support` half and rule 8 read them the same way, for the same reason.
+`core/guard` unusable from the tiers that call it. Rules 5 and 8 read production files too, because
+they are about what lands in a shipped binary. Rules 1 and 4 read test files as well, for the reasons
+given in their entries. Rule 7 reads both: its four computed justifications come from production
+references, and so does what contradicts a `test-support` row, since that is about what a binary
+links; what supports one is a reference from a test anywhere.
 
 ## Temporary exceptions
 
