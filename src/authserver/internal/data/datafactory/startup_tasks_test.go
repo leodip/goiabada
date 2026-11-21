@@ -264,6 +264,9 @@ func TestRunStartupDataTasks_RefusesASetUpDatabaseWithNoUsableCurrentSigningKey(
 			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(tc.keys(t), nil).Once()
 			if tc.asksEmpty {
 				db.EXPECT().IsEmpty(mock.Anything).Return(false, nil).Once()
+				// Seeded, so the signing keys are read once more, in case a seed committed
+				// between the two reads; they are still gone.
+				db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
 			}
 
 			err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
@@ -283,6 +286,55 @@ func TestRunStartupDataTasks_RefusesASetUpDatabaseWithNoUsableCurrentSigningKey(
 		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
 
 		require.ErrorIs(t, err, boom)
+		assert.Contains(t, err.Error(), "the data encryption key check failed")
+	})
+}
+
+// TestRunStartupDataTasks_AcceptsASeedCommittedBetweenItsReads pins the replica that starts while
+// another seeds the database (#542 decision 2): its first read finds no signing key, the other's
+// seed commits, and its read of the settings row finds the database seeded. The seed writes the
+// signing keys and the settings row in one transaction, so the start reads the signing keys again
+// and checks the current one, rather than refusing a healthy database as one that lost its key.
+func TestRunStartupDataTasks_AcceptsASeedCommittedBetweenItsReads(t *testing.T) {
+	seeded := func(t *testing.T) []record.KeyPair {
+		return []record.KeyPair{signingKeyUnder(t, record.KeyStateNext, currentKey), currentUnder(t, currentKey)}
+	}
+
+	t.Run("the seeded current signing key opens, so the start goes on", func(t *testing.T) {
+		db := datamocks.NewDatabase(t)
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+		db.EXPECT().IsEmpty(mock.Anything).Return(false, nil).Once()
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(seeded(t), nil).Once()
+		expectNoSharedIdentifiers(db)
+
+		require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
+		assertCalled(t, db, "GetAllSigningKeys", "IsEmpty", "GetAllSigningKeys", "GetIdentifiersSharedByClientsAndResources")
+	})
+
+	t.Run("the second read is checked as the first would be", func(t *testing.T) {
+		db := datamocks.NewDatabase(t)
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+		db.EXPECT().IsEmpty(mock.Anything).Return(false, nil).Once()
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).
+			Return([]record.KeyPair{currentUnder(t, unknownKey)}, nil).Once()
+
+		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
+
+		require.ErrorIs(t, err, ErrDataKeyMismatch, "a seed under another key is still refused")
+		assert.Equal(t, neitherKeyRefusal, err.Error())
+	})
+
+	t.Run("a failed second read stops startup", func(t *testing.T) {
+		boom := errors.New("storage is unavailable")
+		db := datamocks.NewDatabase(t)
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+		db.EXPECT().IsEmpty(mock.Anything).Return(false, nil).Once()
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, boom).Once()
+
+		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
+
+		require.ErrorIs(t, err, boom)
+		require.NotErrorIs(t, err, ErrNoCurrentSigningKey)
 		assert.Contains(t, err.Error(), "the data encryption key check failed")
 	})
 }

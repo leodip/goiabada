@@ -174,9 +174,11 @@ with no transaction across a table, and writes each value with an `UPDATE` that 
 read, so a value a server replaced or cleared meanwhile is left as the server wrote it. SQL Server's
 `UPDATE` also compares `DATALENGTH`, since its binary comparison ignores trailing zero bytes. A
 write that misses reads the row again and decides on what it now holds. Each write is a transaction
-of its own: the `UPDATE` runs under the run's context, so a stop ends its lock wait, and is rolled
-back when it fails, since a driver can answer a cancellation after the statement took effect; one
-that succeeded commits under a context the stop does not reach. The run's count, and its audit
+of its own, through `runInTransactionSettlingWhateverTheStop`, which shares `RunInTransaction`'s
+deadlock reruns and `data.ErrCommitOutcomeUnknown`: the `UPDATE` runs under the run's context, so a
+stop ends its lock wait, and is rolled back when it fails, since a driver can answer a cancellation
+after the statement took effect; one that succeeded is begun and committed under a context the stop
+does not reach. The run's count, and its audit
 event, are then what the database holds. A value neither key opens is handed to the caller as the
 sweep reaches it, never collected. The signing keys go last, and the current one last of all.
 

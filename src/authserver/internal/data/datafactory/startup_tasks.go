@@ -129,12 +129,34 @@ func warnOfSharedIdentifiers(ctx context.Context, database sharedIdentifierReade
 // seed then writes both in one transaction. A database holding other signing keys but no current
 // one with a PEM, or holding none while its settings row exists, has been set up and lost its
 // current signing key, and is refused with ErrNoCurrentSigningKey. The settings row is asked about
-// only when there is no signing key at all, so a seeded database's start still makes one read. A
-// previous key that is not 32 bytes, or equals the current one, takes no part.
+// only when there is no signing key at all, so a seeded database's start still makes one read; when
+// it then reads as seeded, the signing keys are read once more, since a seed another replica
+// committed between the two reads wrote both. A previous key that is not 32 bytes, or equals the
+// current one, takes no part.
 func checkDataKey(ctx context.Context, database signingKeyReader, currentKey, previousKey []byte) (bool, error) {
 	keys, err := database.GetAllSigningKeys(ctx, nil)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to load signing keys to check the data key")
+	}
+	if len(keys) == 0 {
+		empty, err := database.IsEmpty(ctx)
+		if err != nil {
+			return false, errs.Wrap(err, "unable to tell whether the database holding no signing key is seeded")
+		}
+		if empty {
+			return false, nil // not yet seeded: no encrypted data yet
+		}
+		// Seeded, but the first read found no signing key. Another replica's seed may have
+		// committed between the two reads: it writes the signing keys and the settings row in one
+		// transaction, so a settings row seen now means its signing keys are visible now too. Read
+		// them once more, and refuse only a database still holding none.
+		keys, err = database.GetAllSigningKeys(ctx, nil)
+		if err != nil {
+			return false, errs.Wrap(err, "unable to load signing keys to check the data key")
+		}
+		if len(keys) == 0 {
+			return false, errs.Wrap(ErrNoCurrentSigningKey, "the database holds no signing key")
+		}
 	}
 	var stored []byte
 	foundCurrent := false
@@ -146,19 +168,10 @@ func checkDataKey(ctx context.Context, database signingKeyReader, currentKey, pr
 		}
 	}
 	switch {
-	case foundCurrent && len(stored) == 0:
-		return false, errs.Wrap(ErrNoCurrentSigningKey, "the current signing key's private key is empty")
-	case !foundCurrent && len(keys) > 0:
-		return false, errs.Wrap(ErrNoCurrentSigningKey, "no signing key is in the current state")
 	case !foundCurrent:
-		empty, err := database.IsEmpty(ctx)
-		if err != nil {
-			return false, errs.Wrap(err, "unable to tell whether the database holding no signing key is seeded")
-		}
-		if empty {
-			return false, nil // not yet seeded: no encrypted data yet
-		}
-		return false, errs.Wrap(ErrNoCurrentSigningKey, "the database holds no signing key")
+		return false, errs.Wrap(ErrNoCurrentSigningKey, "no signing key is in the current state")
+	case len(stored) == 0:
+		return false, errs.Wrap(ErrNoCurrentSigningKey, "the current signing key's private key is empty")
 	}
 
 	if _, err := encryption.DecryptText(stored, currentKey); err == nil {

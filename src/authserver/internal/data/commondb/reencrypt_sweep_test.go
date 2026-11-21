@@ -3,6 +3,8 @@ package commondb
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -204,6 +207,77 @@ func TestReencryptStoredSecrets_AWriteAStopReachesIsCountedOnlyWhenItCommits(t *
 			assert.Len(t, script.execArgs, 1, "no write starts after the stop")
 		})
 	}
+}
+
+// The sweep's write is answered as every transaction is (#301, #371): an engine's deadlock victim is
+// run again, and the value counted once the rerun commits; a commit that fails for another reason
+// has an outcome the sweep cannot know, so the run fails carrying data.ErrCommitOutcomeUnknown, with
+// the driver's own error, and counts nothing.
+func TestReencryptStoredSecrets_AWriteIsSettledAsEveryTransactionIs(t *testing.T) {
+	oldKey := []byte(strings.Repeat("o", 32))
+	newKey := []byte(strings.Repeat("n", 32))
+	oneClient := func(t *testing.T) func(query string, args []driver.Value) *scriptedRows {
+		sealed, err := encryption.EncryptText("secret", oldKey)
+		require.NoError(t, err)
+		return func(query string, args []driver.Value) *scriptedRows {
+			if strings.Contains(query, "id, client_secret_encrypted FROM clients") && args[0] == int64(0) {
+				return &scriptedRows{cols: []string{"id", "value"}, values: [][]driver.Value{{int64(1), sealed}}}
+			}
+			return &scriptedRows{cols: []string{"id", "value"}}
+		}
+	}
+
+	t.Run("a deadlock victim is written again", func(t *testing.T) {
+		logs := logtest.CaptureSlog(t)
+		script := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {rowsAffected: 1}}}
+		script.answer = oneClient(t)
+		db := retryingDB(t, script)
+		backoff := recordBackoff(db)
+
+		report, err := db.ReencryptStoredSecrets(context.Background(), newKey, oldKey, nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, record.Reencryption{Reencrypted: 1}, report)
+		counts := script.settled(t)
+		assert.Equal(t, 1, counts.commits, "the rerun commits")
+		assert.Equal(t, 1, counts.rollbacks, "the victim is rolled back")
+		assert.Len(t, script.execArgs, 2, "the write is run once more")
+		assert.Equal(t, []time.Duration{runInTransactionBackoff[0]}, *backoff)
+		assert.Equal(t, 1, retryWarnings(logs))
+	})
+
+	t.Run("a commit whose outcome is unknown fails the run", func(t *testing.T) {
+		script := &scriptedDriver{commitErrs: []error{io.ErrUnexpectedEOF}}
+		script.answer = oneClient(t)
+
+		report, err := retryingDB(t, script).ReencryptStoredSecrets(context.Background(), newKey, oldKey, nil)
+
+		require.ErrorIs(t, err, data.ErrCommitOutcomeUnknown)
+		require.ErrorIs(t, err, io.ErrUnexpectedEOF, "the driver's own error stays reachable")
+		assert.Equal(t, 0, report.Reencrypted, "a commit not known to have landed is not counted")
+		counts := script.settled(t)
+		assert.Equal(t, 1, counts.commits, "the commit is asked for once, never replayed")
+		assert.Len(t, script.execArgs, 1)
+	})
+
+	// pgx answers a statement's cancellation by closing the connection, so the rollback after it
+	// fails; the engine rolled the transaction back, and a stop is no fault to warn of.
+	t.Run("a rollback failing after a stop is not warned of", func(t *testing.T) {
+		logs := logtest.CaptureSlog(t)
+		ctx, stop := context.WithCancel(context.Background())
+		defer stop()
+		script := &scriptedDriver{
+			execs:        []*scriptedExec{{during: stop, err: context.Canceled}},
+			rollbackErrs: []error{errors.New("failed to deallocate cached statement(s): conn closed")},
+		}
+		script.answer = oneClient(t)
+
+		_, err := retryingDB(t, script).ReencryptStoredSecrets(ctx, newKey, oldKey, nil)
+
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, 1, script.settled(t).rollbacks)
+		assert.Zero(t, warningsContaining(logs, "rolling back a failed transaction"))
+	})
 }
 
 // The sweep names each value neither key opens as it reaches it, never holding them to the end of

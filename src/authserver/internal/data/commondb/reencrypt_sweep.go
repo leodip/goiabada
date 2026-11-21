@@ -3,6 +3,7 @@ package commondb
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"strconv"
 
@@ -257,48 +258,42 @@ func storedSecretById(table, column string) statement {
 // from read, its nonce being fresh, so a matched row is a changed row on all four engines, MySQL
 // included.
 //
-// The write is a transaction of its own, so that its outcome is known whatever a stop does to it
-// (#492 decision 8). The UPDATE runs under ctx, so a stop still ends its wait for a row lock; a
-// driver can answer that cancellation after the statement took effect, as SQLite's does while it
-// hands the result back, so a failed UPDATE is rolled back and never counted. One that succeeded
-// is committed under a context the stop does not reach, and counted when the commit returns. The
-// connection is taken under ctx, so a stop also ends a wait for one; the transaction is begun on
-// it without ctx's cancellation, which database/sql would otherwise answer by rolling back a
-// write the sweep goes on to count.
+// The write is a transaction of its own, run by runInTransactionSettlingWhateverTheStop, so that
+// its outcome is known whatever a stop does to it (#492 decision 8), and a deadlock or a commit
+// failure is answered as every transaction's is: an engine's deadlock victim is run again, and a
+// commit whose outcome cannot be known carries data.ErrCommitOutcomeUnknown. The UPDATE runs under
+// ctx, so a stop still ends its wait for a row lock; a driver can answer that cancellation after
+// the statement took effect, as SQLite's does while it hands the result back, so a failed UPDATE
+// is rolled back and never counted. One that succeeded is committed whatever the stop, and counted
+// when the commit returns. A write that finds other bytes is rolled back.
 func (d *Database) writeStoredSecretIfUnchanged(ctx context.Context, table, column string, id int64,
-	sealed, read []byte) (written bool, err error) {
-	conn, err := d.DB.Conn(ctx)
-	if err != nil {
-		return false, errs.Wrap(err, "unable to take a connection")
-	}
-	defer func() { _ = conn.Close() }()
-	settled := context.WithoutCancel(ctx)
-	tx, err := conn.BeginTx(settled, nil)
-	if err != nil {
-		return false, errs.Wrap(err, "unable to begin transaction")
-	}
-	defer func() {
-		if !written {
-			_ = tx.Rollback()
+	sealed, read []byte) (bool, error) {
+	err := d.runInTransactionSettlingWhateverTheStop(ctx, func(tx *sql.Tx) error {
+		result, err := d.ExecSQL(ctx, tx, storedSecretIfUnchanged(table, column).text(d.Dialect), sealed, id, read)
+		if err != nil {
+			return err
 		}
-	}()
-
-	result, err := d.ExecSQL(ctx, tx, storedSecretIfUnchanged(table, column).text(d.Dialect), sealed, id, read)
-	if err != nil {
-		return false, err
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	if rowsAffected != 1 {
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected != 1 {
+			return errStoredSecretChanged
+		}
+		return nil
+	})
+	switch {
+	case errors.Is(err, errStoredSecretChanged):
 		return false, nil
-	}
-	if err := d.CommitTransaction(settled, tx); err != nil {
+	case err != nil:
 		return false, err
 	}
 	return true, nil
 }
+
+// errStoredSecretChanged is writeStoredSecretIfUnchanged's body finding other bytes than the sweep
+// read, which rolls its transaction back. It never leaves this file.
+var errStoredSecretChanged = errors.New("the stored secret no longer holds the bytes the sweep read")
 
 // storedSecretIfUnchanged is writeStoredSecretIfUnchanged's statement: the new ciphertext, the
 // row's id and the bytes read. SQL Server compares two VARBINARY values equal when one is the other

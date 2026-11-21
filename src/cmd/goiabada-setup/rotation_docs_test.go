@@ -31,13 +31,13 @@ var kubectlVerb = regexp.MustCompile(`kubectl ([a-z]+) ([a-z/-]+)`)
 var writtenPreviousKey = regexp.MustCompile(`"(?:/data/)?([a-z-]+-previous)"`)
 
 // rotationKubectl is every kubectl command a rotation runs that changes nothing the manifest sets:
-// it changes a Secret, reads one, lists the pods, restarts them, waits for the pods listed before a
-// restart to stop, or runs a command in one.
-var rotationKubectl = []string{"patch secret", "get secret", "get pods", "rollout restart", "rollout status", "wait -n", "exec -n"}
+// it changes a Secret, reads one, reads the ReplicaSets to find a rollout's revision, restarts the
+// pods, waits for the pods of earlier revisions to stop, or runs a command in one.
+var rotationKubectl = []string{"patch secret", "get secret", "get rs", "rollout restart", "rollout status", "wait -n", "exec -n"}
 
 // TestRotateSecretsPage_OnlyTheSampleKeyRotationChangesWhatTheManifestSets: outside the sample
-// key's rotation, every kubectl command on the rotate page changes a Secret, reads one, lists or
-// waits for the pods, restarts them or runs a command in one, and each -previous key a rotation writes is one the generated
+// key's rotation, every kubectl command on the rotate page changes a Secret, reads one, reads the
+// ReplicaSets, waits for the pods, restarts them or runs a command in one, and each -previous key a rotation writes is one the generated
 // manifest reads through an optional reference, so a pod starts with it present or absent and no
 // Deployment edit is made. The sample key's rotation is the one that scales the auth server.
 func TestRotateSecretsPage_OnlyTheSampleKeyRotationChangesWhatTheManifestSets(t *testing.T) {
