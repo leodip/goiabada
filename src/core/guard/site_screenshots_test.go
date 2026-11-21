@@ -2,14 +2,20 @@ package guard
 
 // The screenshots of Goiabada, held to the pages that show them (#534).
 //
-// The docs home page and the README show screenshots kept among the site's assets. Each image a
-// page shows is a file that exists, so a file renamed or removed fails here rather than leaving a
-// broken image on the home page or on GitHub, and each file is named for what it shows rather
-// than numbered, so a page names an image by what it shows.
+// The docs home page and the README show screenshots kept among the site's assets, which
+// e2e/screenshots.sh retakes: it writes the images its list, images.json, names. Every screenshot
+// among the assets is one the command writes, so one added by hand, which nobody could retake,
+// fails here; every image the command writes is shown by the home page or the README, so the
+// command retakes none that nothing shows; and each image a page shows is a file that exists, so
+// a file renamed or removed fails here rather than leaving a broken image on the home page or on
+// GitHub. Each file is named for what it shows rather than numbered, so a page names an image by
+// what it shows.
 //
-// It is a test rather than a guard: it reads two pages and one folder, and core's tier runs it.
+// It is a test rather than a guard: it reads two pages, one folder and one list, and core's tier
+// runs it.
 
 import (
+	"encoding/json"
 	"os"
 	"path"
 	"path/filepath"
@@ -21,11 +27,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The pages that show screenshots and the folder that holds them, relative to the source root.
+// The pages that show screenshots, the folder that holds them and the list of the images
+// e2e/screenshots.sh writes there, relative to the source root.
 const (
 	homePage         = "../site/src/content/docs/index.mdx"
 	readmePage       = "../README.md"
 	siteAssetsFolder = "../site/src/assets"
+	screenshotsList  = "../e2e/playwright/screenshots/images.json"
 )
 
 // numberedScreenshot is a screenshot's file name that says nothing of what it shows.
@@ -43,6 +51,38 @@ func TestSiteScreenshots_EveryOneThePagesShowExists(t *testing.T) {
 			_, err := os.Stat(file)
 			assert.NoErrorf(t, err, "%s shows %s, which does not exist", page, src)
 		}
+	}
+}
+
+// Every screenshot among the site's assets is one e2e/screenshots.sh writes.
+func TestSiteScreenshots_EveryOneAmongTheAssetsIsOneTheCommandWrites(t *testing.T) {
+	root := SourceRoot(t)
+	written := screenshotsWritten(t, readFile(t, filepath.Join(root, screenshotsList)))
+	entries, err := os.ReadDir(filepath.Join(root, siteAssetsFolder))
+	require.NoError(t, err, "unable to read %s", siteAssetsFolder)
+	for _, entry := range entries {
+		if isScreenshot(entry.Name()) {
+			assert.Containsf(t, written, entry.Name(),
+				"%s/%s is not one %s lists, so e2e/screenshots.sh cannot retake it; add it to the list and to the capture",
+				siteAssetsFolder, entry.Name(), screenshotsList)
+		}
+	}
+}
+
+// Every image e2e/screenshots.sh writes is among the site's assets and shown by the home page or
+// the README.
+func TestSiteScreenshots_EveryOneTheCommandWritesIsShown(t *testing.T) {
+	root := SourceRoot(t)
+	shown := map[string]bool{}
+	for _, page := range []string{homePage, readmePage} {
+		for _, src := range screenshotsShown(readFile(t, filepath.Join(root, page))) {
+			shown[path.Base(src)] = true
+		}
+	}
+	for _, name := range screenshotsWritten(t, readFile(t, filepath.Join(root, screenshotsList))) {
+		_, err := os.Stat(filepath.Join(root, siteAssetsFolder, name))
+		assert.NoErrorf(t, err, "%s lists %s, which is not among %s", screenshotsList, name, siteAssetsFolder)
+		assert.Truef(t, shown[name], "%s lists %s, which neither %s nor %s shows", screenshotsList, name, homePage, readmePage)
 	}
 }
 
@@ -88,6 +128,23 @@ func TestSiteScreenshots_TheReader(t *testing.T) {
 	assert.True(t, numberedScreenshot.MatchString("screenshot3.jpg"))
 	assert.True(t, isScreenshot("screenshot-users.jpg"))
 	assert.False(t, isScreenshot("goiaba.png"))
+
+	assert.Equal(t, []string{"screenshot-a.png", "screenshot-b.png"},
+		screenshotsWritten(t, "[\n  \"screenshot-a.png\",\n  \"screenshot-b.png\"\n]\n"))
+}
+
+// screenshotsWritten is the file names e2e/screenshots.sh writes, read from its list: a JSON array
+// of names, each a screenshot's, at least one.
+func screenshotsWritten(t *testing.T, list string) []string {
+	t.Helper()
+	var names []string
+	require.NoError(t, json.Unmarshal([]byte(list), &names), "%s is not a JSON array of file names", screenshotsList)
+	require.NotEmpty(t, names, "%s lists no image", screenshotsList)
+	for _, name := range names {
+		require.Truef(t, isScreenshot(name) && name == path.Base(name),
+			"%s lists %q, which is not a screenshot's file name", screenshotsList, name)
+	}
+	return names
 }
 
 // imageSource matches the target of a Markdown image, ![alt](target), and the src of an HTML

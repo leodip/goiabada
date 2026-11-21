@@ -11,6 +11,11 @@ utilities for layout (#617). The file is one copy in each application's `web/tai
 regenerate both `main.css`. Every class a page names has a rule in the served `main.css`
 (`core/guard.AssertClassesAreDrawn`), so a misspelt or leftover class fails the unit tier.
 
+A change to the sign-in page, the account Phone page, the users list or the console's menus retakes
+the docs home page's and README's screenshots in the same change: run `e2e/screenshots.sh` from the
+repository root, on the host with Docker (#534), and commit the images it writes. It needs no VPS;
+the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to add an image.
+
 - **Themes**: a page is drawn in a brand (#810): its appearance, `auto` (each
   visitor's device decides), `light` or `dark`, and its theme, one of the eight presets in
   `authserver/internal/brandthemes` or `custom`, the brand's own palette (#815). The layouts write `data-theme` for light and dark alone, and

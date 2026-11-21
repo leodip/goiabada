@@ -31,11 +31,13 @@ const (
 	licensePage        = "../site/src/content/docs/about/license.mdx"
 	licenseFile        = "../LICENSE"
 	runTestsScript     = "authserver/run-tests.sh"
+	screenshotsCommand = "../e2e/screenshots.sh"
 	devcontainerConfig = ".devcontainer/devcontainer.json"
 
 	testsHeading     = "## Run the tests"
 	generatedHeading = "## Commit what you generate"
 	devHeading       = "## Run Goiabada from source"
+	e2eHeading       = "### Browser e2e tests"
 )
 
 // regenerator is one command that rewrites committed files, the module directory it is run from,
@@ -95,6 +97,26 @@ func TestContributingPage_NamesEveryRegenerator(t *testing.T) {
 	for _, rerun := range []string{"./generate-mocks.sh", "go run ./cmd/ownershipdump", "run ./build.sh in src/"} {
 		assert.Contains(t, lint, rerun, "%s's lint tier no longer reruns %q, which %s says it does", runTestsScript, rerun, contributingPage)
 	}
+}
+
+// Contributing's section on generated files names e2e/screenshots.sh, which retakes the
+// screenshots, on a row of its table run from the repository root, and the command is a file that
+// exists. Its e2e section says the command needs no VPS.
+func TestContributingPage_NamesTheScreenshotsCommand(t *testing.T) {
+	root := SourceRoot(t)
+	_, err := os.Stat(filepath.Join(root, filepath.FromSlash(screenshotsCommand)))
+	require.NoError(t, err, "e2e/screenshots.sh, which %s names, does not exist", contributingPage)
+
+	page := readFile(t, filepath.Join(root, contributingPage))
+	section, found := docsreader.SectionText(page, generatedHeading)
+	require.Truef(t, found, "%s has no %q section", contributingPage, generatedHeading)
+	assert.True(t, slices.ContainsFunc(docsreader.Rows(section), func(row []string) bool {
+		return len(row) == 3 && strings.Contains(row[1], "`e2e/screenshots.sh`") && strings.Contains(row[2], "repository root")
+	}), "%s, %s: no row runs %q from the repository root", contributingPage, generatedHeading, "e2e/screenshots.sh")
+
+	e2e, found := docsreader.SectionText(page, e2eHeading)
+	require.Truef(t, found, "%s has no %q section", contributingPage, e2eHeading)
+	assert.Contains(t, e2e, "`e2e/screenshots.sh`", "%s, %s: the section does not name the command", contributingPage, e2eHeading)
 }
 
 // The development values Contributing gives for signing in and reaching the two servers are the

@@ -40,7 +40,11 @@
   with.
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
-  review. Do not run `e2e` or the scripts under `e2e/` yourself, and do not count a
+  review. Do not run `e2e` or the scripts under `e2e/` yourself, except
+  `e2e/screenshots.sh`, which reaches no VPS and no shared environment: when the change
+  touches what a screenshot shows (the sign-in page, the account Phone page, the users
+  list, the console's menus), run it on the host from the worktree's root and check
+  that it leaves the committed images unchanged. Do not count a
   spec that has not run yet as missing evidence. Check that the change adds or
   updates the specs under `e2e/playwright/tests/` it needs, the ones the agreement
   names among them, that they follow `e2e/README.md`, and that their types check on

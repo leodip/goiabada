@@ -45,7 +45,11 @@
   worktree held when it started, so run it again after a change; `serve stop` ends it.
 - **Browser tests:** the Playwright suite under `e2e/` runs against one shared
   environment on a VPS, and placido runs it whole as the last gate, after the
-  review. Do not run `e2e` or the scripts under `e2e/` yourself. Look at
+  review. Do not run `e2e` or the scripts under `e2e/` yourself, with one exception:
+  `e2e/screenshots.sh` reaches no VPS and no shared environment, and when your change
+  touches what a screenshot shows (the sign-in page, the account Phone page, the users
+  list, the console's menus), run it on the host, from the worktree's root, and leave
+  the images it writes in the worktree. Look at
   `e2e/playwright/tests/` and add or update specs as the change needs, starting with
   the ones the agreement names. Follow `e2e/README.md`, and check the types on the
   host with `cd e2e/playwright && npm ci && npm run typecheck`.
