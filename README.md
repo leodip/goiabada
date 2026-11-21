@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src="site/src/assets/screenshot3.png" alt="The admin console's list of users">
+  <img src="site/src/assets/screenshot-users.png" alt="The admin console's list of users">
 </p>
 
 Goiabada is an open-source authentication server built on **OAuth 2.0** and **OpenID Connect**. Your apps sign users in with any standard OAuth 2.0 or OpenID Connect library, with no SDK to adopt, and you choose where the auth server and its database run.
