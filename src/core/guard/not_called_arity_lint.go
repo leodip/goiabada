@@ -271,14 +271,19 @@ func notCalledSitesIn(
 		// A string literal in a package that type-checked always unquotes.
 		method, _ := strconv.Unquote(lit.Value)
 
-		// The double's Mock field named, d.Mock.AssertNotCalled: the method the name means is the
-		// double's, and the walk reads it on the type the call is written on, which here is Mock.
+		// A Mock field named, d.Mock.AssertNotCalled: the method the name means records into that
+		// field, and the walk reads the method on the type the call is written on, which here is
+		// Mock. An embedded Mock is the double's own, so the call belongs on the double; a field the
+		// double names may be any type's recorder, so the call belongs on its recorded Calls.
 		if field, isField := ast.Unparen(sel.X).(*ast.SelectorExpr); isField {
 			if s, isSel := info.Selections[field]; isSel && s.Kind() == types.FieldVal && isTestifyMock(s.Obj().Type()) {
+				instead := "call " + types.ExprString(field.X) + "." + notCalledSelector + " instead"
+				if v, isVar := s.Obj().(*types.Var); !isVar || !v.Embedded() {
+					instead = "assert over " + types.ExprString(field) + ".Calls instead, which match on the name alone"
+				}
 				refuse(notCalledSelector + "(t, \"" + method + "\", ...) is called on the Mock field " +
 					types.ExprString(field) + " rather than on the double, a form this walk does not read, " +
-					"since the method it names is the double's; call " + types.ExprString(field.X) + "." +
-					notCalledSelector + " instead")
+					"since the method it names is the one that records into that field; " + instead)
 				return true
 			}
 		}

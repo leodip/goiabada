@@ -149,10 +149,12 @@ testify's own method, so a method of that name on a type that is not a testify d
 and the receiver is resolved by type rather than by spelling, because one method name can sit on
 two doubles at two arities (`CreateUser` is 3 on `Database` and 2 on `UserCreator`). Each walked
 module is read through `core/pkgload` as the test machine's test build, and the rule tests'
-fixtures require the testify version `core` pins. Four shapes are reported rather than skipped: a method named through anything but
-a string literal, a name the double does not declare, a variadic method, and matchers spread from a slice with `...`, whose
-number the call does not show. It does not widen to `AssertCalled`,
-whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing panics (#421).
+fixtures require the testify version `core` pins. Five shapes are reported rather than skipped: a
+method named through anything but a string literal, a name the double does not declare, a variadic
+method, matchers spread from a slice with `...`, whose number the call does not show, and a call on
+a `Mock` field, `d.Mock.AssertNotCalled`, rather than on the double. It does not widen to
+`AssertCalled`, whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing
+panics (#421).
 
 ## Core symbol ownership table
 
