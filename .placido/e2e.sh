@@ -98,9 +98,9 @@ rerun_failed_tests() { # first_status
     return "$1"
   fi
 
-  # Each Playwright run clears test-results/ and playwright-report/ when it starts, so the
-  # first run's traces, screenshots and report move aside before the sweep's, and each is
-  # announced only once it has moved.
+  # Each Playwright test run clears test-results/ when it starts and rewrites
+  # playwright-report/ when it ends, so the first run's traces, screenshots and report move
+  # aside before the sweep's, and each is announced only once it has moved.
   echo
   if move_aside "$suite/test-results" "$suite/test-results-first-run"; then
     echo "The first run's traces and screenshots are in e2e/playwright/test-results-first-run/."
