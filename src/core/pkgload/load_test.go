@@ -318,7 +318,9 @@ func TestLoad_ADirectoryThatIsNoModuleIsAFailedLoadAndNotAnEmptyOne(t *testing.T
 }
 
 // A package of the module in a directory ./... skips, here one whose name begins with _, is still
-// compiled into a package that imports it, so the load refuses it rather than leave it unread.
+// compiled into a package that imports it, so the load refuses it rather than leave it unread. So is
+// one under the path of a module the module requires, which the go command still resolves to the
+// module itself when that module holds no such package.
 func TestLoad_AnImportOfAPackageTheWildcardSkipsIsAnError(t *testing.T) {
 	root := loadable(t, map[string]string{
 		"mod/go.mod":       "module example.test/mod\n",
@@ -330,6 +332,18 @@ func TestLoad_AnImportOfAPackageTheWildcardSkipsIsAnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "example.test/mod/a in ")
 	assert.Contains(t, err.Error(), "imports example.test/mod/_bridge")
 	assert.NotErrorIs(t, err, pkgload.ErrNoPackages)
+
+	root = loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/a/a.go": "package a\n\nimport (\n\t\"example.test/mod/feature/_bridge\"\n\t\"example.test/mod/feature/pkg\"\n)\n\n" +
+			"var _ = bridge.B + pkg.P\n",
+		"mod/feature/_bridge/b.go": "package bridge\n\nconst B = 1\n",
+		"dep/go.mod":               "module example.test/mod/feature\n",
+		"dep/pkg/p.go":             "package pkg\n\nconst P = 1\n",
+	})
+	_, err = pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.Error(t, err, "a skipped package of the module under a required module's path")
+	assert.Contains(t, err.Error(), "imports example.test/mod/feature/_bridge")
 }
 
 // A module nested in the module's directory is another module, which ./... leaves out rightly, so

@@ -20,11 +20,9 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/leodip/goiabada/core/errs"
-	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -235,11 +233,7 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 				p.ID, dir, describe(build), p.Errors[0])
 		}
 	}
-	p, path, err := unmatchedImport(sorted)
-	if err != nil {
-		return nil, errs.Wrapf(err, "reading the requirements of %s for %s", dir, describe(build))
-	}
-	if p != nil {
+	if p, path := unmatchedImport(sorted); p != nil {
 		return nil, errs.Errorf("%s in %s imports %s for %s, a package of %s that ./... does not match, so no guard "+
 			"reads it: the go command skips a directory whose name begins with _ or . or is testdata, and the "+
 			"package belongs in one it reads", p.ID, dir, path, describe(build), p.Module.Path)
@@ -248,27 +242,17 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 }
 
 // unmatchedImport returns the first package, in the order given, that imports a package of its own
-// module that is not among the packages loaded, and that import's path. An import path that extends
-// the module's own belongs to another module when the module requires one whose path prefixes it, as
-// the go command resolves an import to the longest such path: a module nested in this one's
-// directory, or one elsewhere that only shares its path. ./... leaves those out rightly.
-func unmatchedImport(sorted []*packages.Package) (*packages.Package, string, error) {
+// module that is not among the packages loaded, and that import's path. The module is the one the go
+// command resolved the import to, so a module nested in this one's directory, or one elsewhere whose
+// path extends this one's, is another module, which ./... leaves out rightly.
+func unmatchedImport(sorted []*packages.Package) (*packages.Package, string) {
 	loaded := map[string]bool{}
 	for _, p := range sorted {
 		loaded[p.PkgPath] = true
 	}
-	required := map[string][]string{}
 	for _, p := range sorted {
 		if p.Module == nil {
 			continue
-		}
-		modules, ok := required[p.Module.GoMod]
-		if !ok {
-			var err error
-			if modules, err = requiredModules(p.Module.GoMod); err != nil {
-				return nil, "", err
-			}
-			required[p.Module.GoMod] = modules
 		}
 		paths := make([]string, 0, len(p.Imports))
 		for path := range p.Imports {
@@ -276,40 +260,13 @@ func unmatchedImport(sorted []*packages.Package) (*packages.Package, string, err
 		}
 		sort.Strings(paths)
 		for _, path := range paths {
-			if strings.HasPrefix(path, p.Module.Path+"/") && !loaded[path] && !providedBy(path, modules) {
-				return p, path, nil
+			imported := p.Imports[path]
+			if imported.Module != nil && imported.Module.Path == p.Module.Path && !loaded[path] {
+				return p, path
 			}
 		}
 	}
-	return nil, "", nil
-}
-
-// requiredModules is the path of every module a go.mod requires.
-func requiredModules(goMod string) ([]string, error) {
-	src, err := os.ReadFile(goMod) //nolint:gosec // G304: the go.mod the go command reported for a loaded module
-	if err != nil {
-		return nil, err
-	}
-	parsed, err := modfile.Parse(goMod, src, nil)
-	if err != nil {
-		return nil, err
-	}
-	modules := make([]string, 0, len(parsed.Require))
-	for _, r := range parsed.Require {
-		modules = append(modules, r.Mod.Path)
-	}
-	return modules, nil
-}
-
-// providedBy reports whether one of modules provides the package at path: its path is the import
-// path or a prefix of it ending at a slash.
-func providedBy(path string, modules []string) bool {
-	for _, m := range modules {
-		if path == m || strings.HasPrefix(path, m+"/") {
-			return true
-		}
-	}
-	return false
+	return nil, ""
 }
 
 // describe names a build in an error: its platform, the release build's tag and cgo, and tests.
