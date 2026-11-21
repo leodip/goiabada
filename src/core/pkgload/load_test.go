@@ -699,6 +699,24 @@ func TestMakeLoadable_ReadsAModuleDeclaredInABlock(t *testing.T) {
 	assert.Equal(t, []string{"example.test/app"}, ids(app))
 }
 
+// A gopkg.in path ending in .v-unstable names no major. Setting the tree up requires it at v0.0.0,
+// which the go command refuses when the tree loads, rather than stopping the test process.
+func TestMakeLoadable_LeavesAGopkgInPathThatNamesNoMajorToTheGoCommand(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"app/go.mod": "module example.test/app\n",
+		"lib/go.mod": "module gopkg.in/example.v-unstable\n",
+	})
+	require.NoError(t, pkgload.MakeLoadable(root))
+
+	src, err := os.ReadFile(filepath.Join(root, "app", "go.mod"))
+	require.NoError(t, err)
+	assert.Contains(t, string(src), "require gopkg.in/example.v-unstable v0.0.0\n")
+	_, err = pkgload.Load(filepath.Join(root, "app"), pkgload.Build{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "gopkg.in/example.v-unstable")
+	assert.NotErrorIs(t, err, pkgload.ErrNoPackages, "the go command refuses the go.mod")
+}
+
 func TestMakeLoadable_ATreeWithNoModuleIsAnError(t *testing.T) {
 	root := writeTree(t, map[string]string{"a/a.go": "package a\n"})
 	assert.Error(t, pkgload.MakeLoadable(root))

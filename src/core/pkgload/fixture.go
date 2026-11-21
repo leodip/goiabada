@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
 )
 
 // MakeLoadable makes a fixture tree under root a set of modules the go command can load. A guard's
@@ -108,10 +109,15 @@ func fixtureGoVersion(modules []fixtureModule) (string, error) {
 // suffix names, which the go command holds the version to, or v0.0.0 for a path without one. The
 // suffix is read as the go command reads it (go.dev/ref/mod#major-version-suffixes): /vN from v2
 // on, after a slash, or for a gopkg.in path .vN with an optional -unstable, where .v0 and .v1 are
-// majors too.
+// majors too. A path whose suffix names no major is left at v0.0.0, for the go command to refuse
+// when the tree loads.
 func syntheticVersion(modulePath string) string {
 	if _, pathMajor, ok := module.SplitPathVersion(modulePath); ok && pathMajor != "" {
-		return module.PathMajorPrefix(pathMajor) + ".0.0"
+		// SplitPathVersion accepts gopkg.in/x.v-unstable, which names no major, and
+		// module.PathMajorPrefix panics on it, so the major is checked here.
+		if major := strings.TrimSuffix(pathMajor[1:], "-unstable"); semver.Major(major) == major {
+			return major + ".0.0"
+		}
 	}
 	return "v0.0.0"
 }
