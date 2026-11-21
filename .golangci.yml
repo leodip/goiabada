@@ -41,6 +41,10 @@
 # Left out as noise at their defaults: revive, goconst, modernize, intrange,
 # contextcheck, exhaustive, perfsprint, prealloc, forcetypeassert and dupword.
 #
+# forbidigo was added on its own, with one rule, under its settings below:
+# no Begin or BeginTx of database/sql, or of a type that embeds one, outside
+# the transaction runner and the migrator.
+#
 # The binary itself is pinned in src/authserver/versions.yaml
 # (tools.golangci-lint).
 #
@@ -82,7 +86,29 @@ linters:
     - recvcheck
     - gocritic
     - testifylint
+    - forbidigo
   settings:
+    forbidigo:
+      # Every transaction opens through RunInTransaction, whose deadlock retry
+      # and commit outcome a transaction from database/sql's own Begin or
+      # BeginTx never gets (docs/development/data.md, "Transactions").
+      # commondb/db.go, which is RunInTransaction, and the migrator open one on
+      # purpose, under exclusions below. begin_transaction_lint_test.go in
+      # internal/data holds the Database method BeginTransaction; this holds
+      # database/sql. analyze-types matches a call by its receiver's type, so a
+      # *sql.Conn's BeginTx is sql.Conn.BeginTx whatever the variable is called.
+      # A struct that embeds a *sql.DB, as the setup wizard's sqlConn does,
+      # promotes its BeginTx under the struct's own type, so the second entry
+      # holds the Begin and BeginTx of every Goiabada type and interface too.
+      # Outside tests, none declares one.
+      analyze-types: true
+      forbid:
+        - pattern: '\.(Begin|BeginTx)$'
+          pkg: '^database/sql$'
+          msg: "open a transaction through RunInTransaction (docs/development/data.md); only commondb/db.go and the migrator begin one"
+        - pattern: '\.(Begin|BeginTx)$'
+          pkg: '^github\.com/leodip/goiabada/'
+          msg: "open a transaction through RunInTransaction (docs/development/data.md); only commondb/db.go and the migrator begin one"
     testifylint:
       # encoded-compare turns assert.Equal into JSONEq wherever a name says
       # JSON. Every comparison it found compares exact bytes on purpose: that
@@ -254,3 +280,7 @@ linters:
         linters: [gosec]
       - path: authserver/cmd/schemadump/
         linters: [gosec]
+      # The two files that open a database/sql transaction (forbidigo's
+      # settings above). A test opens one as it needs.
+      - path: (authserver/internal/data/commondb/db\.go|authserver/internal/data/migrator/migrator\.go|_test\.go)$
+        linters: [forbidigo]
