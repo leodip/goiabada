@@ -353,26 +353,6 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 		{"the capture lists two names that differ only in case",
 			[]string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-A.png"},
 			screenshotsLines("screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-A.png"), nil, "checking the images captured", nil},
-		// docker cp keeps a link the capture made, which the host would follow to a file of its own
-		// and commit: here a valid PNG outside the capture's folder, which a check of the bytes alone
-		// would take.
-		{"a captured image is a link", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
-			func(t *testing.T, out string) {
-				outside := filepath.Join(filepath.Dir(out), "outside.png")
-				require.NoError(t, os.WriteFile(outside, []byte(fixturePNG("a file of the host's")), 0o644))
-				require.NoError(t, os.Remove(filepath.Join(out, "screenshot-b.png")))
-				require.NoError(t, os.Symlink(outside, filepath.Join(out, "screenshot-b.png")))
-			}},
-		{"the capture's list is a link", screenshotsFixture, nil, nil, "checking the images captured",
-			func(t *testing.T, out string) {
-				outside := filepath.Join(filepath.Dir(out), "outside.txt")
-				require.NoError(t, os.WriteFile(outside, []byte(*screenshotsLines(screenshotsFixture...)), 0o644))
-				require.NoError(t, os.Symlink(outside, filepath.Join(out, "images.txt")))
-			}},
-		{"a captured image is a folder", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
-			func(t *testing.T, out string) {
-				require.NoError(t, os.Mkdir(filepath.Join(out, "screenshot-c.png"), 0o755))
-			}},
 		{"a captured image is not a PNG", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
 			func(t *testing.T, out string) {
 				require.NoError(t, os.WriteFile(filepath.Join(out, "screenshot-b.png"), []byte("SECRET=a credential\n"), 0o644))
@@ -431,6 +411,58 @@ func TestScreenshotsCommand_AnInterruptDuringTheReplacementsPutsTheImagesBack(t 
 			assert.Empty(t, run.prepared, "the run's own folder is left beside the images")
 			assert.Contains(t, run.out, "screenshots: failed while replacing the committed images")
 			assert.NotContains(t, run.out, "screenshots: wrote")
+			assert.Empty(t, run.tmp, "the staging folder is left behind")
+		})
+	}
+}
+
+// The host refuses a link or a folder the capture handed back, before it reads one and before the
+// check service is run: docker cp keeps a link the capture made, which the host's own byte checks and
+// copy would follow to a file of its own. The check would refuse a link too, so only the host's
+// message and the check never running show which refused it.
+func TestScreenshotsCommand_TheHostRefusesWhatIsNotARegularFile(t *testing.T) {
+	committed := screenshotAssets(map[string]string{"screenshot-a.png": "committed", "screenshot-b.png": "committed", "screenshot-c.png": "committed"})
+	for _, tc := range []struct {
+		name     string
+		captured []string
+		list     *string
+		refusal  string
+		// setup changes, after the fixture is made, what the capture hands back, in its folder out.
+		setup func(t *testing.T, out string)
+	}{
+		// A valid PNG outside the capture's folder, which a check of the bytes alone would take.
+		{"a captured image is a link", screenshotsFixture, screenshotsLines(screenshotsFixture...),
+			"screenshots: the capture's screenshot-b.png is not a regular file",
+			func(t *testing.T, out string) {
+				outside := filepath.Join(filepath.Dir(out), "outside.png")
+				require.NoError(t, os.WriteFile(outside, []byte(fixturePNG("a file of the host's")), 0o644))
+				require.NoError(t, os.Remove(filepath.Join(out, "screenshot-b.png")))
+				require.NoError(t, os.Symlink(outside, filepath.Join(out, "screenshot-b.png")))
+			}},
+		{"the capture's list is a link", screenshotsFixture, nil,
+			"screenshots: the capture wrote no images.txt, or one that is not a regular file",
+			func(t *testing.T, out string) {
+				outside := filepath.Join(filepath.Dir(out), "outside.txt")
+				require.NoError(t, os.WriteFile(outside, []byte(*screenshotsLines(screenshotsFixture...)), 0o644))
+				require.NoError(t, os.Symlink(outside, filepath.Join(out, "images.txt")))
+			}},
+		{"a captured image is a folder", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...),
+			"screenshots: the capture's screenshot-c.png is not a regular file",
+			func(t *testing.T, out string) {
+				require.NoError(t, os.Mkdir(filepath.Join(out, "screenshot-c.png"), 0o755))
+			}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newScreenshotsFixture(t, screenshotsFixture, tc.captured, tc.list, fixtureImagesJSON)
+			tc.setup(t, filepath.Join(f.stub, "out"))
+			run := f.run(t)
+			require.Error(t, run.err, run.out)
+			assert.Equal(t, committed, run.assets, run.out)
+			assert.Contains(t, run.out, tc.refusal)
+			assert.Contains(t, run.out, "screenshots: failed while checking the images captured")
+			for _, line := range strings.Split(readFile(t, filepath.Join(f.stub, "log")), "\n") {
+				assert.False(t, strings.Contains(line, " run ") && strings.Contains(line, " check "), "the check service ran: %s", line)
+			}
 			assert.Empty(t, run.tmp, "the staging folder is left behind")
 		})
 	}
