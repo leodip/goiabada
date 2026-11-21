@@ -1,10 +1,11 @@
 # The Compose project e2e/screenshots.sh runs: both servers built from the release Dockerfiles from
-# this checkout, on a new SQLite database in memory, Mailpit, and the browser from Playwright's image.
-# The script passes every ${...} below; run it rather than this file.
+# this checkout, on a new SQLite database in memory, Mailpit, the browser from Playwright's image,
+# and the check of the images the browser captures. The script passes every ${...} below; run it
+# rather than this file.
 #
-# Nothing is published: every service runs in the auth server's network namespace, so the browser
-# reaches both servers on localhost, where the auth server accepts the admin console's plain HTTP
-# address, and the auth server reaches Mailpit there too.
+# Nothing is published: every service but the check, which has no network, runs in the auth server's
+# network namespace, so the browser reaches both servers on localhost, where the auth server accepts
+# the admin console's plain HTTP address, and the auth server reaches Mailpit there too.
 services:
   authserver:
     build:
