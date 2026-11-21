@@ -12,11 +12,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 ## Go names
 
 An initialism in a Go name is spelled in one case: `UserID`, `redirectURI`, `JWTInfo`, never
-`UserId`. ST1003 holds it in the lint tier, with no directory or file excluded, against the list in
-`.golangci.yml`: staticcheck's 42 and this product's JWT, OTP, ACR, JWKS, JWK, JTI, CSRF, CORS,
-OIDC and AMR. `DPoP` and `PKCE` keep their one spelling. No check reads plurals, test function
-names, receivers or interface method names, so those follow by review: `IDs`, never `Ids`, and
-`TestGetClientByID` like the method it tests.
+`UserId`. ST1003 holds it in the lint tier against the list in `.golangci.yml`: staticcheck's 42
+and this product's JWT, OTP, ACR, JWKS, JWK, JTI, CSRF, CORS, OIDC and AMR. The configuration
+excludes no directory or file. golangci-lint skips generated Go files, such as those marked
+`// Code generated ... DO NOT EDIT.`, so a generator's names follow by review, and a mock takes
+its names from the port it implements. `DPoP` and `PKCE` keep their one spelling. No check reads
+plurals, test function names, receivers or interface method names, so those follow by review:
+`IDs`, never `Ids`, and `TestGetClientByID` like the method it tests.
 
 A name that is stored or sent is declared by a tag or a stored shape, never left to a Go field's
 name, so a respelling cannot change it. JSON fields carry `json` tags (`AuthContext`'s keep the keys

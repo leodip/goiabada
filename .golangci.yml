@@ -100,8 +100,10 @@ linters:
       # (#443 decision 11). ST1000 skips package main and generated files, so
       # the mains keep theirs by review. ST1003, an initialism in a Go name
       # spelled in mixed case (Id, Url, Otp): every module, tests included, is
-      # spelled the Go way, and no directory or file is excluded (#482
-      # decisions 2 and 3). The other four exclusions are the default's own.
+      # spelled the Go way, and this configuration excludes no directory or
+      # file (#482 decisions 2 and 3). golangci-lint skips generated files,
+      # so a generator's names follow by review. The other four exclusions
+      # are the default's own.
       checks: ["all", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
       # The initialisms ST1003 holds to one case. golangci-lint replaces
       # staticcheck's default list rather than extending it, so the first 42
