@@ -349,7 +349,7 @@ command itself and fails on a tree it changed.
 | `core/docsreader` | `BlankColumn` | test-support | Test support: compiled into no binary, and the docs tests read a section's names without one table column through it. |
 | `core/docsreader` | `Rows` | kernel | — |
 | `core/docsreader` | `Section` | kernel | — |
-| `core/docsreader` | `SectionText` | own-package | — |
+| `core/docsreader` | `SectionText` | kernel | — |
 | `core/docsreader` | `Table` | own-package | — |
 | `core/docsreader` | `Tables` | kernel | — |
 | `core/errs` | `Errorf` | kernel | — |
