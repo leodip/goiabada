@@ -7,6 +7,11 @@ package guard
 // where the test says, as a full or failing disk would.
 
 import (
+	"bytes"
+	"compress/zlib"
+	"encoding/binary"
+	"hash/crc32"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -109,7 +114,7 @@ func newScreenshotsFixture(t *testing.T, committed, captured []string, list *str
 	}
 	write(filepath.Join(f.assets, "goiaba.png"), "the logo", 0o644)
 	for _, name := range captured {
-		write(filepath.Join(f.stub, "out", name), "new "+name, 0o644)
+		write(filepath.Join(f.stub, "out", name), screenshotContent("new", name), 0o644)
 	}
 	if list != nil {
 		write(filepath.Join(f.stub, "out", "images.txt"), *list, 0o644)
@@ -171,13 +176,49 @@ func runScreenshots(t *testing.T, committed, captured []string, list *string, im
 	return newScreenshotsFixture(t, committed, captured, list, imagesJSON).run(t, env...)
 }
 
-// screenshotAssets is what the assets folder holds when each name holds the given prefix and the name.
+// screenshotAssets is what the assets folder holds when each name holds its screenshotContent.
 func screenshotAssets(prefix map[string]string) map[string]string {
 	out := map[string]string{"goiaba.png": "the logo"}
 	for name, p := range prefix {
-		out[name] = p + " " + name
+		out[name] = screenshotContent(p, name)
 	}
 	return out
+}
+
+// screenshotContent is what a fixture's image named name holds: a committed one, which the script
+// never reads, the prefix and the name as text; a captured one, prefix "new", a PNG holding them.
+func screenshotContent(prefix, name string) string {
+	if prefix == "new" {
+		return fixturePNG(prefix + " " + name)
+	}
+	return prefix + " " + name
+}
+
+// fixturePNG is a valid PNG of one grey pixel whose tEXt chunk holds text, so each image's bytes
+// are its own.
+func fixturePNG(text string) string {
+	var b bytes.Buffer
+	b.WriteString("\x89PNG\r\n\x1a\n")
+	chunk := func(kind string, data []byte) {
+		_ = binary.Write(&b, binary.BigEndian, uint32(len(data)))
+		body := append([]byte(kind), data...)
+		b.Write(body)
+		_ = binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(body))
+	}
+	chunk("IHDR", []byte{0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0})
+	chunk("tEXt", append([]byte("Comment\x00"), text...))
+	var pixels bytes.Buffer
+	z := zlib.NewWriter(&pixels)
+	_, _ = z.Write([]byte{0, 0x80})
+	_ = z.Close()
+	chunk("IDAT", pixels.Bytes())
+	chunk("IEND", nil)
+	return b.String()
+}
+
+func TestScreenshotsCommand_TheFixturesImagesArePNGs(t *testing.T) {
+	_, err := png.Decode(strings.NewReader(fixturePNG("new screenshot-a.png")))
+	require.NoError(t, err)
 }
 
 // screenshotsLines is the capture's images.txt listing names.
@@ -219,23 +260,58 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 		list     *string
 		env      []string
 		step     string
+		// setup changes, after the fixture is made, what the capture hands back, in its folder out.
+		setup func(t *testing.T, out string)
 	}{
-		{"the capture lists nothing", screenshotsFixture, nil, nil, "checking the images captured"},
-		{"the capture lists a path", screenshotsFixture, screenshotsLines("screenshot-a.png", "../screenshot-b.png"), nil, "checking the images captured"},
-		{"the capture missed a listed image", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...), nil, "checking the images captured"},
+		{"the capture lists nothing", screenshotsFixture, nil, nil, "checking the images captured", nil},
+		{"the capture lists a path", screenshotsFixture, screenshotsLines("screenshot-a.png", "../screenshot-b.png"), nil, "checking the images captured", nil},
+		{"the capture missed a listed image", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...), nil, "checking the images captured", nil},
 		{"a new image cannot be written beside the committed one", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_CP=screenshot-b.png.new"}, "preparing the replacements"},
+			[]string{"FAIL_CP=screenshot-b.png.new"}, "preparing the replacements", nil},
 		{"a committed image cannot be copied beside itself", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_CP=screenshot-c.png.old"}, "preparing the replacements"},
+			[]string{"FAIL_CP=screenshot-c.png.old"}, "preparing the replacements", nil},
 		// The disk fills once the first image has replaced its committed one, and the second
 		// replacement fails: putting the first back has to write no data.
 		{"the second replacement fails on a full disk", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_MV=screenshot-b.png.new", "FULL_AFTER_RENAME=1"}, "replacing the committed images"},
+			[]string{"FAIL_MV=screenshot-b.png.new", "FULL_AFTER_RENAME=1"}, "replacing the committed images", nil},
 		{"the last replacement fails", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_MV=screenshot-c.png.new"}, "replacing the committed images"},
+			[]string{"FAIL_MV=screenshot-c.png.new"}, "replacing the committed images", nil},
+		// docker cp keeps a link the capture made, which the host would follow to a file of its own
+		// and commit: here a valid PNG outside the capture's folder, which a check of the bytes alone
+		// would take.
+		{"a captured image is a link", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				outside := filepath.Join(filepath.Dir(out), "outside.png")
+				require.NoError(t, os.WriteFile(outside, []byte(fixturePNG("a file of the host's")), 0o644))
+				require.NoError(t, os.Remove(filepath.Join(out, "screenshot-b.png")))
+				require.NoError(t, os.Symlink(outside, filepath.Join(out, "screenshot-b.png")))
+			}},
+		{"the capture's list is a link", screenshotsFixture, nil, nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				outside := filepath.Join(filepath.Dir(out), "outside.txt")
+				require.NoError(t, os.WriteFile(outside, []byte(*screenshotsLines(screenshotsFixture...)), 0o644))
+				require.NoError(t, os.Symlink(outside, filepath.Join(out, "images.txt")))
+			}},
+		{"a captured image is a folder", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				require.NoError(t, os.Mkdir(filepath.Join(out, "screenshot-c.png"), 0o755))
+			}},
+		{"a captured image is not a PNG", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				require.NoError(t, os.WriteFile(filepath.Join(out, "screenshot-b.png"), []byte("SECRET=a credential\n"), 0o644))
+			}},
+		{"a captured image is a PNG cut short", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				image := fixturePNG("new screenshot-b.png")
+				require.NoError(t, os.WriteFile(filepath.Join(out, "screenshot-b.png"), []byte(image[:len(image)-12]), 0o644))
+			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			run := runScreenshots(t, screenshotsFixture, tc.captured, tc.list, fixtureImagesJSON, tc.env...)
+			f := newScreenshotsFixture(t, screenshotsFixture, tc.captured, tc.list, fixtureImagesJSON)
+			if tc.setup != nil {
+				tc.setup(t, filepath.Join(f.stub, "out"))
+			}
+			run := f.run(t, tc.env...)
 			require.Error(t, run.err, run.out)
 			assert.Equal(t, committed, run.assets, run.out)
 			assert.Contains(t, run.out, "screenshots: failed while "+tc.step)

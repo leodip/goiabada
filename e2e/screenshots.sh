@@ -115,15 +115,26 @@ docker cp --quiet "$capture:/out/." "$stage/new/"
 
 # The images to write, one file name to a line: the capture's own reading of images.json, so the
 # script writes exactly the images the capture took.
+# docker cp keeps a link the capture made as a link, which the host would follow into its own files,
+# so the list and each image have to be regular files, read only once they are known to be, and
+# each image a PNG: an 8-byte signature, then an IHDR chunk of 13 bytes, and an IEND chunk to end it.
 step="checking the images captured"
-[ -f "$stage/new/images.txt" ] || { echo "screenshots: the capture wrote no images.txt" >&2; exit 1; }
+regular_file() { [ ! -L "$1" ] && [ -f "$1" ]; }
+png_start="89504e470d0a1a0a0000000d49484452"
+png_end="0000000049454e44ae426082"
+hex_bytes() { od -An -vtx1 | tr -d ' \n'; }
+regular_file "$stage/new/images.txt" || { echo "screenshots: the capture wrote no images.txt, or one that is not a regular file" >&2; exit 1; }
 while IFS= read -r name; do
   [[ "$name" =~ ^screenshot[A-Za-z0-9._-]*$ ]] || { echo "screenshots: images.txt names '$name', which is not a screenshot's file name" >&2; exit 1; }
   images+=("$name")
 done <"$stage/new/images.txt"
 [ "${#images[@]}" -gt 0 ] || { echo "screenshots: the capture lists no image" >&2; exit 1; }
 for name in "${images[@]}"; do
-  [ -s "$stage/new/$name" ] || { echo "screenshots: the capture wrote no $name" >&2; exit 1; }
+  image="$stage/new/$name"
+  [ -e "$image" ] || [ -L "$image" ] || { echo "screenshots: the capture wrote no $name" >&2; exit 1; }
+  regular_file "$image" || { echo "screenshots: the capture's $name is not a regular file" >&2; exit 1; }
+  [ "$(head -c 16 "$image" | hex_bytes)" = "$png_start" ] && [ "$(tail -c 12 "$image" | hex_bytes)" = "$png_end" ] ||
+    { echo "screenshots: the capture's $name is not a PNG" >&2; exit 1; }
 done
 
 step="removing the containers"

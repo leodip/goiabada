@@ -105,6 +105,24 @@ func TestSiteScreenshots_TheChecksFail(t *testing.T) {
 	home := "![The Phone page](./screenshot-account-phone.png)\n![Users](../../assets/screenshot-users.png)\n"
 	assert.Equal(t, []string{"screenshot-account-phone.png"},
 		unshownScreenshots(screenshotsShown(homePage, home), []string{"screenshot-account-phone.png", "screenshot-users.png"}))
+
+	// Listed images the README names only inside comments: an inline image and an HTML <img>
+	// commented out, a reference image whose definition is commented out, and an image after a
+	// comment that is never closed. The visible one beside them is still shown.
+	readme = "<!-- ![Hidden](site/src/assets/screenshot-a.png) -->\n" +
+		"<!--\n<img src=\"site/src/assets/screenshot-b.png\">\n-->\n" +
+		"![Defined][c]\n\n<!-- [c]: site/src/assets/screenshot-c.png -->\n" +
+		"![Visible](site/src/assets/screenshot-users.png)\n" +
+		"<!-- never closed\n![Unclosed](site/src/assets/screenshot-d.png)\n"
+	written := []string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-d.png", "screenshot-users.png"}
+	assert.Equal(t, []string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-d.png"},
+		unshownScreenshots(screenshotsShown(readmePage, readme), written))
+
+	// On the home page, an MDX page, an MDX comment hides its image too.
+	home = "{/* ![Hidden](../../assets/screenshot-a.png) */}\n{/*\n  ![Hidden](../../assets/screenshot-b.png)\n*/}\n" +
+		"![Visible](../../assets/screenshot-users.png)\n"
+	assert.Equal(t, []string{"screenshot-a.png", "screenshot-b.png"},
+		unshownScreenshots(screenshotsShown(homePage, home), []string{"screenshot-a.png", "screenshot-b.png", "screenshot-users.png"}))
 }
 
 // No screenshot among the site's assets, and none either page shows, is numbered rather than
@@ -217,9 +235,30 @@ var imageReference = regexp.MustCompile(
 // image names.
 var linkDefinition = regexp.MustCompile(`(?m)^ {0,3}\[([^\]]+)\]:[ \t]*(<[^>]*>|\S+)`)
 
+// pageComment matches a comment, which a page does not render, so an image or a link definition
+// inside one is not shown: an HTML comment, which runs to the end of the page when it is not
+// closed, and, on an MDX page, an MDX comment, {/* ... */}.
+var (
+	pageComment = regexp.MustCompile(`(?s)<!--.*?(?:-->|$)`)
+	mdxComment  = regexp.MustCompile(`(?s)\{\s*/\*.*?\*/\s*\}`)
+)
+
+// withoutComments is a page's content with its comments taken out, each left as the line breaks it
+// held, so the lines around it stay lines of their own.
+func withoutComments(page, content string) string {
+	blank := func(comment string) string { return strings.Repeat("\n", strings.Count(comment, "\n")) }
+	content = pageComment.ReplaceAllStringFunc(content, blank)
+	if path.Ext(page) == ".mdx" {
+		content = mdxComment.ReplaceAllStringFunc(content, blank)
+	}
+	return content
+}
+
 // screenshotsShown is every image a page shows whose file is a screenshot, in order, each target
-// resolved against the folder of the page, given relative to the source root.
+// resolved against the folder of the page, given relative to the source root. An image inside a
+// comment is not shown, nor one that only a definition inside a comment names.
 func screenshotsShown(page, content string) []shownScreenshot {
+	content = withoutComments(page, content)
 	definitions := map[string]string{}
 	for _, m := range linkDefinition.FindAllStringSubmatch(content, -1) {
 		label := referenceLabel(m[1])
