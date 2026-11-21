@@ -9,15 +9,20 @@ import { linksIn, waitForMail } from "../../lib/mailpit";
 import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/settings";
 import { uniqueIdentifier } from "../../lib/unique";
 
-// The id of the user the users list names by exactly this email, or none when there is no such user.
-// Only a users list that rendered, its table or its empty state, answers none: a refused or failed
-// lookup throws, so the test fails rather than leave a user it could not look for.
+// The id of the user the users list shows with exactly this email, or none when there is no such
+// user. Only the users list itself, rendered with its table or its empty state, answers none: a
+// refused or failed lookup, or one that lands on another page, throws, so the test fails rather than
+// leave a user it could not look for. A row is found by the email it shows rather than by its link's
+// name, so a listed user whose link is named otherwise fails idFromListLink instead of being skipped.
 async function listedUserId(page: Page, email: string): Promise<number | undefined> {
   const listUrl = `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`;
   const response = await page.goto(listUrl);
-  if (response?.status() !== 200) throw new Error(`the users list at ${listUrl} answered ${response?.status() ?? "nothing"}`);
+  if (response?.status() !== 200 || !new RegExp(`^${env.adminUrl}/admin/users/?(\\?|$)`).test(page.url())) {
+    throw new Error(`the users list at ${listUrl} answered ${response?.status() ?? "nothing"} at ${page.url()}`);
+  }
   await expect(page.locator("#usersTable, .empty-state").first(), `the users list at ${listUrl}`).toBeVisible();
-  if ((await page.locator("#usersTable").getByRole("link", { name: email, exact: true }).count()) === 0) return undefined;
+  const rows = page.locator("#usersTable tbody tr").filter({ has: page.getByText(email, { exact: true }) });
+  if ((await rows.count()) === 0) return undefined;
   return idFromListLink(page, listUrl, email);
 }
 
