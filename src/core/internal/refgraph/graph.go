@@ -219,8 +219,9 @@ func (g *ImportGraph) TopCorePackage(importPath string) string {
 }
 
 // topLevelCorePackages lists the directories directly under core that hold at least one production
-// Go file at any depth. That is the set the ownership table must cover exactly: core/audit holds
-// nothing but a mocks directory and is still a directory whose fate has to be recorded.
+// Go file at any depth. That is the set the ownership table must cover exactly: a directory whose
+// only Go files sit in a subdirectory, as when it holds nothing but a mocks directory, still has a
+// fate the table must record.
 func topLevelCorePackages(root string) ([]string, error) {
 	entries, err := os.ReadDir(filepath.Join(root, "core"))
 	if err != nil {

@@ -134,10 +134,10 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 
 Notes on rows that are not self-evident:
 
-- There is no `core/audit` row because there is no `core/audit` in the repository. #333 lists it for
-  deletion, and it does exist as a directory of generated mocks in a working tree that has run the
-  mock generator, but git has never tracked a file under it. A row for it fails the completeness
-  rule, which is how this was found.
+- There is no `core/audit` row because there is no `core/audit` in the repository. #333 listed it for
+  deletion; #328 deleted the last file git tracked under it, a generated mock, and the mock
+  generator no longer writes there. A row for it fails the completeness rule, which is how this was
+  found.
 - `core/cmd` is kernel because it holds three developer tools: `ownershipdump`, which writes the
   per-symbol table described below, `imagescanreport`, which turns the weekly scan of the
   published images into the issue listing what someone can act on (#520), and `screenshotcheck`,
