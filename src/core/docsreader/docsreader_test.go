@@ -405,6 +405,25 @@ func TestBlankColumn_EmptiesEachDataCellOfTheColumn(t *testing.T) {
 	})
 }
 
+// TestBlankColumn_EmptiesTheColumnInEveryTableThatHasIt: each table that has the column has its
+// cells emptied, the column found in each table's own header, wherever that header puts it.
+func TestBlankColumn_EmptiesTheColumnInEveryTableThatHasIt(t *testing.T) {
+	text := "| Details | Event |\n" +
+		"|---|---|\n" +
+		"| `first` | `a` |\n" +
+		"\n" +
+		"| Event | Details | Why |\n" +
+		"|---|---|---|\n" +
+		"| `b` | `second` | two |\n" +
+		"| `c` | `third` | three |\n"
+	blanked := BlankColumn(text, "Details")
+	assertLinesKept(t, text, blanked, 2, 6, 7)
+	assertTables(t, Tables(blanked), []Table{
+		{Header: []string{"Details", "Event"}, Rows: [][]string{{"", "`a`"}}},
+		{Header: []string{"Event", "Details", "Why"}, Rows: [][]string{{"`b`", "", "two"}, {"`c`", "", "three"}}},
+	})
+}
+
 // TestBlankColumn_TheColumnIsTheFirstHeaderCellEqualToTheHeader: a header cell that only starts
 // with the header is not it, and of two equal header cells the first is the column.
 func TestBlankColumn_TheColumnIsTheFirstHeaderCellEqualToTheHeader(t *testing.T) {

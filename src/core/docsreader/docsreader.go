@@ -113,11 +113,17 @@ func (t Table) Columns(headers ...string) ([][]string, error) {
 // delimiter row under a header is neither a header nor a data row, and the header is the row the
 // first delimiter row follows.
 func Tables(text string) []Table {
-	var tables []Table
-	for _, run := range runs(strings.Split(text, "\n")) {
-		tables = append(tables, classify(run))
+	return tables(strings.Split(text, "\n"))
+}
+
+// tables is the one read of a text's split lines that Tables and BlankColumn share: each run of
+// table rows, told into its header and its data rows by classify.
+func tables(lines []string) []Table {
+	var found []Table
+	for _, run := range runs(lines) {
+		found = append(found, classify(run))
 	}
-	return tables
+	return found
 }
 
 // BlankColumn returns text with every data cell of the column headed header emptied, in every
@@ -132,22 +138,19 @@ func Tables(text string) []Table {
 // without the Details column whose payload keys are spelled like events, reads through it (#536).
 func BlankColumn(text, header string) string {
 	lines := strings.Split(text, "\n")
-	for _, run := range runs(lines) {
-		delimiter := delimiterRow(run.rows)
-		if delimiter < 0 {
-			continue
-		}
-		column := slices.Index(run.rows[delimiter-1], header)
+	for _, table := range tables(lines) {
+		column := slices.Index(table.Header, header)
 		if column < 0 {
 			continue
 		}
-		for i, row := range run.rows {
-			if i == delimiter || i == delimiter-1 || column >= len(row) {
+		for i, row := range table.Rows {
+			if column >= len(row) {
 				continue
 			}
-			line := lines[run.lines[i]]
+			index := table.Lines[i] - 1
+			line := lines[index]
 			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
-			lines[run.lines[i]] = indent + spell(row, column)
+			lines[index] = indent + spell(row, column)
 		}
 	}
 	return strings.Join(lines, "\n")
@@ -160,7 +163,7 @@ type run struct {
 	lines []int
 }
 
-// runs is the one walk over a text's lines that Tables and BlankColumn read: each run of table rows
+// runs is the one walk over a text's lines that tables reads: each run of table rows
 // in the order the page reads them. A row is a line that opens with a pipe outside a code fence; a
 // fence line, a fenced line and any other line end the run before it.
 func runs(lines []string) []run {

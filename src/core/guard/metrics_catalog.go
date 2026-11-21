@@ -65,9 +65,7 @@ func (f metricsCatalogFinding) String() string {
 	return fmt.Sprintf("%s: %s", f.Metric, f.Reason)
 }
 
-// The catalog's header row, and the values its type and server cells may take.
-const metricsCatalogHeader = "| metric | type | labels | server | meaning |"
-
+// The catalog's header cells, and the values its type and server cells may take.
 var (
 	metricsCatalogColumns = []string{"metric", "type", "labels", "server", "meaning"}
 	metricsCatalogTypes   = []string{"counter", "gauge", "histogram"}
@@ -267,7 +265,8 @@ func readMetricsCatalog(path string) ([]catalogRow, error) {
 
 	switch tables {
 	case 0:
-		return nil, errs.Errorf("%s has no catalog table, whose header row is %q", path, metricsCatalogHeader)
+		return nil, errs.Errorf("%s has no catalog table, whose header row is %q", path,
+			"| "+strings.Join(metricsCatalogColumns, " | ")+" |")
 	case 1:
 		return rows, nil
 	default:
