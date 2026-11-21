@@ -15,7 +15,8 @@ import { freshTotp } from "../../lib/totp";
 
 for (const translation of translations) {
   const { name, tag, regionalTag } = translation;
-  const missingPage = `missing-${name.toLowerCase()}-page`;
+  // Named by the tag, which, unlike "Portuguese (Brazil)", is safe in a path.
+  const missingPage = `missing-${tag.toLowerCase()}-page`;
 
   for (const theme of ["light", "dark"] as const) {
     test(`${name} console pages fit a phone in ${theme}`, async ({ page, clients, groups, resources, users }) => {

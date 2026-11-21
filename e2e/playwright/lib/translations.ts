@@ -6,13 +6,16 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
+// A tag's language subtag: "pt" for "pt-BR", and the tag itself for "de".
+type LanguageOf<Tag extends string> = Tag extends `${infer Language}-${string}` ? Language : Tag;
+
 export type Translation<Tag extends string = string> = {
   // The language's English name, which titles its tests.
   name: string;
   // The catalog's tag, the page's <html lang> and the ui_locales the walk asks for.
   tag: Tag;
   // A regional tag that reaches the catalog: the browser's Accept-Language and locale.
-  regionalTag: `${NoInfer<Tag>}-${string}`;
+  regionalTag: `${LanguageOf<NoInfer<Tag>>}-${string}`;
   // The regional tag's entry in a user's Language and region list: what is typed, and the option.
   region: { typed: string; option: RegExp };
   // The console pages, with a client, a group, a resource and a user of the test's own.
@@ -87,7 +90,7 @@ export type Translation<Tag extends string = string> = {
   };
 };
 
-// Ties a row's regional tag to its own tag, so a row cannot ask for another language's region.
+// Ties a row's regional tag to its own language, so a row cannot ask for another language's region.
 function row<Tag extends string>(translation: Translation<Tag>): Translation {
   return translation;
 }
@@ -355,6 +358,139 @@ export const translations: readonly Translation[] = [
       activate: "Buat akun",
       accountActivated: "Akun diaktifkan",
       accountCreated: "Akun dibuat",
+    },
+  }),
+  row({
+    name: "Spanish",
+    tag: "es",
+    regionalTag: "es-MX",
+    region: { typed: "Spanish (Mexico)", option: /Spanish \(Mexico\)/ },
+    console: {
+      attributeValue: "Investigación",
+      renamedSuffix: "nuevo",
+      cancel: "Cancelar",
+      tokenLifetime: "1 hora y 30 minutos",
+      wholeSecondsRefusal: "Escribe un número entero de segundos.",
+      deleteResource: "Eliminar recurso",
+      wrongResourceIdentifier: "Ese no es el identificador de este recurso.",
+      defaultBrandTag: "Predeterminada",
+      siteKey: "Clave del sitio",
+      secretKey: "Clave secreta",
+      filter: "Filtrar",
+    },
+    signIn: {
+      signIn: "Iniciar sesión",
+      emailRequired: "El correo electrónico es obligatorio.",
+      verifyOtp: "Verificar",
+      saveRecoveryCodes: "Guarda tus códigos de recuperación",
+      recoveryCodesShown: "Tus códigos de recuperación ya se mostraron",
+      continue: "Continuar",
+      consentTitle: "Permitir acceso",
+      allow: "Permitir",
+      notRedirected: "No se te ha redirigido a ningún sitio",
+      backToApplication: "Volviendo a la aplicación",
+      twoFactor: "Autenticación de dos factores",
+      useRecoveryCodeLink: "Usar un código de recuperación",
+      useRecoveryCodeTitle: "Usa un código de recuperación",
+      verifyRecoveryCode: "Verificar",
+      wrongRecoveryCode: "Ese código de recuperación no es correcto o ya se usó.",
+      signOut: "Cerrar sesión",
+      signedOut: "Sesión cerrada",
+    },
+    accountRecoveryCodes: {
+      profileSaved: "Perfil guardado.",
+      saveRecoveryCodes: "Guarda tus códigos de recuperación",
+      recoveryCodes: "Códigos de recuperación",
+      tenOfTenUnused: "Te quedan 10 de tus 10 códigos de recuperación sin usar.",
+      newRecoveryCodesQuestion: "¿Obtener códigos de recuperación nuevos?",
+    },
+    passwordReset: {
+      sendLink: "Enviar enlace",
+      checkEmail: "Revisa tu correo",
+      subject: "Restablecimiento de contraseña",
+      sentence: "Para restablecer tu contraseña",
+      setPassword: "Establecer contraseña",
+      passwordSet: "Contraseña establecida",
+      sendCode: "Enviar código",
+      verificationWait: "Espera 1 minuto y 30 segundos antes de solicitar otro código.",
+      adminOnly: "Solo administradores",
+    },
+    registration: {
+      title: "Crear una cuenta",
+      register: "Crear cuenta",
+      checkEmail: "Revisa tu correo",
+      activationSubject: "Activa tu cuenta",
+      choosePassword: "Elige tu contraseña",
+      activate: "Crear cuenta",
+      accountActivated: "Cuenta activada",
+      accountCreated: "Cuenta creada",
+    },
+  }),
+  // pt-PT has no catalog of its own: a browser or user asking for it is served the pt-BR one.
+  row({
+    name: "Portuguese (Brazil)",
+    tag: "pt-BR",
+    regionalTag: "pt-PT",
+    region: { typed: "Portuguese (Portugal)", option: /Portuguese \(Portugal\)/ },
+    console: {
+      attributeValue: "Pesquisa",
+      renamedSuffix: "novo",
+      cancel: "Cancelar",
+      tokenLifetime: "1 hora e 30 minutos",
+      wholeSecondsRefusal: "Informe um número inteiro de segundos.",
+      deleteResource: "Excluir recurso",
+      wrongResourceIdentifier: "Este não é o identificador deste recurso.",
+      defaultBrandTag: "Padrão",
+      siteKey: "Chave do site",
+      secretKey: "Chave secreta",
+      filter: "Filtrar",
+    },
+    signIn: {
+      signIn: "Entrar",
+      emailRequired: "O e-mail é obrigatório.",
+      verifyOtp: "Verificar",
+      saveRecoveryCodes: "Guarde seus códigos de recuperação",
+      recoveryCodesShown: "Seus códigos de recuperação já foram mostrados",
+      continue: "Continuar",
+      consentTitle: "Permitir acesso",
+      allow: "Permitir",
+      notRedirected: "Você não foi enviado a lugar nenhum",
+      backToApplication: "Levando você de volta ao aplicativo",
+      twoFactor: "Autenticação de dois fatores",
+      useRecoveryCodeLink: "Usar um código de recuperação",
+      useRecoveryCodeTitle: "Use um código de recuperação",
+      verifyRecoveryCode: "Verificar",
+      wrongRecoveryCode: "Esse código de recuperação não está correto ou já foi usado.",
+      signOut: "Sair",
+      signedOut: "Sessão encerrada",
+    },
+    accountRecoveryCodes: {
+      profileSaved: "Perfil salvo.",
+      saveRecoveryCodes: "Guarde seus códigos de recuperação",
+      recoveryCodes: "Códigos de recuperação",
+      tenOfTenUnused: "10 dos seus 10 códigos de recuperação ainda não foram usados.",
+      newRecoveryCodesQuestion: "Gerar novos códigos de recuperação?",
+    },
+    passwordReset: {
+      sendLink: "Enviar link de redefinição",
+      checkEmail: "Verifique seu e-mail",
+      subject: "Redefinição de senha",
+      sentence: "redefinir sua senha",
+      setPassword: "Definir senha",
+      passwordSet: "Senha definida",
+      sendCode: "Enviar código",
+      verificationWait: "Aguarde 1 minuto e 30 segundos antes de pedir outro código.",
+      adminOnly: "Somente administradores",
+    },
+    registration: {
+      title: "Criar uma conta",
+      register: "Criar conta",
+      checkEmail: "Verifique seu e-mail",
+      activationSubject: "Ative sua conta",
+      choosePassword: "Escolha sua senha",
+      activate: "Criar conta",
+      accountActivated: "Conta ativada",
+      accountCreated: "Conta criada",
     },
   }),
 ];
