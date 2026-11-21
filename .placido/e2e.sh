@@ -6,9 +6,9 @@
 #   .placido/e2e.sh                  # the whole e2e suite
 #   .placido/e2e.sh tests/oauth      # one area; any Playwright argument passes through
 #
-# When at most 20 tests fail, they run once more against the same environment, alone and
-# one at a time, after the setup project's sweep. If they pass, the gate prints FLAKY with
-# their names and passes.
+# When at most 20 tests fail in a run given no Playwright option, they run once more against
+# the same environment, alone and one at a time, after the setup project's sweep. If they
+# pass, the gate prints FLAKY with their names and passes.
 #
 # There is one environment, so a lock keeps two placido runs from rebuilding it at
 # once, and the main checkout's suite lock keeps this run and a suite run by hand there
@@ -102,11 +102,26 @@ rerun_failed_tests() { # first_status
   printf '%s\n' "$names"
 }
 
-PLAYWRIGHT_LAST_RUN_OUTPUT_FILE="$last_run" "$worktree/e2e/run.sh" --source "$@"
+# The rerun picks its tests by their IDs and runs them with options of its own, so it follows
+# only a run given test locations alone, or nothing, as placido gives it. A Playwright option,
+# such as --last-failed or --repeat-each, changes which tests run in a way the rerun would not
+# repeat, and such a run goes as given, reading and writing Playwright's own last-run file.
+rerunnable=1
+for arg in "$@"; do
+  [[ "$arg" == -* ]] && rerunnable=0
+done
+
+if ((rerunnable)); then
+  PLAYWRIGHT_LAST_RUN_OUTPUT_FILE="$last_run" "$worktree/e2e/run.sh" --source "$@"
+else
+  "$worktree/e2e/run.sh" --source "$@"
+fi
 status=$?
-if ((status != 0)); then
+if ((status != 0 && rerunnable)); then
   rerun_failed_tests "$status"
   status=$?
+elif ((status != 0)); then
+  echo "No rerun: the gate reruns only a run given test locations alone, and this one was given a Playwright option."
 fi
 
 if [[ "$main" != "$worktree" && -d "$worktree/e2e/.state" ]]; then
