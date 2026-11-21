@@ -30,12 +30,14 @@ CodeRabbit (`coderabbitai[bot]`) reviews every pull request, and again on each p
   new comments.
 - **Never mention it** (`@coderabbitai`) in a reply or a note: a mention makes it act,
   and it can resolve threads or push fixes of its own.
-- **A comment that a repository guard misreads a form the repository does not write**
-  is minor, whatever fixture shows it. When the guard passes that form silently, fix it
-  by having the guard report the form as one it cannot read, not by teaching it the
-  form; when the guard reports it already, the reply says so. Only a misreading of code
-  the tree contains is significant ("Guards that read code or configuration" in
-  `docs/development/guards.md`).
+- **A comment that a repository guard misreads a form the repository does not write**,
+  or a build environment or fixture input the repository does not use, such as a
+  `//line` directive, `GOPACKAGESDRIVER`, a Windows test host, or a `go.mod` shape no
+  fixture writes, is minor, whatever fixture shows it. When the guard passes that form
+  silently, fix it by having the guard report the form as one it cannot read, not by
+  teaching it the form; when the guard reports it already, the reply says so. Only a
+  misreading of code the tree contains is significant ("Guards that read code or
+  configuration" in `docs/development/guards.md`).
 - **It knows only the diff.** It often misses a decision the agreement or the
   decisions recorded, a guard elsewhere, or an engine-specific case it did not read: a
   comment that contradicts one of them is not valid, and the reply names it.

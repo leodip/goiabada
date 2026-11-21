@@ -56,7 +56,9 @@ not change instead (#420).
 
 A guard that works out what code or a workflow does, such as a route's middleware chain or the
 images a job pulls, reads the forms the repository writes and reports any other form as one it
-cannot read, naming the form to write instead. It is not taught a form the tree does not contain. A
+cannot read, naming the form to write instead. It is not taught a form the tree does not contain,
+nor made to work in a build environment or with a fixture input the repository does not use, such
+as `GOPACKAGESDRIVER`, a Windows test host, or a `go.mod` shape no fixture writes. A
 guard that learns one more form of Go or of the Actions syntax with each review never finishes,
 while one that refuses what it cannot read cannot pass what it misread. #261's OpenAPI status lint
 grew by about 2,450 lines over four passes of review comments, each on a form `routes.go` never

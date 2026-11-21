@@ -22,8 +22,10 @@
   sees them ("MySQL snapshots" in `docs/development/data.md`).
 - **Guards that read code or a workflow** follow "Guards that read code or
   configuration" in `docs/development/guards.md`. A finding shown only in a fixture of
-  a form the tree does not write is minor; say in it whether the guard reads the real
-  tree any differently.
+  a form the tree does not write, or about a build environment or fixture input the
+  repository does not use, such as a `//line` directive, `GOPACKAGESDRIVER`, a Windows
+  test host, or a `go.mod` shape no fixture writes, is minor; say in it whether the
+  guard reads the real tree any differently.
 - **Generated files must be current:** the schema goldens, the core ownership table,
   the mocks, and the CSS. A stale one is a blocking finding, since it turns CI red.
 - **Documentation:** check that reader-facing changes have matching updates under
