@@ -256,6 +256,7 @@ const otherLanguages = [
   { tag: "es", label: "Privacidad", notice: "(se abre en una pestaña nueva)" },
   { tag: "fr", label: "Confidentialité", notice: "(s’ouvre dans un nouvel onglet)" },
   { tag: "it", label: "Riservatezza", notice: "(si apre in una nuova scheda)" },
+  { tag: "id", label: "Privasi", notice: "(terbuka di tab baru)" },
 ];
 
 test("a footer link's label in each other built-in language is drawn on a page in that language, and the fallback where it has none", async ({

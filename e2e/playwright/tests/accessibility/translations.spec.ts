@@ -1,7 +1,7 @@
 // Each translation uses the same responsive components as the other catalogs. Exercise its rendered
 // wording at the smallest supported phone width, including tabs, tables, dialogs and refusals, for
 // every row of the table in lib/translations.ts.
-import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, resourceUrl, userUrl } from "../../lib/admin-console";
+import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, legalDocumentUrl, resourceUrl, userUrl } from "../../lib/admin-console";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { signInToConsole } from "../../lib/console-user";
 import { brandUrl, defaultBrand } from "../../lib/brands";
@@ -45,14 +45,14 @@ for (const translation of translations) {
       const urls = [
         `${env.adminUrl}/`,
         ...["clients", "groups", "resources", "users"].flatMap((kind) => [`${env.adminUrl}/admin/${kind}`, `${env.adminUrl}/admin/${kind}/new`]),
-        ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "sign-out-redirect-uris", "backchannel-logout", "web-origins", "user-sessions", "permissions", "introspection", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
+        ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "sign-out-redirect-uris", "backchannel-logout", "web-origins", "user-sessions", "permissions", "introspection", "legal-documents", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
         ...(["settings", "attributes", "members", "permissions", "delete"] as const).map((tab) => groupUrl(group.id, tab)),
         `${groupUrl(group.id, "attributes")}/add`, `${groupUrl(group.id, "members")}/add`, new URL(groupEdit!, env.adminUrl).href,
         ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "connected-clients", "legal-documents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),
         `${userUrl(user.id, "attributes")}/add`, new URL(userEdit!, env.adminUrl).href,
         ...(["settings", "permissions", "users-with-permission", "groups-with-permission", "delete"] as const).map((tab) => resourceUrl(resource.id, tab)),
         new URL(grant!, env.adminUrl).href,
-        ...["general", "branding", "branding/new", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
+        ...["general", "branding", "branding/new", "sessions", "tokens", "keys", "email", "email/send-test-email", "email/templates", `email/templates/password_reset_link/${tag}`, "turnstile", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
         brandUrl(seededBrand.id, "edit"), brandUrl(seededBrand.id, "delete"),
         ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "applications", "legal-documents", "sessions", "data", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
         `${env.adminUrl}/${missingPage}`, `${env.adminUrl}/auth/callback`, `${env.adminUrl}/auth/logout`,
@@ -100,6 +100,38 @@ for (const translation of translations) {
       await page.getByRole("button", { name: wording.deleteResource, exact: true }).click();
       await expect(page.getByRole("alert")).toContainText(wording.wrongResourceIdentifier);
       await fitsIn(page, translation);
+      // Keep fixture cleanup in its original language.
+      await page.setExtraHTTPHeaders({});
+    });
+
+    // The documents are the test's own: a draft the fixture deletes, and a notice published to a
+    // client of the test's own, so no other test's sign-in shows it, which the fixture retires.
+    test(`${name} legal documents pages fit a phone in ${theme}`, async ({ page, clients, legalDocuments }) => {
+      test.setTimeout(90_000);
+      const client = await clients.create();
+      const draft = await legalDocuments.create({ markdown: "# Draft\n\nNot published yet." });
+      const published = await legalDocuments.create({ markdown: "# Notice\n\n| Data | Kept for |\n|---|---|\n| Email | A year |", apps: [client.identifier], publish: true });
+
+      await page.setViewportSize({ width: 320, height: 740 });
+      page.setDefaultTimeout(10_000);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.setExtraHTTPHeaders({ "Accept-Language": regionalTag });
+      const list = `${env.adminUrl}/admin/legal-documents`;
+      for (const url of [
+        list,
+        `${list}/new`,
+        legalDocumentUrl(draft.id, "draft"),
+        legalDocumentUrl(draft.id, "apps"),
+        legalDocumentUrl(published.id, "versions"),
+        `${legalDocumentUrl(published.id, "versions")}/1`,
+        legalDocumentUrl(draft.id, "delete"),
+      ]) {
+        await test.step(url, async () => {
+          const response = await page.goto(`${url}?ui_locales=${tag}`);
+          expect(response?.status()).toBe(200);
+          await fitsIn(page, translation);
+        });
+      }
       // Keep fixture cleanup in its original language.
       await page.setExtraHTTPHeaders({});
     });
