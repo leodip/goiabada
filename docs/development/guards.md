@@ -37,9 +37,12 @@ selects it. The context-value, discarded-error and request-field guards also rea
 machine's default build and merge what they find; the ownership census reads its test references
 from the test machine's test build. Any other guard on the loader reads only the test machine's
 test build. A package that does not load or type-check stops it with one message naming the
-package, so every fixture tree compiles, made loadable with `pkgload.MakeLoadable`. A guard that
-reads only syntax, such as an import list, parses with `go/parser` rather than matching text: an
-alias binds a different name to the same path.
+package, so every fixture tree compiles, made loadable with `pkgload.MakeLoadable`. So does a
+package that imports one of its own module's packages that `./...` skips, in a directory whose name
+begins with `_` or `.` or is `testdata`, which the build compiles and no guard would read; the
+dead-interface and vacuous-assertion guards also refuse a directory beginning with `_` or `.` among
+those they walk. A guard that reads only syntax, such as an import list, parses with `go/parser`
+rather than matching text: an alias binds a different name to the same path.
 
 Before writing a guard, look for a `golangci-lint` check that already holds the rule, as #443 did
 when it turned on staticcheck's ST1000 for package comments; `.golangci.yml` lists what is enabled
