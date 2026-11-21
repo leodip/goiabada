@@ -30,14 +30,14 @@ import (
 // The lockout's refusal committed the disable, so a client block that then fails to load answers
 // 500 and still tells the user (#724 decision 7). Only that refusal reports the lockout, so a notice
 // lost here would never be sent.
-func TestHandleAuthOtpPost_TellsTheLockoutWhenTheRefusalCannotBeShown(t *testing.T) {
+func TestHandleAuthOTPPost_TellsTheLockoutWhenTheRefusalCannotBeShown(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	emailSender := accounthandlersmocks.NewEmailSender(t)
 	jobs := &signInNoticeJobs{}
-	handler := buildAuthOtpPost(authOtpPostDeps{
+	handler := buildAuthOTPPost(authOTPPostDeps{
 		pageRenderer:  pageRenderer,
 		ceremonyStore: ceremonyStore,
 		database:      database,
@@ -56,7 +56,7 @@ func TestHandleAuthOtpPost_TellsTheLockoutWhenTheRefusalCannotBeShown(t *testing
 		Return(true, nil).Once()
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return((*record.Client)(nil), errors.New("client read unavailable")).Once()
-	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventOTPAuthenticatorDisabled, mock.Anything).Return().Once()
 	pageRenderer.On("InternalServerError", rr, req, mock.Anything).
 		Run(func(mock.Arguments) { rr.WriteHeader(http.StatusInternalServerError) }).Return().Once()
@@ -85,7 +85,7 @@ func answerSignInLockedRead(t *testing.T, database *datamocks.Database, current 
 	require.True(t, found, "the step reads the user's row in the change's transaction")
 }
 
-func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.T) {
+func TestHandleAuthOTPPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.T) {
 	const currentAddress = "current-address@example.com"
 	for _, path := range []struct {
 		name  string
@@ -106,13 +106,13 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 				req := signInNoticeRequest(t, signInNoticeSettings(), otptest.Code(t, secret, time.Now()))
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 					AuthState:  ceremony.AuthStateLevel2OTP,
-					CeremonyId: testCeremonyId,
-					UserId:     1,
-					ClientId:   "test-client",
+					CeremonyID: testCeremonyID,
+					UserID:     1,
+					ClientID:   "test-client",
 					OTPKeyURL:  otpTestKeyURL(secret),
 				}, nil)
 				stubSignInEnrolment(database, auditLogger, before)
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 				return req
 			},
@@ -142,7 +142,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 				req := recoveryNoticeRequest(t, signInNoticeSettings(), recoveryCodeTyped)
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
 				stubAcceptedRecoveryCode(database, auditLogger, before, 3)
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 				return req
 			},
@@ -165,7 +165,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				emailSender := accounthandlersmocks.NewEmailSender(t)
 				jobs := &signInNoticeJobs{}
-				handler := buildAuthOtpPost(authOtpPostDeps{
+				handler := buildAuthOTPPost(authOTPPostDeps{
 					pageRenderer:  pageRenderer,
 					ceremonyStore: ceremonyStore,
 					database:      database,

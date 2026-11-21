@@ -225,7 +225,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 }
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
-// Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
+// Unlike auth code flow, ROPC tokens store UserID and ClientID directly on the RefreshToken
 // instead of referencing a Code entity. jti is generateRefreshToken's, and the binding is decided
 // as it is there, from input.DPoPThumbprint and input.Client.
 func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
@@ -264,7 +264,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 
 	claims["scope"] = scope
 
-	// Create refresh token entity with direct UserId and ClientId (no Code reference)
+	// Create refresh token entity with direct UserID and ClientID (no Code reference)
 	refreshTokenEntity := &record.RefreshToken{
 		RefreshTokenJTI:  jti,
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},

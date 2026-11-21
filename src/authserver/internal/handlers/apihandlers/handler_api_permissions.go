@@ -23,9 +23,9 @@ import (
 // and the permission rows under it.
 type permissionsDatabase interface {
 	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
-	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
-	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	DeletePermission(ctx context.Context, tx *sql.Tx, permissionID int64) error
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
@@ -35,21 +35,21 @@ func HandlePermissionsByResourceGet(
 	database permissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resourceIdStr := r.PathValue("resourceId")
-		if len(resourceIdStr) == 0 {
+		resourceIDStr := r.PathValue("resourceId")
+		if len(resourceIDStr) == 0 {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
+		resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid resource ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		permissions, err := database.GetPermissionsByResourceID(r.Context(), nil, resourceId)
+		permissions, err := database.GetPermissionsByResourceID(r.Context(), nil, resourceID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting permissions"), "resource_id", resourceId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting permissions"), "resource_id", resourceID)
 			return
 		}
 
@@ -83,21 +83,21 @@ func HandleResourcePermissionsPut(
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resourceIdStr := r.PathValue("resourceId")
-		if len(resourceIdStr) == 0 {
+		resourceIDStr := r.PathValue("resourceId")
+		if len(resourceIDStr) == 0 {
 			writeJSONError(w, "Resource ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
+		resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid resource ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		resource, err := database.GetResourceByID(r.Context(), nil, resourceId)
+		resource, err := database.GetResourceByID(r.Context(), nil, resourceID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for permissions update"), "resource_id", resourceId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for permissions update"), "resource_id", resourceID)
 			return
 		}
 		if resource == nil {
@@ -120,15 +120,15 @@ func HandleResourcePermissionsPut(
 
 		// Deduplicate identifiers and validate entries
 		seenIdentifiers := map[string]bool{}
-		seenIds := map[int64]bool{}
+		seenIDs := map[int64]bool{}
 		for i := range req.Permissions {
 			// Reject duplicate IDs (prevents bypass of built-in permission protection)
 			if req.Permissions[i].ID > 0 {
-				if seenIds[req.Permissions[i].ID] {
+				if seenIDs[req.Permissions[i].ID] {
 					writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionDuplicateIDs, nil))
 					return
 				}
-				seenIds[req.Permissions[i].ID] = true
+				seenIDs[req.Permissions[i].ID] = true
 			}
 
 			// Trim inputs
@@ -182,10 +182,10 @@ func HandleResourcePermissionsPut(
 		}
 
 		// Build a map for uniqueness checks
-		existingById := map[int64]record.Permission{}
+		existingByID := map[int64]record.Permission{}
 		existingByIdentifier := map[string]record.Permission{}
 		for _, p := range existing {
-			existingById[p.ID] = p
+			existingByID[p.ID] = p
 			existingByIdentifier[p.PermissionIdentifier] = p
 		}
 
@@ -234,7 +234,7 @@ func HandleResourcePermissionsPut(
 		// here, so the index is met only by another save racing this one, and answered 409 (#428).
 		for _, p := range req.Permissions {
 			if p.ID > 0 {
-				if _, ok := existingById[p.ID]; !ok {
+				if _, ok := existingByID[p.ID]; !ok {
 					writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 					return
 				}
@@ -267,16 +267,16 @@ func HandleResourcePermissionsPut(
 				return errListChanged
 			}
 
-			storedById := make(map[int64]record.Permission, len(stored))
+			storedByID := make(map[int64]record.Permission, len(stored))
 			for _, p := range stored {
-				storedById[p.ID] = p
+				storedByID[p.ID] = p
 			}
 			named := make(map[int64]bool, len(req.Permissions))
 			for _, p := range req.Permissions {
 				if p.ID <= 0 {
 					continue
 				}
-				if _, ok := storedById[p.ID]; !ok {
+				if _, ok := storedByID[p.ID]; !ok {
 					// Validated against the rows read before the transaction and gone from this
 					// read, with the loaded list still matching it: the list changed and changed
 					// back between the two reads.
@@ -299,7 +299,7 @@ func HandleResourcePermissionsPut(
 				if p.ID <= 0 {
 					continue
 				}
-				cur := storedById[p.ID]
+				cur := storedByID[p.ID]
 				if cur.PermissionIdentifier == p.PermissionIdentifier && cur.Description == p.Description {
 					continue
 				}

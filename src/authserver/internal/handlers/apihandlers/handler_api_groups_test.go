@@ -30,7 +30,7 @@ var errCountFailed = errs.New("the member count query failed")
 // requireCountFailureAnswered500 asserts what every count failure on this surface owes: the one
 // 500 envelope, with nothing of the groups in it, and one Error record carrying the failure and
 // the group it was counting.
-func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, groupId int64) {
+func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, groupID int64) {
 	t.Helper()
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -46,7 +46,7 @@ func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder,
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	logged := fmt.Sprint(records[0].Attrs["error"])
 	assert.Contains(t, logged, errCountFailed.Error())
-	assert.Contains(t, logged, fmt.Sprintf("unable to count the members of group %d", groupId))
+	assert.Contains(t, logged, fmt.Sprintf("unable to count the members of group %d", groupID))
 }
 
 func TestCountGroupMembers_CountsEveryGroup(t *testing.T) {
@@ -95,7 +95,7 @@ func TestHandleGroupsGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
+	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingID("/api/v1/admin/groups"))
 
 	requireCountFailureAnswered500(t, rr, capture, 6)
 }
@@ -109,12 +109,12 @@ func TestHandleGroupsGet_PublishesEachGroupsOwnCount(t *testing.T) {
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(7, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
+	HandleGroupsGet(database).ServeHTTP(rr, apiRequestCarryingID("/api/v1/admin/groups"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	var body struct {
 		Groups []struct {
-			Id          int64 `json:"id"`
+			ID          int64 `json:"id"`
 			MemberCount int   `json:"memberCount"`
 		} `json:"groups"`
 	}
@@ -133,7 +133,7 @@ func TestHandleGroupGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5", "5"))
+	HandleGroupGet(database).ServeHTTP(rr, apiIDRequest("/api/v1/admin/groups/5", "5"))
 
 	requireCountFailureAnswered500(t, rr, capture, 5)
 }

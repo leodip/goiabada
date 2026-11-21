@@ -34,9 +34,9 @@ type accountDeletionDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error
 }
 
 // The deletion's transaction returns these to say why it rolled back, so the response is written
@@ -310,7 +310,7 @@ func soleAdministrator(ctx context.Context, database accountDeletionDatabase, us
 		if err != nil || !holdsManage || !user.Enabled {
 			return err
 		}
-		holders, err := database.CountEnabledUsersHoldingPermission(ctx, tx, administrators.manageId)
+		holders, err := database.CountEnabledUsersHoldingPermission(ctx, tx, administrators.manageID)
 		if err != nil {
 			return errs.Wrap(err, "unable to count the administrators")
 		}
@@ -337,7 +337,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 	}
 
 	// A replayed code is answered as a wrong one, so the caller cannot tell them apart (#111).
-	incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
+	incorrectOTPCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
 	switch verified.Outcome {
 	case otpcredential.OutcomeMatched:
 		return true
@@ -366,12 +366,12 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 			"logged_in_user": subject,
 		})
 	case otpcredential.OutcomeClockAhead:
-		auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.EventAuthFailedOTP, map[string]interface{}{
 			"user_id":        user.ID,
 			"logged_in_user": subject,
-			"reason":         audit.AuthFailedOtpClockAhead,
+			"reason":         audit.AuthFailedOTPClockAhead,
 		})
-		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpClockAhead, nil),
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OTPClockAhead, nil),
 			"OTP_CLOCK_AHEAD", http.StatusBadRequest)
 		return false
 	default:
@@ -385,7 +385,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 		})
 		defer notifier.Send(r, accountnotice.OTPLockout, accountnotice.To(verified.Current))
 	}
-	writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+	writeLocalizedError(w, r, incorrectOTPCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 	return false
 }
 
@@ -394,9 +394,9 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 // answer for a wrong code and a used one (#257 decisions 6 and 10). The transaction rolled back, so
 // nothing was deleted and no code was spent.
 func refuseDeletionRecoveryCode(w http.ResponseWriter, r *http.Request, database accountDeletionDatabase,
-	auditLogger AuditLogger, credentialFailures CredentialFailureRecorder, userId int64, subject string, codeHash string) {
+	auditLogger AuditLogger, credentialFailures CredentialFailureRecorder, userID int64, subject string, codeHash string) {
 
-	exists, err := database.UserRecoveryCodeExists(r.Context(), nil, userId, codeHash)
+	exists, err := database.UserRecoveryCodeExists(r.Context(), nil, userID, codeHash)
 	if err != nil {
 		writeInternalServerError(w, r, err)
 		return
@@ -404,10 +404,10 @@ func refuseDeletionRecoveryCode(w http.ResponseWriter, r *http.Request, database
 	credentialFailures.RecordCredentialFailure(r)
 	if exists {
 		auditLogger.Log(r.Context(), audit.EventRecoveryCodeReplayDetected, map[string]interface{}{
-			"user_id":        userId,
+			"user_id":        userID,
 			"logged_in_user": subject,
 		})
 	}
-	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpIncorrectRecoveryCode, nil),
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OTPIncorrectRecoveryCode, nil),
 		"INVALID_RECOVERY_CODE", http.StatusBadRequest)
 }

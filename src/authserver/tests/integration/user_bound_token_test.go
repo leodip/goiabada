@@ -208,7 +208,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 
 	// GET and POST /userinfo are separate route registrations, so a guard added to only
 	// one leaves the other reachable. The POST form carries the token in the body, which
-	// also exercises the distinct extraction path in JwtAuthorizationHeaderToContext.
+	// also exercises the distinct extraction path in JWTAuthorizationHeaderToContext.
 	t.Run("POST userinfo with a form-body access_token is refused", func(t *testing.T) {
 		form := url.Values{"access_token": {userinfoToken}}
 		req, err := http.NewRequest("POST", appConfig.AuthServer.BaseURL+"/userinfo",

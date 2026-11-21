@@ -349,7 +349,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 
 	builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		builtIns = append(builtIns, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		builtIns = append(builtIns, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsID, PermissionIdentifier: identifier, Description: identifier})
 	}
 	manage := -1
 	for i, p := range builtIns {

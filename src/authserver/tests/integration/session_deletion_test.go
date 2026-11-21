@@ -334,7 +334,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 //
 // The ceremony here never enters a password. It reuses an existing level 1 session, is sent
 // to /auth/otp because the client asks for level2_mandatory, and the session is ended while
-// it sits on the OTP form. HandleAuthOtpPost reads no session row, so the termination is
+// it sits on the OTP form. HandleAuthOTPPost reads no session row, so the termination is
 // invisible to it: it verifies the code and hands off to /auth/completed with
 // AuthenticatedAt set. Only the gate there stops the ceremony, and only because it reads
 // Level1AuthCompleted rather than AuthenticatedAt.

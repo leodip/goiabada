@@ -139,8 +139,8 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 	refreshToken := stored.Row
 	isROPCToken := stored.IsROPC
-	tokenClientId := stored.ClientId
-	tokenUserId := stored.UserId
+	tokenClientID := stored.ClientID
+	tokenUserID := stored.UserID
 	tokenScope := stored.Scope
 
 	// RFC 6749 section 5.2 names this case under invalid_grant: a refresh token "issued to another
@@ -153,7 +153,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// stolen refresh token could present it under any public client and tell three outcomes apart:
 	// "does not belong to the client" for an untouched account, "The user account is disabled." and
 	// the superseded wording. A check on the token's state placed above ownership reopens that.
-	if tokenClientId != client.ID {
+	if tokenClientID != client.ID {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
 	}
@@ -309,7 +309,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 				http.StatusBadRequest),
 			Client: client,
 			Scopes: refused,
-			UserId: tokenUserId,
+			UserID: tokenUserID,
 		}
 	}
 
@@ -319,7 +319,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		return nil, err
 	}
 
-	// GetUserBySubject answers (nil, nil) for a subject that names no row, and user.Id is
+	// GetUserBySubject answers (nil, nil) for a subject that names no row, and user.ID is
 	// dereferenced by the permission re-check further down, so an unresolvable sub panicked the
 	// process. The refusal belongs here rather than at the dereference: that branch is skipped
 	// for an OIDC scope and offline_access, so a check placed there would refuse a
@@ -359,7 +359,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 	consentCheckRequired := !isROPCToken && (consentEveryScope || len(owed) > 0)
 	if consentCheckRequired {
-		consent, err := val.database.GetConsentByUserIDAndClientID(ctx, nil, tokenUserId, tokenClientId)
+		consent, err := val.database.GetConsentByUserIDAndClientID(ctx, nil, tokenUserID, tokenClientID)
 		if err != nil {
 			return nil, err
 		}

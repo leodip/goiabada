@@ -26,7 +26,7 @@ import (
 // other refused code (#489 decision 2). The refusals that do not reach the limit audit nothing more,
 // which every other refused-code case in this package holds, since the audit double fails on an
 // event it was not told to expect.
-func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *testing.T) {
+func TestHandleAuthOTPPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *testing.T) {
 	otpSecret := otpTestMintedSecret(t)
 	matching := otptest.Code(t, otpSecret, time.Now())
 
@@ -37,9 +37,9 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 		events []string
 	}{
 		{name: "a wrong code", code: "000000",
-			events: []string{audit.EventAuthFailedOtp, audit.EventOTPAuthenticatorDisabled}},
+			events: []string{audit.EventAuthFailedOTP, audit.EventOTPAuthenticatorDisabled}},
 		{name: "a replayed code", code: matching, replay: true,
-			events: []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOtp,
+			events: []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOTP,
 				audit.EventOTPAuthenticatorDisabled}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -48,7 +48,7 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -56,7 +56,7 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 			})
 
 			form := url.Values{}
-			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add(ceremony.IDField, testCeremonyID)
 			form.Add("otp", tc.code)
 			req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -65,9 +65,9 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel2OTP,
-				CeremonyId: testCeremonyId,
-				UserId:     1,
-				ClientId:   "test-client",
+				CeremonyID: testCeremonyID,
+				UserID:     1,
+				ClientID:   "test-client",
 			}, nil)
 			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
 				ID:                     1,

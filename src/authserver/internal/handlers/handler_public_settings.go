@@ -18,7 +18,7 @@ import (
 // publicSettingsDatabase is what the public settings endpoint needs: the settings row, and the brand
 // the admin console's own client is drawn in, its own or the default the row points at.
 type publicSettingsDatabase interface {
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	render.PageBrandReader
 }
 

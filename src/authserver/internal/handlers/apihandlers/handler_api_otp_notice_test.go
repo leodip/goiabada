@@ -42,7 +42,7 @@ const (
 	otpNoticeSubject   = "the-subject"
 	otpNoticePassword  = "P4ss!word"
 	otpNoticeAddress   = "carla.mendes@example.com"
-	otpNoticeRequestId = "req-otp-0001"
+	otpNoticeRequestID = "req-otp-0001"
 )
 
 // otpNoticeUser is the caller part way through an enrolment (otpTestUser), with a verified
@@ -60,7 +60,7 @@ func otpNoticeUser(t *testing.T) *record.User {
 
 // withNoticeContext gives a request the request's id and settings.
 func withNoticeContext(req *http.Request, settings *record.Settings) *http.Request {
-	ctx := requestid.NewContext(req.Context(), otpNoticeRequestId)
+	ctx := requestid.NewContext(req.Context(), otpNoticeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -175,7 +175,7 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasSetUp(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			accountOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender).ServeHTTP(rr,
-				withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t)),
+				withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOTPCode(t)),
 					passwordNoticeSettings()))
 
 			// The renderer and the sender have no expectations yet, so a notice sent inside the
@@ -197,7 +197,7 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasSetUp(t *testing.T) {
 			for _, code := range body.RecoveryCodes {
 				assert.NotContains(t, fmt.Sprintf("%+v", captured.values), code, "the notice carries no recovery code")
 			}
-			assert.NotContains(t, captured.sent.Subject+captured.sent.HtmlBody, body.RecoveryCodes[0])
+			assert.NotContains(t, captured.sent.Subject+captured.sent.HTMLBody, body.RecoveryCodes[0])
 		})
 	}
 }
@@ -334,7 +334,7 @@ func TestHandleAccountOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			}
 			var req *http.Request
 			if tc.enable {
-				req = accountOTPEnableRequest(t, otpNoticeSubject, password, currentOtpCode(t))
+				req = accountOTPEnableRequest(t, otpNoticeSubject, password, currentOTPCode(t))
 			} else {
 				req = accountOTPDisableRequest(t, otpNoticeSubject, password)
 			}
@@ -378,20 +378,20 @@ func TestHandleAccountOTPPut_AFailedNoticeIsOneErrorRecord(t *testing.T) {
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "unable to send an account notice", records[0].Message)
 	assert.Equal(t, "otp_disabled", records[0].Attrs["notice"])
-	assert.Equal(t, otpNoticeRequestId, records[0].Attrs["request_id"])
+	assert.Equal(t, otpNoticeRequestID, records[0].Attrs["request_id"])
 	assert.Equal(t, user.ID, records[0].Attrs["user_id"])
 	assert.NotContains(t, capture.Text(), otpNoticeAddress, "the record names no address")
 }
 
 // adminOTPNoticeRequest is the administrator's switch turning the user's authenticator off, with a
 // manage-scoped token, the request's id and settings.
-func adminOTPNoticeRequest(t *testing.T, settings *record.Settings, userId int64) *http.Request {
+func adminOTPNoticeRequest(t *testing.T, settings *record.Settings, userID int64) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(map[string]bool{"enabled": false})
 	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userId), bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userID), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("id", fmt.Sprint(userId))
+	req.SetPathValue("id", fmt.Sprint(userID))
 	return setTokenContextWithClaims(withNoticeContext(req, settings),
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 }

@@ -25,13 +25,13 @@ import (
 // what the administrative policy reads to judge a save.
 type clientIntrospectionResourcesDatabase interface {
 	clientTargetPolicyDatabase
-	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error
 	CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error
-	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
+	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceID int64) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
+	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIDs []int64) ([]record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -65,11 +65,11 @@ func HandleClientIntrospectionResourcesGet(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client introspection resources"), "client_id", client.ID)
 			return
 		}
-		resourceIds := make([]int64, 0, len(links))
+		resourceIDs := make([]int64, 0, len(links))
 		for _, link := range links {
-			resourceIds = append(resourceIds, link.ResourceID)
+			resourceIDs = append(resourceIDs, link.ResourceID)
 		}
-		resources, err := database.GetResourcesByIDs(r.Context(), nil, resourceIds)
+		resources, err := database.GetResourcesByIDs(r.Context(), nil, resourceIDs)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading introspection resources"), "client_id", client.ID)
 			return
@@ -135,10 +135,10 @@ func HandleClientIntrospectionResourcesPut(
 		}
 
 		resources := make([]record.Resource, 0, len(wanted))
-		for _, resourceId := range wanted {
-			resource, getErr := database.GetResourceByID(r.Context(), nil, resourceId)
+		for _, resourceID := range wanted {
+			resource, getErr := database.GetResourceByID(r.Context(), nil, resourceID)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting resource by ID for validation"), "resource_id", resourceId, "client_id", client.ID)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting resource by ID for validation"), "resource_id", resourceID, "client_id", client.ID)
 				return
 			}
 			if resource == nil {
@@ -158,7 +158,7 @@ func HandleClientIntrospectionResourcesPut(
 		}
 
 		listedKey := func(link record.ClientIntrospectionResource) int64 { return link.ResourceID }
-		listedId := func(link record.ClientIntrospectionResource) int64 { return link.ID }
+		listedID := func(link record.ClientIntrospectionResource) int64 { return link.ID }
 
 		// One transaction, rerun whole after a deadlock (#301), with nothing written to the response
 		// inside it. No row lock for the list itself, as for every list save: overlapping saves merge
@@ -179,7 +179,7 @@ func HandleClientIntrospectionResourcesPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, listedKey, listedId, wanted)
+			insert, remove := replaceSet(stored, listedKey, listedID, wanted)
 			if len(insert) > 0 {
 				if acquireErr := database.AcquireClientRow(r.Context(), tx, client.ID); acquireErr != nil {
 					return acquireErr
@@ -192,17 +192,17 @@ func HandleClientIntrospectionResourcesPut(
 					return errClientIsPublic
 				}
 			}
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteClientIntrospectionResource(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting client introspection resource %d", rowId)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteClientIntrospectionResource(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting client introspection resource %d", rowID)
 				}
 			}
-			for _, resourceId := range insert {
+			for _, resourceID := range insert {
 				if createErr := database.CreateClientIntrospectionResource(r.Context(), tx, &record.ClientIntrospectionResource{
 					ClientID:   client.ID,
-					ResourceID: resourceId,
+					ResourceID: resourceID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error listing introspection resource %d", resourceId)
+					return errs.Wrapf(createErr, "database error listing introspection resource %d", resourceID)
 				}
 			}
 			// Assigned only by an attempt that reached its end. Never nil, so the record names an

@@ -24,7 +24,7 @@ import (
 	"github.com/leodip/goiabada/core/metrics"
 )
 
-// authContextGetter reads the ceremony a request names (ceremony.RequestedId), whose user keys the OTP
+// authContextGetter reads the ceremony a request names (ceremony.RequestedID), whose user keys the OTP
 // budget: the ceremony the step boundary loads, and so the one whose code the step checks.
 //
 // The limiter's three ports are unexported, like every other port in this module: the handler
@@ -400,10 +400,10 @@ type RateLimiter struct {
 	// pwdAccount is shared with the ROPC grant: both are a password guessed against one
 	// account, so one budget covers them.
 	pwdAccount *accountTiers
-	pwdIp      *failureTier
-	// pwdIpRequests is the per-address ceiling on every password check, successful ones included,
-	// beside pwdIp's budget of failures. ropcIpRequests is its twin on the password grant.
-	pwdIpRequests *requestTier
+	pwdIP      *failureTier
+	// pwdIPRequests is the per-address ceiling on every password check, successful ones included,
+	// beside pwdIP's budget of failures. ropcIPRequests is its twin on the password grant.
+	pwdIPRequests *requestTier
 	otp           *failureTier
 	// emailVerification bounds guessing at the account's own email verification code.
 	emailVerification *failureTier
@@ -424,10 +424,10 @@ type RateLimiter struct {
 	registerEmail  *requestTier
 	resetPwd       *requestTier
 	forgotPwd      *requestTier
-	forgotPwdIp    *requestTier
+	forgotPwdIP    *requestTier
 	dcr            *requestTier
-	ropcIp         *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
-	ropcIpRequests *requestTier
+	ropcIP         *failureTier // RFC 6749 §4.3.2 MUST protect against brute force
+	ropcIPRequests *requestTier
 	// authorize is the admission tier on /auth/authorize, whose GET writes a browser-session
 	// row and whose POST parks a request, on every request that passes its first validation
 	// (#504).
@@ -494,15 +494,15 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		// 31st person in a minute and everyone behind them; a check that names no account it
 		// can find counts, as on the account tiers. Counted in the process on every engine
 		// (#564 decisions 2 and 3).
-		pwdIp: failureInProcess("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
+		pwdIP: failureInProcess("pwd_ip", countedByIP, "ip", 30, 1*time.Minute),
 		// per-IP password checks, every request counted, successful ones and a disabled account's
-		// right password included. pwdIp's budget of failures leaves the checks a correct password
+		// right password included. pwdIP's budget of failures leaves the checks a correct password
 		// passes unbounded, and each costs a bcrypt, an audit row and a session write: one account
 		// anyone can register, looped from one address, kept that work going with nothing in its way
 		// but the 30 checks in flight at once the address tier admits. 120 a minute is four times the
 		// 30 every request used to spend, which a few hundred people signing in at once from one
 		// office stay under, and bcrypt at two a second is a fraction of one core (#564).
-		pwdIpRequests: request("pwd_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
+		pwdIPRequests: request("pwd_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
 		// per-user OTP failures. 5 per 15 minutes is 480 guesses a day against the 14,400
 		// the 10 a minute it replaces allowed, which takes the chance of a hit over a
 		// month from 72.6% to 4.2% against an attacker who already holds the password.
@@ -591,26 +591,26 @@ func NewRateLimiter(ceremonyStore authContextGetter, renderer errorRenderer, jso
 		registerEmail: request("register_email", countedByAccount, "", 5, 5*time.Minute),
 		// per-IP: 10 reset operations per 5 minutes, at the three requests a reset now
 		// costs (the link's GET, the clean GET, the clean POST). Half of what
-		// forgotPwdIp allows, which is the only other endpoint with an IP tier (#112)
+		// forgotPwdIP allows, which is the only other endpoint with an IP tier (#112)
 		resetPwd: request("reset_pwd", countedByIP, "ip", 30, 5*time.Minute),
 		// per-email: mail-bomb protection, whatever the switch says (#503 decision 1)
 		forgotPwd: request("forgot_pwd_email", countedByAccount, "", 5, 5*time.Minute),
 		// per-IP: resource DoS protection
-		forgotPwdIp: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
+		forgotPwdIP: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
 		// RFC 7591 §3 DoS protection
 		dcr: request("dcr", countedByIP, "ip", 10, 1*time.Minute),
 		// per-IP password failures: stops one host spraying passwords across many accounts
-		// through the password grant, exactly as pwdIp does for the browser form, at the same
+		// through the password grant, exactly as pwdIP does for the browser form, at the same
 		// budget and counting failures only too, so a machine-driven integration
 		// authenticating from one address spends nothing (#564 decision 2). Its account half
 		// is pwdAccount above, shared rather than mirrored: the composite
 		// ropc_<clientId>_<username>_<ip> key this replaces gave every client and every
 		// source address a fresh budget against one account, so the per-account ceiling RFC
 		// 6749 §4.3.2 makes a MUST did not exist at all (#107, #219).
-		ropcIp: failureInProcess("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
-		// per-IP password grants, every request counted, as pwdIpRequests counts the sign-in form's
+		ropcIP: failureInProcess("ropc_ip", countedByIP, "ip", 30, 1*time.Minute),
+		// per-IP password grants, every request counted, as pwdIPRequests counts the sign-in form's
 		// and for its reason: the grant runs the same bcrypt on a correct password (#564).
-		ropcIpRequests: request("ropc_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
+		ropcIPRequests: request("ropc_ip_requests", countedByIP, "ip", 120, 1*time.Minute),
 		// per-IP: the admission tier on /auth/authorize, GET and POST together. The GET saves a
 		// browser session and the POST parks the request on every call that passes its first
 		// validation, so an unauthenticated holder of one public client_id and its registered
@@ -801,16 +801,16 @@ func (m *RateLimiter) LimitPwd(next http.Handler) http.Handler {
 		//
 		// In front of them all, the per-IP ceiling every check spends, right password or wrong,
 		// which is what bounds the work one address holding a correct password can drive.
-		if m.trippedCeiling(w, r, m.pwdIpRequests, rejectBrowser) {
+		if m.trippedCeiling(w, r, m.pwdIPRequests, rejectBrowser) {
 			return
 		}
-		ipKey, ipAudited, _ := m.bucket(r, &m.pwdIp.tier, "")
-		held, t, key, err := m.reservePassword(r, m.pwdIp, ipKey, m.pwdAccount, r.FormValue("email"))
+		ipKey, ipAudited, _ := m.bucket(r, &m.pwdIP.tier, "")
+		held, t, key, err := m.reservePassword(r, m.pwdIP, ipKey, m.pwdAccount, r.FormValue("email"))
 		if err != nil {
 			m.fault(w, r, rejectBrowser, err)
 			return
 		}
-		if t == &m.pwdIp.tier {
+		if t == &m.pwdIP.tier {
 			m.refuse(w, r, t, key, rejectBrowser, ipAudited)
 			return
 		}
@@ -852,7 +852,7 @@ func (m *RateLimiter) applies(t *tier) bool {
 }
 
 // limitFailuresPerSubject writes the body of a limiter only a failed credential check can
-// spend, keyed on the subject its tier counts by, refusing in the shape class names. LimitOtp,
+// spend, keyed on the subject its tier counts by, refusing in the shape class names. LimitOTP,
 // LimitEmailVerification and LimitAccountPassword are this over their own tier (#439).
 //
 // A request with no subject passes through to the handler. No subject means no bucket to key,
@@ -901,20 +901,20 @@ func (m *RateLimiter) limitFailuresPerSubject(next http.Handler, t *failureTier,
 	})
 }
 
-// LimitOtp rate limits the OTP check, on the user of the sign-in ceremony the submitted form names:
+// LimitOTP rate limits the OTP check, on the user of the sign-in ceremony the submitted form names:
 // the user the ceremony has already authenticated with a password. Single tier, unlike the
 // password gate: reaching the OTP form at all requires having already passed the password, so a
 // third party cannot spend this budget without already holding the account's password.
 //
 // The ceremony is read through the store's one rule for which ceremony a request names
-// (ceremony.RequestedId), the rule the step boundary loads the step's ceremony by, so the budget a
+// (ceremony.RequestedID), the rule the step boundary loads the step's ceremony by, so the budget a
 // submission spends belongs to the user whose code the step checks (#246). Reading the form here
 // leaves it parsed for the handler.
 //
 // No readable auth context, or a form naming a ceremony the browser does not hold, means no user to
 // key a bucket on, and the handler rejects that request before reaching the OTP secret or the
 // database.
-func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
+func (m *RateLimiter) LimitOTP(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.otp, rejectBrowser)
 }
 
@@ -930,7 +930,7 @@ func (m *RateLimiter) LimitOtp(next http.Handler) http.Handler {
 // attacked rather than the host attacking it, and reaching this route at all requires a
 // valid access token for that account. A request with no readable token passes through to
 // the handler, which answers it 500 before touching the code, so the skipped limit costs
-// nothing: LimitOtp's rule from #114, unchanged.
+// nothing: LimitOTP's rule from #114, unchanged.
 func (m *RateLimiter) LimitEmailVerification(next http.Handler) http.Handler {
 	return m.limitFailuresPerSubject(next, m.emailVerification, rejectAPI)
 }
@@ -1124,9 +1124,9 @@ func (m *RateLimiter) LimitResetPwd(next http.Handler) http.Handler {
 func (m *RateLimiter) LimitForgotPwd(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Per-IP ceiling: stops one host from mail-bombing many addresses.
-		if m.applies(&m.forgotPwdIp.tier) {
-			ipKey, ipAudited, _ := m.bucket(r, &m.forgotPwdIp.tier, "")
-			if m.tripped(w, r, m.forgotPwdIp, ipKey, rejectBrowser, ipAudited) {
+		if m.applies(&m.forgotPwdIP.tier) {
+			ipKey, ipAudited, _ := m.bucket(r, &m.forgotPwdIP.tier, "")
+			if m.tripped(w, r, m.forgotPwdIP, ipKey, rejectBrowser, ipAudited) {
 				return
 			}
 		}
@@ -1206,7 +1206,7 @@ func (m *RateLimiter) bucket(r *http.Request, t *tier, account string) (string, 
 		if err != nil {
 			return "", nil, false
 		}
-		return fmt.Sprintf("user_%d", authContext.UserId), map[string]interface{}{"user_id": authContext.UserId}, true
+		return fmt.Sprintf("user_%d", authContext.UserID), map[string]interface{}{"user_id": authContext.UserID}, true
 	case countedByTokenUser:
 		key, ok := tokenSubjectRateLimitKey(r)
 		if !ok {
@@ -1312,16 +1312,16 @@ func (m *RateLimiter) LimitROPC(next http.Handler) http.Handler {
 		// by them. client_id is deliberately absent from the keys: a ceiling an attacker escapes
 		// by registering a second client is not a ceiling. The per-IP key is drawn either way,
 		// for LimitPwd's reason. The per-IP ceiling on every grant goes first, as on the form.
-		if m.trippedCeiling(w, r, m.ropcIpRequests, rejectOAuth) {
+		if m.trippedCeiling(w, r, m.ropcIPRequests, rejectOAuth) {
 			return
 		}
-		ipKey, ipAudited, _ := m.bucket(r, &m.ropcIp.tier, "")
-		held, t, key, err := m.reservePassword(r, m.ropcIp, ipKey, m.pwdAccount, r.PostFormValue("username"))
+		ipKey, ipAudited, _ := m.bucket(r, &m.ropcIP.tier, "")
+		held, t, key, err := m.reservePassword(r, m.ropcIP, ipKey, m.pwdAccount, r.PostFormValue("username"))
 		if err != nil {
 			m.fault(w, r, rejectOAuth, err)
 			return
 		}
-		if t == &m.ropcIp.tier {
+		if t == &m.ropcIP.tier {
 			m.refuse(w, r, t, key, rejectOAuth, ipAudited)
 			return
 		}

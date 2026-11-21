@@ -35,11 +35,11 @@ import (
 type brandsDatabase interface {
 	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
 	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
-	GetBrandByID(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandID int64) (*record.Brand, error)
 	GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand, error)
 	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
-	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (int64, error)
-	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error)
+	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandID int64) (int64, error)
+	DeleteBrand(ctx context.Context, tx *sql.Tx, brandID int64) (int, error)
 	CountClientsPerBrand(ctx context.Context, tx *sql.Tx) (map[int64]int, error)
 	brandasset.SlotsReader
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
@@ -176,7 +176,7 @@ func validateBrandSlots(ctx context.Context, assets brandasset.SlotsReader, bran
 		return brandasset.Slots{}, i18n.NewLocalizedError(i18n.ErrCodeBrandBoldFontRegularRequired, nil)
 	}
 
-	ids := brandasset.SlotIds(brand)
+	ids := brandasset.SlotIDs(brand)
 	if len(ids) == 0 {
 		return brandasset.Slots{}, nil
 	}
@@ -238,7 +238,7 @@ func brandNameTaken(w http.ResponseWriter, r *http.Request, err error) bool {
 // their assets, or whose slots cannot be read again, failed for another reason and is the caller's
 // to answer.
 func brandSlotSwept(w http.ResponseWriter, r *http.Request, assets brandasset.SlotsReader, brand *record.Brand) bool {
-	if len(brandasset.SlotIds(brand)) == 0 {
+	if len(brandasset.SlotIDs(brand)) == 0 {
 		return false
 	}
 	_, err := validateBrandSlots(r.Context(), assets, brand)
@@ -251,7 +251,7 @@ func brandSlotSwept(w http.ResponseWriter, r *http.Request, assets brandasset.Sl
 }
 
 // brandId reads the {id} path value, answering the request when it is not an id.
-func brandId(w http.ResponseWriter, r *http.Request) (int64, bool) {
+func brandID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		writeJSONError(w, "Invalid brand ID", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -266,7 +266,7 @@ func writeBrandNotFound(w http.ResponseWriter) {
 
 // loadBrand reads the brand the path names, answering the request when it cannot.
 func loadBrand(w http.ResponseWriter, r *http.Request, database brandsDatabase) (*record.Brand, bool) {
-	id, ok := brandId(w, r)
+	id, ok := brandID(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -282,9 +282,9 @@ func loadBrand(w http.ResponseWriter, r *http.Request, database brandsDatabase) 
 	return brand, true
 }
 
-// defaultBrandId reads the id of the default brand, 0 when the settings row points at none,
+// defaultBrandID reads the id of the default brand, 0 when the settings row points at none,
 // answering the request when it cannot.
-func defaultBrandId(w http.ResponseWriter, r *http.Request, database brandsDatabase) (int64, bool) {
+func defaultBrandID(w http.ResponseWriter, r *http.Request, database brandsDatabase) (int64, bool) {
 	brand, err := database.GetDefaultBrand(r.Context(), nil)
 	if err != nil {
 		writeInternalServerError(w, r, errs.Wrap(err, "database error getting the default brand"))
@@ -316,7 +316,7 @@ func HandleBrandsGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting all brands"))
 			return
 		}
-		defaultId, ok := defaultBrandId(w, r, database)
+		defaultID, ok := defaultBrandID(w, r, database)
 		if !ok {
 			return
 		}
@@ -328,7 +328,7 @@ func HandleBrandsGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 		// Every brand's assets are read at once, without their bytes, and none when no slot is filled.
 		var ids []int64
 		for i := range brands {
-			for _, id := range brandasset.SlotIds(&brands[i]) {
+			for _, id := range brandasset.SlotIDs(&brands[i]) {
 				if !slices.Contains(ids, id) {
 					ids = append(ids, id)
 				}
@@ -348,7 +348,7 @@ func HandleBrandsGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 		response := api.GetBrandsResponse{Brands: make([]api.BrandResponse, 0, len(brands))}
 		for i := range brands {
 			response.Brands = append(response.Brands, brandResponse(r.Context(), &brands[i], brandasset.SlotsOf(&brands[i], assets), baseURL,
-				brands[i].ID == defaultId, counts[brands[i].ID]))
+				brands[i].ID == defaultID, counts[brands[i].ID]))
 		}
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -403,7 +403,7 @@ func HandleBrandGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		defaultId, ok := defaultBrandId(w, r, database)
+		defaultID, ok := defaultBrandID(w, r, database)
 		if !ok {
 			return
 		}
@@ -415,7 +415,7 @@ func HandleBrandGet(database brandsDatabase, baseURL string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.ID == defaultId, counts[brand.ID])})
+		writeJSON(w, r, http.StatusOK, api.GetBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.ID == defaultID, counts[brand.ID])})
 	}
 }
 
@@ -492,7 +492,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 		brandCustomCSSAudit(brand, details)
 		auditLogger.Log(r.Context(), audit.EventUpdatedBrand, details)
 
-		defaultId, ok := defaultBrandId(w, r, database)
+		defaultID, ok := defaultBrandID(w, r, database)
 		if !ok {
 			return
 		}
@@ -500,7 +500,7 @@ func HandleBrandUpdatePut(database brandsDatabase, auditLogger AuditLogger, base
 		if !ok {
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.ID == defaultId, counts[brand.ID])})
+		writeJSON(w, r, http.StatusOK, api.UpdateBrandResponse{Brand: brandResponse(r.Context(), brand, slots, baseURL, brand.ID == defaultID, counts[brand.ID])})
 	}
 }
 
@@ -557,19 +557,19 @@ func HandleBrandDelete(database brandsDatabase, auditLogger AuditLogger) http.Ha
 // already is the default is answered as it is, and nothing is recorded.
 func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandId(w, r)
+		id, ok := brandID(w, r)
 		if !ok {
 			return
 		}
 
 		var brand, previous *record.Brand
-		var previousId int64
+		var previousID int64
 		var slots brandasset.Slots
 		var counts map[int64]int
 		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			brand, previous, slots, counts = nil, nil, brandasset.Slots{}, nil
 			var err error
-			previousId, err = database.MakeBrandDefault(r.Context(), tx, id)
+			previousID, err = database.MakeBrandDefault(r.Context(), tx, id)
 			if err != nil {
 				return err
 			}
@@ -580,8 +580,8 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			if brand == nil {
 				return errs.WithStack(data.ErrBrandNotFound)
 			}
-			if previousId != id && previousId != 0 {
-				previous, err = database.GetBrandByID(r.Context(), tx, previousId)
+			if previousID != id && previousID != 0 {
+				previous, err = database.GetBrandByID(r.Context(), tx, previousID)
 				if err != nil {
 					return errs.Wrap(err, "database error getting the previous default brand")
 				}
@@ -605,7 +605,7 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			return
 		}
 
-		if previousId != id {
+		if previousID != id {
 			// The pointer was empty, or named a brand gone since: the old brand is named as none.
 			previousName := ""
 			if previous != nil {
@@ -614,7 +614,7 @@ func HandleBrandMakeDefaultPost(database brandsDatabase, auditLogger AuditLogger
 			auditLogger.Log(r.Context(), audit.EventUpdatedDefaultBrand, map[string]interface{}{
 				"brand_id":       brand.ID,
 				"brand_name":     brand.Name,
-				"old_brand_id":   previousId,
+				"old_brand_id":   previousID,
 				"old_brand_name": previousName,
 				"logged_in_user": callerSubject(r),
 			})

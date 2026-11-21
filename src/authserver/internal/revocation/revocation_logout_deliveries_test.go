@@ -16,7 +16,7 @@ import (
 // expectTerminationWrites registers the three writes every termination makes, with nothing to
 // revoke.
 func expectTerminationWrites(db *datamocks.Database) {
-	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
+	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionID).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 		Return([]*record.RefreshToken{}, nil).Once()
@@ -29,20 +29,20 @@ func expectTerminationWrites(db *datamocks.Database) {
 func TestTerminateUserSessionTx_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 
-	db.On("GetUserByID", mock.Anything, mock.Anything, revokeUserId).
-		Return(&record.User{ID: revokeUserId, Subject: "subject-of-7"}, nil).Once()
+	db.On("GetUserByID", mock.Anything, mock.Anything, revokeUserID).
+		Return(&record.User{ID: revokeUserID, Subject: "subject-of-7"}, nil).Once()
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	db.On("AcquireUserSessionRow", mock.Anything, revokeTx, terminateSid).Return(true, nil).Once()
 	sessionClients := []record.UserSessionClient{
-		{ID: 1, UserSessionID: terminateSessionId, ClientID: 11,
+		{ID: 1, UserSessionID: terminateSessionID, ClientID: 11,
 			Client: record.Client{ID: 11, ClientIdentifier: "web", BackchannelLogoutURI: "https://web.example/bc"}},
-		{ID: 2, UserSessionID: terminateSessionId, ClientID: 12,
+		{ID: 2, UserSessionID: terminateSessionID, ClientID: 12,
 			Client: record.Client{ID: 12, ClientIdentifier: "no-uri"}},
-		{ID: 3, UserSessionID: terminateSessionId, ClientID: 13,
+		{ID: 3, UserSessionID: terminateSessionID, ClientID: 13,
 			Client: record.Client{ID: 13, ClientIdentifier: "dcr_spa", IsPublic: true, CreatedViaDCR: true,
 				BackchannelLogoutURI: "https://spa.example/bc?x=1"}},
 	}
-	db.On("GetCommittedUserSessionClients", mock.Anything, revokeTx, terminateSessionId).
+	db.On("GetCommittedUserSessionClients", mock.Anything, revokeTx, terminateSessionID).
 		Return(sessionClients, nil).Once()
 	expectTerminationWrites(db)
 
@@ -50,10 +50,10 @@ func TestTerminateUserSessionTx_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []backchannel.Delivery{
-		{ClientId: 11, ClientIdentifier: "web", URI: "https://web.example/bc",
-			UserId: revokeUserId, Subject: "subject-of-7", SessionIdentifier: terminateSid},
-		{ClientId: 13, ClientIdentifier: "dcr_spa", URI: "https://spa.example/bc?x=1", IsPublic: true, CreatedViaDCR: true,
-			UserId: revokeUserId, Subject: "subject-of-7", SessionIdentifier: terminateSid},
+		{ClientID: 11, ClientIdentifier: "web", URI: "https://web.example/bc",
+			UserID: revokeUserID, Subject: "subject-of-7", SessionIdentifier: terminateSid},
+		{ClientID: 13, ClientIdentifier: "dcr_spa", URI: "https://spa.example/bc?x=1", IsPublic: true, CreatedViaDCR: true,
+			UserID: revokeUserID, Subject: "subject-of-7", SessionIdentifier: terminateSid},
 	}, result.LogoutDeliveries)
 
 	// Under the session's row, and before its deletion takes the session's apps with it: a ceremony
@@ -71,8 +71,8 @@ func TestTerminateUserSessionTx_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 func TestTerminateUserSessionTx_ASessionAlreadyGoneTellsNobody(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 
-	db.On("GetUserByID", mock.Anything, mock.Anything, revokeUserId).
-		Return(&record.User{ID: revokeUserId, Subject: "subject-of-7"}, nil).Once()
+	db.On("GetUserByID", mock.Anything, mock.Anything, revokeUserID).
+		Return(&record.User{ID: revokeUserID, Subject: "subject-of-7"}, nil).Once()
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	db.On("AcquireUserSessionRow", mock.Anything, revokeTx, terminateSid).Return(false, nil).Once()
 	expectTerminationWrites(db)
@@ -105,9 +105,9 @@ func TestTerminateUserSessionTx_AnExpiredSessionTellsNobody(t *testing.T) {
 // token for each app on the session with a back-channel logout URI, naming the code's user (#784
 // decision 1). An expired session, or no liveness to judge by, names nobody and reads no app.
 func TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell(t *testing.T) {
-	session := &record.UserSession{ID: 9, UserID: revokeUserId, SessionIdentifier: reuseSid}
-	code := &record.Code{ID: 42, SessionIdentifier: reuseSid, UserID: revokeUserId,
-		User: record.User{ID: revokeUserId, Subject: "subject-of-7"}}
+	session := &record.UserSession{ID: 9, UserID: revokeUserID, SessionIdentifier: reuseSid}
+	code := &record.Code{ID: 42, SessionIdentifier: reuseSid, UserID: revokeUserID,
+		User: record.User{ID: revokeUserID, Subject: "subject-of-7"}}
 
 	expectReuse := func(db *datamocks.Database) {
 		token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1"}
@@ -138,8 +138,8 @@ func TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Same(t, session, judged, "the session judged is the one the response ends")
-		assert.Equal(t, []backchannel.Delivery{{ClientId: 11, ClientIdentifier: "web", URI: "https://web.example/bc",
-			UserId: revokeUserId, Subject: "subject-of-7", SessionIdentifier: reuseSid}}, result.LogoutDeliveries)
+		assert.Equal(t, []backchannel.Delivery{{ClientID: 11, ClientIdentifier: "web", URI: "https://web.example/bc",
+			UserID: revokeUserID, Subject: "subject-of-7", SessionIdentifier: reuseSid}}, result.LogoutDeliveries)
 		// The apps are read before the deletion takes their rows.
 		order := methodOrder(db)
 		assert.Less(t, slices.Index(order, "GetCommittedUserSessionClients"), slices.Index(order, "DeleteUserSession"))
@@ -164,17 +164,17 @@ func TestRevokeOnAuthCodeReuse_ALiveSessionNamesTheAppsToTell(t *testing.T) {
 // The two sessions and the apps of the user-wide and session-specific fixtures below: session 1
 // still valid, session 2 not. Liveness is the notice's judgement, so the fixture names it directly.
 const (
-	liveSessionId    = int64(1)
+	liveSessionID    = int64(1)
 	liveSessionSid   = "sid-live"
-	expiredSessionId = int64(2)
+	expiredSessionID = int64(2)
 	expiredSid       = "sid-expired"
 )
 
 func noticeSessions() []record.UserSession {
 	// Out of id order, as the query may answer them: the rows are taken in id order.
 	return []record.UserSession{
-		{ID: expiredSessionId, UserID: revokeUserId, SessionIdentifier: expiredSid},
-		{ID: liveSessionId, UserID: revokeUserId, SessionIdentifier: liveSessionSid},
+		{ID: expiredSessionID, UserID: revokeUserID, SessionIdentifier: expiredSid},
+		{ID: liveSessionID, UserID: revokeUserID, SessionIdentifier: liveSessionSid},
 	}
 }
 
@@ -195,23 +195,23 @@ var (
 )
 
 // expectSessionApps registers the row and the apps of one session.
-func expectSessionApps(db *datamocks.Database, sid string, sessionId int64, held bool, clients ...record.Client) {
+func expectSessionApps(db *datamocks.Database, sid string, sessionID int64, held bool, clients ...record.Client) {
 	db.On("AcquireUserSessionRow", mock.Anything, revokeTx, sid).Return(held, nil).Once()
 	if !held {
 		return
 	}
 	sessionClients := make([]record.UserSessionClient, len(clients))
 	for i, client := range clients {
-		sessionClients[i] = record.UserSessionClient{UserSessionID: sessionId, ClientID: client.ID, Client: client}
+		sessionClients[i] = record.UserSessionClient{UserSessionID: sessionID, ClientID: client.ID, Client: client}
 	}
-	db.On("GetCommittedUserSessionClients", mock.Anything, revokeTx, sessionId).Return(sessionClients, nil).Once()
+	db.On("GetCommittedUserSessionClients", mock.Anything, revokeTx, sessionID).Return(sessionClients, nil).Once()
 }
 
 // expectSweep registers the generation increment and the sweep of the two sessions with no tokens,
 // keeping keptSid's session when it is set.
 func expectSweep(db *datamocks.Database, keptSid string) {
-	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(revokeNewGeneration, nil).Once()
-	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserId).Return(noticeSessions(), nil).Once()
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserID).Return(revokeNewGeneration, nil).Once()
+	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserID).Return(noticeSessions(), nil).Once()
 	for _, session := range noticeSessions() {
 		if session.SessionIdentifier == keptSid {
 			db.On("PromoteUserSessionGeneration", mock.Anything, revokeTx, session.ID, revokeNewGeneration).Return(nil).Once()
@@ -219,7 +219,7 @@ func expectSweep(db *datamocks.Database, keptSid string) {
 		}
 		db.On("DeleteUserSession", mock.Anything, revokeTx, session.ID).Return(nil).Once()
 	}
-	db.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, revokeUserId).Return([]*record.RefreshToken{}, nil).Once()
+	db.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, revokeUserID).Return([]*record.RefreshToken{}, nil).Once()
 	if keptSid != "" {
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, keptSid).Return([]*record.RefreshToken{}, nil).Once()
 	}
@@ -228,9 +228,9 @@ func expectSweep(db *datamocks.Database, keptSid string) {
 
 // subOnly is the sub-only token to client a user-wide end sends.
 func subOnly(client record.Client) backchannel.Delivery {
-	return backchannel.Delivery{ClientId: client.ID, ClientIdentifier: client.ClientIdentifier,
+	return backchannel.Delivery{ClientID: client.ID, ClientIdentifier: client.ClientIdentifier,
 		URI: client.BackchannelLogoutURI, IsPublic: client.IsPublic, CreatedViaDCR: client.CreatedViaDCR,
-		UserId: revokeUserId, Subject: "subject-of-7"}
+		UserID: revokeUserID, Subject: "subject-of-7"}
 }
 
 // withSid is the sub+sid token about session sid to client.
@@ -248,15 +248,15 @@ func withSid(client record.Client, sid string) backchannel.Delivery {
 func TestRevokeUserAuthState_AUserWideEndTellsEveryAppThatKnewTheUser(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectSweep(db, "")
-	expectSessionApps(db, liveSessionSid, liveSessionId, true, onBoth, noURI, sidRequired)
-	expectSessionApps(db, expiredSid, expiredSessionId, true, onBoth, onExpired, sidRequired)
-	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+	expectSessionApps(db, liveSessionSid, liveSessionID, true, onBoth, noURI, sidRequired)
+	expectSessionApps(db, expiredSid, expiredSessionID, true, onBoth, onExpired, sidRequired)
+	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserID, mock.Anything).
 		Return([]int64{grantOnly.ID, onBoth.ID, sidRequired.ID, grantNoURI.ID}, nil).Once()
 	// onBoth was read on a session already; the others are read now.
 	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{grantOnly.ID, sidRequired.ID, grantNoURI.ID}).
 		Return([]record.Client{grantOnly, sidRequired, grantNoURI}, nil).Once()
 
-	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserID, "",
 		LogoutNotice{Subject: "subject-of-7", UserWide: true, Live: liveOnly})
 	require.NoError(t, err)
 
@@ -289,17 +289,17 @@ func TestRevokeUserAuthState_AUserWideEndTellsEveryAppThatKnewTheUser(t *testing
 func TestRevokeUserAuthState_AUserWideEndSkipsASessionAlreadyGone(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectSweep(db, "")
-	expectSessionApps(db, liveSessionSid, liveSessionId, false)
-	expectSessionApps(db, expiredSid, expiredSessionId, true, onExpired)
-	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+	expectSessionApps(db, liveSessionSid, liveSessionID, false)
+	expectSessionApps(db, expiredSid, expiredSessionID, true, onExpired)
+	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserID, mock.Anything).
 		Return([]int64{onExpired.ID}, nil).Once()
 
-	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserID, "",
 		LogoutNotice{Subject: "subject-of-7", UserWide: true, Live: liveOnly})
 	require.NoError(t, err)
 
 	assert.Equal(t, []backchannel.Delivery{subOnly(onExpired)}, result.LogoutDeliveries)
-	db.AssertNotCalled(t, "GetCommittedUserSessionClients", mock.Anything, revokeTx, liveSessionId)
+	db.AssertNotCalled(t, "GetCommittedUserSessionClients", mock.Anything, revokeTx, liveSessionID)
 	db.AssertNotCalled(t, "GetClientsByIDs", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -310,22 +310,22 @@ func TestRevokeUserAuthState_AUserWideEndSkipsASessionAlreadyGone(t *testing.T) 
 func TestRevokeUserAuthState_ASessionSpecificEndTellsTheEndedValidSessionsApps(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	sessions := []record.UserSession{
-		{ID: 3, UserID: revokeUserId, SessionIdentifier: revokeKeepSid},
-		{ID: liveSessionId, UserID: revokeUserId, SessionIdentifier: liveSessionSid},
-		{ID: expiredSessionId, UserID: revokeUserId, SessionIdentifier: expiredSid},
+		{ID: 3, UserID: revokeUserID, SessionIdentifier: revokeKeepSid},
+		{ID: liveSessionID, UserID: revokeUserID, SessionIdentifier: liveSessionSid},
+		{ID: expiredSessionID, UserID: revokeUserID, SessionIdentifier: expiredSid},
 	}
-	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(revokeNewGeneration, nil).Once()
-	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserId).Return(sessions, nil).Once()
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserID).Return(revokeNewGeneration, nil).Once()
+	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserID).Return(sessions, nil).Once()
 	db.On("PromoteUserSessionGeneration", mock.Anything, revokeTx, int64(3), revokeNewGeneration).Return(nil).Once()
-	db.On("DeleteUserSession", mock.Anything, revokeTx, liveSessionId).Return(nil).Once()
-	db.On("DeleteUserSession", mock.Anything, revokeTx, expiredSessionId).Return(nil).Once()
-	db.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, revokeUserId).Return([]*record.RefreshToken{}, nil).Once()
+	db.On("DeleteUserSession", mock.Anything, revokeTx, liveSessionID).Return(nil).Once()
+	db.On("DeleteUserSession", mock.Anything, revokeTx, expiredSessionID).Return(nil).Once()
+	db.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, revokeUserID).Return([]*record.RefreshToken{}, nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, revokeKeepSid).Return([]*record.RefreshToken{}, nil).Once()
 	db.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, revokeNewGeneration).Return(nil).Once()
-	expectSessionApps(db, liveSessionSid, liveSessionId, true, onBoth, noURI, sidRequired)
+	expectSessionApps(db, liveSessionSid, liveSessionID, true, onBoth, noURI, sidRequired)
 
 	live := func(session *record.UserSession) bool { return session.SessionIdentifier != expiredSid }
-	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, revokeKeepSid,
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserID, revokeKeepSid,
 		LogoutNotice{Subject: "subject-of-7", Live: live})
 	require.NoError(t, err)
 
@@ -344,7 +344,7 @@ func TestRevokeUserAuthState_NoNoticeTellsNobody(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectSweep(db, "")
 
-	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "",
+	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserID, "",
 		LogoutNotice{UserWide: true, Live: liveOnly})
 	require.NoError(t, err)
 
@@ -357,14 +357,14 @@ func TestRevokeUserAuthState_NoNoticeTellsNobody(t *testing.T) {
 // shape over the user's sessions as it reads them.
 func TestUserWideDeliveries_ReadsTheUsersSessionsAndGrants(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserId).Return(noticeSessions(), nil).Once()
-	expectSessionApps(db, liveSessionSid, liveSessionId, true, sidRequired)
-	expectSessionApps(db, expiredSid, expiredSessionId, true, onExpired, sidRequired)
-	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserId, mock.Anything).
+	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, revokeUserID).Return(noticeSessions(), nil).Once()
+	expectSessionApps(db, liveSessionSid, liveSessionID, true, sidRequired)
+	expectSessionApps(db, expiredSid, expiredSessionID, true, onExpired, sidRequired)
+	db.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, revokeTx, revokeUserID, mock.Anything).
 		Return([]int64{grantOnly.ID}, nil).Once()
 	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{grantOnly.ID}).Return([]record.Client{grantOnly}, nil).Once()
 
-	deliveries, err := UserWideDeliveries(context.Background(), db, revokeTx, revokeUserId, "subject-of-7", liveOnly)
+	deliveries, err := UserWideDeliveries(context.Background(), db, revokeTx, revokeUserID, "subject-of-7", liveOnly)
 	require.NoError(t, err)
 
 	assert.Equal(t, []backchannel.Delivery{

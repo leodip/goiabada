@@ -85,7 +85,7 @@ type Database interface {
 	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
 	IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error)
 }
 
@@ -342,13 +342,13 @@ func grantAccessToken(ctx context.Context, database Database, token oauth.JWTTok
 	if _, hasGrant := token.Claims["grant_id"]; !hasGrant {
 		return revokedAccessToken(ctx, database, token, verdict)
 	}
-	grantId := token.StringClaim("grant_id")
-	if grantId == "" {
+	grantID := token.StringClaim("grant_id")
+	if grantID == "" {
 		verdict.Refusal = GrantRevoked
 		return verdict, nil
 	}
 
-	live, err := database.IsRefreshTokenFamilyLive(ctx, nil, grantId)
+	live, err := database.IsRefreshTokenFamilyLive(ctx, nil, grantID)
 	if err != nil {
 		verdict.Refusal = 0
 		return verdict, errs.Wrap(err, "failed to look up the grant for bearer token validation")

@@ -193,7 +193,7 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// change left it, promoted or revoked. One that went first inserts its child before the change
 		// starts, and the change's sweep finds it. Both take the user row first, so the pair cannot
 		// deadlock on each other (#131, #301). Only a lock on the user: updated_at is left alone.
-		if err := t.database.AcquireUserRow(ctx, tx, refreshOwnerUserId(input)); err != nil {
+		if err := t.database.AcquireUserRow(ctx, tx, refreshOwnerUserID(input)); err != nil {
 			return err
 		}
 
@@ -297,10 +297,10 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 	return tokenResponse, outcome, nil
 }
 
-// refreshOwnerUserId is the user a presented refresh token belongs to: the token's own for a
+// refreshOwnerUserID is the user a presented refresh token belongs to: the token's own for a
 // password grant's, which records none through a code, and the code's otherwise. The rotation takes
 // this user's row first (#131).
-func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
+func refreshOwnerUserID(input *RefreshTokenGrantInput) int64 {
 	if input.IsROPC {
 		return input.RefreshToken.UserID.Int64
 	}
@@ -319,16 +319,16 @@ func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
 // Two containments of one new family can both read the record absent and the second insert then
 // loses on the key. RunInTransactionRetryingConflict runs the loser once more, and it finds the
 // record the winner committed.
-func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefreshTokenJti string) (int64, bool, error) {
+func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefreshTokenJTI string) (int64, bool, error) {
 	var revokedCount int64
 	var recorded bool
 	err := data.RunInTransactionRetryingConflict(ctx, t.database, func(tx *sql.Tx) error {
 		var err error
-		recorded, err = t.database.RecordRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJti, RevokedFamilyReasonReplay)
+		recorded, err = t.database.RecordRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJTI, RevokedFamilyReasonReplay)
 		if err != nil {
 			return err
 		}
-		revokedCount, err = t.database.RevokeRefreshTokenFamily(ctx, tx, firstRefreshTokenJti)
+		revokedCount, err = t.database.RevokeRefreshTokenFamily(ctx, tx, firstRefreshTokenJTI)
 		return err
 	})
 	if err != nil {
@@ -404,7 +404,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
+		idTokenStr, idTokenErr := t.generateIDToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
@@ -508,7 +508,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateROPCIDToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}

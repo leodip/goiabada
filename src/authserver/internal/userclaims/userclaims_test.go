@@ -23,7 +23,7 @@ import (
 // base URLs the assertions can name apart, the auth server's and the admin console's.
 func idTokenMapper(db Database) Mapper {
 	return Mapper{Database: db, BaseURL: "http://localhost:8081", AdminConsoleBaseURL: "http://localhost:9091",
-		Inclusion: InclusionIdToken}
+		Inclusion: InclusionIDToken}
 }
 
 // TestAddOpenIDConnectClaims is the table that came with the code from
@@ -262,7 +262,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.
 	updatedAt := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
 	user := &record.User{ID: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 
-	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+	for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 		mapper := Mapper{Database: datamocks.NewDatabase(t), BaseURL: "http://localhost:8081",
 			Inclusion: inclusion}
 
@@ -395,7 +395,7 @@ func TestGroupAndAttributeClaimsFollowTheInclusion(t *testing.T) {
 
 	t.Run("the ID token's flag", func(t *testing.T) {
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, user, scopes)
 		mapper.AddAttributeClaims(claims, user, scopes)
 
@@ -432,7 +432,7 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 
 	t.Run("no groups or attributes scope", func(t *testing.T) {
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, user, []string{"openid", "profile"})
 		mapper.AddAttributeClaims(claims, user, []string{"openid", "profile"})
 
@@ -448,7 +448,7 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 		}
 
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, none, []string{"groups", "attributes"})
 		mapper.AddAttributeClaims(claims, none, []string{"groups", "attributes"})
 
@@ -471,7 +471,7 @@ func TestAttributeClaims_GroupPassWinsACollision(t *testing.T) {
 	}
 
 	claims := jwt.MapClaims{}
-	Mapper{Inclusion: InclusionIdToken}.AddAttributeClaims(claims, user, []string{"attributes"})
+	Mapper{Inclusion: InclusionIDToken}.AddAttributeClaims(claims, user, []string{"attributes"})
 
 	assert.Equal(t, map[string]string{"shared": "from the group"}, claims["attributes"])
 }
@@ -701,7 +701,7 @@ func TestAddOpenIDConnectClaims_PhoneNumberIsE164(t *testing.T) {
 				PhoneNumberVerified:           test.verified,
 			}
 
-			for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+			for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 				claims := jwt.MapClaims{}
 				Mapper{Database: datamocks.NewDatabase(t), BaseURL: "https://auth.example.com", Inclusion: inclusion}.
 					AddOpenIDConnectClaims(context.Background(), nil, claims, user, []string{"openid", "phone"})
@@ -743,7 +743,7 @@ func TestAddOpenIDConnectClaims_TheDocsGiveThePhoneNumberFormat(t *testing.T) {
 // too, and for the access token's, with base URLs that differ, so a profile built on the auth
 // server's cannot pass, and the Scopes and UserInfo pages say where it goes (#527, #563 decision 7).
 func TestAddOpenIDConnectClaims_ProfileIsTheAdminConsolesProfilePage(t *testing.T) {
-	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+	for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 		db := datamocks.NewDatabase(t)
 		db.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(true, nil)
 		claims := jwt.MapClaims{}

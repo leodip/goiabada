@@ -27,13 +27,13 @@ import (
 // in apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type BrowserSessionDatabase interface {
 	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error
-	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
-	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData string, now time.Time) (bool, error)
-	GetBrowserSessionByOwnerAndSessionIDHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*record.BrowserSession, error)
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
-	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
-	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
-	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
+	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string) error
+	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData string, now time.Time) (bool, error)
+	GetBrowserSessionByOwnerAndSessionIDHash(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now time.Time) (*record.BrowserSession, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
+	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
 }
 
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
@@ -255,7 +255,7 @@ func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime tim
 
 // settingsReader is what settingsFor reads the settings row through.
 type settingsReader interface {
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 }
 
 // settingsFor returns the deployment's settings for this request.

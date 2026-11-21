@@ -33,7 +33,7 @@ import (
 //
 // Two branches here are specific to this handler and to no other. The response is JSON rather than a
 // rerendered template, and the replay branch deliberately emits EventOTPCodeReplayDetected *without*
-// the EventAuthFailedOtp that both browser sites emit beside it, because a wrong code at this endpoint
+// the EventAuthFailedOTP that both browser sites emit beside it, because a wrong code at this endpoint
 // has never audited anything and enabling OTP is not an authentication ceremony. Neither of those is
 // reachable from seam 5, and no integration case can drive them either: a sequential second enable is
 // intercepted by OTP_ALREADY_ENABLED before the claim is ever consulted, so making TryConsumeUserOTPStep
@@ -93,12 +93,12 @@ func accountOTPRawRequest(t *testing.T, subject string, fields map[string]interf
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
-// currentOtpCode returns a code that matches otpTestSecret right now. The step it belongs to is
+// currentOTPCode returns a code that matches otpTestSecret right now. The step it belongs to is
 // deliberately not asserted against a computed value: decision 12's walk can report a step below the
 // current one when a collision chain exists, and a period boundary can fall between this call and the
 // handler's own time.Now(). Every case below captures the step the handler actually claimed and asserts
 // the audit payload against that, which pins the payload without pinning the clock.
-func currentOtpCode(t *testing.T) string {
+func currentOTPCode(t *testing.T) string {
 	t.Helper()
 	return otptest.Code(t, otpTestSecret, time.Now().UTC())
 }
@@ -132,7 +132,7 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
-	// The step is captured rather than predicted, per currentOtpCode's note. false is the replay
+	// The step is captured rather than predicted, per currentOTPCode's note. false is the replay
 	// answer: the compare-and-set matched no row because this step is already recorded.
 	var claimedStep int64
 	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.ID, mock.Anything).
@@ -143,7 +143,7 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	// The refused claim's re-read finds the account still there, so the refusal is a replay.
 	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(user, nil).Once()
 
-	// Registering only this event is itself the assertion that EventAuthFailedOtp is not emitted: the
+	// Registering only this event is itself the assertion that EventAuthFailedOTP is not emitted: the
 	// mock fails an unexpected Log call, so adding the browser sites' failure event here would break
 	// this test. That asymmetry is deliberate and decision 5 permits it, since there is no existing
 	// failure event at this endpoint for the replay event to be emitted "alongside".
@@ -155,7 +155,7 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
@@ -197,7 +197,7 @@ func TestHandleAccountOTPPut_Enable_AClaimOnAnAccountDeletedMeanwhile(t *testing
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
 	assert.Equal(t, "NOT_FOUND", errorCodeOf(t, rr))
@@ -223,7 +223,7 @@ func TestHandleAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
@@ -275,7 +275,7 @@ func TestHandleAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t
 	user := otpTestUser(t, password)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{
+	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOTP, map[string]interface{}{
 		"user_id":        user.ID,
 		"logged_in_user": subject,
 		"reason":         "clock_ahead",
@@ -346,7 +346,7 @@ func TestHandleAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, []string{"begin", "establish", "increment", "clear", "recovery-codes", "commit"}, calls,
@@ -388,7 +388,7 @@ func TestHandleAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
@@ -518,7 +518,7 @@ func TestHandleAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 // because a fixed literal is the real code roughly once in a million runs.
 func wrongButWellFormedCode(t *testing.T) string {
 	t.Helper()
-	current := currentOtpCode(t)
+	current := currentOTPCode(t)
 	for _, candidate := range []string{"000000", "111111", "222222"} {
 		if candidate != current {
 			if _, match := otp.MatchStep(candidate, otpTestSecret, time.Now().UTC()); match == otp.NoMatch {
@@ -601,11 +601,11 @@ func decodeEnrollment(t *testing.T, rr *httptest.ResponseRecorder) api.AccountOT
 // scanned, which is what every call did before (#242 part 3, still live on this surface).
 //
 // The generator mock is constructed and never given an expectation, so calling it fails the test.
-// That is the assertion: mockery's NewOtpSecretGenerator(t) registers a cleanup that refuses an
+// That is the assertion: mockery's NewOTPSecretGenerator(t) registers a cleanup that refuses an
 // unexpected call.
 func TestHandleAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	generator := handlersmocks.NewOtpSecretGenerator(t)
+	generator := handlersmocks.NewOTPSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -632,7 +632,7 @@ func TestHandleAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing
 // decision 12's expiry an abandoned seed would sit on the user row with nothing to sweep it.
 func TestHandleAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	generator := handlersmocks.NewOtpSecretGenerator(t)
+	generator := handlersmocks.NewOTPSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -672,7 +672,7 @@ func TestHandleAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
 // give the user a code the PUT can never accept.
 func TestHandleAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	generator := handlersmocks.NewOtpSecretGenerator(t)
+	generator := handlersmocks.NewOTPSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	loser := otpTestUser(t, "P4ss!word")
@@ -705,7 +705,7 @@ func TestHandleAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testi
 // 500 and not a seed. Enrollment is over for them.
 func TestHandleAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	generator := handlersmocks.NewOtpSecretGenerator(t)
+	generator := handlersmocks.NewOTPSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -758,7 +758,7 @@ func TestHandleAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 			req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 				"enabled":   true,
 				"password":  "P4ss!word",
-				"otpCode":   currentOtpCode(t),
+				"otpCode":   currentOTPCode(t),
 				"secretKey": tc.value,
 			})
 
@@ -825,7 +825,7 @@ func TestHandleAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 		"enabled":  true,
 		"password": "P4ss!word",
-		"otpCode":  currentOtpCode(t),
+		"otpCode":  currentOTPCode(t),
 		// An unknown field, so it is ignored rather than rejected on its name: nothing here
 		// sets DisallowUnknownFields. Its only job is to put the body over the cap.
 		"padding": strings.Repeat("A", maxOTPRequestBodyBytes),
@@ -889,7 +889,7 @@ func TestHandleAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *test
 
 			rr := httptest.NewRecorder()
 			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, "OTP_ENROLLMENT_NOT_PENDING", errorCodeOf(t, rr))
@@ -939,7 +939,7 @@ func TestHandleAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.True(t, user.OTPEnabled)
@@ -1025,7 +1025,7 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 
 			rr := httptest.NewRecorder()
 			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+				ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 			assert.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			assert.Equal(t, tc.wantCode, errorCodeOf(t, rr))
@@ -1114,7 +1114,7 @@ func TestHandleAccountOTPPut_AnAccountDeletedAfterTheChangeCommitted(t *testing.
 				stubOTPEnableAnswering(database, auditLogger, user, nil)
 			},
 			request: func(t *testing.T) *http.Request {
-				return accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t))
+				return accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOTPCode(t))
 			},
 		},
 		{
@@ -1186,7 +1186,7 @@ func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.
 
 	rr := httptest.NewRecorder()
 	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
-		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOTPCode(t)))
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var body api.UpdateAccountOTPResponse

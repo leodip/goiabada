@@ -81,7 +81,7 @@ func newCodeGrantRedemption(t *testing.T, grant codeGrant, registered bool) (*To
 	}
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     grant.clientIdentifier,
+		ClientID:     grant.clientIdentifier,
 		ClientSecret: clientSecret,
 		Code:         "valid_code",
 		RedirectURI:  redirectURI,
@@ -150,7 +150,7 @@ func TestValidateTokenRequest_AuthorizationCode_AdministrativeScope(t *testing.T
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
 			assert.Equal(t, int64(1), refused.Client.ID)
 			assert.Equal(t, "client1", refused.Client.ClientIdentifier)
-			assert.Equal(t, int64(7), refused.UserId)
+			assert.Equal(t, int64(7), refused.UserID)
 
 			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)

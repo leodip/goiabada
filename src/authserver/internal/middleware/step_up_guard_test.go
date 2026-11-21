@@ -201,7 +201,7 @@ func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *te
 			logtest.CaptureSlog(t)
 			store := newReplayStore()
 			guards := dpopGuards(t, surface, dpopResourceBaseURL, store)
-			chain := guards.JwtAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
+			chain := guards.JWTAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
 				record.ACRLevel2Optional, func() time.Time { return dpopNow })(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					t.Error("the next handler ran for a sign-in the guard refuses")
@@ -227,7 +227,7 @@ func TestRequireRecentAuthentication_AfterTheClientGuard(t *testing.T) {
 
 	for _, tc := range []struct {
 		name     string
-		clientId string
+		clientID string
 		authTime float64
 		want     chainAnswer
 	}{
@@ -239,7 +239,7 @@ func TestRequireRecentAuthentication_AfterTheClientGuard(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logtest.CaptureSlog(t)
 			token := stepUpToken(map[string]interface{}{"auth_time": tc.authTime, "acr": "urn:goiabada:level2_optional",
-				"client_id": tc.clientId})
+				"client_id": tc.clientID})
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/account/export", nil)
 			req = req.WithContext(reqctx.WithBearerToken(req.Context(), token))
 			rr := httptest.NewRecorder()

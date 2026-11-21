@@ -20,7 +20,7 @@ import (
 // HandleClientLogoGet tests
 // =============================================================================
 
-func TestHandleClientLogoGet_NoClientId(t *testing.T) {
+func TestHandleClientLogoGet_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
@@ -38,7 +38,7 @@ func TestHandleClientLogoGet_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoGet_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
@@ -130,7 +130,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 // HandleClientLogoPost tests
 // =============================================================================
 
-func TestHandleClientLogoPost_NoClientId(t *testing.T) {
+func TestHandleClientLogoPost_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -149,7 +149,7 @@ func TestHandleClientLogoPost_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoPost_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -335,7 +335,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 // HandleClientLogoDelete tests
 // =============================================================================
 
-func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
+func TestHandleClientLogoDelete_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -354,7 +354,7 @@ func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoDelete_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 

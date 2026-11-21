@@ -83,18 +83,18 @@ func everyGatedStep() []stepUnderTest {
 		{name: "otp GET", method: http.MethodGet, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return buildAuthOtpGet(authOtpGetDeps{
+				return buildAuthOTPGet(authOTPGetDeps{
 					pageRenderer:       pr,
 					ceremonyStore:      cs,
 					database:           datamocks.NewDatabase(t),
-					otpSecretGenerator: handlersmocks.NewOtpSecretGenerator(t),
+					otpSecretGenerator: handlersmocks.NewOTPSecretGenerator(t),
 					auditLogger:        al,
 				})
 			}},
 		{name: "otp POST", method: http.MethodPost, path: "/auth/otp", accepted: ceremony.AuthStateLevel2OTP,
 			build: func(t *testing.T, pr *handlersmocks.PageRenderer, cs CeremonyStore,
 				al *handlersmocks.AuditLogger) http.Handler {
-				return buildAuthOtpPost(authOtpPostDeps{
+				return buildAuthOTPPost(authOTPPostDeps{
 					pageRenderer:  pr,
 					ceremonyStore: cs,
 					database:      datamocks.NewDatabase(t),
@@ -208,7 +208,7 @@ func everyGatedStep() []stepUnderTest {
 // decision 22). Each case varies one thing from a
 // request that passes; the passing one is the last subtest, which reaches the state gate instead.
 func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
-	const otherId = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
+	const otherID = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
 
 	for _, step := range everyGatedStep() {
 		// A page load names the ceremony in the URL; a submission, in its body. Each is built the way
@@ -222,7 +222,7 @@ func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 
 		refused := map[string]*http.Request{
 			"naming no ceremony":      idIn(""),
-			"naming another ceremony": idIn(otherId),
+			"naming another ceremony": idIn(otherID),
 		}
 		for name, req := range refused {
 			t.Run(step.name+" "+name, func(t *testing.T) {
@@ -230,7 +230,7 @@ func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				rr := httptest.NewRecorder()
 
-				stored := &ceremony.AuthContext{CeremonyId: testCeremonyId, ClientId: "test-client", AuthState: step.accepted}
+				stored := &ceremony.AuthContext{CeremonyID: testCeremonyID, ClientID: "test-client", AuthState: step.accepted}
 				ceremonyStore, cookies := holdingCeremony(t, stored)
 				req = withCookies(req, cookies)
 				expectCeremonyMismatchOf(t, pageRenderer, auditLogger, rr, req, stored)
@@ -247,11 +247,11 @@ func TestEveryGatedStep_IsJudgedByTheCeremonyItNames(t *testing.T) {
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			rr := httptest.NewRecorder()
-			req := idIn(testCeremonyId)
+			req := idIn(testCeremonyID)
 
 			// A state no route accepts: what refuses the request is the state gate, past the
 			// comparison, and the audit event of a ceremony mismatch is never written.
-			stored := &ceremony.AuthContext{CeremonyId: testCeremonyId, ClientId: "test-client",
+			stored := &ceremony.AuthContext{CeremonyID: testCeremonyID, ClientID: "test-client",
 				AuthState: ceremony.AuthState("not_a_state")}
 			ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
 			expectAuthStateMismatch(t, pageRenderer, rr, req)

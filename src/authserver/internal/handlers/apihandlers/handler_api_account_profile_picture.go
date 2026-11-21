@@ -16,11 +16,11 @@ import (
 // user row and the picture attached to it.
 type accountProfilePictureDatabase interface {
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) error
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
 	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 }
 
 // HandleAccountProfilePicturePost - POST /api/v1/account/profile-picture

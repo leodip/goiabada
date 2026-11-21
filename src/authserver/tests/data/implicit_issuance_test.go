@@ -46,7 +46,7 @@ func implicitInput(client *record.Client, user *record.User, sessionIdentifier s
 		Client:            client,
 		User:              user,
 		Scope:             "openid profile",
-		AcrLevel:          record.ACRLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: sessionIdentifier,
 		Nonce:             "implicit-nonce",
@@ -125,7 +125,7 @@ func TestIssueImplicit_KeepsThePictureInBothTokens(t *testing.T) {
 
 	want := implicitTestBaseURL + "/userinfo/picture/" + user.Subject
 	assert.Equal(t, want, claimsOf(t, response.AccessToken)["picture"], "the access token carries the picture")
-	assert.Equal(t, want, claimsOf(t, response.IdToken)["picture"], "the ID token carries the picture")
+	assert.Equal(t, want, claimsOf(t, response.IDToken)["picture"], "the ID token carries the picture")
 	assert.Equal(t, session.SessionIdentifier, claimsOf(t, response.AccessToken)["sid"])
 }
 
@@ -146,7 +146,7 @@ func TestIssueImplicit_NoPictureNoClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotContains(t, claimsOf(t, response.AccessToken), "picture")
-	assert.NotContains(t, claimsOf(t, response.IdToken), "picture")
+	assert.NotContains(t, claimsOf(t, response.IDToken), "picture")
 }
 
 // A session that is gone is refused with the sentinel /auth/issue answers with the level 1 restart,

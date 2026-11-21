@@ -54,7 +54,7 @@ func assertClockAheadRefused(t *testing.T, resp *http.Response) {
 func clockAheadRefusalsFor(t *testing.T, adminToken string, userId int64) int {
 	t.Helper()
 
-	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventAuthFailedOtp+"&size=200")
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventAuthFailedOTP+"&size=200")
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 

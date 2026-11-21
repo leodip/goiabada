@@ -569,8 +569,8 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 	}
 
 	if client.BrandID.Valid {
-		brandId := client.BrandID.Int64
-		resp.BrandID = &brandId
+		brandID := client.BrandID.Int64
+		resp.BrandID = &brandID
 	}
 
 	if client.CreatedAt.Valid {
@@ -712,13 +712,13 @@ func ToAuditLogResponse(log *record.AuditLog) api.AuditLogResponse {
 		AuditEvent:     log.AuditEvent,
 		Details:        log.Details, // JSON string
 		RequestID:      log.RequestID,
-		UserID:         nullableId(log.UserID),
-		LoggedInUserID: nullableId(log.LoggedInUserID),
+		UserID:         nullableID(log.UserID),
+		LoggedInUserID: nullableID(log.LoggedInUserID),
 	}
 }
 
-// nullableId is a nullable id column as the wire carries it: the id, or nil for NULL.
-func nullableId(id sql.NullInt64) *int64 {
+// nullableID is a nullable id column as the wire carries it: the id, or nil for NULL.
+func nullableID(id sql.NullInt64) *int64 {
 	if !id.Valid {
 		return nil
 	}

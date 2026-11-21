@@ -101,7 +101,7 @@ func TestLegalDocumentList_TakesEachDocumentsCurrentVersion(t *testing.T) {
 
 // A document set to selected apps carries the client ids it lists, in the order read; one listing
 // none carries [] and is still selected apps, which applies to nobody, never all apps.
-func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
+func TestLegalDocument_SelectedAppsCarryTheirClientIDs(t *testing.T) {
 	doc, versions := publishedTerms()
 	doc.AppliesToAllApps = false
 	links := []record.LegalDocumentClient{

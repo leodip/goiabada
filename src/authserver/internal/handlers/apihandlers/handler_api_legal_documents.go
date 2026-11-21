@@ -35,16 +35,16 @@ import (
 // the document's row its lifecycle writes take, and the transaction they run in.
 type legalDocumentsDatabase interface {
 	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
-	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
-	GetLegalDocumentByID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
+	GetLegalDocumentByID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) (*record.LegalDocument, error)
 	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
-	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
-	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
-	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentID int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentClient, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -135,7 +135,7 @@ func validateLegalDocumentMarkdown(markdown string) error {
 }
 
 // legalDocumentId reads the {id} path value, answering the request when it is not an id.
-func legalDocumentId(w http.ResponseWriter, r *http.Request) (int64, bool) {
+func legalDocumentID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		writeJSONError(w, "Invalid legal document ID", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -146,7 +146,7 @@ func legalDocumentId(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 // loadLegalDocument reads the document the path names, answering the request when it cannot.
 func loadLegalDocument(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase) (*record.LegalDocument, bool) {
-	id, ok := legalDocumentId(w, r)
+	id, ok := legalDocumentID(w, r)
 	if !ok {
 		return nil, false
 	}
@@ -349,7 +349,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -453,7 +453,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -542,7 +542,7 @@ func handleLegalDocumentRetirement(database legalDocumentsDatabase, auditLogger 
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -609,7 +609,7 @@ func HandleLegalDocumentDelete(database legalDocumentsDatabase, auditLogger Audi
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}

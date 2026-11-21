@@ -30,8 +30,8 @@ type accountPasswordDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
 }
 
 // HandleAccountPasswordPut - PUT /api/v1/account/password

@@ -42,16 +42,16 @@ type Database interface {
 	revocation.Database
 	otpcredential.Database
 	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
-	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserPermission, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
@@ -73,10 +73,10 @@ type Request struct {
 }
 
 // Outcome is what a committed recovery did: each action's result as the committing attempt
-// produced it, and the revocation sweep's. UserId and Email are zero, and Revocation empty, when no
+// produced it, and the revocation sweep's. UserID and Email are zero, and Revocation empty, when no
 // user was named.
 type Outcome struct {
-	UserId            int64
+	UserID            int64
 	Email             string // the address as Run looked it up, trimmed and lowercased
 	PasswordSet       bool
 	OTPRemoved        bool // false when no authenticator was enrolled
@@ -129,9 +129,9 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// The manage permission's id is read before the transaction: the permission row it names is
 	// seeded with the instance and changes with a migration, not with a concurrent request.
 	// Whether the user already holds it is read inside the transaction, under the permission's row.
-	var managePermissionId int64
+	var managePermissionID int64
 	if req.GrantManage {
-		managePermissionId, err = managePermission(ctx, database)
+		managePermissionID, err = managePermission(ctx, database)
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -212,7 +212,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// A recovery ends every session of the user and keeps none, a user-wide end, so the sweep
 	// collects a logout token for every app that knew the user (#784 decisions 3 and 11). A
 	// database with no settings row has no issuer to sign them as, and tells nobody.
-	outcome := Outcome{Email: email, UserId: user.ID}
+	outcome := Outcome{Email: email, UserID: user.ID}
 	var notice revocation.LogoutNotice
 	if settings != nil {
 		outcome.Issuer = settings.Issuer
@@ -281,13 +281,13 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 				return grantsErr
 			}
 			for _, grant := range grants {
-				if grant.PermissionID == managePermissionId {
+				if grant.PermissionID == managePermissionID {
 					return nil
 				}
 			}
 			if writeErr := database.CreateUserPermission(ctx, tx, &record.UserPermission{
 				UserID:       current.ID,
-				PermissionID: managePermissionId,
+				PermissionID: managePermissionID,
 			}); writeErr != nil {
 				return writeErr
 			}
@@ -318,7 +318,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	if outcome.ManageGranted {
 		auditLogger.Log(ctx, audit.EventAddedUserPermission, map[string]interface{}{
 			"user_id":       user.ID,
-			"permission_id": managePermissionId,
+			"permission_id": managePermissionID,
 			"command":       Actor,
 		})
 		// The record every change to who is an administrator writes, after the change's own, so

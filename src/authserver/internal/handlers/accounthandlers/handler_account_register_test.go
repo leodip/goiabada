@@ -788,8 +788,8 @@ func TestHandleRegisterPost(t *testing.T) {
 			Return().Once()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
-			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
+			adminConsoleBaseURL, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseURL == testAdminConsoleBaseURL
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -876,8 +876,8 @@ func TestHandleRegisterPost(t *testing.T) {
 			})).Return(emaildelivery.SendResult{}, nil)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
-			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
+			adminConsoleBaseURL, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseURL == testAdminConsoleBaseURL
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

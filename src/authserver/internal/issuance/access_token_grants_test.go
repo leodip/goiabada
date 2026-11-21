@@ -308,7 +308,7 @@ func TestAccessToken_ImplicitFlow(t *testing.T) {
 		Client:              &record.Client{ID: 5, ClientIdentifier: "old-spa", TokenExpirationInSeconds: 900},
 		User:                user,
 		Scope:               "openid",
-		AcrLevel:            record.ACRLevel2Mandatory,
+		ACRLevel:            record.ACRLevel2Mandatory,
 		AuthMethods:         "pwd otp",
 		SessionIdentifier:   "session-1",
 		Nonce:               "n-0S6_WzA2Mj",

@@ -31,12 +31,12 @@ var apiClientNotAllowed = chainAnswer{http.StatusForbidden, challengeClientNotAl
 
 // accountTokenOf is a user's Account API token issued to clientId, or to no client when clientId
 // is empty.
-func accountTokenOf(clientId string) oauth.JWTToken {
+func accountTokenOf(clientID string) oauth.JWTToken {
 	claims := map[string]interface{}{
 		"sub": "u1", "auth_time": float64(1), "scope": "openid authserver:manage-account",
 	}
-	if clientId != "" {
-		claims["client_id"] = clientId
+	if clientID != "" {
+		claims["client_id"] = clientID
 	}
 	return oauth.JWTToken{Claims: claims}
 }
@@ -59,7 +59,7 @@ func TestRequireAdminConsoleClient_AdmitsTheConsolesToken(t *testing.T) {
 }
 
 func TestRequireAdminConsoleClient_RefusesAnyOtherClientsToken(t *testing.T) {
-	for _, tc := range []struct{ name, clientId string }{
+	for _, tc := range []struct{ name, clientID string }{
 		{"another client holding authserver:manage-account", "my-app"},
 		// Matched exactly, as the token endpoint matches client_id (#640): a client whose
 		// identifier differs from the console's only in case is another client.
@@ -69,7 +69,7 @@ func TestRequireAdminConsoleClient_RefusesAnyOtherClientsToken(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			token := accountTokenOf(tc.clientId)
+			token := accountTokenOf(tc.clientID)
 
 			rr := serveAdminConsoleClientGuard(t, &token)
 
@@ -92,7 +92,7 @@ func TestRequireAdminConsoleClient_NoTokenIsTheMissingCredential(t *testing.T) {
 // reaches this guard and is refused here.
 func TestRequireAdminConsoleClient_InTheAccountAPIsChain(t *testing.T) {
 	guards := NewBearerTokenForAPI(chainParser{}, ResourceProofs{})
-	chain := guards.JwtAuthorizationHeaderToContext()(
+	chain := guards.JWTAuthorizationHeaderToContext()(
 		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(guards.RequireAdminConsoleClient()(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })))))
 

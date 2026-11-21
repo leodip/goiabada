@@ -419,7 +419,7 @@ func HandleSettingsEmailSendTestPost(
 		input := &emaildelivery.SendEmailInput{
 			To:       req.To,
 			Subject:  message.Subject,
-			HtmlBody: message.HTML,
+			HTMLBody: message.HTML,
 		}
 		// A failure answers the fixed message of its kind and the error goes to the log: the error
 		// carries addresses, operating-system strings and the server's own replies, and anyone who

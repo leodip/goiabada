@@ -74,7 +74,7 @@ func TestAuthorizationResponse_EveryRedirectCarriesIssAfterState(t *testing.T) {
 			name: "implicit tokens in the fragment",
 			write: func(w http.ResponseWriter, r *http.Request) error {
 				return issueImplicitTokens(w, r, formPostTemplate{}, "", callback, "st", &issuance.ImplicitGrantResponse{
-					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
+					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IDToken: "it", Scope: "openid",
 				})
 			},
 			want: callback + "#access_token=at&token_type=Bearer&expires_in=60&id_token=it&scope=openid&state=st&iss=" +
@@ -185,7 +185,7 @@ func TestAuthorizationResponse_EveryFormPostCarriesIssAfterState(t *testing.T) {
 			name: "implicit tokens",
 			write: func(w http.ResponseWriter, r *http.Request) error {
 				return issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", callback, "st", &issuance.ImplicitGrantResponse{
-					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it", Scope: "openid",
+					AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IDToken: "it", Scope: "openid",
 				})
 			},
 			want: [][2]string{{"access_token", "at"}, {"token_type", "Bearer"}, {"expires_in", "60"}, {"id_token", "it"},

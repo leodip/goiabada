@@ -60,8 +60,8 @@ func TestCreateAuthCode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		ClientId:            "test-client",
-		UserId:              123,
+		ClientID:            "test-client",
+		UserID:              123,
 		ConsentedScope:      "openid profile",
 		Scope:               "openid profile email",
 		CodeChallenge:       "challenge",
@@ -71,8 +71,8 @@ func TestCreateAuthCode(t *testing.T) {
 		Nonce:               "nonce456",
 		UserAgent:           "Mozilla/5.0",
 		ResponseMode:        "query",
-		IpAddress:           "127.0.0.1",
-		AcrLevel:            record.ACRLevel1,
+		IPAddress:           "127.0.0.1",
+		ACRLevel:            record.ACRLevel1,
 		AuthMethods:         "pwd",
 		AuthenticatedAt:     codeAuthTime(),
 		SessionIdentifier:   "session123",
@@ -83,7 +83,7 @@ func TestCreateAuthCode(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, code)
 	assert.Equal(t, testClient.ID, code.ClientID)
-	assert.Equal(t, input.UserId, code.UserID)
+	assert.Equal(t, input.UserID, code.UserID)
 	assert.Equal(t, input.ConsentedScope, code.Scope)
 	assert.Equal(t, input.CodeChallenge, code.CodeChallenge.String)
 	assert.Equal(t, input.CodeChallengeMethod, code.CodeChallengeMethod.String)
@@ -92,8 +92,8 @@ func TestCreateAuthCode(t *testing.T) {
 	assert.Equal(t, input.Nonce, code.Nonce)
 	assert.Equal(t, input.UserAgent, code.UserAgent)
 	assert.Equal(t, input.ResponseMode, code.ResponseMode)
-	assert.Equal(t, input.IpAddress, code.IPAddress)
-	assert.Equal(t, input.AcrLevel, code.ACRLevel)
+	assert.Equal(t, input.IPAddress, code.IPAddress)
+	assert.Equal(t, input.ACRLevel, code.ACRLevel)
 	assert.Equal(t, input.AuthMethods, code.AuthMethods)
 	assert.Equal(t, input.SessionIdentifier, code.SessionIdentifier)
 	assert.False(t, code.Used)
@@ -127,7 +127,7 @@ func TestCreateAuthCode_WritesTheDPoPJkt(t *testing.T) {
 				Run(func(args mock.Arguments) { written = args.Get(2).(*record.Code) }).Return(nil)
 
 			_, err := NewCodeIssuer(mockDB).createAuthCode(context.Background(), nil, &CreateCodeInput{
-				ClientId: "test-client", UserId: 123, Scope: "openid", RedirectURI: "https://example.com/callback",
+				ClientID: "test-client", UserID: 123, Scope: "openid", RedirectURI: "https://example.com/callback",
 				AuthenticatedAt: codeAuthTime(), SessionIdentifier: "session123", DPoPJkt: tc.dpopJkt,
 			})
 
@@ -193,15 +193,15 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				}).Return(nil)
 
 			_, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-				ClientId:          "test-client",
-				UserId:            123,
+				ClientID:          "test-client",
+				UserID:            123,
 				ConsentedScope:    "openid",
 				Scope:             "openid",
 				RedirectURI:       "https://example.com/callback",
 				UserAgent:         tc.userAgent,
 				ResponseMode:      "query",
-				IpAddress:         "127.0.0.1",
-				AcrLevel:          record.ACRLevel1,
+				IPAddress:         "127.0.0.1",
+				ACRLevel:          record.ACRLevel1,
 				AuthMethods:       "pwd",
 				AuthenticatedAt:   codeAuthTime(),
 				SessionIdentifier: "session123",
@@ -230,8 +230,8 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		ClientId: "test-client",
-		UserId:   123,
+		ClientID: "test-client",
+		UserID:   123,
 		// ResponseMode is intentionally left empty
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
@@ -288,8 +288,8 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := &CreateCodeInput{
-				ClientId:          "test-client",
-				UserId:            123,
+				ClientID:          "test-client",
+				UserID:            123,
 				ConsentedScope:    tc.consentedScope,
 				Scope:             tc.scope,
 				AuthenticatedAt:   codeAuthTime(),
@@ -321,8 +321,8 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
 	}
@@ -340,7 +340,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 // changed its reachability.
 //
 // The client this ceremony started against can be deleted while the ceremony is in flight, and
-// the lookup here then returns nil, which the line building the code dereferenced for client.Id.
+// the lookup here then returns nil, which the line building the code dereferenced for client.ID.
 // That was a narrow race before; since #139 issuance takes a SHARED lock on the client row, so a
 // deletion that got there first makes this transaction WAIT and then proceed into this lookup,
 // and the panic becomes the reliable outcome of losing that race rather than an unlucky one.
@@ -358,7 +358,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 		Return((*record.Client)(nil), nil)
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-		ClientId: "deleted-client", UserId: 123,
+		ClientID: "deleted-client", UserID: 123,
 		SessionIdentifier: "session123",
 	})
 
@@ -397,7 +397,7 @@ func TestCreateAuthCode_DecidesOnTheClientRowItHolds(t *testing.T) {
 			mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, looked.ID).Return(tc.held, tc.heldErr).Once()
 
 			code, err := NewCodeIssuer(mockDB).createAuthCode(context.Background(), issueTx, &CreateCodeInput{
-				ClientId: "test-client", UserId: 123, SessionIdentifier: "session123",
+				ClientID: "test-client", UserID: 123, SessionIdentifier: "session123",
 			})
 
 			if tc.refused {
@@ -420,11 +420,11 @@ const issueSid = "sid-issuing"
 
 func issueCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		Scope:             "openid profile",
 		RedirectURI:       "https://example.com/callback",
-		AcrLevel:          record.ACRLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: issueSid,

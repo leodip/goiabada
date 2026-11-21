@@ -84,7 +84,7 @@ func (race *recipientsRace) requireBothTold(t *testing.T, deliveries []backchann
 	require.Nil(t, race.db.join, "the join ran inside the end")
 	told := map[int64]backchannel.Delivery{}
 	for _, delivery := range deliveries {
-		told[delivery.ClientId] = delivery
+		told[delivery.ClientID] = delivery
 	}
 	require.Len(t, told, 2, "the app on the session and the app that joined it before it was taken")
 	require.Contains(t, told, race.first.ID)
@@ -288,7 +288,7 @@ func TestLogoutRecipients_ASignInRemovalTellsAnAppThatJoinedBeforeTheSessionLock
 
 	now := time.Now().UTC()
 	_, removed, err := usersession.NewManager(race.db).StartNewUserSession(ctx, signingIn.ID, usersession.Authentication{
-		UserId: race.user.ID, AuthMethods: "pwd", AcrLevel: record.ACRLevel1,
+		UserID: race.user.ID, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 		AuthTime: &now, PasswordAuthTime: &now,
 	}, race.user.AuthStateGeneration, nil, usersession.Device{Identifier: "recipients-new-device", New: true}, "127.0.0.1",
 		race.session, usersession.SessionLimits{IdleTimeoutInSeconds: 3600, MaxLifetimeInSeconds: 86400, MaxSessionsPerUser: 100})

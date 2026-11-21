@@ -12,7 +12,7 @@ import (
 type ResponseTypeInfo struct {
 	HasCode    bool
 	HasToken   bool
-	HasIdToken bool
+	HasIDToken bool
 
 	// Unrecognised is set when a value is none of code, token and id_token. RFC 6749 3.1.1 makes
 	// response_type a space-delimited list of values and 3.1.2.4 an unsupported one an error, so the
@@ -48,7 +48,7 @@ func ParseResponseType(responseType string) ResponseTypeInfo {
 		case "token":
 			seen = &info.HasToken
 		case "id_token":
-			seen = &info.HasIdToken
+			seen = &info.HasIDToken
 		default:
 			info.Unrecognised = true
 			continue
@@ -65,7 +65,7 @@ func ParseResponseType(responseType string) ResponseTypeInfo {
 // Implicit flow response types: "token", "id_token", "id_token token" (or "token id_token").
 // A response type with "code" is NOT implicit flow (it's authorization code or hybrid flow).
 func (r ResponseTypeInfo) IsImplicitFlow() bool {
-	return (r.HasToken || r.HasIdToken) && !r.HasCode
+	return (r.HasToken || r.HasIDToken) && !r.HasCode
 }
 
 // IsCodeOnly reports whether the response type is exactly "code": the code was asked for and
@@ -75,11 +75,11 @@ func (r ResponseTypeInfo) IsImplicitFlow() bool {
 // flow, at the three places that decide it (ValidateClientAndRedirectURI, RedirectWillBeEmitted and
 // /auth/issue's registration gate). They used to recover this from the raw token sequence, because
 // the parser ignored unrecognised values and collapsed duplicates, which made HasCode && !HasToken
-// && !HasIdToken true for "code foo" and "code code". The parser reports both now, so the parsed
+// && !HasIDToken true for "code foo" and "code code". The parser reports both now, so the parsed
 // result carries the whole answer. And not !IsImplicitFlow(), which is true for "code token" and
 // for garbage such as "foo": only the exact type buys an arbitrary loopback port (#41, #244).
 func (r ResponseTypeInfo) IsCodeOnly() bool {
-	return r.HasCode && !r.HasToken && !r.HasIdToken && !r.Unrecognised && !r.Repeated && !r.Malformed
+	return r.HasCode && !r.HasToken && !r.HasIDToken && !r.Unrecognised && !r.Repeated && !r.Malformed
 }
 
 // ScopeHonoured is scope as this response type can use it: offline_access is dropped when the

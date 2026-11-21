@@ -12,7 +12,7 @@ func TestParseResponseType(t *testing.T) {
 		responseType string
 		wantCode     bool
 		wantToken    bool
-		wantIdToken  bool
+		wantIDToken  bool
 	}{
 		// Single valid response types
 		{
@@ -20,21 +20,21 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "code",
 			wantCode:     true,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "token only",
 			responseType: "token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "id_token only",
 			responseType: "id_token",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 
 		// Multiple response types (OIDC combinations)
@@ -43,35 +43,35 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "id_token token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 		{
 			name:         "token id_token (reversed order)",
 			responseType: "token id_token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 		{
 			name:         "code token (hybrid)",
 			responseType: "code token",
 			wantCode:     true,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "code id_token (hybrid)",
 			responseType: "code id_token",
 			wantCode:     true,
 			wantToken:    false,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 		{
 			name:         "code id_token token (hybrid)",
 			responseType: "code id_token token",
 			wantCode:     true,
 			wantToken:    true,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 
 		// Empty and whitespace
@@ -80,21 +80,21 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "whitespace only",
 			responseType: "   ",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "tabs only",
 			responseType: "\t\t",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 
 		// Whitespace handling
@@ -103,14 +103,14 @@ func TestParseResponseType(t *testing.T) {
 			responseType: " token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "trailing space",
 			responseType: "token ",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		// A run of spaces is malformed, which ValidateRequest refuses, but the values are still read
 		// from it, so the mode an error is answered in follows what was asked for (#244).
@@ -119,7 +119,7 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "id_token  token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  true,
+			wantIDToken:  true,
 		},
 		// Only a space separates: a tab or a newline joins two types into one value that is neither.
 		// Both used to split (#244).
@@ -128,14 +128,14 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "id_token\ttoken",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "newline between tokens joins them",
 			responseType: "id_token\ntoken",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 
 		// Invalid/unrecognized response types
@@ -144,28 +144,28 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "invalid",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "partial match - tokens (plural)",
 			responseType: "tokens",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "partial match - id_tokens (plural)",
 			responseType: "id_tokens",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "partial match - codes (plural)",
 			responseType: "codes",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 
 		// Case sensitivity (OAuth is case-sensitive)
@@ -174,28 +174,28 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "CODE",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "uppercase TOKEN",
 			responseType: "TOKEN",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "uppercase ID_TOKEN",
 			responseType: "ID_TOKEN",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "mixed case Code",
 			responseType: "Code",
 			wantCode:     false,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 
 		// Mixed valid and invalid. The recognised booleans are still set, and Unrecognised reports
@@ -206,14 +206,14 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "token unknown",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "unknown with valid type",
 			responseType: "unknown code",
 			wantCode:     true,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 
 		// Duplicates: the boolean is set once, and Repeated reports the second copy, which
@@ -223,14 +223,14 @@ func TestParseResponseType(t *testing.T) {
 			responseType: "token token",
 			wantCode:     false,
 			wantToken:    true,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 		{
 			name:         "duplicate code",
 			responseType: "code code",
 			wantCode:     true,
 			wantToken:    false,
-			wantIdToken:  false,
+			wantIDToken:  false,
 		},
 	}
 
@@ -239,7 +239,7 @@ func TestParseResponseType(t *testing.T) {
 			result := ParseResponseType(tt.responseType)
 			assert.Equal(t, tt.wantCode, result.HasCode, "HasCode mismatch for %q", tt.responseType)
 			assert.Equal(t, tt.wantToken, result.HasToken, "HasToken mismatch for %q", tt.responseType)
-			assert.Equal(t, tt.wantIdToken, result.HasIdToken, "HasIdToken mismatch for %q", tt.responseType)
+			assert.Equal(t, tt.wantIDToken, result.HasIDToken, "HasIDToken mismatch for %q", tt.responseType)
 		})
 	}
 }
@@ -253,48 +253,48 @@ func TestResponseTypeInfo_IsImplicitFlow(t *testing.T) {
 		// Implicit flow cases (token or id_token without code)
 		{
 			name:     "token only is implicit",
-			info:     ResponseTypeInfo{HasCode: false, HasToken: true, HasIdToken: false},
+			info:     ResponseTypeInfo{HasCode: false, HasToken: true, HasIDToken: false},
 			expected: true,
 		},
 		{
 			name:     "id_token only is implicit",
-			info:     ResponseTypeInfo{HasCode: false, HasToken: false, HasIdToken: true},
+			info:     ResponseTypeInfo{HasCode: false, HasToken: false, HasIDToken: true},
 			expected: true,
 		},
 		{
 			name:     "token and id_token is implicit",
-			info:     ResponseTypeInfo{HasCode: false, HasToken: true, HasIdToken: true},
+			info:     ResponseTypeInfo{HasCode: false, HasToken: true, HasIDToken: true},
 			expected: true,
 		},
 
 		// Authorization code flow (code without token/id_token)
 		{
 			name:     "code only is not implicit",
-			info:     ResponseTypeInfo{HasCode: true, HasToken: false, HasIdToken: false},
+			info:     ResponseTypeInfo{HasCode: true, HasToken: false, HasIDToken: false},
 			expected: false,
 		},
 
 		// Hybrid flows (code with token and/or id_token)
 		{
 			name:     "code with token is hybrid, not implicit",
-			info:     ResponseTypeInfo{HasCode: true, HasToken: true, HasIdToken: false},
+			info:     ResponseTypeInfo{HasCode: true, HasToken: true, HasIDToken: false},
 			expected: false,
 		},
 		{
 			name:     "code with id_token is hybrid, not implicit",
-			info:     ResponseTypeInfo{HasCode: true, HasToken: false, HasIdToken: true},
+			info:     ResponseTypeInfo{HasCode: true, HasToken: false, HasIDToken: true},
 			expected: false,
 		},
 		{
 			name:     "code with token and id_token is hybrid, not implicit",
-			info:     ResponseTypeInfo{HasCode: true, HasToken: true, HasIdToken: true},
+			info:     ResponseTypeInfo{HasCode: true, HasToken: true, HasIDToken: true},
 			expected: false,
 		},
 
 		// Empty/none
 		{
 			name:     "no response types is not implicit",
-			info:     ResponseTypeInfo{HasCode: false, HasToken: false, HasIdToken: false},
+			info:     ResponseTypeInfo{HasCode: false, HasToken: false, HasIDToken: false},
 			expected: false,
 		},
 	}

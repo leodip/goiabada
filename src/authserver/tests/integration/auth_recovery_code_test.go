@@ -237,7 +237,7 @@ func TestRecoveryCode_SignsInAtLevel3(t *testing.T) {
 	require.Len(t, events, 1)
 	assert.Equal(t, map[string]any{"user_id": float64(user.ID), "remaining": float64(9)}, events[0],
 		"the user and the count, never the code or its hash")
-	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventAuthSuccessOtp, user.ID),
+	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventAuthSuccessOTP, user.ID),
 		"a recovery-code sign-in is not counted as an authenticator sign-in")
 }
 

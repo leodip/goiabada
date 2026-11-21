@@ -120,7 +120,7 @@ func (notice Notice) class() afterresponse.Class {
 // committed the change read it under the row's lock, never a read from before it, so an address
 // changed, verified or unverified while the request ran is answered as the change found it.
 type Recipient struct {
-	UserId        int64
+	UserID        int64
 	Email         string
 	EmailVerified bool
 	Name          string
@@ -133,7 +133,7 @@ type Recipient struct {
 // To is the account's own address, as user holds it.
 func To(user *record.User) Recipient {
 	return Recipient{
-		UserId:        user.ID,
+		UserID:        user.ID,
 		Email:         user.Email,
 		EmailVerified: user.EmailVerified,
 		Name:          user.FullName(),
@@ -172,7 +172,7 @@ func (n *Notifier) send(r *http.Request, notice Notice, to Recipient, codesLeft 
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
 		slog.ErrorContext(r.Context(), "unable to send an account notice",
-			"notice", string(notice), "user_id", to.UserId, "error", reqctx.ErrNoSettings)
+			"notice", string(notice), "user_id", to.UserID, "error", reqctx.ErrNoSettings)
 		return
 	}
 	if !settings.SMTPEnabled || !to.EmailVerified {
@@ -224,7 +224,7 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 	email := emailOf(notice)
 	if email == nil {
 		slog.ErrorContext(ctx, "unable to render an account notice",
-			"notice", string(notice), "user_id", to.UserId, "error", errUnknownNotice)
+			"notice", string(notice), "user_id", to.UserID, "error", errUnknownNotice)
 		return
 	}
 
@@ -237,17 +237,17 @@ func (n *Notifier) deliver(ctx context.Context, r *http.Request, notice Notice, 
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to render an account notice",
-			"notice", string(notice), "user_id", to.UserId, "error", err)
+			"notice", string(notice), "user_id", to.UserID, "error", err)
 		return
 	}
 
 	input := &emaildelivery.SendEmailInput{
 		To:       to.Email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}
 	if _, err := n.sender.SendEmail(ctx, smtpConfig, input); err != nil {
 		slog.ErrorContext(ctx, "unable to send an account notice",
-			"notice", string(notice), "user_id", to.UserId, "error", err)
+			"notice", string(notice), "user_id", to.UserID, "error", err)
 	}
 }

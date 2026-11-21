@@ -48,7 +48,7 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 	// The step-up ceremony accepted its code before the newer sign-in's password.
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory,
+		UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 		AuthTime: &olderInstant,
 	}, false, "")
 
@@ -83,7 +83,7 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.ACRLevel1,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 		AuthTime: &olderInstant, PasswordAuthTime: &olderInstant,
 	}, true, "")
 
@@ -134,7 +134,7 @@ func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *tes
 
 			instant := tc.instant
 			auth := Authentication{
-				UserId: 123, AuthMethods: tc.methods, AcrLevel: tc.level,
+				UserID: 123, AuthMethods: tc.methods, ACRLevel: tc.level,
 				AuthTime: &instant,
 			}
 			if tc.replace {
@@ -166,9 +166,9 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 		auth Authentication
 	}{
 		{"a legacy row with no auth_time takes any instant",
-			Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory, AuthTime: &staleInstant}},
+			Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &staleInstant}},
 		{"a carryless bump that adopted nothing is never stale",
-			Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.ACRLevel1}},
+			Authentication{UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -245,7 +245,7 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 			// instant it adopted them at, with the instant of a code it entered when it stepped up.
 			adoptedInstant := tc.adopted
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456,
-				Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory,
+				Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 					AuthTime: tc.ownInstant, AdoptedAuthTime: &adoptedInstant}, false, "")
 
 			if tc.wantStale {
@@ -338,7 +338,7 @@ func TestAuthenticationIsStale_AsksTheRuleOfTheRowAsItIsNow(t *testing.T) {
 
 			adoptedInstant := adopted
 			stale, err := manager.AuthenticationIsStale(context.Background(), bumpSessionIdentifier,
-				Authentication{UserId: 123, AuthMethods: "pwd otp", AdoptedAuthTime: &adoptedInstant})
+				Authentication{UserID: 123, AuthMethods: "pwd otp", AdoptedAuthTime: &adoptedInstant})
 
 			if tc.readErr != nil {
 				require.ErrorIs(t, err, readFailure)

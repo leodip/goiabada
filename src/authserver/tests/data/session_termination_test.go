@@ -57,9 +57,9 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	if result.RevokedCodeCount != 2 {
 		t.Errorf("RevokedCodeCount = %d, want 2", result.RevokedCodeCount)
 	}
-	if len(result.RevokedRefreshTokenJtis) != 2 {
+	if len(result.RevokedRefreshTokenJTIs) != 2 {
 		t.Errorf("RevokedRefreshTokenJtis = %v, want the two tokens of this session",
-			result.RevokedRefreshTokenJtis)
+			result.RevokedRefreshTokenJTIs)
 	}
 
 	// The row is gone, which is what the first statement did.

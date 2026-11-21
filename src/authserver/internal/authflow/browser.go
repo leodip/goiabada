@@ -16,14 +16,14 @@ type stepSaver interface {
 // when the browser session no longer holds it (#257 decision 14). The handler's per-request adapter
 // satisfies it, over ceremony.Store.
 type recoveryCodesTaker interface {
-	TakeRecoveryCodes(ceremonyId string) ([]string, error)
+	TakeRecoveryCodes(ceremonyID string) ([]string, error)
 }
 
 // ceremonyClearer is the browser-session write that ends a ceremony: its auth context cleared, only
 // while the browser session still holds it, and otherwise ceremony.ErrCeremonyReplaced with nothing
 // written (#579). The handler's per-request adapter satisfies it, over ceremony.Store.
 type ceremonyClearer interface {
-	ClearAuthContext(ceremonyId string) error
+	ClearAuthContext(ceremonyID string) error
 }
 
 // sessionRotator is the browser-session write that replaces the session's identifier at a privilege
@@ -34,7 +34,7 @@ type ceremonyClearer interface {
 // It keeps no ceremony held for a user other than userId, the user the ceremony has authenticated
 // (#246). The handler's per-request adapter satisfies it, over ceremony.Store.
 type sessionRotator interface {
-	RegenerateSession(ceremonyId string, userId int64) error
+	RegenerateSession(ceremonyID string, userID int64) error
 }
 
 // credentialFailureRecorder charges a refused credential to the rate limiter, against the

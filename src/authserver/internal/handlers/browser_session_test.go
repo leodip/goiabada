@@ -35,7 +35,7 @@ func theRequest(req *http.Request) interface{} {
 // call that reached the store on a derived or a background context would be told apart by
 // requestKeyValue.
 func adapterRequest() *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil)
 	return req.WithContext(context.WithValue(req.Context(), adapterContextKey{}, "this request"))
 }
 
@@ -49,7 +49,7 @@ func TestBrowserSession_SaveAuthContextCarriesTheHandlersWriterAndRequest(t *tes
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
-	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel2OTP}
+	authContext := &ceremony.AuthContext{CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateLevel2OTP}
 
 	ceremonyStore.On("SaveAuthContext", theWriter(rr), theRequest(req), authContext).
 		Run(func(args mock.Arguments) {
@@ -66,7 +66,7 @@ func TestBrowserSession_SaveAuthContextReturnsTheStoresRefusal(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
-	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId}
+	authContext := &ceremony.AuthContext{CeremonyID: testCeremonyID}
 
 	ceremonyStore.On("SaveAuthContext", theWriter(rr), theRequest(req), authContext).
 		Return(ceremony.ErrCeremonyReplaced).Once()
@@ -81,12 +81,12 @@ func TestBrowserSession_ClearAuthContextCarriesTheHandlersWriterAndRequest(t *te
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("ClearAuthContext", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("ClearAuthContext", theWriter(rr), theRequest(req), testCeremonyID).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(nil).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ClearAuthContext(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).ClearAuthContext(testCeremonyID)
 
 	require.NoError(t, err)
 	ceremonyStore.AssertExpectations(t)
@@ -97,10 +97,10 @@ func TestBrowserSession_ClearAuthContextReturnsTheStoresRefusal(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("ClearAuthContext", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("ClearAuthContext", theWriter(rr), theRequest(req), testCeremonyID).
 		Return(assert.AnError).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ClearAuthContext(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).ClearAuthContext(testCeremonyID)
 
 	require.ErrorIs(t, err, assert.AnError)
 }
@@ -109,7 +109,7 @@ func TestBrowserSession_AddAuthContextCarriesTheHandlersWriterAndRequest(t *test
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
-	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateReadyToIssueCode}
+	authContext := &ceremony.AuthContext{CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateReadyToIssueCode}
 
 	ceremonyStore.On("AddAuthContext", theWriter(rr), theRequest(req), authContext).
 		Run(func(args mock.Arguments) {
@@ -126,7 +126,7 @@ func TestBrowserSession_AddAuthContextReturnsTheStoresFailure(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
-	authContext := &ceremony.AuthContext{CeremonyId: testCeremonyId}
+	authContext := &ceremony.AuthContext{CeremonyID: testCeremonyID}
 
 	ceremonyStore.On("AddAuthContext", theWriter(rr), theRequest(req), authContext).
 		Return(assert.AnError).Once()
@@ -142,8 +142,8 @@ func TestBrowserSession_TwoRequestsKeepTheirOwnWritersAndRequests(t *testing.T) 
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rrA, reqA := httptest.NewRecorder(), adapterRequest()
 	rrB, reqB := httptest.NewRecorder(), adapterRequest()
-	contextA := &ceremony.AuthContext{CeremonyId: "A"}
-	contextB := &ceremony.AuthContext{CeremonyId: "B"}
+	contextA := &ceremony.AuthContext{CeremonyID: "A"}
+	contextB := &ceremony.AuthContext{CeremonyID: "B"}
 
 	ceremonyStore.On("SaveAuthContext", theWriter(rrA), theRequest(reqA), contextA).Return(nil).Once()
 	ceremonyStore.On("SaveAuthContext", theWriter(rrB), theRequest(reqB), contextB).Return(nil).Once()
@@ -161,12 +161,12 @@ func TestBrowserSession_RegenerateSessionCarriesTheHandlersWriterAndRequest(t *t
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId, int64(42)).
+	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyID, int64(42)).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(nil).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId, 42)
+	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyID, 42)
 
 	require.NoError(t, err)
 	ceremonyStore.AssertExpectations(t)
@@ -177,10 +177,10 @@ func TestBrowserSession_RegenerateSessionReturnsTheStoresRefusal(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyId, int64(42)).
+	ceremonyStore.On("RegenerateSession", theWriter(rr), theRequest(req), testCeremonyID, int64(42)).
 		Return(ceremony.ErrCeremonyReplaced).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyId, 42)
+	err := newBrowserSession(rr, req, ceremonyStore).RegenerateSession(testCeremonyID, 42)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 }
@@ -190,12 +190,12 @@ func TestBrowserSession_ConfirmCeremonyCarriesTheHandlersWriterAndRequest(t *tes
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("ConfirmCeremony", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("ConfirmCeremony", theWriter(rr), theRequest(req), testCeremonyID).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(nil).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ConfirmCeremony(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).ConfirmCeremony(testCeremonyID)
 
 	require.NoError(t, err)
 	ceremonyStore.AssertExpectations(t)
@@ -206,10 +206,10 @@ func TestBrowserSession_ConfirmCeremonyReturnsTheStoresRefusal(t *testing.T) {
 	rr := httptest.NewRecorder()
 	req := adapterRequest()
 
-	ceremonyStore.On("ConfirmCeremony", theWriter(rr), theRequest(req), testCeremonyId).
+	ceremonyStore.On("ConfirmCeremony", theWriter(rr), theRequest(req), testCeremonyID).
 		Return(ceremony.ErrCeremonyReplaced).Once()
 
-	err := newBrowserSession(rr, req, ceremonyStore).ConfirmCeremony(testCeremonyId)
+	err := newBrowserSession(rr, req, ceremonyStore).ConfirmCeremony(testCeremonyID)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 }
@@ -223,14 +223,14 @@ func TestBrowserSession_RegenerateSessionAndBindCarriesTheHandlersWriterAndReque
 	req := adapterRequest()
 
 	ticked := true
-	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyId, int64(42), "the-new-user-session",
+	ceremonyStore.On("RegenerateSessionAndBind", theWriter(rr), theRequest(req), testCeremonyID, int64(42), "the-new-user-session",
 		&ticked).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(ceremony.ErrCeremonyReplaced).Once()
 
 	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
-		RegenerateSessionAndBind(testCeremonyId, 42, "the-new-user-session", &ticked)
+		RegenerateSessionAndBind(testCeremonyID, 42, "the-new-user-session", &ticked)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	ceremonyStore.AssertExpectations(t)
@@ -244,13 +244,13 @@ func TestBrowserSession_RecordKeepSignedInCarriesTheHandlersWriterAndRequest(t *
 	req := adapterRequest()
 
 	unticked := false
-	ceremonyStore.On("RecordKeepSignedIn", theWriter(rr), theRequest(req), testCeremonyId, &unticked).
+	ceremonyStore.On("RecordKeepSignedIn", theWriter(rr), theRequest(req), testCeremonyID, &unticked).
 		Run(func(args mock.Arguments) {
 			assert.Equal(t, "this request", requestKeyValue(args.Get(1).(*http.Request)))
 		}).Return(ceremony.ErrCeremonyReplaced).Once()
 
 	err := newSessionStartingBrowserSession(rr, req, ceremonyStore, NewDeviceCookie(false)).
-		RecordKeepSignedIn(testCeremonyId, &unticked)
+		RecordKeepSignedIn(testCeremonyID, &unticked)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	ceremonyStore.AssertExpectations(t)

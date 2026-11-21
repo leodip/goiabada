@@ -245,7 +245,7 @@ func TestRFC9068_ImplicitFlow(t *testing.T) {
 		Client:            &record.Client{ID: 5, ClientIdentifier: "old-spa"},
 		User:              user,
 		Scope:             "openid",
-		AcrLevel:          record.ACRLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: "session-1",
 		AuthenticatedAt:   time.Now().UTC(),
@@ -255,7 +255,7 @@ func TestRFC9068_ImplicitFlow(t *testing.T) {
 	response, err := tokenIssuer.IssueImplicitTx(context.Background(), rfc9068Settings(), input, true, true)
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, "")
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, "")
 	claims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "old-spa", claims["client_id"])
 	assert.NotContains(t, claims, "grant_id")
@@ -288,7 +288,7 @@ func TestRFC9068_OfflineAccessNamesTheAuthServer(t *testing.T) {
 				User:            &record.User{Subject: fake.UUID()},
 				Client:          &record.Client{ClientIdentifier: "web-app"},
 				Scope:           tc.scope,
-				AcrLevel:        record.ACRLevel1,
+				ACRLevel:        record.ACRLevel1,
 				AuthenticatedAt: now,
 			}
 

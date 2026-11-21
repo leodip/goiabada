@@ -77,7 +77,7 @@ func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
 				Detail: tc.detail,
 				Client: client,
 				Scopes: []string{"authserver:manage"},
-				UserId: 7,
+				UserID: 7,
 			}
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).

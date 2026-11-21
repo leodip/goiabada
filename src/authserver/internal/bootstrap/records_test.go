@@ -100,10 +100,10 @@ func TestBootstrapCredentialVars_CoverBothServices(t *testing.T) {
 	}
 }
 
-// TestBootstrapEnvContent_CarriesNoClientId pins the whole point of #285 on the one artifact that
+// TestBootstrapEnvContent_CarriesNoClientID pins the whole point of #285 on the one artifact that
 // hands an operator their configuration: the admin console's client id is not configurable, so the
 // bootstrap file must not offer it as something to copy.
-func TestBootstrapEnvContent_CarriesNoClientId(t *testing.T) {
+func TestBootstrapEnvContent_CarriesNoClientID(t *testing.T) {
 	content := bootstrapEnvContent("the-secret", "aaaa", "bbbb", "cccc", "dddd")
 
 	assert.NotContains(t, content, "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID",

@@ -55,7 +55,7 @@ func SignInPageClient(ceremonies signInCeremonies) func(next http.Handler) http.
 // linkedSignInCeremonies is what LinkedSignInPageClient reads: the sign-in a page's URL names,
 // whatever the request's method.
 type linkedSignInCeremonies interface {
-	HeldAuthContext(r *http.Request, ceremonyId string) (*ceremony.AuthContext, error)
+	HeldAuthContext(r *http.Request, ceremonyID string) (*ceremony.AuthContext, error)
 }
 
 // LinkedSignInPageClient names the client of the sign-in a page's URL names, when the id is well
@@ -76,9 +76,9 @@ type linkedSignInCeremonies interface {
 func LinkedSignInPageClient(ceremonies linkedSignInCeremonies) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ceremonyId := r.URL.Query().Get(ceremony.QueryParameter)
-			if ceremony.IsWellFormedId(ceremonyId) {
-				if authContext, err := ceremonies.HeldAuthContext(r, ceremonyId); err == nil && authContext != nil {
+			ceremonyID := r.URL.Query().Get(ceremony.QueryParameter)
+			if ceremony.IsWellFormedID(ceremonyID) {
+				if authContext, err := ceremonies.HeldAuthContext(r, ceremonyID); err == nil && authContext != nil {
 					namePageSignIn(r, authContext)
 				}
 			}
@@ -90,7 +90,7 @@ func LinkedSignInPageClient(ceremonies linkedSignInCeremonies) func(next http.Ha
 // namePageSignIn draws the request's pages as authContext's sign-in draws them: for its client, and
 // in safe mode when it asked for it.
 func namePageSignIn(r *http.Request, authContext *ceremony.AuthContext) {
-	reqctx.NamePageClient(r.Context(), authContext.ClientId)
+	reqctx.NamePageClient(r.Context(), authContext.ClientID)
 	if authContext.SafeMode {
 		reqctx.KeepPageSafeMode(r.Context())
 	}

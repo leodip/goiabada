@@ -55,33 +55,33 @@ func HandleCertsGet(
 		}
 
 		if nextKey != nil {
-			var publicKeyJwk oauth.JWK
-			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		if currentKey != nil {
-			var publicKeyJwk oauth.JWK
-			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		if previousKey != nil {
-			var publicKeyJwk oauth.JWK
-			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		setMetadataCacheLifetime(w)

@@ -37,7 +37,7 @@ func TestMissingSettings_ConsentAnswersBeforeReadingItsCeremony(t *testing.T) {
 			if step.method == http.MethodPost {
 				form := url.Values{}
 				form.Add("btnSubmit", "submit")
-				form.Add(ceremony.IdField, testCeremonyId)
+				form.Add(ceremony.IDField, testCeremonyID)
 				form.Add("consent0", "on")
 				req = httptest.NewRequest(http.MethodPost, "/auth/consent", strings.NewReader(form.Encode()))
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -49,7 +49,7 @@ func TestMissingSettings_ConsentAnswersBeforeReadingItsCeremony(t *testing.T) {
 					permissionChecker: permissionChecker,
 				})
 			} else {
-				req = httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
+				req = httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyID, nil)
 				handler = buildConsentGet(consentGetDeps{
 					pageRenderer:  pageRenderer,
 					ceremonyStore: ceremonyStore,

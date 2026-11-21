@@ -250,7 +250,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			Client:              &record.Client{ID: 1, ClientIdentifier: "test-client", TokenExpirationInSeconds: 900},
 			User:                &record.User{ID: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 9},
 			Scope:               "openid",
-			AcrLevel:            "urn:goiabada:level1",
+			ACRLevel:            "urn:goiabada:level1",
 			AuthMethods:         "pwd",
 			SessionIdentifier:   sid,
 			AuthenticatedAt:     now,
@@ -308,8 +308,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Return(nil)
 
 		input := &CreateCodeInput{SessionIdentifier: sid}
-		input.ClientId = "test-client"
-		input.UserId = 1
+		input.ClientID = "test-client"
+		input.UserID = 1
 		input.RedirectURI = "https://example.com/cb"
 		input.Scope = "openid"
 		input.ResponseMode = "query"

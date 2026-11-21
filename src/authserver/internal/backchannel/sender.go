@@ -251,17 +251,17 @@ func (s *Sender) deliver(ctx context.Context, issuer string, delivery Delivery) 
 	case res.outcome == Delivered:
 	case res.err != nil:
 		slog.WarnContext(ctx, "a logout token was not delivered",
-			"client_id", delivery.ClientId,
+			"client_id", delivery.ClientID,
 			"client_identifier", delivery.ClientIdentifier,
-			"user_id", delivery.UserId,
+			"user_id", delivery.UserID,
 			"outcome", string(res.outcome),
 			"attempts", res.attempts,
 			"error", res.err)
 	default:
 		slog.WarnContext(ctx, "a logout token was not delivered",
-			"client_id", delivery.ClientId,
+			"client_id", delivery.ClientID,
 			"client_identifier", delivery.ClientIdentifier,
-			"user_id", delivery.UserId,
+			"user_id", delivery.UserID,
 			"outcome", string(res.outcome),
 			"attempts", res.attempts,
 			"status", res.status)
@@ -412,8 +412,8 @@ func LogSentLogoutToken(ctx context.Context, auditLogger AuditLogger, delivery D
 	outcome Outcome, attempts int) {
 
 	auditLogger.Log(ctx, audit.EventSentLogoutToken, map[string]interface{}{
-		"client_id":          delivery.ClientId,
-		"user_id":            delivery.UserId,
+		"client_id":          delivery.ClientID,
+		"user_id":            delivery.UserID,
 		"session_identifier": delivery.SessionIdentifier,
 		"jti":                jti,
 		"outcome":            string(outcome),

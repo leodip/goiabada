@@ -16,7 +16,7 @@ var ErrAuthenticatorRemoved = errors.New("the authenticator this sign-in's one-t
 
 // OTPClaim is what an authentication claims of a one-time code: whether its methods name one, and
 // the otp_config_generation of the authenticator it came from. A ceremony's is its AuthMethods
-// beside its OtpClaimGeneration.
+// beside its OTPClaimGeneration.
 type OTPClaim struct {
 	Claimed    bool
 	Generation *int64
@@ -37,8 +37,8 @@ func (c OTPClaim) StandsFor(user *record.User) bool {
 
 // ClaimDatabase is what Recheck reads the user through.
 type ClaimDatabase interface {
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // Recheck takes userId's row in tx and answers ErrAuthenticatorRemoved unless the claim stands for
@@ -57,14 +57,14 @@ type ClaimDatabase interface {
 // first plain read: a read before the lock would hide a removal that committed while the
 // transaction waited for it. And the user's row before the session's, the order a removal and a
 // credential change take them in.
-func (c OTPClaim) Recheck(ctx context.Context, db ClaimDatabase, tx *sql.Tx, userId int64) error {
+func (c OTPClaim) Recheck(ctx context.Context, db ClaimDatabase, tx *sql.Tx, userID int64) error {
 	if !c.Claimed {
 		return nil
 	}
-	if err := db.AcquireUserRow(ctx, tx, userId); err != nil {
+	if err := db.AcquireUserRow(ctx, tx, userID); err != nil {
 		return err
 	}
-	user, err := db.GetUserByID(ctx, tx, userId)
+	user, err := db.GetUserByID(ctx, tx, userID)
 	if err != nil {
 		return err
 	}

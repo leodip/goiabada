@@ -97,7 +97,7 @@ const invalidTokenDescription = "The access token is invalid."
 // how mime.ParseMediaType returns every spelling of it.
 const formMediaType = "application/x-www-form-urlencoded"
 
-// JwtAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
+// JWTAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
 // presented, and it decides it for every guard behind it. Three methods carry one: RFC 6750 section
 // 2.1's Authorization header with the Bearer scheme; RFC 9449 section 7.1's Authorization header
 // with the DPoP scheme, beside a DPoP proof; and, for a POST with a form-encoded body, RFC 6750
@@ -152,7 +152,7 @@ const formMediaType = "application/x-www-form-urlencoded"
 //     context; the scope guard behind it answers the challenges with no error.
 //
 // A validated token is stored with reqctx.WithBearerToken, which every guard behind this reads.
-func (m *BearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
+func (m *BearerToken) JWTAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authorizations := r.Header.Values("Authorization")

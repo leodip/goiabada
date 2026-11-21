@@ -23,8 +23,8 @@ import (
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type userEmailVerificationCodeDatabase interface {
 	userTargetPolicyDatabase
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		issuedAt time.Time) (bool, error)
 }
 
@@ -37,19 +37,19 @@ func HandleUserEmailVerificationCodePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
 
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

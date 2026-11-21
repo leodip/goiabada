@@ -14,7 +14,7 @@ import (
 type TokenType int
 
 const (
-	TokenTypeId TokenType = iota
+	TokenTypeID TokenType = iota
 	TokenTypeBearer
 	// TokenTypeRefresh is a session-bound refresh token, valid while its browser session is.
 	TokenTypeRefresh
@@ -27,7 +27,7 @@ const (
 // value is one of the four constants -- but the guard goes on the type so the next caller cannot
 // step on it (#385).
 func (tt TokenType) String() string {
-	if tt < TokenTypeId || tt > TokenTypeOffline {
+	if tt < TokenTypeID || tt > TokenTypeOffline {
 		return ""
 	}
 	return []string{"ID", "Bearer", "Refresh", "Offline"}[tt]

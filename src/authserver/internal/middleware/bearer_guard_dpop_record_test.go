@@ -45,7 +45,7 @@ func newResourceInstance(t *testing.T, store *replayStore, now time.Time) *resou
 	instance := &resourceInstance{now: now}
 	guards := NewBearerTokenForAPI(dpopParser{jkt: dpoptest.RFC7517Key(t).Thumbprint},
 		ResourceProofs{Checker: checker, Replays: store, Now: func() time.Time { return instance.now }})
-	instance.chain = guards.JwtAuthorizationHeaderToContext()(guards.RequireBearerTokenScope("openid")(
+	instance.chain = guards.JWTAuthorizationHeaderToContext()(guards.RequireBearerTokenScope("openid")(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("admitted")) })))
 	return instance
 }
@@ -97,7 +97,7 @@ func TestBearerGuardDPoP_WhateverTheRouteAnswersTheProofStaysSpent(t *testing.T)
 			guards := NewBearerTokenForAPI(dpopParser{jkt: key.Thumbprint},
 				ResourceProofs{Checker: checker, Replays: store, Now: func() time.Time { return dpopNow }})
 			reached := 0
-			chain := guards.JwtAuthorizationHeaderToContext()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			chain := guards.JWTAuthorizationHeaderToContext()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				reached++
 				w.WriteHeader(status)
 			}))

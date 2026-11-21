@@ -64,9 +64,9 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 	t.Helper()
 
 	claimGeneration := int64(2)
-	userOtpConfigGeneration := claimGeneration
+	userOTPConfigGeneration := claimGeneration
 	if world.authenticatorReplaced {
-		userOtpConfigGeneration = 4
+		userOTPConfigGeneration = 4
 	}
 
 	facts := issuanceFacts{
@@ -107,7 +107,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 					Enabled:             !world.userDisabled,
 					AuthStateGeneration: ceremonyGeneration + world.generationDrift,
 					OTPEnabled:          !world.noAuthenticator,
-					OTPConfigGeneration: userOtpConfigGeneration,
+					OTPConfigGeneration: userOTPConfigGeneration,
 				}
 			}
 		case issuanceFactSession:

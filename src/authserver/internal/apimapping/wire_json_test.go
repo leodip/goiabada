@@ -611,7 +611,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	// reads administrativeScopesAllowed true with its row's column left false: the
 	// admin console's client is always allowed (#499). brandId is the client's own brand, or null
 	// for a client that follows the default (#812).
-	clientScalars := func(identifier string, systemLevel bool, brandId string) string {
+	clientScalars := func(identifier string, systemLevel bool, brandID string) string {
 		flag := `false`
 		if systemLevel {
 			flag = `true`
@@ -622,7 +622,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			`"consentRequired":true,"rememberConsent":true,` +
 			`"backchannelLogoutUri":"http://app.internal:3000/backchannel-logout?tenant=a",` +
 			`"backchannelLogoutSessionRequired":true,"dpopBoundAccessTokens":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
-			`,"brandId":` + brandId + `,"showLogo":true,"showDisplayName":true,` +
+			`,"brandId":` + brandID + `,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,` +
 			`"tokenEndpointAuthMethod":"client_secret_post","isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +

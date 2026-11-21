@@ -34,7 +34,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			ClientId:  "client1",
+			ClientID:  "client1",
 		}
 
 		client := &record.Client{
@@ -70,7 +70,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			ClientId:  "client1",
+			ClientID:  "client1",
 			// Code is intentionally left empty
 		}
 
@@ -107,7 +107,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			ClientId:  "client1",
+			ClientID:  "client1",
 			Code:      "some_code",
 			// RedirectURI is intentionally left empty
 		}
@@ -145,7 +145,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:   "authorization_code",
-			ClientId:    "client1",
+			ClientID:    "client1",
 			Code:        "some_code",
 			RedirectURI: "https://example.com/callback",
 			// CodeVerifier is intentionally left empty
@@ -204,7 +204,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "invalid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -246,7 +246,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/wrong_callback",
 			CodeVerifier: testCodeVerifier,
@@ -291,7 +291,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -341,7 +341,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -382,7 +382,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
 		// The code's user, which the handler's user_disabled record names (#522 decision 7).
-		assert.Equal(t, int64(53), disabled.UserId)
+		assert.Equal(t, int64(53), disabled.UserID)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.Code())
@@ -402,7 +402,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -462,7 +462,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: wrongCodeVerifier,
@@ -520,7 +520,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "non_public_client",
+			ClientID:     "non_public_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -581,7 +581,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "confidential_client",
+			ClientID:     "confidential_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -648,7 +648,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "public_client",
+			ClientID:     "public_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -709,7 +709,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -764,7 +764,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeVerifier := testCodeVerifier
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "public_client",
+			ClientID:     "public_client",
 			Code:         "valid_code_for_public_client",
 			RedirectURI:  "https://example.com/public-client/callback",
 			CodeVerifier: codeVerifier,
@@ -864,7 +864,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -927,7 +927,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "confidential_client",
+			ClientID:     "confidential_client",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			ClientSecret: clientSecret, // correct
@@ -963,7 +963,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -1027,7 +1027,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "attacker_client",
+			ClientID:     "attacker_client",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -1073,7 +1073,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://attacker.example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -1122,7 +1122,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:   "authorization_code",
-			ClientId:    "confidential_client",
+			ClientID:    "confidential_client",
 			Code:        "reused_code",
 			RedirectURI: "https://example.com/callback",
 			// ClientSecret intentionally missing
@@ -1172,7 +1172,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "confidential_client",
+			ClientID:     "confidential_client",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			ClientSecret: "wrong_secret",
@@ -1217,7 +1217,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "reused_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: wrongCodeVerifier,
@@ -1263,7 +1263,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			Code:         "totally_unknown_code",
 			RedirectURI:  "https://example.com/callback",
 			CodeVerifier: testCodeVerifier,
@@ -1309,7 +1309,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
@@ -1376,7 +1376,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
@@ -1445,7 +1445,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: codeVerifier,
@@ -1502,7 +1502,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: "", // No code_verifier provided but PKCE was used
@@ -1567,7 +1567,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: "wrong_code_verifier_string_that_is_long_enough", // Wrong verifier
@@ -1630,7 +1630,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		ClientSecret: "client_secret",
 		Code:         "valid_code",
 		RedirectURI:  "https://example.com/callback",
@@ -1724,7 +1724,7 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 
 	input := &ValidateTokenRequestInput{
 		GrantType:   "authorization_code",
-		ClientId:    "client1",
+		ClientID:    "client1",
 		Code:        "valid_code",
 		RedirectURI: "https://example.com/callback",
 	}
@@ -1791,7 +1791,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 // empty and mocks no lookup, and the database mock is strict, so a lookup on the empty path
 // would fail all of them.
 func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
-	const grantUserId = int64(1)
+	const grantUserID = int64(1)
 	const sid = "sid-of-the-browser"
 
 	// setup returns a validator whose code names `sid`. sessionOwner nil means the row is
@@ -1829,9 +1829,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			SessionIdentifier: sid,
 			// Both sides of the comparison are non-zero, so the accept row is a real match
 			// rather than the zero-to-zero one an incomplete fixture would give.
-			UserID: grantUserId,
+			UserID: grantUserID,
 			Client: record.Client{ClientIdentifier: "client1"},
-			User:   record.User{ID: grantUserId, Enabled: true},
+			User:   record.User{ID: grantUserID, Enabled: true},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),
 				Valid: true,
@@ -1857,7 +1857,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			Code:         "valid_code",
 			RedirectURI:  "https://example.com/callback",
@@ -1869,7 +1869,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	owner := func(id int64) *int64 { return &id }
 
 	t.Run("a session belonging to the code's user is accepted", func(t *testing.T) {
-		validator, input, settings := setup(t, owner(grantUserId), nil)
+		validator, input, settings := setup(t, owner(grantUserID), nil)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -1907,7 +1907,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, settings := setup(t, owner(grantUserId+1), nil)
+		validator, input, settings := setup(t, owner(grantUserID+1), nil)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -1937,7 +1937,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 // client, and a non-nil loadErr makes the load itself fail, which is a distinct outcome and not a
 // third flavour of "not registered".
 func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *testing.T) {
-	const grantUserId = int64(1)
+	const grantUserID = int64(1)
 
 	// codeChallenge empty means the code was minted without PKCE, which is every case but the
 	// last; the last needs a stored challenge so that a wrong verifier is a genuine PKCE
@@ -1971,9 +1971,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 			CodeHash:          "hash_of_valid_code",
 			RedirectURI:       codeRedirectURI,
 			SessionIdentifier: "",
-			UserID:            grantUserId,
+			UserID:            grantUserID,
 			Client:            record.Client{ClientIdentifier: "client1"},
-			User:              record.User{ID: grantUserId, Enabled: true},
+			User:              record.User{ID: grantUserID, Enabled: true},
 			CodeChallenge:     sql.NullString{String: codeChallenge, Valid: codeChallenge != ""},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),
@@ -2005,7 +2005,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			Code:         "valid_code",
 			RedirectURI:  codeRedirectURI,

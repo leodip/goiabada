@@ -143,16 +143,16 @@ var configVariables = []configVar{
 		func(c *Config) any { return c.AuthServer.InternalBaseURL }),
 	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "authserver-listen-host-https", "0.0.0.0",
 		"10.0.0.1", "10.0.0.2",
-		func(c *Config) any { return c.AuthServer.ListenHostHttps }),
+		func(c *Config) any { return c.AuthServer.ListenHostHTTPS }),
 	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", "authserver-listen-port-https", 9443,
 		19443, 29443,
-		func(c *Config) any { return c.AuthServer.ListenPortHttps }),
+		func(c *Config) any { return c.AuthServer.ListenPortHTTPS }),
 	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "authserver-listen-host-http", "0.0.0.0",
 		"10.0.1.1", "10.0.1.2",
-		func(c *Config) any { return c.AuthServer.ListenHostHttp }),
+		func(c *Config) any { return c.AuthServer.ListenHostHTTP }),
 	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", "authserver-listen-port-http", 9090,
 		19090, 29090,
-		func(c *Config) any { return c.AuthServer.ListenPortHttp }),
+		func(c *Config) any { return c.AuthServer.ListenPortHTTP }),
 	boolVar("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", "authserver-trust-proxy-headers", false,
 		true, false,
 		func(c *Config) any { return c.AuthServer.TrustProxyHeaders }),
@@ -162,7 +162,7 @@ var configVariables = []configVar{
 		func(c *Config) any { return c.AuthServer.TrustedProxies }),
 	boolVar("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", "authserver-log-http-requests", false,
 		true, false,
-		func(c *Config) any { return c.AuthServer.LogHttpRequests }),
+		func(c *Config) any { return c.AuthServer.LogHTTPRequests }),
 	strVar("GOIABADA_AUTHSERVER_LOG_LEVEL", "authserver-log-level", "info",
 		"debug", "warn",
 		func(c *Config) any { return c.AuthServer.LogLevel }),
@@ -1122,9 +1122,9 @@ func TestCheckDatabaseFlags_RefusesWhatTheFlagsGivenLeaveOutOfRange(t *testing.T
 
 func intPtr(n int) *int { return &n }
 
-// TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine: the help text named two of the four
+// TestRegisterDatabaseFlags_DBTypeHelpNamesEveryEngine: the help text named two of the four
 // engines this binary supports.
-func TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine(t *testing.T) {
+func TestRegisterDatabaseFlags_DBTypeHelpNamesEveryEngine(t *testing.T) {
 	var local DatabaseConfig
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	RegisterDatabaseFlags(fs, &local)

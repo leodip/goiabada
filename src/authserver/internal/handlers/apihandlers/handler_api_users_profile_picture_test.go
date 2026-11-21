@@ -34,7 +34,7 @@ func setTokenContextWithClaims(req *http.Request, claims map[string]interface{})
 	return req.WithContext(ctx)
 }
 
-func TestHandleUserProfilePictureGet_NoUserId(t *testing.T) {
+func TestHandleUserProfilePictureGet_NoUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
@@ -52,7 +52,7 @@ func TestHandleUserProfilePictureGet_NoUserId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleUserProfilePictureGet_InvalidUserId(t *testing.T) {
+func TestHandleUserProfilePictureGet_InvalidUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleUserProfilePictureGet(database, testBaseURL)
@@ -142,7 +142,7 @@ func TestHandleUserProfilePictureGet_NoPicture(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-func TestHandleUserProfilePicturePost_NoUserId(t *testing.T) {
+func TestHandleUserProfilePicturePost_NoUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -161,7 +161,7 @@ func TestHandleUserProfilePicturePost_NoUserId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleUserProfilePicturePost_InvalidUserId(t *testing.T) {
+func TestHandleUserProfilePicturePost_InvalidUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -347,7 +347,7 @@ func TestHandleUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 }
 
-func TestHandleUserProfilePictureDelete_NoUserId(t *testing.T) {
+func TestHandleUserProfilePictureDelete_NoUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -366,7 +366,7 @@ func TestHandleUserProfilePictureDelete_NoUserId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleUserProfilePictureDelete_InvalidUserId(t *testing.T) {
+func TestHandleUserProfilePictureDelete_InvalidUserID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 

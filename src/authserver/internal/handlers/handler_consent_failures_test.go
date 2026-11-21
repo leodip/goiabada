@@ -91,15 +91,15 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 				auditLogger:   auditLogger,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyID, nil)
 			req = withSettings(req, &record.Settings{})
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				CeremonyId: testCeremonyId,
+				CeremonyID: testCeremonyID,
 				AuthState:  ceremony.AuthStateRequiresConsent,
-				UserId:     1,
-				ClientId:   "test-client",
+				UserID:     1,
+				ClientID:   "test-client",
 				Scope:      "openid",
 			}, nil)
 			tc.stub(database, pageRenderer, ceremonyStore)
@@ -203,7 +203,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 			form := url.Values{}
 			form.Add("btnSubmit", "submit")
-			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add(ceremony.IDField, testCeremonyID)
 			form.Add("consent0", "on")
 			req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 			req = withSettings(req, &record.Settings{})
@@ -212,9 +212,9 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateRequiresConsent,
-				CeremonyId: testCeremonyId,
-				UserId:     1,
-				ClientId:   "test-client",
+				CeremonyID: testCeremonyID,
+				UserID:     1,
+				ClientID:   "test-client",
 				Scope:      "openid profile",
 			}, nil)
 			tc.stub(database, permissionChecker, ceremonyStore)
@@ -251,7 +251,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("consent0", "on")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -260,9 +260,9 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateRequiresConsent,
-			CeremonyId: testCeremonyId,
-			UserId:     1,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			UserID:     1,
+			ClientID:   "test-client",
 			Scope:      "openid profile",
 		}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)

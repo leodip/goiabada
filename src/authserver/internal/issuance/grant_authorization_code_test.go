@@ -128,7 +128,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "openid profile email address phone groups attributes offline_access", response.Scope)
 	assert.Equal(t, int64(3600), response.RefreshExpiresIn)
 
-	// validate Id token --------------------------------------------
+	// validate ID token --------------------------------------------
 
 	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
@@ -350,7 +350,7 @@ func TestMintAuthorizationCodeTokens_MinimalScope(t *testing.T) {
 	assert.Equal(t, "openid", response.Scope)
 	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "what the session's maximum lifetime leaves")
 
-	// validate Id token --------------------------------------------
+	// validate ID token --------------------------------------------
 
 	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
@@ -620,7 +620,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, "openid profile email resource1:read resource2:write", response.Scope)
 	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "what the session's maximum lifetime leaves")
 
-	// validate Id token --------------------------------------------
+	// validate ID token --------------------------------------------
 
 	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])

@@ -22,12 +22,12 @@ import (
 // the transaction its lock is held in.
 type clientBrandDatabase interface {
 	clientTargetPolicyDatabase
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
-	GetBrandByID(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
-	SetClientBrand(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64) (bool, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandID int64) (*record.Brand, error)
+	SetClientBrand(ctx context.Context, tx *sql.Tx, clientID int64, brandID sql.NullInt64) (bool, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -70,19 +70,19 @@ func HandleClientBrandPut(
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		rawBrandId, sent := fields["brandId"]
+		rawBrandID, sent := fields["brandId"]
 		if !sent {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBrandIDRequired, nil))
 			return
 		}
 		var req api.UpdateClientBrandRequest
-		if decodeErr := json.Unmarshal(rawBrandId, &req.BrandID); decodeErr != nil {
+		if decodeErr := json.Unmarshal(rawBrandID, &req.BrandID); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		var brandId sql.NullInt64
+		var brandID sql.NullInt64
 		if req.BrandID != nil {
-			brandId = sql.NullInt64{Int64: *req.BrandID, Valid: true}
+			brandID = sql.NullInt64{Int64: *req.BrandID, Valid: true}
 		}
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).
@@ -95,13 +95,13 @@ func HandleClientBrandPut(
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			changed, brand = false, nil
 			var setErr error
-			changed, setErr = database.SetClientBrand(r.Context(), tx, client.ID, brandId)
+			changed, setErr = database.SetClientBrand(r.Context(), tx, client.ID, brandID)
 			if setErr != nil {
 				return setErr
 			}
-			if changed && brandId.Valid {
+			if changed && brandID.Valid {
 				// Read under the lock SetClientBrand took, so it is the brand just given.
-				brand, setErr = database.GetBrandByID(r.Context(), tx, brandId.Int64)
+				brand, setErr = database.GetBrandByID(r.Context(), tx, brandID.Int64)
 				if setErr != nil {
 					return errs.Wrap(setErr, "database error getting the brand given to the client")
 				}

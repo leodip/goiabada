@@ -73,7 +73,7 @@ func TestHandleAuditLogsGet_TheUserFilterReachesTheReadWithTheOthers(t *testing.
 
 // A userId that is not a positive integer is refused rather than ignored: ignoring it would list
 // every user's events under a filter the caller believes is set (#780 decision 3).
-func TestHandleAuditLogsGet_AUserIdThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
+func TestHandleAuditLogsGet_AUserIDThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
 	for _, value := range []string{
 		"", // present but empty: a filter the caller set, not an absent one
 		"abc",
@@ -124,13 +124,13 @@ func TestHandleAuditLogsGet_EveryEntryAnswersItsUserColumns(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	require.Len(t, body.AuditLogs, 4)
 
-	wantUserIds := []any{float64(42), float64(42), nil, nil}
-	wantLoggedInUserIds := []any{float64(7), nil, float64(7), nil}
+	wantUserIDs := []any{float64(42), float64(42), nil, nil}
+	wantLoggedInUserIDs := []any{float64(7), nil, float64(7), nil}
 	for i, entry := range body.AuditLogs {
 		assert.Contains(t, entry, "userId", "entry %d carries userId, null or not", i)
 		assert.Contains(t, entry, "loggedInUserId", "entry %d carries loggedInUserId, null or not", i)
-		assert.Equal(t, wantUserIds[i], entry["userId"], "entry %d's userId", i)
-		assert.Equal(t, wantLoggedInUserIds[i], entry["loggedInUserId"], "entry %d's loggedInUserId", i)
+		assert.Equal(t, wantUserIDs[i], entry["userId"], "entry %d's userId", i)
+		assert.Equal(t, wantLoggedInUserIDs[i], entry["loggedInUserId"], "entry %d's loggedInUserId", i)
 	}
 }
 

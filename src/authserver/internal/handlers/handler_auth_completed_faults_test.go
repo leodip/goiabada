@@ -68,7 +68,7 @@ func newCompletedFixtureWith(t *testing.T, authContext *ceremony.AuthContext, le
 		permissionChecker:  f.permissionChecker,
 		legalDocuments:     legalDocuments,
 	})
-	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	f.req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), completedSessionIdentifier))
 	f.ceremonyStore.On("GetAuthContext", f.req).Return(authContext, nil).Once()
@@ -79,10 +79,10 @@ func newCompletedFixtureWith(t *testing.T, authContext *ceremony.AuthContext, le
 // credential, and its user is user 1.
 func ssoCeremony(scope string) *ceremony.AuthContext {
 	return &ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
+		CeremonyID: testCeremonyID,
 		AuthState:  ceremony.AuthStateAuthenticationCompleted,
-		ClientId:   "test-client",
-		UserId:     1,
+		ClientID:   "test-client",
+		UserID:     1,
 		Scope:      scope,
 	}
 }
@@ -131,7 +131,7 @@ func TestMissingSettings_AuthCompletedAnswersBeforeReadingItsCeremony(t *testing
 	database := datamocks.NewDatabase(t)
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyID, nil)
 	rr := httptest.NewRecorder()
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
@@ -324,7 +324,7 @@ func TestHandleAuthCompletedGet_TheStoredConsentDecidesAManageAccountScope(t *te
 			f.handler.ServeHTTP(f.rr, f.req)
 
 			assert.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testBaseURL+tc.wantStep+"?ceremony="+testCeremonyId, f.rr.Header().Get("Location"))
+			assert.Equal(t, testBaseURL+tc.wantStep+"?ceremony="+testCeremonyID, f.rr.Header().Get("Location"))
 			f.ceremonyStore.AssertExpectations(t)
 			f.database.AssertExpectations(t)
 		})
@@ -342,7 +342,7 @@ func TestHandleAuthCompletedGet_TheStoredConsentDecidesAManageAccountScope(t *te
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, f.rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, f.rr.Header().Get("Location"))
 		f.database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything)
 	})
@@ -379,10 +379,10 @@ func TestHandleAuthCompletedGet_ABoundSessionWithNoAuthTimeIsRefused(t *testing.
 	t.Run("create arm", func(t *testing.T) {
 		passwordAt := time.Date(2026, 10, 14, 8, 30, 0, 0, time.UTC)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid",
 			AuthMethods:         "pwd",
 			AuthenticatedAt:     &passwordAt,

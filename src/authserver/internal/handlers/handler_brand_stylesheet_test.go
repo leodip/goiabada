@@ -126,9 +126,9 @@ func kitBrand(theme string, corners record.BrandCorners, font record.BrandFont) 
 }
 
 // brandStylesheetPath is a brand's stylesheet path as the pages link it, fingerprint included.
-func brandStylesheetPath(t *testing.T, brandId int64, theme string) string {
+func brandStylesheetPath(t *testing.T, brandID int64, theme string) string {
 	t.Helper()
-	path, err := brandthemes.StylesheetPath(themedBrand(brandId, theme), brandasset.Slots{})
+	path, err := brandthemes.StylesheetPath(themedBrand(brandID, theme), brandasset.Slots{})
 	require.NoError(t, err)
 	return path
 }
@@ -244,7 +244,7 @@ func TestHandleBrandStylesheetGet_UnknownBrandIsNotFound(t *testing.T) {
 }
 
 // An id that names no brand at all is not looked up.
-func TestHandleBrandStylesheetGet_MalformedIdIsNotFound(t *testing.T) {
+func TestHandleBrandStylesheetGet_MalformedIDIsNotFound(t *testing.T) {
 	for _, id := range []string{"", "abc", "-1", "0", "7x", "99999999999999999999"} {
 		t.Run(id, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)

@@ -134,22 +134,22 @@ func buildAuthLevel2Get(d authLevel2GetDeps) http.HandlerFunc {
 		d.pageRenderer, d.ceremonyStore, authflow.NewLevel2Selection(d.database))
 }
 
-type authOtpGetDeps struct {
+type authOTPGetDeps struct {
 	pageRenderer       PageRenderer
 	ceremonyStore      CeremonyStore
 	database           *datamocks.Database
-	otpSecretGenerator OtpSecretGenerator
+	otpSecretGenerator OTPSecretGenerator
 	auditLogger        AuditLogger
 }
 
-func buildAuthOtpGet(d authOtpGetDeps) http.HandlerFunc {
-	return HandleAuthOtpGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+func buildAuthOTPGet(d authOTPGetDeps) http.HandlerFunc {
+	return HandleAuthOTPGet(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		d.pageRenderer, d.ceremonyStore, authflow.NewOTPPrompt(d.database, d.otpSecretGenerator))
 }
 
-// authOtpPostDeps.credentialFailures left out records nothing (noCredentialFailures), and
+// authOTPPostDeps.credentialFailures left out records nothing (noCredentialFailures), and
 // notifier left out sends nothing (noNotices).
-type authOtpPostDeps struct {
+type authOTPPostDeps struct {
 	pageRenderer       PageRenderer
 	ceremonyStore      CeremonyStore
 	database           *datamocks.Database
@@ -158,8 +158,8 @@ type authOtpPostDeps struct {
 	notifier           AccountNotifier
 }
 
-func buildAuthOtpPost(d authOtpPostDeps) http.HandlerFunc {
-	return HandleAuthOtpPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
+func buildAuthOTPPost(d authOTPPostDeps) http.HandlerFunc {
+	return HandleAuthOTPPost(testCeremonyBoundary(d.pageRenderer, d.ceremonyStore, d.auditLogger),
 		d.pageRenderer, d.ceremonyStore, credentialFailuresOrNone(d.credentialFailures),
 		authflow.NewOTPSubmission(d.database, d.auditLogger, testDataCipher), notifierOrNone(d.notifier))
 }
@@ -298,7 +298,7 @@ func credentialFailuresOrNone(credentialFailures CredentialFailureRecorder) Cred
 
 // legalDocumentsPort is the legal documents a step asks what a user owes.
 type legalDocumentsPort interface {
-	Owed(ctx context.Context, client *record.Client, userId int64) ([]legaldocuments.InEffect, error)
+	Owed(ctx context.Context, client *record.Client, userID int64) ([]legaldocuments.InEffect, error)
 }
 
 // noLegalDocumentsOwed owes nothing, for the builders whose test is about something else.

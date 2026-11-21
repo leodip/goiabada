@@ -49,12 +49,12 @@ type usersCrudDatabase interface {
 	accountOTPDatabase
 	revocation.Database
 
-	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
-	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
+	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userID int64, expected bool, desired bool) (bool, error)
 }
 
 // HandleUserGet - GET /api/v1/admin/users/{id}
@@ -65,20 +65,20 @@ func HandleUserGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -111,13 +111,13 @@ func HandleUserPasswordPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -137,7 +137,7 @@ func HandleUserPasswordPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -238,7 +238,7 @@ func HandleUserPasswordPut(
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -270,13 +270,13 @@ func HandleUserOTPPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -296,7 +296,7 @@ func HandleUserOTPPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -346,7 +346,7 @@ func HandleUserOTPPut(
 		})
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -632,7 +632,7 @@ func renderSetupEmail(r *http.Request, pageRenderer PageRenderer,
 	return &emaildelivery.SendEmailInput{
 		To:       newUser.Email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}, nil
 }
 
@@ -653,13 +653,13 @@ func HandleUserEnabledPut(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -673,7 +673,7 @@ func HandleUserEnabledPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -732,26 +732,26 @@ func HandleUserEnabledPut(
 			// committed while this waited for the row (#796 decision 1). A user deleted before the
 			// write is answered 404 with nothing written (#796 decision 3).
 			notice := userWideNotice(settings, user)
-			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", notice, func(tx *sql.Tx) error {
+			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userID, "", notice, func(tx *sql.Tx) error {
 				administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 				if lockErr != nil {
 					return lockErr
 				}
-				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
+				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userID)
 				if lockedErr != nil {
 					return errs.Wrap(lockedErr, "unable to read the user under its lock")
 				}
 				if locked == nil {
 					return errAccountGone
 				}
-				holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
+				holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userID)
 				if readErr != nil {
 					return readErr
 				}
 				if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 					return decideErr
 				}
-				flipped, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
+				flipped, setErr := database.TrySetUserEnabled(r.Context(), tx, userID, true, false)
 				if setErr != nil {
 					return setErr
 				}
@@ -782,14 +782,14 @@ func HandleUserEnabledPut(
 			// enabled, whose request keeps its answer and event (#796 decision 3). Safe to rerun:
 			// the compare-and-set asks the row again.
 			err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
+				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userID)
 				if lockedErr != nil {
 					return errs.Wrap(lockedErr, "unable to read the user under its lock")
 				}
 				if locked == nil {
 					return errAccountGone
 				}
-				_, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, false, true)
+				_, setErr := database.TrySetUserEnabled(r.Context(), tx, userID, false, true)
 				return setErr
 			})
 		} else {
@@ -812,19 +812,19 @@ func HandleUserEnabledPut(
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
 		// fires for every successful request, including the ones that revoke nothing.
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserDetails, map[string]interface{}{
-			"user_id":        userId,
+			"user_id":        userID,
 			"logged_in_user": loggedInUser,
 		})
 
 		// Only on a real disable transition, and only after its commit.
 		if transitioned {
-			revocation.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
+			revocation.LogRevokedUserAuthState(r.Context(), auditLogger, userID,
 				revocation.ReasonAccountDisabled, loggedInUser, result)
 			logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 		}
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -858,20 +858,20 @@ func HandleUserDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if user exists before deleting
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -914,26 +914,26 @@ func HandleUserDelete(
 			if lockErr != nil {
 				return lockErr
 			}
-			locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
+			locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userID)
 			if lockedErr != nil {
 				return errs.Wrap(lockedErr, "unable to read the user under its lock")
 			}
 			if locked == nil {
 				return errAccountGone
 			}
-			holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
+			holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userID)
 			if readErr != nil {
 				return readErr
 			}
 			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 				return decideErr
 			}
-			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, userId, locked.Subject,
+			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, userID, locked.Subject,
 				sessionLive(settings))
 			if collectErr != nil {
 				return collectErr
 			}
-			if deleteErr := database.DeleteUser(r.Context(), tx, userId); deleteErr != nil {
+			if deleteErr := database.DeleteUser(r.Context(), tx, userID); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the user")
 			}
 			if leaveErr := administrators.leavesAnAdministrator(r.Context()); leaveErr != nil {
@@ -973,7 +973,7 @@ func HandleUserDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedUser, map[string]interface{}{
-			"user_id":        userId,
+			"user_id":        userID,
 			"logged_in_user": loggedInUser,
 		})
 		logoutTokens.Send(r.Context(), settings.Issuer, deliveries)

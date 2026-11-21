@@ -32,7 +32,7 @@ import (
 // The pages, relative to the repository root.
 const (
 	promptPage    = "site/src/content/docs/concepts/prompt.mdx"
-	acrAndAmrPage = "site/src/content/docs/concepts/acr-and-amr.mdx"
+	acrAndAMRPage = "site/src/content/docs/concepts/acr-and-amr.mdx"
 )
 
 // conceptSection is one section of a page: the page, and its heading line as written.
@@ -40,7 +40,7 @@ type conceptSection struct{ page, heading string }
 
 var (
 	silentChecksSection = conceptSection{promptPage, "## The silent checks"}
-	signInLevelsSection = conceptSection{acrAndAmrPage, "## A sign-in with no session"}
+	signInLevelsSection = conceptSection{acrAndAMRPage, "## A sign-in with no session"}
 )
 
 // silentRefusalWorlds is one prompt=none request per refusal, in the order decideSilentAuthentication
@@ -56,9 +56,9 @@ func silentRefusalWorlds() []silentWorld {
 		subject:            "sub-1",
 		hint:               "sub-2",
 		target:             record.ACRLevel2Mandatory,
-		sessionAcr:         record.ACRLevel1,
-		sessionOtpGen:      1,
-		userOtpGen:         2,
+		sessionACR:         record.ACRLevel1,
+		sessionOTPGen:      1,
+		userOTPGen:         2,
 		otpEnabled:         false,
 		effectiveScope:     "",
 		consentRequired:    true,
@@ -85,13 +85,13 @@ func silentRefusalWorlds() []silentWorld {
 	lowerLevel.hint = "sub-1"
 
 	noAuthenticator := lowerLevel
-	noAuthenticator.sessionAcr = record.ACRLevel2Mandatory
+	noAuthenticator.sessionACR = record.ACRLevel2Mandatory
 
 	authenticatorChanged := noAuthenticator
 	authenticatorChanged.otpEnabled = true
 
 	noScope := authenticatorChanged
-	noScope.userOtpGen = noScope.sessionOtpGen
+	noScope.userOTPGen = noScope.sessionOTPGen
 
 	owesALegalDocument := noScope
 	owesALegalDocument.effectiveScope = "openid profile"
@@ -146,7 +146,7 @@ type signInLevel struct {
 }
 
 // signInLevels is, for every level and both answers to "has the user an authenticator", what a
-// sign-in with no session ends with: the acr is the target, as SetAcrLevel writes it with no
+// sign-in with no session ends with: the acr is the target, as SetACRLevel writes it with no
 // session, and the amr is pwd, with otp when the step-up rule sends the ceremony to level 2 and
 // decideLevel2Arm asks for a code there.
 func signInLevels(t *testing.T) []signInLevel {
@@ -155,7 +155,7 @@ func signInLevels(t *testing.T) []signInLevel {
 	for _, level := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory} {
 		for _, userHasOTP := range []bool{false, true} {
 			var authContext ceremony.AuthContext
-			if err := authContext.SetAcrLevel(level, nil); err != nil {
+			if err := authContext.SetACRLevel(level, nil); err != nil {
 				t.Fatalf("setting the acr for %s: %v", level, err)
 			}
 			amr := `["pwd"]`
@@ -172,7 +172,7 @@ func signInLevels(t *testing.T) []signInLevel {
 					amr = `["pwd", "otp"]`
 				}
 			}
-			levels = append(levels, signInLevel{level, userHasOTP, authContext.AcrLevel.String(), amr})
+			levels = append(levels, signInLevel{level, userHasOTP, authContext.ACRLevel.String(), amr})
 		}
 	}
 	return levels

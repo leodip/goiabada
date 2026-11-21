@@ -128,7 +128,7 @@ func TestValidateTokenRequest_RefreshGrant_ATokenOfAnEarlierIssuer(t *testing.T)
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{Issuer: currentIssuer},
 					&ValidateTokenRequestInput{
 						GrantType:    "refresh_token",
-						ClientId:     clientIdentifier,
+						ClientID:     clientIdentifier,
 						RefreshToken: "the_refresh_token",
 					})
 
@@ -186,7 +186,7 @@ func TestValidateTokenRequest_RefreshGrant_ARotatedTokenOfAnEarlierIssuerGoesOnT
 
 	capture := logtest.CaptureSlog(t)
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{Issuer: currentIssuer},
-		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientId: "owner", RefreshToken: "the_refresh_token"})
+		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientID: "owner", RefreshToken: "the_refresh_token"})
 
 	require.NoError(t, err)
 	grant := grantAs[*RefreshTokenGrant](t, result)

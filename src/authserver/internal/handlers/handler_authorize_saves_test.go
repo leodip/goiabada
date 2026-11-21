@@ -121,7 +121,7 @@ func TestHandleAuthorizeGet_ARefusalWritesNoAuthContext(t *testing.T) {
 // Every exit of /auth/authorize that saves the auth context saves it once, with the state that exit
 // declares (#436). Before this change each of them was the third save of the request, after two that
 // stored `initial`. The prompt=none exit, the sixth that saves, is pinned by the prompt=none cases in
-// TestHandleAuthorizeGet_IdTokenHint, which hold it to one save carrying ready_to_issue_code.
+// TestHandleAuthorizeGet_IDTokenHint, which hold it to one save carrying ready_to_issue_code.
 //
 // Every save is recorded rather than matched, so a second save of any shape fails the count, and
 // the one save is asserted to carry the whole request as well as its state: the request fields are
@@ -249,22 +249,22 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rr.Code)
 			require.Len(t, saves, 1, "each exit saves the auth context exactly once")
 			saved := saves[0]
-			assert.Equal(t, saved.CeremonyId, assertStepLocation(t, rr.Header().Get("Location"), tc.wantLocation),
+			assert.Equal(t, saved.CeremonyID, assertStepLocation(t, rr.Header().Get("Location"), tc.wantLocation),
 				"the redirect names the ceremony this request just saved")
 			assert.Equal(t, tc.wantState, saved.AuthState)
 			assert.Equal(t, tc.wantDeferred, saved.DeferredErrorCode)
 
-			assert.Len(t, saved.CeremonyId, ceremony.IdLength)
-			assert.Equal(t, "test-client", saved.ClientId)
+			assert.Len(t, saved.CeremonyID, ceremony.IDLength)
+			assert.Equal(t, "test-client", saved.ClientID)
 			assert.Equal(t, "https://example.com", saved.RedirectURI)
 			assert.Equal(t, "code", saved.ResponseType)
 			assert.Equal(t, "openid", saved.Scope)
 			assert.Equal(t, "openid", saved.RequestedScope, "what a restart puts Scope back to")
 			assert.Equal(t, "the-state", saved.State)
 			assert.Equal(t, "the-nonce", saved.Nonce)
-			assert.Equal(t, tc.hint, saved.IdTokenHintSub)
+			assert.Equal(t, tc.hint, saved.IDTokenHintSub)
 			if !tc.scopeInvalid {
-				assert.Equal(t, record.ACRLevel1.String(), saved.TargetAcrLevel,
+				assert.Equal(t, record.ACRLevel1.String(), saved.TargetACRLevel,
 					"the target is fixed before the exit saves")
 			}
 

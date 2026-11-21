@@ -30,7 +30,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Client credentials flow not enabled", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "secret",
 		}
 
@@ -57,7 +57,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Public client not eligible for client credentials", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "secret",
 		}
 
@@ -85,7 +85,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Missing client secret", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType: "client_credentials",
-			ClientId:  "client1",
+			ClientID:  "client1",
 			// ClientSecret is intentionally left empty
 		}
 
@@ -122,7 +122,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:permission",
 		}
@@ -167,7 +167,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "invalid_secret",
 		}
 
@@ -206,7 +206,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource1:read resource2:write",
 		}
@@ -253,7 +253,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "invalid_scope",
 		}
@@ -295,7 +295,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:read",
 		}
@@ -340,7 +340,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "openid profile",
 		}
@@ -382,7 +382,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "non_existent_resource:read",
 		}
@@ -425,7 +425,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:non_existent_permission",
 		}
@@ -469,7 +469,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource1:read resource2:write resource3:delete",
 		}
@@ -578,7 +578,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "cc_client",
+			ClientID:     "cc_client",
 			ClientSecret: "valid_secret",
 			Scope:        scope,
 		})
@@ -845,7 +845,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
-				ClientId:     "cc_client",
+				ClientID:     "cc_client",
 				ClientSecret: "valid_secret",
 				Scope:        "billing-api:read",
 			})
@@ -943,7 +943,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 			// Scope deliberately omitted, which is what selects the expansion branch.
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
-				ClientId:     "cc_client",
+				ClientID:     "cc_client",
 				ClientSecret: "valid_secret",
 			})
 
@@ -978,7 +978,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothing
 
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "client_credentials",
-		ClientId:     "cc_client",
+		ClientID:     "cc_client",
 		ClientSecret: "valid_secret",
 	})
 

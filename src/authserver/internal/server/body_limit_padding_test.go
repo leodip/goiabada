@@ -60,7 +60,7 @@ type readCount struct {
 
 // newPaddingTestServer runs the real initMiddleware and initRoutes behind a listener. Outside the
 // root chain, a wrapper counts what is read from the request body before the handler returns, and
-// places the decoded bearer token where JwtAuthorizationHeaderToContext would: signature
+// places the decoded bearer token where JWTAuthorizationHeaderToContext would: signature
 // validation is not what these cases claim.
 func newPaddingTestServer(t *testing.T, database *datamocks.Database) (*httptest.Server, <-chan readCount) {
 	t.Helper()

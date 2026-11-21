@@ -40,7 +40,7 @@ func forgotPasswordLink(t *testing.T, browser *http.Client, authorizeURL string)
 	link, err := url.Parse(href)
 	require.NoError(t, err)
 	ceremonyId := link.Query().Get(ceremony.QueryParameter)
-	require.True(t, ceremony.IsWellFormedId(ceremonyId), "the link names the sign-in: %s", href)
+	require.True(t, ceremony.IsWellFormedID(ceremonyId), "the link names the sign-in: %s", href)
 	return appConfig.AuthServer.BaseURL + href, ceremonyId
 }
 
@@ -127,7 +127,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 	})
 
 	t.Run("a sign-in the browser does not hold", func(t *testing.T) {
-		page := loadPage(t, browser, withCeremonyParameter(t, forgotURL, ceremony.NewId()))
+		page := loadPage(t, browser, withCeremonyParameter(t, forgotURL, ceremony.NewID()))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -196,7 +196,7 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 	})
 
 	t.Run("a sign-in the browser does not hold", func(t *testing.T) {
-		page := loadPage(t, browser, withCeremonyParameter(t, registerURL, ceremony.NewId()))
+		page := loadPage(t, browser, withCeremonyParameter(t, registerURL, ceremony.NewID()))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")

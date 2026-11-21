@@ -17,7 +17,7 @@ import (
 // settingsDatabase is what the settings middleware needs: the settings row it puts on every
 // request's context.
 type settingsDatabase interface {
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 }
 
 // Settings puts the settings row on the request's context. A failure to read it is
@@ -36,12 +36,12 @@ func Settings(database settingsDatabase, faults ServerFaults) func(next http.Han
 				// reads. The sentence is unchanged; the log line is decision 9's shape, with the
 				// stack riding inside the error attribute rather than formatted into the message
 				// (#279).
-				requestId := requestid.FromContext(r.Context())
+				requestID := requestid.FromContext(r.Context())
 				// No request_id attribute: the installed handler takes it off the context this
 				// call passes it (#320 decision 2). requestId is still read for the body below,
 				// which is what gives whoever hit this something to quote to an operator.
 				slog.ErrorContext(r.Context(), "unable to load the settings", "error", err)
-				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", requestId), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: %v", requestID), http.StatusInternalServerError)
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(reqctx.WithSettings(ctx, settings)))

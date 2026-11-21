@@ -52,7 +52,7 @@ func (s *recordedLogoutTokens) toldClientIDs() map[int64]bool {
 	defer s.mu.Unlock()
 	told := map[int64]bool{}
 	for _, delivery := range s.deliveries {
-		told[delivery.ClientId] = true
+		told[delivery.ClientID] = true
 	}
 	return told
 }
@@ -63,7 +63,7 @@ func (s *recordedLogoutTokens) toldAbout(clientID int64, subject string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, delivery := range s.deliveries {
-		if delivery.ClientId == clientID && delivery.Subject == subject {
+		if delivery.ClientID == clientID && delivery.Subject == subject {
 			return true
 		}
 	}

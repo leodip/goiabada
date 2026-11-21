@@ -25,7 +25,7 @@ import (
 // Every refusal names both parameters, whichever was short, so the client signs in once and meets
 // both.
 //
-// It reads the token JwtAuthorizationHeaderToContext stored, after RequireValidSession has judged
+// It reads the token JWTAuthorizationHeaderToContext stored, after RequireValidSession has judged
 // it live, and is mounted after RequireAdminConsoleClient on the download, so another client's
 // token is told the client check's answer and is never asked to sign the user in again. now is the
 // clock, read on every request. The sentence is English, as every bearer refusal is.

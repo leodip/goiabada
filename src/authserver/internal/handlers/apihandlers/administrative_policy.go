@@ -73,7 +73,7 @@ const (
 // permissions.AdministrativePermissions's port. Every handler a ceiling guards names it in its own
 // port.
 type administrativePolicyDatabase interface {
-	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 }
 
@@ -81,22 +81,22 @@ type administrativePolicyDatabase interface {
 // or a group's deletion: the administrative set, and what the groups hold.
 type administrativeGroupPolicyDatabase interface {
 	administrativePolicyDatabase
-	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
+	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.GroupPermission, error)
 }
 
 // userGroupsPolicyDatabase is what the policy reads to judge a save of a user's groups: beside
 // what the groups hold, the memberships the user has.
 type userGroupsPolicyDatabase interface {
 	administrativeGroupPolicyDatabase
-	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserGroup, error)
 }
 
 // userTargetPolicyDatabase is what the policy reads to judge a write on a user: the administrative
 // set, the permissions the user holds directly, and those its groups hold.
 type userTargetPolicyDatabase interface {
 	administrativeGroupPolicyDatabase
-	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
-	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserGroup, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserPermission, error)
 }
 
 // callerHoldsManage reports whether the request's validated token carries authserver:manage.
@@ -108,19 +108,19 @@ func callerHoldsManage(r *http.Request) bool {
 // administratorChangeRefusal is what one refusal records beside the caller and the route.
 type administratorChangeRefusal struct {
 	ceiling string
-	// targetKind and targetId name the user, group, client or resource the request acts on. A
+	// targetKind and targetID name the user, group, client or resource the request acts on. A
 	// request with no target, a settings write, leaves targetKind empty and the record names neither.
 	targetKind string
-	targetId   int64
+	targetID   int64
 	// permissionIds is the administrative permissions whose change caused a grant refusal, or
 	// whose description a target refusal of a resource's permissions save would have changed.
-	permissionIds []int64
+	permissionIDs []int64
 	// groupIds is the administrative groups whose membership change caused a grant refusal, when
 	// the target is the user moved into or out of them.
-	groupIds []int64
+	groupIDs []int64
 	// resourceIds is the resources whose listing on a client's introspection resources caused a
 	// grant refusal: the authserver resource, the one listing reserved to authserver:manage.
-	resourceIds []int64
+	resourceIDs []int64
 }
 
 // refuseAdministratorChange answers a request the policy refused: one administrator_change_refused
@@ -140,19 +140,19 @@ func refuseAdministratorChange(w http.ResponseWriter, r *http.Request, auditLogg
 	}
 	if refusal.targetKind != "" {
 		details["target_kind"] = refusal.targetKind
-		details["target_id"] = refusal.targetId
+		details["target_id"] = refusal.targetID
 	}
 	if refusal.targetKind == targetKindUser {
-		details["user_id"] = refusal.targetId
+		details["user_id"] = refusal.targetID
 	}
-	if refusal.permissionIds != nil {
-		details["permission_ids"] = refusal.permissionIds
+	if refusal.permissionIDs != nil {
+		details["permission_ids"] = refusal.permissionIDs
 	}
-	if refusal.groupIds != nil {
-		details["group_ids"] = refusal.groupIds
+	if refusal.groupIDs != nil {
+		details["group_ids"] = refusal.groupIDs
 	}
-	if refusal.resourceIds != nil {
-		details["resource_ids"] = refusal.resourceIds
+	if refusal.resourceIDs != nil {
+		details["resource_ids"] = refusal.resourceIDs
 	}
 	auditLogger.Log(r.Context(), audit.EventAdministratorChangeRefused, details)
 
@@ -181,7 +181,7 @@ func routePattern(r *http.Request) string {
 // refused, but the set is read for it too, before the transaction, so that a change is never
 // committed without knowing which records it owes (#402 decision 6).
 func grantCeilingAllows(w http.ResponseWriter, r *http.Request, database administrativePolicyDatabase, auditLogger AuditLogger,
-	targetKind string, targetId int64, wanted, expected []int64) (map[int64]string, bool) {
+	targetKind string, targetID int64, wanted, expected []int64) (map[int64]string, bool) {
 	changed := grantChange(wanted, expected)
 	if len(changed) == 0 {
 		return nil, true
@@ -189,16 +189,16 @@ func grantCeilingAllows(w http.ResponseWriter, r *http.Request, database adminis
 
 	administrative, err := permissions.AdministrativePermissions(r.Context(), database, nil)
 	if err != nil {
-		writeInternalServerError(w, r, err, "target_kind", targetKind, "target_id", targetId)
+		writeInternalServerError(w, r, err, "target_kind", targetKind, "target_id", targetID)
 		return nil, false
 	}
 	if callerHoldsManage(r) {
 		return administrative, true
 	}
 	var causes []int64
-	for _, permissionId := range changed {
-		if administrative[permissionId] != "" {
-			causes = append(causes, permissionId)
+	for _, permissionID := range changed {
+		if administrative[permissionID] != "" {
+			causes = append(causes, permissionID)
 		}
 	}
 	if len(causes) == 0 {
@@ -208,8 +208,8 @@ func grantCeilingAllows(w http.ResponseWriter, r *http.Request, database adminis
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:       ceilingGrant,
 		targetKind:    targetKind,
-		targetId:      targetId,
-		permissionIds: causes,
+		targetID:      targetID,
+		permissionIDs: causes,
 	})
 	return nil, false
 }
@@ -225,14 +225,14 @@ const (
 // granted and one for those it revoked, each only when there are any. administrative is the set
 // grantCeilingAllows handed back.
 func recordAdministrativePermissionChanges(r *http.Request, auditLogger AuditLogger, administrative map[int64]string,
-	targetKind string, targetId int64, granted, revoked []int64) {
+	targetKind string, targetID int64, granted, revoked []int64) {
 	for _, direction := range []struct {
 		change        string
-		permissionIds []int64
+		permissionIDs []int64
 	}{{changeGranted, granted}, {changeRevoked, revoked}} {
 		var identifiers []string
-		for _, permissionId := range direction.permissionIds {
-			if identifier := administrative[permissionId]; identifier != "" {
+		for _, permissionID := range direction.permissionIDs {
+			if identifier := administrative[permissionID]; identifier != "" {
 				identifiers = append(identifiers, identifier)
 			}
 		}
@@ -242,12 +242,12 @@ func recordAdministrativePermissionChanges(r *http.Request, auditLogger AuditLog
 		details := map[string]interface{}{
 			"change":                 direction.change,
 			"target_kind":            targetKind,
-			"target_id":              targetId,
+			"target_id":              targetID,
 			"permission_identifiers": identifiers,
 			"logged_in_user":         callerSubject(r),
 		}
 		if targetKind == targetKindUser {
-			details["user_id"] = targetId
+			details["user_id"] = targetID
 		}
 		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, details)
 	}
@@ -289,15 +289,15 @@ func grantedAndRevoked(wanted, expected []int64) (granted, revoked []int64) {
 // administrative permissions it holds, each once, by id and by identifier.
 type administrativeGroup struct {
 	id            int64
-	permissionIds []int64
+	permissionIDs []int64
 	identifiers   []string
 }
 
 // administrativeGroups is which of groupIds hold an administrative permission, in groupIds' order,
 // each with what it holds of the administrative set. Read on tx, or outside any transaction when tx
 // is nil; a set of groups holding no grant at all reads nothing more.
-func administrativeGroups(ctx context.Context, database administrativeGroupPolicyDatabase, tx *sql.Tx, groupIds []int64) ([]administrativeGroup, error) {
-	grants, err := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIds)
+func administrativeGroups(ctx context.Context, database administrativeGroupPolicyDatabase, tx *sql.Tx, groupIDs []int64) ([]administrativeGroup, error) {
+	grants, err := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIDs)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the groups' permissions for the administrative policy")
 	}
@@ -320,14 +320,14 @@ func administrativeGroups(ctx context.Context, database administrativeGroupPolic
 			group = &administrativeGroup{id: grant.GroupID}
 			held[grant.GroupID] = group
 		}
-		if !slices.Contains(group.permissionIds, grant.PermissionID) {
-			group.permissionIds = append(group.permissionIds, grant.PermissionID)
+		if !slices.Contains(group.permissionIDs, grant.PermissionID) {
+			group.permissionIDs = append(group.permissionIDs, grant.PermissionID)
 			group.identifiers = append(group.identifiers, identifier)
 		}
 	}
 	var groups []administrativeGroup
-	for _, groupId := range firstOccurrences(groupIds) {
-		if group := held[groupId]; group != nil {
+	for _, groupID := range firstOccurrences(groupIDs) {
+		if group := held[groupID]; group != nil {
 			groups = append(groups, *group)
 		}
 	}
@@ -336,28 +336,28 @@ func administrativeGroups(ctx context.Context, database administrativeGroupPolic
 
 // refusalCauses is the ids of groups and the administrative permissions they hold, each once, group
 // by group, as a grant refusal names them.
-func refusalCauses(groups []administrativeGroup) (groupIds, permissionIds []int64) {
+func refusalCauses(groups []administrativeGroup) (groupIDs, permissionIDs []int64) {
 	for _, group := range groups {
-		groupIds = append(groupIds, group.id)
-		for _, permissionId := range group.permissionIds {
-			if !slices.Contains(permissionIds, permissionId) {
-				permissionIds = append(permissionIds, permissionId)
+		groupIDs = append(groupIDs, group.id)
+		for _, permissionID := range group.permissionIDs {
+			if !slices.Contains(permissionIDs, permissionID) {
+				permissionIDs = append(permissionIDs, permissionID)
 			}
 		}
 	}
-	return groupIds, permissionIds
+	return groupIDs, permissionIDs
 }
 
 // recordMembershipChanges writes, after a committed change of a user's memberships and after its
 // own records, one administrative_permission_changed record per administrative group the user
 // joined (change granted) or left (change revoked), naming what the group holds of the set.
-func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userId int64, change string, groups []administrativeGroup) {
+func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userID int64, change string, groups []administrativeGroup) {
 	for _, group := range groups {
 		auditLogger.Log(r.Context(), audit.EventAdministrativePermissionChanged, map[string]interface{}{
 			"change":                 change,
 			"target_kind":            targetKindUser,
-			"target_id":              userId,
-			"user_id":                userId,
+			"target_id":              userID,
+			"user_id":                userID,
 			"group_id":               group.id,
 			"permission_identifiers": group.identifiers,
 			"logged_in_user":         callerSubject(r),
@@ -373,14 +373,14 @@ func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userId in
 // an authserver:manage caller is never refused, but what the groups hold is read for it too, before
 // the write, so that a change is never made without knowing which records it owes (#402 decision 6).
 func membershipCeilingAllows(w http.ResponseWriter, r *http.Request, database administrativeGroupPolicyDatabase, auditLogger AuditLogger,
-	userId int64, groupIds []int64) ([]administrativeGroup, bool) {
-	if len(groupIds) == 0 {
+	userID int64, groupIDs []int64) ([]administrativeGroup, bool) {
+	if len(groupIDs) == 0 {
 		return nil, true
 	}
 
-	groups, err := administrativeGroups(r.Context(), database, nil, groupIds)
+	groups, err := administrativeGroups(r.Context(), database, nil, groupIDs)
 	if err != nil {
-		writeInternalServerError(w, r, err, "user_id", userId, "group_ids", groupIds)
+		writeInternalServerError(w, r, err, "user_id", userID, "group_ids", groupIDs)
 		return nil, false
 	}
 	if len(groups) == 0 || callerHoldsManage(r) {
@@ -391,9 +391,9 @@ func membershipCeilingAllows(w http.ResponseWriter, r *http.Request, database ad
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:       ceilingGrant,
 		targetKind:    targetKindUser,
-		targetId:      userId,
-		permissionIds: causes,
-		groupIds:      causeGroups,
+		targetID:      userID,
+		permissionIDs: causes,
+		groupIDs:      causeGroups,
 	})
 	return nil, false
 }
@@ -406,30 +406,30 @@ func membershipCeilingAllows(w http.ResponseWriter, r *http.Request, database ad
 // that commits. Only the groups left that the user belongs to are judged, which bounds what the
 // policy reads by the user's memberships rather than by the length of the loaded list.
 func userGroupsCeilingAllows(w http.ResponseWriter, r *http.Request, database userGroupsPolicyDatabase, auditLogger AuditLogger,
-	userId int64, wanted, expected []int64) bool {
+	userID int64, wanted, expected []int64) bool {
 	if callerHoldsManage(r) {
 		return true
 	}
 
 	judged, left := grantedAndRevoked(wanted, expected)
 	if len(left) > 0 {
-		stored, err := database.GetUserGroupsByUserID(r.Context(), nil, userId)
+		stored, err := database.GetUserGroupsByUserID(r.Context(), nil, userID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "unable to read the user's groups for the administrative policy"), "user_id", userId)
+			writeInternalServerError(w, r, errs.Wrap(err, "unable to read the user's groups for the administrative policy"), "user_id", userID)
 			return false
 		}
 		belongs := make(map[int64]bool, len(stored))
 		for _, membership := range stored {
 			belongs[membership.GroupID] = true
 		}
-		for _, groupId := range left {
-			if belongs[groupId] {
-				judged = append(judged, groupId)
+		for _, groupID := range left {
+			if belongs[groupID] {
+				judged = append(judged, groupID)
 			}
 		}
 	}
 
-	_, allowed := membershipCeilingAllows(w, r, database, auditLogger, userId, judged)
+	_, allowed := membershipCeilingAllows(w, r, database, auditLogger, userID, judged)
 	return allowed
 }
 
@@ -438,14 +438,14 @@ func userGroupsCeilingAllows(w http.ResponseWriter, r *http.Request, database us
 // deletion may go on, and when it may not it has answered the request. An authserver:manage caller
 // reads nothing here.
 func groupDeletionCeilingAllows(w http.ResponseWriter, r *http.Request, database administrativeGroupPolicyDatabase, auditLogger AuditLogger,
-	groupId int64) bool {
+	groupID int64) bool {
 	if callerHoldsManage(r) {
 		return true
 	}
 
-	groups, err := administrativeGroups(r.Context(), database, nil, []int64{groupId})
+	groups, err := administrativeGroups(r.Context(), database, nil, []int64{groupID})
 	if err != nil {
-		writeInternalServerError(w, r, err, "group_id", groupId)
+		writeInternalServerError(w, r, err, "group_id", groupID)
 		return false
 	}
 	if len(groups) == 0 {
@@ -456,8 +456,8 @@ func groupDeletionCeilingAllows(w http.ResponseWriter, r *http.Request, database
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:       ceilingGrant,
 		targetKind:    targetKindGroup,
-		targetId:      groupId,
-		permissionIds: causes,
+		targetID:      groupID,
+		permissionIDs: causes,
 	})
 	return false
 }
@@ -502,7 +502,7 @@ func backchannelLogoutURICeilingAllows(w http.ResponseWriter, r *http.Request, a
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingBackchannelLogoutURI,
 		targetKind: targetKindClient,
-		targetId:   client.ID,
+		targetID:   client.ID,
 	})
 	return false
 }
@@ -510,12 +510,12 @@ func backchannelLogoutURICeilingAllows(w http.ResponseWriter, r *http.Request, a
 // userIsAdministrator reports whether the user holds an administrative permission, directly or
 // through any of its groups. Read on tx, or outside any transaction when tx is nil; a user holding
 // no grant at all, directly or through a group, reads nothing more.
-func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase, tx *sql.Tx, userId int64) (bool, error) {
-	direct, err := database.GetUserPermissionsByUserID(ctx, tx, userId)
+func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase, tx *sql.Tx, userID int64) (bool, error) {
+	direct, err := database.GetUserPermissionsByUserID(ctx, tx, userID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's permissions for the administrative policy")
 	}
-	memberships, err := database.GetUserGroupsByUserID(ctx, tx, userId)
+	memberships, err := database.GetUserGroupsByUserID(ctx, tx, userID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's groups for the administrative policy")
 	}
@@ -524,11 +524,11 @@ func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase,
 		held = append(held, grant.PermissionID)
 	}
 	if len(memberships) > 0 {
-		groupIds := make([]int64, 0, len(memberships))
+		groupIDs := make([]int64, 0, len(memberships))
 		for _, membership := range memberships {
-			groupIds = append(groupIds, membership.GroupID)
+			groupIDs = append(groupIDs, membership.GroupID)
 		}
-		grants, groupErr := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIds)
+		grants, groupErr := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIDs)
 		if groupErr != nil {
 			return false, errs.Wrap(groupErr, "unable to read the user's groups' permissions for the administrative policy")
 		}
@@ -544,8 +544,8 @@ func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase,
 	if err != nil {
 		return false, err
 	}
-	for _, permissionId := range held {
-		if administrative[permissionId] != "" {
+	for _, permissionID := range held {
+		if administrative[permissionID] != "" {
 			return true, nil
 		}
 	}
@@ -565,14 +565,14 @@ func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase,
 // that caused it; this refuses what the grant ceiling lets through, such as granting an
 // administrator an ordinary permission or moving one into an ordinary group.
 func userTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database userTargetPolicyDatabase, auditLogger AuditLogger,
-	userId int64) bool {
+	userID int64) bool {
 	if callerHoldsManage(r) {
 		return true
 	}
 
-	administrator, err := userIsAdministrator(r.Context(), database, nil, userId)
+	administrator, err := userIsAdministrator(r.Context(), database, nil, userID)
 	if err != nil {
-		writeInternalServerError(w, r, err, "user_id", userId)
+		writeInternalServerError(w, r, err, "user_id", userID)
 		return false
 	}
 	if !administrator {
@@ -582,7 +582,7 @@ func userTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database us
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindUser,
-		targetId:   userId,
+		targetID:   userID,
 	})
 	return false
 }
@@ -596,14 +596,14 @@ func userTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database us
 // A save of the group's permissions meets the grant ceiling first. Deleting the group and changing
 // its members are the grant ceiling's alone, which refuses exactly the groups this would.
 func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database administrativeGroupPolicyDatabase, auditLogger AuditLogger,
-	groupId int64) bool {
+	groupID int64) bool {
 	if callerHoldsManage(r) {
 		return true
 	}
 
-	groups, err := administrativeGroups(r.Context(), database, nil, []int64{groupId})
+	groups, err := administrativeGroups(r.Context(), database, nil, []int64{groupID})
 	if err != nil {
-		writeInternalServerError(w, r, err, "group_id", groupId)
+		writeInternalServerError(w, r, err, "group_id", groupID)
 		return false
 	}
 	if len(groups) == 0 {
@@ -613,7 +613,7 @@ func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database a
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindGroup,
-		targetId:   groupId,
+		targetID:   groupID,
 	})
 	return false
 }
@@ -622,7 +622,7 @@ func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database a
 // administrative set and the permissions the client holds.
 type clientTargetPolicyDatabase interface {
 	administrativePolicyDatabase
-	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
+	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientPermission, error)
 }
 
 // clientIsAdministrator reports whether the client is an administrator: the admin console's own
@@ -687,7 +687,7 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.ID,
+		targetID:   client.ID,
 	})
 	return false
 }
@@ -697,7 +697,7 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 // resource's tokens.
 type clientCredentialsPolicyDatabase interface {
 	clientTargetPolicyDatabase
-	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 }
 
@@ -758,7 +758,7 @@ func clientCredentialsCeilingAllows(w http.ResponseWriter, r *http.Request, data
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.ID,
+		targetID:   client.ID,
 	})
 	return false
 }
@@ -778,8 +778,8 @@ func clientCredentialsCeilingAllows(w http.ResponseWriter, r *http.Request, data
 func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger,
 	client *record.Client, wanted []record.Resource, expected []int64) bool {
 	listed := make(map[int64]bool, len(expected))
-	for _, resourceId := range expected {
-		listed[resourceId] = true
+	for _, resourceID := range expected {
+		listed[resourceID] = true
 	}
 	var causes []int64
 	for _, resource := range wanted {
@@ -794,8 +794,8 @@ func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:     ceilingGrant,
 		targetKind:  targetKindClient,
-		targetId:    client.ID,
-		resourceIds: causes,
+		targetID:    client.ID,
+		resourceIDs: causes,
 	})
 	return false
 }
@@ -812,7 +812,7 @@ func allowanceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.ID,
+		targetID:   client.ID,
 	})
 	return false
 }
@@ -864,8 +864,8 @@ func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:       ceilingTarget,
 		targetKind:    targetKindResource,
-		targetId:      resource.ID,
-		permissionIds: causes,
+		targetID:      resource.ID,
+		permissionIDs: causes,
 	})
 	return false
 }

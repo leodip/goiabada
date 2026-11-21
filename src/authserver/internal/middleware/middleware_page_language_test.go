@@ -22,7 +22,7 @@ import (
 // once it has verified the password or adopted a session, else zero.
 type signInUser int64
 
-func (u signInUser) SignInUserId(*http.Request) int64 { return int64(u) }
+func (u signInUser) SignInUserID(*http.Request) int64 { return int64(u) }
 
 // When the page-language middleware cannot read the known user, it stops the page: 500 in
 // text/plain naming the request, the cause in the log and not in the response, and the page itself
@@ -44,7 +44,7 @@ func TestPageLanguage_ADatabaseFailureStopsThePage(t *testing.T) {
 			db.On("GetUserByID", mock.Anything, mock.Anything, int64(7)).Return(nil, cause).Once()
 
 			req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-			req = req.WithContext(reqctx.WithSessionUserId(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
+			req = req.WithContext(reqctx.WithSessionUserID(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
 			reached := false
 			rr := httptest.NewRecorder()
 			PageLanguage(tc.signIn, db)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -75,7 +75,7 @@ func TestPageLanguage_TheSessionsUserComesOffTheContext(t *testing.T) {
 		Return(&record.User{ID: 7, PageLanguage: "pt-BR"}, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-	req = req.WithContext(reqctx.WithSessionUserId(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
+	req = req.WithContext(reqctx.WithSessionUserID(reqctx.WithSessionIdentifier(req.Context(), "the-session"), 7))
 	var language string
 	PageLanguage(signInUser(0), db)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		language = i18n.CatalogTag(r.Context())

@@ -51,14 +51,14 @@ func (b *browserSession) SaveAuthContext(authContext *ceremony.AuthContext) erro
 }
 
 // ClearAuthContext is CeremonyStore.ClearAuthContext, a step's conditional clear.
-func (b *browserSession) ClearAuthContext(ceremonyId string) error {
-	return b.ceremonyStore.ClearAuthContext(b.w, b.r, ceremonyId)
+func (b *browserSession) ClearAuthContext(ceremonyID string) error {
+	return b.ceremonyStore.ClearAuthContext(b.w, b.r, ceremonyID)
 }
 
 // TakeRecoveryCodes is CeremonyStore.TakeRecoveryCodes, which takes the set of recovery codes off
 // the ceremony in one conditional write.
-func (b *browserSession) TakeRecoveryCodes(ceremonyId string) ([]string, error) {
-	return b.ceremonyStore.TakeRecoveryCodes(b.w, b.r, ceremonyId)
+func (b *browserSession) TakeRecoveryCodes(ceremonyID string) ([]string, error) {
+	return b.ceremonyStore.TakeRecoveryCodes(b.w, b.r, ceremonyID)
 }
 
 // AddAuthContext is CeremonyStore.AddAuthContext, /auth/authorize's save, which starts a ceremony
@@ -69,27 +69,27 @@ func (b *browserSession) AddAuthContext(authContext *ceremony.AuthContext) error
 
 // RegenerateSession is CeremonyStore.RegenerateSession, a step's conditional rotation of the browser
 // session's identifier.
-func (b *browserSession) RegenerateSession(ceremonyId string, userId int64) error {
-	return b.ceremonyStore.RegenerateSession(b.w, b.r, ceremonyId, userId)
+func (b *browserSession) RegenerateSession(ceremonyID string, userID int64) error {
+	return b.ceremonyStore.RegenerateSession(b.w, b.r, ceremonyID, userID)
 }
 
 // ConfirmCeremony is CeremonyStore.ConfirmCeremony, which writes nothing.
-func (b *browserSession) ConfirmCeremony(ceremonyId string) error {
-	return b.ceremonyStore.ConfirmCeremony(b.w, b.r, ceremonyId)
+func (b *browserSession) ConfirmCeremony(ceremonyID string) error {
+	return b.ceremonyStore.ConfirmCeremony(b.w, b.r, ceremonyID)
 }
 
 // RegenerateSessionAndBind is CeremonyStore.RegenerateSessionAndBind, the create arm's conditional
 // rotation, which binds the user session it started to the browser session and records the answer
 // the ceremony entered its password with.
-func (b *browserSession) RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string,
+func (b *browserSession) RegenerateSessionAndBind(ceremonyID string, userID int64, userSessionIdentifier string,
 	keepSignedIn *bool) error {
-	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyId, userId, userSessionIdentifier, keepSignedIn)
+	return b.ceremonyStore.RegenerateSessionAndBind(b.w, b.r, ceremonyID, userID, userSessionIdentifier, keepSignedIn)
 }
 
 // RecordKeepSignedIn is CeremonyStore.RecordKeepSignedIn, the reuse arm's conditional write of the
 // answer its ceremony entered the password with.
-func (b *browserSession) RecordKeepSignedIn(ceremonyId string, keepSignedIn *bool) error {
-	return b.ceremonyStore.RecordKeepSignedIn(b.w, b.r, ceremonyId, keepSignedIn)
+func (b *browserSession) RecordKeepSignedIn(ceremonyID string, keepSignedIn *bool) error {
+	return b.ceremonyStore.RecordKeepSignedIn(b.w, b.r, ceremonyID, keepSignedIn)
 }
 
 // Device is the browser this request comes from, as its device cookie and headers say.

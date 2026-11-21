@@ -88,10 +88,10 @@ type CredentialFailureRecorder interface {
 	RecordCredentialFailure(r *http.Request)
 }
 
-// OtpSecretGenerator mints a TOTP key URL for an enrolment about to be offered. The stored
+// OTPSecretGenerator mints a TOTP key URL for an enrolment about to be offered. The stored
 // credential itself belongs to internal/otpcredential; this is the stateless primitive that
 // produces the seed (#387).
-type OtpSecretGenerator interface {
+type OTPSecretGenerator interface {
 	GenerateKeyURL(email string, appName string) (string, error)
 }
 

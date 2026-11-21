@@ -23,10 +23,10 @@ import (
 type usersAttributesDatabase interface {
 	userTargetPolicyDatabase
 	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
-	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
-	GetUserAttributeByID(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error)
-	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeID int64) error
+	GetUserAttributeByID(ctx context.Context, tx *sql.Tx, userAttributeID int64) (*record.UserAttribute, error)
+	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserAttribute, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 }
 
@@ -38,20 +38,20 @@ func HandleUserAttributesGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if user exists
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -62,7 +62,7 @@ func HandleUserAttributesGet(
 		}
 
 		// Get user attributes
-		attributes, err := database.GetUserAttributesByUserID(r.Context(), nil, userId)
+		attributes, err := database.GetUserAttributesByUserID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -86,20 +86,20 @@ func HandleUserAttributeGet(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user attribute from database
-		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -225,13 +225,13 @@ func HandleUserAttributeUpdatePut(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -245,7 +245,7 @@ func HandleUserAttributeUpdatePut(
 		}
 
 		// Get existing attribute
-		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -331,20 +331,20 @@ func HandleUserAttributeDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if attribute exists before deleting
-		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -360,7 +360,7 @@ func HandleUserAttributeDelete(
 		}
 
 		// Delete attribute from database
-		err = database.DeleteUserAttribute(r.Context(), nil, attributeId)
+		err = database.DeleteUserAttribute(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -376,7 +376,7 @@ func HandleUserAttributeDelete(
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeleteUserAttribute, map[string]interface{}{
 			"user_id":           attribute.UserID,
-			"user_attribute_id": attributeId,
+			"user_attribute_id": attributeID,
 			"logged_in_user":    loggedInUser,
 		})
 

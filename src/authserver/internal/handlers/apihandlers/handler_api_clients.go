@@ -36,7 +36,7 @@ type clientsDatabase interface {
 	revocation.Database
 	clientTargetPolicyDatabase
 
-	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -44,23 +44,23 @@ type clientsDatabase interface {
 	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
-	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
-	DeleteClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) error
-	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error
-	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
-	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientID int64) error
+	DeleteClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) error
+	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIID int64) error
+	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIID int64) error
+	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginID int64) error
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
-	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
-	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
-	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
-	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
-	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
-	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error)
+	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientID int64, allowed bool) error
+	SetClientPublic(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
+	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientID int64, remember bool) error
+	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientID int64, uri string, sessionRequired bool) error
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientID int64, required bool) error
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientID int64, clientIdentifier string) (bool, error)
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
 
@@ -289,7 +289,7 @@ func writeSettingsRememberConsent(ctx context.Context, database clientsDatabase,
 // refusal is the *i18n.LocalizedError the save answers; a failed lookup is an error, never read as
 // "no clash".
 func checkClientIdentifierChange(ctx context.Context, database clientsDatabase, tx *sql.Tx,
-	validator *inputvalidation.IdentifierValidator, identifier string, clientId int64) error {
+	validator *inputvalidation.IdentifierValidator, identifier string, clientID int64) error {
 
 	if err := validator.Validate(identifier, true); err != nil {
 		return err
@@ -299,7 +299,7 @@ func checkClientIdentifierChange(ctx context.Context, database clientsDatabase, 
 	if err != nil {
 		return errs.Wrap(err, "database error checking client existence by identifier for update")
 	}
-	if existingClient != nil && existingClient.ID != clientId {
+	if existingClient != nil && existingClient.ID != clientID {
 		return i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil)
 	}
 
@@ -1371,7 +1371,7 @@ func HandleClientRedirectURIsPut(
 		}
 
 		redirectURIKey := func(ru record.RedirectURI) string { return strings.TrimSpace(ru.URI) }
-		redirectURIId := func(ru record.RedirectURI) int64 { return ru.ID }
+		redirectURIID := func(ru record.RedirectURI) int64 { return ru.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised callback and adding its replacement ends with both
@@ -1392,7 +1392,7 @@ func HandleClientRedirectURIsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.RedirectURIs, redirectURIKey, redirectURIId, normalized)
+			insert, remove := replaceSet(client.RedirectURIs, redirectURIKey, redirectURIID, normalized)
 			for _, rid := range remove {
 				if deleteErr := database.DeleteRedirectURI(r.Context(), tx, rid); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting redirect URI %d", rid)
@@ -1547,7 +1547,7 @@ func HandleClientWebOriginsPut(
 		// The stored value is already canonical, migration 000034 having repaired the rows
 		// written before this endpoint canonicalized, so it is keyed as it stands (#250).
 		webOriginKey := func(wo record.WebOrigin) string { return wo.Origin }
-		webOriginId := func(wo record.WebOrigin) int64 { return wo.ID }
+		webOriginID := func(wo record.WebOrigin) int64 { return wo.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised origin and adding its replacement ends with both
@@ -1570,7 +1570,7 @@ func HandleClientWebOriginsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.WebOrigins, webOriginKey, webOriginId, normalized)
+			insert, remove := replaceSet(client.WebOrigins, webOriginKey, webOriginID, normalized)
 			for _, wid := range remove {
 				if deleteErr := database.DeleteWebOrigin(r.Context(), tx, wid); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting web origin %d", wid)
@@ -1677,7 +1677,7 @@ func HandleClientTokensPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil))
 			return
 		}
-		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIDToken))
+		includeClaimsInIDToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIDToken))
 		if err != nil {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIDTokenInvalid, nil))
 			return
@@ -1688,7 +1688,7 @@ func HandleClientTokensPut(
 		client.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = includeClaimsInAccessToken.String()
-		client.IncludeOpenIDConnectClaimsInIDToken = includeClaimsInIdToken.String()
+		client.IncludeOpenIDConnectClaimsInIDToken = includeClaimsInIDToken.String()
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).
 		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {

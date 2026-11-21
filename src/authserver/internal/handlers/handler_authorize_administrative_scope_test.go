@@ -40,7 +40,7 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 		blockedPage  = "render the refusal interstitial"
 	)
 	const redirectURI = "https://legit.example/cb"
-	const sessionUserId = int64(77)
+	const sessionUserID = int64(77)
 
 	for _, tc := range []struct {
 		name       string
@@ -101,7 +101,7 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 			database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 				Return([]record.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&record.UserSession{ID: 1, UserID: sessionUserId}, nil).Maybe()
+				Return(&record.UserSession{ID: 1, UserID: sessionUserID}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(tc.hasSession).Maybe()
 
@@ -124,7 +124,7 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 					"client_identifier": "test-client",
 					"scopes":            []string{"authserver:manage"},
 					"checkpoint":        "authorize",
-					"user_id":           sessionUserId,
+					"user_id":           sessionUserID,
 				}).Return().Once()
 			}
 

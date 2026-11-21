@@ -29,9 +29,9 @@ import (
 type legalDocumentAppsDatabase interface {
 	legalDocumentsDatabase
 	CreateLegalDocumentClient(ctx context.Context, tx *sql.Tx, link *record.LegalDocumentClient) error
-	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientId int64) error
-	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64, appliesToAllApps bool) error
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientID int64) error
+	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentID int64, appliesToAllApps bool) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
 }
 
 // HandleLegalDocumentAppsPut - PUT /api/v1/admin/legal-documents/{id}/apps
@@ -84,11 +84,11 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 			return
 		}
 
-		for _, clientId := range wanted {
-			client, err := database.GetClientByID(r.Context(), nil, clientId)
+		for _, clientID := range wanted {
+			client, err := database.GetClientByID(r.Context(), nil, clientID)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for legal document apps"),
-					"client_id", clientId, "legal_document_id", doc.ID)
+					"client_id", clientID, "legal_document_id", doc.ID)
 				return
 			}
 			if client == nil {
@@ -102,7 +102,7 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 		}
 
 		listedKey := func(link record.LegalDocumentClient) int64 { return link.ClientID }
-		listedId := func(link record.LegalDocumentClient) int64 { return link.ID }
+		listedID := func(link record.LegalDocumentClient) int64 { return link.ID }
 
 		// One transaction, rerun whole after a deadlock (#301), with nothing written to the response
 		// inside it. The list itself is not locked, as for every list save: the stored list must be
@@ -128,18 +128,18 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, listedKey, listedId, wanted)
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteLegalDocumentClient(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting legal document client %d", rowId)
+			insert, remove := replaceSet(stored, listedKey, listedID, wanted)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteLegalDocumentClient(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting legal document client %d", rowID)
 				}
 			}
-			for _, clientId := range insert {
+			for _, clientID := range insert {
 				if createErr := database.CreateLegalDocumentClient(r.Context(), tx, &record.LegalDocumentClient{
 					LegalDocumentID: doc.ID,
-					ClientID:        clientId,
+					ClientID:        clientID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error listing client %d on legal document", clientId)
+					return errs.Wrapf(createErr, "database error listing client %d on legal document", clientID)
 				}
 			}
 			if current.AppliesToAllApps != allApps {
@@ -186,11 +186,11 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 // clientLegalDocumentsDatabase is what a client's documents need: the client, every document, the
 // documents that list the client, and each document's versions and apps.
 type clientLegalDocumentsDatabase interface {
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
-	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
-	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentClient, error)
 }
 
 // HandleClientLegalDocumentsGet - GET /api/v1/admin/clients/{id}/legal-documents

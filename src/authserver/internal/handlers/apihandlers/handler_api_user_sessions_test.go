@@ -109,7 +109,7 @@ func TestHandleUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 	}
 }
 
-func TestHandleUserSessionGet_AnIdNamingNoSessionIsNotFound(t *testing.T) {
+func TestHandleUserSessionGet_AnIDNamingNoSessionIsNotFound(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(99999)).Return(nil, nil).Once()
 

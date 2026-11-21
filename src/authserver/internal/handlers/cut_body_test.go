@@ -87,7 +87,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 // checked, which is how the form already treats a body that names no ceremony.
 func TestCutBody_ThePasswordForm(t *testing.T) {
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("email", "test@example.com")
 	form.Add("password", "the password")
 	body := form.Encode()
@@ -101,8 +101,8 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		// The real store, whose read of the ceremony the body names is what the cut decides.
 		ceremonyStore, cookies := holdingCeremony(t, &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		})
 
 		rr := httptest.NewRecorder()

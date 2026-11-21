@@ -312,7 +312,7 @@ func TestSendEmail_ACancelledCallerIsNotFallenBackFor(t *testing.T) {
 			_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			elapsed := time.Since(started)
 

@@ -20,7 +20,7 @@ import (
 // registered now, for the registration gate, and the brand its form_post page is drawn in.
 // data.Database satisfies it.
 type clientErrorDatabase interface {
-	GetRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
+	GetRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.RedirectURI, error)
 	render.PageBrandReader
 }
 

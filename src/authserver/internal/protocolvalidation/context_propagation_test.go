@@ -24,15 +24,15 @@ import (
 // furthest to travel from this package: ValidateScopes takes it, hands it to the resolver it shares
 // with the token endpoint, and that function makes two reads.
 
-const propagatedRequestId = "goiabada/req-validation-propagation-1"
+const propagatedRequestID = "goiabada/req-validation-propagation-1"
 
 func aCallersContext() context.Context {
-	return requestid.NewContext(context.Background(), propagatedRequestId)
+	return requestid.NewContext(context.Background(), propagatedRequestID)
 }
 
 func theCallersContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == propagatedRequestId
+		return requestid.FromContext(ctx) == propagatedRequestID
 	})
 }
 
@@ -82,7 +82,7 @@ func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *te
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
 		&ValidateClientAndRedirectURIInput{
-			ClientId:    "portal",
+			ClientID:    "portal",
 			RedirectURI: "https://example.com/callback",
 		})
 
@@ -92,12 +92,12 @@ func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *te
 
 // The reject arm for the client half: an empty client_id is refused before the lookup, so the
 // client port is never reached.
-func TestValidateClientAndRedirectURI_AnEmptyClientIdReachesNoClientPort(t *testing.T) {
+func TestValidateClientAndRedirectURI_AnEmptyClientIDReachesNoClientPort(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
 		&ValidateClientAndRedirectURIInput{
-			ClientId:    "",
+			ClientID:    "",
 			RedirectURI: "https://example.com/callback",
 		})
 

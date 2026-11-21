@@ -6,7 +6,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/render"
 )
 
-// LogoutIdTokenHintPresent reports whether this is a POST to the logout endpoint carrying an
+// LogoutIDTokenHintPresent reports whether this is a POST to the logout endpoint carrying an
 // id_token_hint, which is the one shape of /auth/logout that must work cross-site. It is the
 // conditional entry of this server's CSRF policy, supplied at the composition root in
 // internal/server/server.go.
@@ -39,7 +39,7 @@ import (
 // to #109 decision 9 rather than introduced by reading the body: the same origin need only move the
 // hint into the query to reach the handler, which parses the body itself to honour ui_locales. Go
 // bounds the parse the same way it bounds every other form endpoint here.
-func LogoutIdTokenHintPresent(r *http.Request) bool {
+func LogoutIDTokenHintPresent(r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		return false
 	}

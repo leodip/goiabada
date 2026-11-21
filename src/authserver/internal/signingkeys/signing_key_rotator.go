@@ -34,10 +34,10 @@ var ErrKeySetIncomplete = errors.New("expected current and next signing keys to 
 // apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type RotationDatabase interface {
 	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
-	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairID int64) error
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
+	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairID int64, fromState string, toState string) (bool, error)
 }
 
 // Rotator performs the current -> previous -> deleted transition of the signing

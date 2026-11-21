@@ -77,7 +77,7 @@ func RefuseUnavailableRegistration(pageRenderer PageRenderer) func(http.Handler)
 	}
 }
 
-// registrationCeremonyId is the sign-in the visitor came to this page from, when the password page's
+// registrationCeremonyID is the sign-in the visitor came to this page from, when the password page's
 // "Register" link said so: the id that link carried, if it has the shape of one. The page puts it back
 // into its own "Sign in" link, so a visitor who registers nothing and goes back lands on the same
 // sign-in's password form, where without it the link would load a step that names no ceremony and get
@@ -91,9 +91,9 @@ func RefuseUnavailableRegistration(pageRenderer PageRenderer) func(http.Handler)
 // leads to the admin console's account page, which starts the console's own sign-in, rather than a
 // bare /auth/pwd: in a browser holding any other sign-in, an app's open in another tab, that is
 // refused as no longer active and audited as a ceremony mismatch (#812).
-func registrationCeremonyId(r *http.Request) string {
+func registrationCeremonyID(r *http.Request) string {
 	id := r.URL.Query().Get(ceremony.QueryParameter)
-	if !ceremony.IsWellFormedId(id) {
+	if !ceremony.IsWellFormedID(id) {
 		return ""
 	}
 	return id
@@ -102,7 +102,7 @@ func registrationCeremonyId(r *http.Request) string {
 // registrationCeremonies is what the registration form needs of the browser's sign-ins: the one its
 // Create an account link named, while the browser still holds it.
 type registrationCeremonies interface {
-	HeldAuthContext(r *http.Request, ceremonyId string) (*ceremony.AuthContext, error)
+	HeldAuthContext(r *http.Request, ceremonyID string) (*ceremony.AuthContext, error)
 }
 
 // signInCeremonies is what registration and activation need of the browser's sign-ins: the one the
@@ -110,7 +110,7 @@ type registrationCeremonies interface {
 // *ceremony.Store satisfies it.
 type signInCeremonies interface {
 	registrationCeremonies
-	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyID string, userID int64) error
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 }
 
@@ -152,22 +152,22 @@ type legalDocumentLink struct {
 }
 
 // registrationClient is the app a registration form belongs to: the client of the sign-in the
-// request's URL names (registrationCeremonyId), while the browser holds it. A URL naming none, or
+// request's URL names (registrationCeremonyID), while the browser holds it. A URL naming none, or
 // one the browser does not hold, in another browser or after the sign-in ended, names no app, and
 // the answer is "".
 func registrationClient(r *http.Request, ceremonies registrationCeremonies) (string, error) {
-	ceremonyId := registrationCeremonyId(r)
-	if ceremonyId == "" {
+	ceremonyID := registrationCeremonyID(r)
+	if ceremonyID == "" {
 		return "", nil
 	}
-	authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
+	authContext, err := ceremonies.HeldAuthContext(r, ceremonyID)
 	if errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return authContext.ClientId, nil
+	return authContext.ClientID, nil
 }
 
 // registrationRequiresEmailVerification is the mode in which an account comes from the emailed
@@ -207,7 +207,7 @@ func HandleRegisterGet(
 // submission has, and a redrawn form carries the id on. Every render of the form, its first and
 // each beside a refusal, carries a fresh Turnstile widget while the challenge is on (#642 decision
 // 2); the pages answering a registration, which have no form, carry none. adminConsoleBaseURL is for
-// the form's Sign in link when its URL names no sign-in (registrationCeremonyId).
+// the form's Sign in link when its URL names no sign-in (registrationCeremonyID).
 func renderRegisterForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	ceremonies registrationCeremonies, legalDocuments registrationLegalDocuments,
 	adminConsoleBaseURL string, settings *record.Settings, email, refusal, field string) {
@@ -216,7 +216,7 @@ func renderRegisterForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 		"email":                     email,
 		"error":                     refusal,
 		"errorField":                field,
-		"ceremonyId":                registrationCeremonyId(r),
+		"ceremonyId":                registrationCeremonyID(r),
 		"adminConsoleBaseUrl":       adminConsoleBaseURL,
 		"requiresEmailVerification": registrationRequiresEmailVerification(settings),
 		"passwordRules":             passwordRulesHint(r),
@@ -238,7 +238,7 @@ type accountRegisterDatabase interface {
 	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error
 	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
+	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64, deadCodeHash string,
 		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
 }
 
@@ -297,17 +297,17 @@ const (
 // It takes the context rather than the request because a well-formed request's entry is written
 // by the job after its response, under the job's context, which keeps the request's id.
 func auditRequestedRegistration(ctx context.Context, auditLogger AuditLogger, clientIP string, email string,
-	userId int64, preRegistrationId int64, outcome string) {
+	userID int64, preRegistrationID int64, outcome string) {
 	details := map[string]interface{}{
 		"ip":           clientIP,
 		"email_digest": hashutil.HashString(email),
 		"outcome":      outcome,
 	}
-	if userId != 0 {
-		details["user_id"] = userId
+	if userID != 0 {
+		details["user_id"] = userID
 	}
-	if preRegistrationId != 0 {
-		details["pre_registration_id"] = preRegistrationId
+	if preRegistrationID != 0 {
+		details["pre_registration_id"] = preRegistrationID
 	}
 	auditLogger.Log(ctx, audit.EventRequestedRegistration, details)
 }
@@ -367,9 +367,9 @@ func HandleRegisterPost(
 
 		// recordRequest writes this request's requested_registration entry, which only registration
 		// with verification leaves. Without it the request is recorded as created_user, or not at all.
-		recordRequest := func(userId int64, outcome string) {
+		recordRequest := func(userID int64, outcome string) {
 			if requiresEmailVerification {
-				auditRequestedRegistration(r.Context(), auditLogger, clientIP, email, userId, 0, outcome)
+				auditRequestedRegistration(r.Context(), auditLogger, clientIP, email, userID, 0, outcome)
 			}
 		}
 
@@ -424,7 +424,7 @@ func HandleRegisterPost(
 
 		if requiresEmailVerification {
 			registerWithVerification(w, r, pageRenderer, database, emailSender, auditLogger, afterResponse,
-				dataCipher, baseURL, settings, clientIP, email, registrationCeremonyId(r))
+				dataCipher, baseURL, settings, clientIP, email, registrationCeremonyID(r))
 			return
 		}
 
@@ -525,7 +525,7 @@ func HandleRegisterPost(
 
 		// Registered from an app's sign-in the browser still holds: signed straight into it, and on into
 		// the app. Anywhere else, the page saying the account was created.
-		if carryOnSignIn(w, r, ceremonies, proof, baseURL, registrationCeremonyId(r), user) {
+		if carryOnSignIn(w, r, ceremonies, proof, baseURL, registrationCeremonyID(r), user) {
 			return
 		}
 
@@ -571,7 +571,7 @@ func sendWelcomeEmail(
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
@@ -597,7 +597,7 @@ func registerWithVerification(
 	settings *record.Settings,
 	clientIP string,
 	email string,
-	ceremonyId string,
+	ceremonyID string,
 ) {
 	user, err := database.GetUserByEmail(r.Context(), nil, email)
 	if err != nil {
@@ -610,11 +610,11 @@ func registerWithVerification(
 	// cost the response the same two queries.
 	preRegistration, err := database.GetPreRegistrationByEmail(r.Context(), nil, email)
 	if err != nil {
-		var userId int64
+		var userID int64
 		if user != nil {
-			userId = user.ID
+			userID = user.ID
 		}
-		auditRequestedRegistration(r.Context(), auditLogger, clientIP, email, userId, 0, registrationOutcomeServerError)
+		auditRequestedRegistration(r.Context(), auditLogger, clientIP, email, userID, 0, registrationOutcomeServerError)
 		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
@@ -629,7 +629,7 @@ func registerWithVerification(
 
 	afterResponse.Go(r.Context(), afterresponse.ClassRegistration, func(ctx context.Context) {
 		finishRegistration(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
-			settings, clientIP, email, ceremonyId, user, preRegistration)
+			settings, clientIP, email, ceremonyID, user, preRegistration)
 	})
 }
 
@@ -654,41 +654,41 @@ func finishRegistration(
 	settings *record.Settings,
 	clientIP string,
 	email string,
-	ceremonyId string,
+	ceremonyID string,
 	user *record.User,
 	preRegistration *record.PreRegistration,
 ) {
-	var userId, preRegistrationId int64
+	var userID, preRegistrationID int64
 	if user != nil {
-		userId = user.ID
+		userID = user.ID
 	}
 	if preRegistration != nil {
-		preRegistrationId = preRegistration.ID
+		preRegistrationID = preRegistration.ID
 	}
 
 	switch {
 	case user != nil && !user.Enabled:
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userId, preRegistrationId,
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userID, preRegistrationID,
 			registrationOutcomeAccountDisabled)
 	case user != nil && !canRecoverPassword(user):
 		// The rule forgot-password applies, so the two flows share one eligibility rule: the
 		// notice points at password recovery, which sends an unverified address nothing (#207
 		// decision 5).
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userId, preRegistrationId,
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userID, preRegistrationID,
 			registrationOutcomeUnverifiedAddress)
 	case user != nil:
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userId, preRegistrationId,
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, userID, preRegistrationID,
 			registrationOutcomeNoticeIssued)
 		sendExistingAccountNotice(ctx, r, emailSender, pageRenderer, baseURL, settings, user)
 	case livePreRegistration(preRegistration, time.Now().UTC()) != nil:
 		// It can still complete, so its link is still the one that completes it, and replacing
 		// it would change the code under a form already on screen (#207 decision 6).
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistrationId,
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistrationID,
 			registrationOutcomeLinkPending)
 	default:
 		// No pending registration, or a dead one, which this replaces.
 		issueActivationLink(ctx, r, database, emailSender, auditLogger, pageRenderer, dataCipher, baseURL,
-			settings, clientIP, email, ceremonyId, preRegistration)
+			settings, clientIP, email, ceremonyID, preRegistration)
 	}
 }
 
@@ -713,19 +713,19 @@ func issueActivationLink(
 	settings *record.Settings,
 	clientIP string,
 	email string,
-	ceremonyId string,
+	ceremonyID string,
 	dead *record.PreRegistration,
 ) {
-	var deadId int64
+	var deadID int64
 	if dead != nil {
-		deadId = dead.ID
+		deadID = dead.ID
 	}
 
 	verificationCode := securerandom.String(32)
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to encrypt the activation code", "error", err)
-		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, deadId, registrationOutcomeServerError)
+		auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, deadID, registrationOutcomeServerError)
 		return
 	}
 
@@ -769,7 +769,7 @@ func issueActivationLink(
 		// The code and nothing else: the address used to travel here too, which broke every '+'
 		// and '%xx' address under form-urlencoded query parsing (#112). The helper also owns the
 		// path the activation handler redirects back to, so the two cannot drift.
-		Link: emaillinks.AccountActivateLink(baseURL, verificationCode, ceremonyId),
+		Link: emaillinks.AccountActivateLink(baseURL, verificationCode, ceremonyID),
 		// The email says how long the link lasts (#818 decision 4).
 		Expiry: emaillinks.ActivationCodeLifetime,
 	}
@@ -787,7 +787,7 @@ func issueActivationLink(
 	input := &emaildelivery.SendEmailInput{
 		To:       email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
@@ -820,7 +820,7 @@ func sendExistingAccountNotice(
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {

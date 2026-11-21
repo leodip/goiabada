@@ -97,7 +97,7 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
 				&ValidateTokenRequestInput{
 					GrantType: "password",
-					ClientId:  "ropc-client",
+					ClientID:  "ropc-client",
 					Username:  "user@example.com",
 					Password:  "correctpassword",
 					Scope:     tc.scope,
@@ -114,7 +114,7 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 			require.ErrorAs(t, err, &refused)
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
 			assert.Same(t, client, refused.Client)
-			assert.Equal(t, int64(7), refused.UserId)
+			assert.Equal(t, int64(7), refused.UserID)
 
 			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)

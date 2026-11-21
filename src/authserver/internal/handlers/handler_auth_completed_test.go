@@ -48,7 +48,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		// The reuse bump records the browser's address, read as the rest of the server reads
 		// it, so the session holds the latest address it was seen from (#243).
 		req.RemoteAddr = "203.0.113.7:4444"
@@ -57,10 +57,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// SSO reuse: AuthenticatedAt is nil (not set by password handler)
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateAuthenticationCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 			Scope:      "openid profile",
 		}
 
@@ -116,7 +116,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		// Ordinary single sign-on raises nothing: the ceremony recorded no methods and the
 		// target ACR is the one the session already holds. Rotating here would replace the
@@ -143,7 +143,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// expired-session login.
 	//
 	// Every one of them gives the ambient session a HIGHER ACR than the target, which is what
-	// makes the acr assertion mean something: with the ambient session fed to SetAcrLevel the
+	// makes the acr assertion mean something: with the ambient session fed to SetACRLevel the
 	// context would leave carrying level2_mandatory, and with the bound session it leaves
 	// carrying level1, the only level anyone proved in this ceremony.
 	// =====================================================================================
@@ -204,7 +204,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -213,10 +213,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// in exactly this shape.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              2,
+			ClientID:            "test-client",
+			UserID:              2,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 3,
@@ -324,7 +324,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// level2_mandatory. This is the assertion the higher ambient ACR above exists for.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.ACRLevel1 &&
+				ac.ACRLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -335,7 +335,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		// The event exists to name both parties: without previousUserId an operator cannot tell
 		// a browser changing hands from an administrator ending a session.
@@ -418,16 +418,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              2,
+			ClientID:            "test-client",
+			UserID:              2,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 3,
@@ -497,7 +497,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.ACRLevel1 &&
+				ac.ACRLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -508,7 +508,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -541,17 +541,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req.RemoteAddr = "203.0.113.7:4444"
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 3,
@@ -629,7 +629,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the acr of a token bound to the level1 session this ceremony just created.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.ACRLevel1 &&
+				ac.ACRLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -640,7 +640,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		assertNotAttempted(t, database, "RunInTransaction", "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "DeleteUserSession")
@@ -699,17 +699,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req.RemoteAddr = "203.0.113.7:4444"
 			req = withSessionSettings(req)
 			rr := httptest.NewRecorder()
 
 			pwdAuthTime := time.Now().UTC()
 			authContext := &ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Scope:               "openid profile",
 				AuthMethods:         "pwd",
 				AuthStateGeneration: 3,
@@ -733,16 +733,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				Return(&record.User{ID: 1, Enabled: true, AuthStateGeneration: 3}, nil)
 
 			var events []string
-			var auditedIds []int64
+			var auditedIDs []int64
 			var auditedReasons []interface{}
-			var auditedUserIds []interface{}
+			var auditedUserIDs []interface{}
 			var answered bool
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, mock.Anything).Run(func(args mock.Arguments) {
 				assert.False(t, answered, "every removal is audited before the 500 is written")
 				events = append(events, args.Get(1).(string))
-				auditedIds = append(auditedIds, args.Get(2).(map[string]interface{})["user_session_id"].(int64))
+				auditedIDs = append(auditedIDs, args.Get(2).(map[string]interface{})["user_session_id"].(int64))
 				auditedReasons = append(auditedReasons, args.Get(2).(map[string]interface{})["reason"])
-				auditedUserIds = append(auditedUserIds, args.Get(2).(map[string]interface{})["user_id"])
+				auditedUserIDs = append(auditedUserIDs, args.Get(2).(map[string]interface{})["user_id"])
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
@@ -752,7 +752,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 				Return(started, tc.removed, nil)
 			rotateError := errors.New("the backend refused the write")
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1", (*bool)(nil)).
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyID, int64(1), "new-session-of-user-1", (*bool)(nil)).
 				Return(rotateError).Once()
 			// The rotation's failure, wrapped, is the cause the abandonment is handed; what it answers is
 			// what the 500 carries.
@@ -768,18 +768,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 			assert.True(t, answered)
 			assert.Equal(t, tc.events, events)
-			wantIds := []int64(nil)
+			wantIDs := []int64(nil)
 			wantReasons := []interface{}(nil)
 			for _, removal := range tc.removed {
-				wantIds = append(wantIds, removal.Session.ID)
+				wantIDs = append(wantIDs, removal.Session.ID)
 				wantReasons = append(wantReasons, removal.Reason)
 			}
-			assert.Equal(t, wantIds, auditedIds)
+			assert.Equal(t, wantIDs, auditedIDs)
 			assert.Equal(t, wantReasons, auditedReasons, "each event carries the reason its removal was reported with")
 			if tc.removed != nil {
-				assert.Equal(t, []interface{}{int64(1), int64(5)}, auditedUserIds, "each event names its own session's user")
+				assert.Equal(t, []interface{}{int64(1), int64(5)}, auditedUserIDs, "each event names its own session's user")
 			} else {
-				assert.Nil(t, auditedUserIds)
+				assert.Nil(t, auditedUserIDs)
 			}
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
@@ -815,16 +815,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              2,
+			ClientID:            "test-client",
+			UserID:              2,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 3,
@@ -939,16 +939,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              2,
+			ClientID:            "test-client",
+			UserID:              2,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 3,
@@ -1066,7 +1066,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1078,10 +1078,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the two apart. "now" would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateAuthenticationCompleted,
-			ClientId:        "test-client",
-			UserId:          1,
+			ClientID:        "test-client",
+			UserID:          1,
 			Scope:           "openid profile",
 			AuthenticatedAt: &pwdAuthTime,
 		}
@@ -1127,7 +1127,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// itself, so it raises the session rather than replacing its authentication.
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			mock.MatchedBy(func(a usersession.Authentication) bool {
-				return a.AcrLevel == record.ACRLevel1 && a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
+				return a.ACRLevel == record.ACRLevel1 && a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
 					a.PasswordAuthTime == nil
 			}), false, "").Return(&refreshed, nil)
 
@@ -1151,7 +1151,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1185,16 +1185,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC().Add(-2 * time.Minute)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid",
 			AuthMethods:         "pwd",
 			AuthenticatedAt:     &pwdAuthTime,
@@ -1225,14 +1225,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		replaced.ACRLevel, replaced.AuthMethods, replaced.AuthTime = record.ACRLevel1, "pwd", pwdAuthTime
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			mock.MatchedBy(func(a usersession.Authentication) bool {
-				return a.UserId == 1 && a.AcrLevel == record.ACRLevel1 && a.AuthMethods == "pwd" &&
+				return a.UserID == 1 && a.ACRLevel == record.ACRLevel1 && a.AuthMethods == "pwd" &&
 					a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
 					a.PasswordAuthTime != nil && a.PasswordAuthTime.Equal(pwdAuthTime)
 			}), true, "").Return(&replaced, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 		// The password was entered with no Keep me signed in box, so the session is left with no
 		// answer (#743).
-		ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyId, (*bool)(nil)).Return(nil).Once()
+		ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyID, (*bool)(nil)).Return(nil).Once()
 
 		user := &record.User{ID: 1, Enabled: true}
 		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1242,14 +1242,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// password's instant, all three about the same authentication.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.ACRLevel1 && ac.AuthMethods == "pwd" &&
+				ac.ACRLevel == record.ACRLevel1 && ac.AuthMethods == "pwd" &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(pwdAuthTime)
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 		ceremonyStore.AssertExpectations(t)
 		userSessionManager.AssertExpectations(t)
 		database.AssertExpectations(t)
@@ -1281,7 +1281,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1289,10 +1289,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// yields for an absent RFC 3339 timestamp.
 		var zeroAuthenticatedAt time.Time
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateAuthenticationCompleted,
-			ClientId:        "test-client",
-			UserId:          1,
+			ClientID:        "test-client",
+			UserID:          1,
 			Scope:           "openid profile",
 			AuthenticatedAt: &zeroAuthenticatedAt,
 		}
@@ -1351,7 +1351,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1380,7 +1380,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1393,10 +1393,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// with "now" the assertion would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:  testCeremonyId,
+			CeremonyID:  testCeremonyID,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
-			ClientId:    "test-client",
-			UserId:      1,
+			ClientID:    "test-client",
+			UserID:      1,
 			Scope:       "openid profile",
 			AuthMethods: "pwd",
 			// Nonzero so the StartNewUserSession expectation below pins that the handler
@@ -1470,7 +1470,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, 43200, deviceCookieOf(t, rr).MaxAge, "the device cookie lives the max lifetime the session was started under, not the idle timeout")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1509,21 +1509,21 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// 4 rather than 0, so the assertion below cannot also pass against a hard-coded zero.
 		captured := int64(4)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd otp",
-			OtpConfigGeneration: &captured,
-			OtpClaimGeneration:  &captured,
+			OTPConfigGeneration: &captured,
+			OTPClaimGeneration:  &captured,
 		}
 
 		sessionIdentifier := "test-session"
@@ -1563,7 +1563,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.ACRLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1586,7 +1586,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 		assert.EqualValues(t, 4, userSession.OTPConfigGeneration,
 			"the in-memory session must carry what was written, since the ACR below is taken against it")
 
@@ -1621,19 +1621,19 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
-			OtpConfigGeneration: &captured,
+			OTPConfigGeneration: &captured,
 		}
 
 		sessionIdentifier := "test-session"
@@ -1673,7 +1673,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
@@ -1727,20 +1727,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// The methods and the generation of their code adopted from the session below.
 		adoptedGeneration := int64(3)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:         testCeremonyId,
+			CeremonyID:         testCeremonyID,
 			AuthState:          ceremony.AuthStateAuthenticationCompleted,
-			ClientId:           "test-client",
-			UserId:             1,
+			ClientID:           "test-client",
+			UserID:             1,
 			Scope:              "openid profile",
 			AuthMethods:        "pwd otp",
-			OtpClaimGeneration: &adoptedGeneration,
+			OTPClaimGeneration: &adoptedGeneration,
 		}
 
 		sessionIdentifier := "test-session"
@@ -1780,7 +1780,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// staleness check, which finds nothing newer on the session here (#538).
 		userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, mock.Anything).
 			Return(false, nil).Once()
-		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			boundWith("pwd otp", record.ACRLevel2Optional), mock.Anything, "").Return(userSession, nil)
@@ -1831,22 +1831,22 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd otp",
 			AuthStateGeneration: 7,
-			OtpConfigGeneration: &captured,
-			OtpClaimGeneration:  &captured,
+			OTPConfigGeneration: &captured,
+			OTPClaimGeneration:  &captured,
 			AuthenticatedAt:     &pwdAuthTime,
 			PasswordVerifiedAt:  &pwdAuthTime,
 			Level1AuthCompleted: true,
@@ -1886,7 +1886,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 			signedInWith(usersession.Authentication{
-				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Optional,
+				UserID: 1, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Optional,
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
 			}), int64(7), &captured, aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
@@ -1941,7 +1941,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -1977,12 +1977,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -2014,14 +2014,14 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateAuthenticationCompleted,
-			ClientId:   "test-client",
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -2064,16 +2064,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "query",
 			RedirectURI:  "https://example.com/callback",
@@ -2122,7 +2122,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the sentinel under either ordering; rr.Result() reads the snapshot taken when the
 		// status line was written, which is the only unit-tier view that tells them apart.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -2171,15 +2171,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "query",
 			RedirectURI:  "https://example.com/callback",
@@ -2224,7 +2224,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -2271,15 +2271,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "form_post",
 			RedirectURI:  "https://example.com/callback",
@@ -2321,7 +2321,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			"user_id": int64(1),
 		}).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -2367,15 +2367,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "form_post",
 			RedirectURI:  "https://example.com/callback",
@@ -2420,7 +2420,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the site's second and pre-existing 500,
 		// pinned separately so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -2458,16 +2458,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "query",
 			RedirectURI:  "https://example.com/callback",
@@ -2518,7 +2518,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Same sentinel as the disabled-user case, for the second refusal in this handler.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -2567,15 +2567,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "query",
 			RedirectURI:  "https://example.com/callback",
@@ -2619,7 +2619,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errors.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -2662,15 +2662,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "form_post",
 			RedirectURI:  "https://example.com/callback",
@@ -2714,7 +2714,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errors.New("the session store is unreachable"))
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -2755,15 +2755,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateAuthenticationCompleted,
-			ClientId:     "test-client",
-			UserId:       1,
+			ClientID:     "test-client",
+			UserID:       1,
 			Scope:        "openid profile",
 			ResponseMode: "form_post",
 			RedirectURI:  "https://example.com/callback",
@@ -2811,7 +2811,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// this change the handler carried on into the clear after answering the 500, which is
 		// the missing return decision 5 adds; the 500 is asserted Once() so a second one would
 		// fail the mock.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -2848,17 +2848,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the subtest above.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:  testCeremonyId,
+			CeremonyID:  testCeremonyID,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
-			ClientId:    "test-client",
-			UserId:      1,
+			ClientID:    "test-client",
+			UserID:      1,
 			Scope:       "openid profile",
 			AuthMethods: "pwd",
 			// Nonzero so the StartNewUserSession expectation below pins that the handler
@@ -2928,7 +2928,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2957,17 +2957,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the two subtests above.
 		pwdAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:  testCeremonyId,
+			CeremonyID:  testCeremonyID,
 			AuthState:   ceremony.AuthStateAuthenticationCompleted,
-			ClientId:    "test-client",
-			UserId:      1,
+			ClientID:    "test-client",
+			UserID:      1,
 			Scope:       "openid profile offline_access",
 			AuthMethods: "pwd",
 			// Nonzero for the same reason as the other cases: it pins that the handler
@@ -3036,7 +3036,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, minted, deviceCookieOf(t, rr).Value, "the device cookie holds the identifier the session was recorded with")
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/consent?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3078,7 +3078,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -3087,10 +3087,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// AuthenticatedAt and Level1AuthCompleted are unset. The session was then ended
 		// mid-flight.
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 7,
@@ -3128,7 +3128,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3157,7 +3157,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -3167,10 +3167,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// reading userReallyAuthenticated recreates the session here; this gate must not.
 		otpAuthTime := time.Now().UTC()
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd otp",
 			AuthStateGeneration: 7,
@@ -3208,7 +3208,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3261,7 +3261,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -3270,15 +3270,15 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			captured := int64(4)
 			authenticatedAt := time.Now().UTC().Add(-time.Minute)
 			authContext := &ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Scope:               "openid",
 				AuthMethods:         "pwd otp",
 				AuthenticatedAt:     &authenticatedAt,
-				OtpConfigGeneration: &captured,
-				OtpClaimGeneration:  &captured,
+				OTPConfigGeneration: &captured,
+				OTPClaimGeneration:  &captured,
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -3304,7 +3304,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier,
 				boundWith("pwd otp", record.ACRLevel2Optional)).Return(false, errAt(precheck)).Once()
 			if tc.failedAt > precheck {
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(errAt(regenerate)).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(errAt(regenerate)).Once()
 			}
 			if tc.failedAt > regenerate {
 				bindErr := errAt(bind)
@@ -3449,7 +3449,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					permissionChecker:  permissionChecker,
 				})
 
-				req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+				req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 				req = withSessionSettings(req)
 				sessionIdentifier := "test-session"
 				req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -3457,10 +3457,10 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 
 				authenticatedAt := time.Now().UTC().Add(-time.Minute)
 				authContext := &ceremony.AuthContext{
-					CeremonyId:          testCeremonyId,
+					CeremonyID:          testCeremonyID,
 					AuthState:           ceremony.AuthStateAuthenticationCompleted,
-					ClientId:            "test-client",
-					UserId:              1,
+					ClientID:            "test-client",
+					UserID:              1,
 					RequestedScope:      "openid profile",
 					Scope:               "openid",
 					ResponseMode:        "query",
@@ -3471,8 +3471,8 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					AuthenticatedAt:     &authenticatedAt,
 					PasswordVerifiedAt:  &authenticatedAt,
 					Level1AuthCompleted: arm.level1Completed,
-					OtpClaimGeneration:  func() *int64 { g := claimGeneration; return &g }(),
-					IdTokenHintSub:      u.hint,
+					OTPClaimGeneration:  func() *int64 { g := claimGeneration; return &g }(),
+					IDTokenHintSub:      u.hint,
 				}
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -3492,7 +3492,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					if arm.endsForeignSession {
 						expectForeignSessionEnded(ceremonyStore, database, auditLogger, rr, req, arm.session)
 					}
-					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(u.clearErr).Once()
+					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(u.clearErr).Once()
 					if errors.Is(u.clearErr, ceremony.ErrCeremonyReplaced) {
 						expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 					} else {
@@ -3503,11 +3503,11 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 						"user_id": int64(1),
 					}).Return().Once()
-					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+					ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil).Once()
 				default:
 					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 						// Restart route 1: the request kept, the attempt discarded.
-						return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.UserId == 0 &&
+						return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.UserID == 0 &&
 							ac.AuthMethods == "" && !ac.Level1AuthCompleted && ac.Scope == "openid profile"
 					})).Return(nil).Once()
 				}
@@ -3542,7 +3542,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 					assert.Equal(t, "some-state", location.Query().Get("state"))
 				default:
 					assert.Equal(t, http.StatusFound, rr.Code)
-					assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+					assert.Equal(t, testBaseURL+"/auth/level1?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 				}
 
 				pageRenderer.AssertExpectations(t)
@@ -3590,7 +3590,7 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -3598,10 +3598,10 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 
 			at := time.Now().UTC().Add(-time.Minute)
 			authContext := &ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				RequestedScope:      "openid",
 				Scope:               "openid",
 				ResponseMode:        "query",
@@ -3612,7 +3612,7 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 				AuthenticatedAt:     &at,
 				PasswordVerifiedAt:  &at,
 				Level1AuthCompleted: true,
-				IdTokenHintSub:      "the-hint",
+				IDTokenHintSub:      "the-hint",
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -3631,12 +3631,12 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 
 			switch {
 			case errors.Is(tc.confirmErr, ceremony.ErrCeremonyReplaced):
-				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(tc.confirmErr).Once()
+				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyID).Return(tc.confirmErr).Once()
 				expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 			case tc.confirmErr != nil:
 				// No transaction is expected, so a termination attempted anyway fails on the strict
 				// database mock.
-				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(tc.confirmErr).Once()
+				ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyID).Return(tc.confirmErr).Once()
 				pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 					return errors.Is(err, tc.confirmErr)
 				})).Return().Once()
@@ -3722,8 +3722,8 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 
 // signedInAs is what /auth/completed hands the session manager for a sign-in by userId that entered
 // a password at at and no code after it, so the password's instant is the credential's.
-func signedInAs(userId int64, methods string, acr record.ACRLevel, at *time.Time) interface{} {
-	return signedInWith(usersession.Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at,
+func signedInAs(userID int64, methods string, acr record.ACRLevel, at *time.Time) interface{} {
+	return signedInWith(usersession.Authentication{UserID: userID, AuthMethods: methods, ACRLevel: acr, AuthTime: at,
 		PasswordAuthTime: at})
 }
 
@@ -3737,7 +3737,7 @@ func signedInWith(want usersession.Authentication) interface{} {
 // boundWith matches the authentication /auth/completed binds a reused session with, on its methods
 // and level.
 func boundWith(methods string, acr record.ACRLevel) interface{} {
-	return mock.MatchedBy(func(a usersession.Authentication) bool { return a.AuthMethods == methods && a.AcrLevel == acr })
+	return mock.MatchedBy(func(a usersession.Authentication) bool { return a.AuthMethods == methods && a.ACRLevel == acr })
 }
 
 // The session writes ask decideBeforeBinding's question again under the user's row lock, so an
@@ -3767,7 +3767,7 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -3776,18 +3776,18 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			generation := int64(4)
 			at := time.Now().UTC().Add(-time.Minute)
 			authContext := &ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Scope:               "openid",
 				RequestedScope:      "openid",
 				AuthMethods:         "pwd otp",
 				AuthenticatedAt:     &at,
 				PasswordVerifiedAt:  &at,
 				Level1AuthCompleted: create,
-				OtpConfigGeneration: &generation,
-				OtpClaimGeneration:  &generation,
+				OTPConfigGeneration: &generation,
+				OTPClaimGeneration:  &generation,
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -3820,7 +3820,7 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 					Return(nil, removed).Once()
 			}
 			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-				return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.AuthMethods == "" && ac.OtpClaimGeneration == nil
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.AuthMethods == "" && ac.OTPClaimGeneration == nil
 			})).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
@@ -3863,7 +3863,7 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 				return &ceremony.AuthContext{
 					AuthMethods:            "pwd otp",
 					AdoptedSessionAuthTime: &adopted,
-					OtpClaimGeneration:     &generation,
+					OTPClaimGeneration:     &generation,
 				}
 			},
 			replace: false,
@@ -3905,17 +3905,17 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 			rr := httptest.NewRecorder()
 
 			authContext := tc.authContext()
-			authContext.CeremonyId = testCeremonyId
+			authContext.CeremonyID = testCeremonyID
 			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
-			authContext.ClientId = "test-client"
-			authContext.UserId = 1
+			authContext.ClientID = "test-client"
+			authContext.UserID = 1
 			authContext.Scope = "openid"
 			authContext.RequestedScope = "openid"
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -3988,7 +3988,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "test-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -3997,16 +3997,16 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			// An SSO ceremony that adopted a level 1 session and stepped up with a code for a level 3
 			// client: binding it raises the session, so the plan rotates the identifier.
 			authContext := &ceremony.AuthContext{
-				CeremonyId:             testCeremonyId,
+				CeremonyID:             testCeremonyID,
 				AuthState:              ceremony.AuthStateAuthenticationCompleted,
-				ClientId:               "test-client",
-				UserId:                 1,
+				ClientID:               "test-client",
+				UserID:                 1,
 				Scope:                  "openid",
 				RequestedScope:         "openid",
 				AuthMethods:            "pwd otp",
 				AuthenticatedAt:        &entered,
 				AdoptedSessionAuthTime: &adopted,
-				OtpClaimGeneration:     &generation,
+				OTPClaimGeneration:     &generation,
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -4030,7 +4030,7 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier, handed).
 				Return(tc.staleAtCheck, nil).Once()
 			if tc.wantRotationAndBind {
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), handed, false, "").
 					Return(nil, errs.WithStack(usersession.ErrStaleAuthentication)).Once()
 			}
@@ -4079,7 +4079,7 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			rr := httptest.NewRecorder()
 
@@ -4088,10 +4088,10 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Scope:               "openid profile",
 				AuthMethods:         "pwd",
 				AuthStateGeneration: 7,
@@ -4153,7 +4153,7 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			permissionChecker:  permissionChecker,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
@@ -4162,10 +4162,10 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 
 		// An SSO ceremony whose session ended mid-flight: restart route 1.
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid profile",
 			AuthMethods:         "pwd",
 			AuthStateGeneration: 7,

@@ -17,8 +17,8 @@ import (
 // The user and client of a disconnect (#622, #135). Ids of their own, so an expectation copied
 // from another fixture in this package cannot match here by accident.
 const (
-	disconnectUserId   = int64(31)
-	disconnectClientId = int64(5151)
+	disconnectUserID   = int64(31)
+	disconnectClientID = int64(5151)
 )
 
 // disconnectFixture is one family with a live member and an already-rotated one, and a second
@@ -34,8 +34,8 @@ func disconnectFixture() []*record.RefreshToken {
 // expectClientWithoutLogoutURI registers the disconnect's first read, the client, which registered no
 // back-channel logout URI, so the disconnect tells nobody and reads nothing more for it.
 func expectClientWithoutLogoutURI(db *datamocks.Database) {
-	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientId}).
-		Return([]record.Client{{ID: disconnectClientId, ClientIdentifier: "no-logout-uri"}}, nil)
+	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).
+		Return([]record.Client{{ID: disconnectClientID, ClientIdentifier: "no-logout-uri"}}, nil)
 }
 
 // deletesTheConsent is a consent deletion that reports it deleted the row.
@@ -52,10 +52,10 @@ func TestDisconnectClientTx_DeletesTheConsentRecordsAndSweeps(t *testing.T) {
 	var order []string
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectClientWithoutLogoutURI(db)
-	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Run(func(mock.Arguments) { order = append(order, "mark codes") }).
 		Return(int64(2), nil).Once()
-	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Run(func(mock.Arguments) { order = append(order, "enumerate") }).
 		Return(tokens, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", "client_disconnected").
@@ -71,7 +71,7 @@ func TestDisconnectClientTx_DeletesTheConsentRecordsAndSweeps(t *testing.T) {
 		Run(func(mock.Arguments) { order = append(order, "sweep") }).
 		Return(true, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil,
 		func(tx *sql.Tx) (bool, error) {
 			assert.Same(t, revokeTx, tx, "the consent deletion runs on the disconnect's own transaction")
 			order = append(order, "delete consent")
@@ -82,7 +82,7 @@ func TestDisconnectClientTx_DeletesTheConsentRecordsAndSweeps(t *testing.T) {
 	assert.Equal(t, DisconnectResult{
 		ConsentDeleted:          true,
 		RevokedCodeCount:        2,
-		RevokedRefreshTokenJtis: []string{"rt-live-a", "rt-live-b"},
+		RevokedRefreshTokenJTIs: []string{"rt-live-a", "rt-live-b"},
 		RecordedFamilyCount:     2,
 	}, result, "only what this call changed is reported")
 	assert.True(t, result.Changed())
@@ -96,19 +96,19 @@ func TestDisconnectClientTx_WithoutAConsentDeletion(t *testing.T) {
 	tokens := []*record.RefreshToken{{ID: 4, RefreshTokenJTI: "rt-ropc", FirstRefreshTokenJTI: "fam-ropc"}}
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectClientWithoutLogoutURI(db)
-	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(tokens, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-ropc", "client_disconnected").
 		Return(true, nil).Once()
 	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, tokens[0].ID).Return(true, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil, nil)
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, DisconnectResult{
-		RevokedRefreshTokenJtis: []string{"rt-ropc"},
+		RevokedRefreshTokenJTIs: []string{"rt-ropc"},
 		RecordedFamilyCount:     1,
 	}, result)
 	assert.True(t, result.Changed())
@@ -121,21 +121,21 @@ func TestDisconnectClientTx_NothingToEndReportsNoChange(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectClientWithoutLogoutURI(db)
-	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return([]*record.RefreshToken{
 			{ID: 5, RefreshTokenJTI: "rt-gone", FirstRefreshTokenJTI: "fam-gone", Revoked: true},
 		}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-gone", "client_disconnected").
 		Return(false, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil,
 		func(*sql.Tx) (bool, error) { return false, nil })
 
 	require.NoError(t, err)
-	require.NotNil(t, result.RevokedRefreshTokenJtis)
-	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJtis: []string{}}, result)
+	require.NotNil(t, result.RevokedRefreshTokenJTIs)
+	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJTIs: []string{}}, result)
 	assert.False(t, result.Changed(), "a call that deleted, marked, revoked and recorded nothing changed nothing")
 }
 
@@ -147,9 +147,9 @@ func TestDisconnectClientTx_ATokenAnOverlappingCallRevokedFirstIsNotReported(t *
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectClientWithoutLogoutURI(db)
-	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return([]*record.RefreshToken{
 			{ID: 7, RefreshTokenJTI: "rt-read-live", FirstRefreshTokenJTI: "fam-overlap"},
 		}, nil).Once()
@@ -157,11 +157,11 @@ func TestDisconnectClientTx_ATokenAnOverlappingCallRevokedFirstIsNotReported(t *
 		Return(false, nil).Once()
 	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, int64(7)).Return(false, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil,
 		func(*sql.Tx) (bool, error) { return false, nil })
 
 	require.NoError(t, err)
-	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJtis: []string{}}, result)
+	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJTIs: []string{}}, result)
 	assert.False(t, result.Changed(), "the overlapping call made every change this one would have")
 }
 
@@ -172,19 +172,19 @@ func TestDisconnectClientTx_ANewlyRecordedFamilyAloneIsAChange(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectClientWithoutLogoutURI(db)
-	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return([]*record.RefreshToken{
 			{ID: 6, RefreshTokenJTI: "rt-claimed", FirstRefreshTokenJTI: "fam-in-flight", Revoked: true},
 		}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-in-flight", "client_disconnected").
 		Return(true, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil, nil)
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil, nil)
 
 	require.NoError(t, err)
-	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJtis: []string{}, RecordedFamilyCount: 1}, result)
+	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJTIs: []string{}, RecordedFamilyCount: 1}, result)
 	assert.True(t, result.Changed())
 }
 
@@ -195,11 +195,11 @@ func TestDisconnectResult_Changed(t *testing.T) {
 		result DisconnectResult
 		want   bool
 	}{
-		{"nothing", DisconnectResult{RevokedRefreshTokenJtis: []string{}}, false},
+		{"nothing", DisconnectResult{RevokedRefreshTokenJTIs: []string{}}, false},
 		{"the zero value", DisconnectResult{}, false},
 		{"the consent deleted", DisconnectResult{ConsentDeleted: true}, true},
 		{"one code marked", DisconnectResult{RevokedCodeCount: 1}, true},
-		{"one token revoked", DisconnectResult{RevokedRefreshTokenJtis: []string{"rt"}}, true},
+		{"one token revoked", DisconnectResult{RevokedRefreshTokenJTIs: []string{"rt"}}, true},
 		{"one family recorded", DisconnectResult{RecordedFamilyCount: 1}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				expectClientWithoutLogoutURI(db)
-				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(int64(0), boom).Once()
 			},
 			notAttempted: []string{"GetRefreshTokensByUserIDAndClientID", "RecordRefreshTokenFamilyRevoked",
@@ -260,9 +260,9 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				expectClientWithoutLogoutURI(db)
-				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(int64(1), nil).Once()
-				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(nil, boom).Once()
 			},
 			notAttempted: []string{"RecordRefreshTokenFamilyRevoked", "MarkRefreshTokenAsRevoked"},
@@ -272,9 +272,9 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				expectClientWithoutLogoutURI(db)
-				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(int64(1), nil).Once()
-				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(disconnectFixture(), nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", ReasonClientDisconnected).
 					Return(false, boom).Once()
@@ -288,9 +288,9 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				tokens := disconnectFixture()
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				expectClientWithoutLogoutURI(db)
-				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(int64(1), nil).Once()
-				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonClientDisconnected).
 					Return(true, nil).Twice()
@@ -305,9 +305,9 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				tokens := disconnectFixture()
 				datamocks.ExpectRunInTransactionThenFail(db, revokeTx, boom)
 				expectClientWithoutLogoutURI(db)
-				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(int64(1), nil).Once()
-				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+				db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonClientDisconnected).
 					Return(true, nil).Twice()
@@ -321,7 +321,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			db := datamocks.NewDatabase(t)
 			tc.setup(db)
 
-			result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
+			result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil,
 				func(tx *sql.Tx) (bool, error) { return tc.deleteErr == nil, tc.deleteErr })
 
 			require.ErrorIs(t, err, boom)
@@ -339,16 +339,16 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 func TestLogDisconnectedClient_Payload(t *testing.T) {
 	recorder := &reuseAuditRecorder{}
 
-	LogDisconnectedClient(context.Background(), recorder, disconnectUserId, disconnectClientId, "the-caller",
-		DisconnectResult{ConsentDeleted: true, RevokedCodeCount: 2, RevokedRefreshTokenJtis: []string{"rt-1"},
+	LogDisconnectedClient(context.Background(), recorder, disconnectUserID, disconnectClientID, "the-caller",
+		DisconnectResult{ConsentDeleted: true, RevokedCodeCount: 2, RevokedRefreshTokenJTIs: []string{"rt-1"},
 			RecordedFamilyCount: 1})
 
 	require.Equal(t, 1, recorder.calls)
 	assert.Equal(t, "disconnected_client", recorder.event)
 	assert.Equal(t, audit.EventDisconnectedClient, recorder.event)
 	assert.Equal(t, map[string]interface{}{
-		"user_id":                    disconnectUserId,
-		"client_id":                  disconnectClientId,
+		"user_id":                    disconnectUserID,
+		"client_id":                  disconnectClientID,
 		"logged_in_user":             "the-caller",
 		"revoked_code_count":         int64(2),
 		"revoked_refresh_token_jtis": []string{"rt-1"},

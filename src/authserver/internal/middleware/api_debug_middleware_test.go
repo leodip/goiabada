@@ -486,7 +486,7 @@ func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
 // this call site names it, which is what decision 2 bought. debugLog is the only
 // API-surface writer reached through a *Context variant, so it is where that is
 // worth pinning at this seam.
-func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
+func TestDebugLog_CarriesTheRequestIDFromTheContext(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
@@ -760,7 +760,7 @@ func TestDebugLog_RedactsThroughNestedStructures(t *testing.T) {
 // that /auth/logout accepts. Nothing about the name logoutUrl says so, which is why
 // it is in the named set rather than caught by the substring net: remove that entry
 // and this case is the one that fails.
-func TestDebugLog_RedactsTheLogoutUrlCarryingAnIdTokenHint(t *testing.T) {
+func TestDebugLog_RedactsTheLogoutURLCarryingAnIDTokenHint(t *testing.T) {
 	output := logRequestBody(t, `{"logoutUrl":"https://localhost:8080/auth/logout`+
 		`?id_token_hint=JWT-SENTINEL&post_logout_redirect_uri=https%3A%2F%2Fc.test%2Fout"}`)
 

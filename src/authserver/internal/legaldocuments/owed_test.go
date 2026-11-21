@@ -57,9 +57,9 @@ func mustAcceptDocuments(database *datamocks.Database) {
 }
 
 // acceptedVersions makes the user 42 hold acceptances of the versions given.
-func acceptedVersions(database *datamocks.Database, versionIds ...int64) {
+func acceptedVersions(database *datamocks.Database, versionIDs ...int64) {
 	acceptances := []record.LegalDocumentAcceptance{}
-	for _, id := range versionIds {
+	for _, id := range versionIDs {
 		acceptances = append(acceptances, record.LegalDocumentAcceptance{UserID: 42, LegalDocumentVersionID: id})
 	}
 	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(acceptances, nil)

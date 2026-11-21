@@ -52,11 +52,11 @@ func decodeSessionList(t *testing.T, rr *httptest.ResponseRecorder) []api.UserSe
 // the sessions it kept, in a single GetUsersByIDs. Only that endpoint has it, because only that
 // one lists sessions across users.
 func expectSessionOwnerRead(database *datamocks.Database, users ...record.User) {
-	byId := make(map[int64]record.User, len(users))
+	byID := make(map[int64]record.User, len(users))
 	for _, user := range users {
-		byId[user.ID] = user
+		byID[user.ID] = user
 	}
-	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(byId, nil).Once()
+	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(byID, nil).Once()
 }
 
 // expectSessionListReads registers the reads every list handler makes once it has its sessions:

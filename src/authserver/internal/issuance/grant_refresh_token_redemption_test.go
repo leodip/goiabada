@@ -48,15 +48,15 @@ type fakeSessions struct {
 
 type bumpCall struct {
 	sessionIdentifier string
-	clientId          int64
+	clientID          int64
 	authMethods       string
 	acrLevel          record.ACRLevel
 	ipAddress         string
 }
 
-func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier string, clientId int64,
+func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier string, clientID int64,
 	authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error) {
-	f.bumps = append(f.bumps, bumpCall{sessionIdentifier, clientId, authMethods, acrLevel, ipAddress})
+	f.bumps = append(f.bumps, bumpCall{sessionIdentifier, clientID, authMethods, acrLevel, ipAddress})
 	if f.note != nil {
 		f.note("bump")
 	}
@@ -136,7 +136,7 @@ func armRotationReading(mockDB *datamocks.Database, input *RefreshTokenGrantInpu
 	claimed bool, familyRevoked bool, note func(string)) *datamocks.RunInTransactionStub {
 
 	stub := datamocks.ExpectRunInTransaction(mockDB, rotationTx, note)
-	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, refreshOwnerUserId(input)).
+	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, refreshOwnerUserID(input)).
 		Run(func(mock.Arguments) { note("acquire") }).Return(nil).Once()
 	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).
 		Run(func(mock.Arguments) { note("claim") }).Return(claimed, nil).Once()
@@ -239,7 +239,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	require.Len(t, sessions.bumps, 1)
 	bump := sessions.bumps[0]
 	assert.Equal(t, "sid-1", bump.sessionIdentifier)
-	assert.Equal(t, int64(1), bump.clientId, "the session is bumped for the code's client")
+	assert.Equal(t, int64(1), bump.clientID, "the session is bumped for the code's client")
 	// No step-up and no address: the session keeps its methods, its level and the address its
 	// browser was last seen from (#243).
 	assert.Empty(t, bump.authMethods)
@@ -302,7 +302,7 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 	for _, tc := range []struct {
 		name   string
 		input  func() *RefreshTokenGrantInput
-		userId int64
+		userID int64
 	}{
 		{"authorization code token", codeRefreshInput, 5},
 		{"ROPC token", ropcRefreshInput, 5},
@@ -321,13 +321,13 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 
 			armRotation(mockDB, input, true, false, func(string) {})
 			armRefreshMint(t, mockDB, input, func(string) {})
-			mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, tc.userId).Return(true, nil)
+			mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, tc.userID).Return(true, nil)
 
 			response, _, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
 
 			require.NoError(t, err)
 			assert.NotEmpty(t, response.IDToken)
-			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userId)
+			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userID)
 			mockDB.AssertExpectations(t)
 		})
 	}

@@ -24,10 +24,10 @@ import (
 // console's own client, and a client's documents are the ones not retired that apply to all apps or
 // list it.
 
-func links(documentId int64, clientIds ...int64) []record.LegalDocumentClient {
+func links(documentID int64, clientIDs ...int64) []record.LegalDocumentClient {
 	out := []record.LegalDocumentClient{}
-	for i, clientId := range clientIds {
-		out = append(out, record.LegalDocumentClient{ID: int64(900 + i), LegalDocumentID: documentId, ClientID: clientId})
+	for i, clientID := range clientIDs {
+		out = append(out, record.LegalDocumentClient{ID: int64(900 + i), LegalDocumentID: documentID, ClientID: clientID})
 	}
 	return out
 }
@@ -352,7 +352,7 @@ func TestClientLegalDocuments_AnUnknownClientIs404(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", errorCode(body))
 }
 
-func TestClientLegalDocuments_AnInvalidIdIsABadRequest(t *testing.T) {
+func TestClientLegalDocuments_AnInvalidIDIsABadRequest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	status, body := serveLegal(HandleClientLegalDocumentsGet(database), clientDocumentsRequest(t, "abc"))

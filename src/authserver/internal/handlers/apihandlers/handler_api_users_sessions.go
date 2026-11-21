@@ -24,9 +24,9 @@ type usersSessionsDatabase interface {
 	sessionDetailsDatabase
 	revocation.Database
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
-	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionID int64) (*record.UserSession, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -121,14 +121,14 @@ func HandleUserSessionDelete(
 			return
 		}
 
-		sessionId, err := strconv.ParseInt(idStr, 10, 64)
+		sessionID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user session ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if session exists
-		userSession, err := database.GetUserSessionByID(r.Context(), nil, sessionId)
+		userSession, err := database.GetUserSessionByID(r.Context(), nil, sessionID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -174,7 +174,7 @@ func HandleUserSessionDelete(
 		// terminated_user_session carries the security detail (decision 9).
 		loggedInUser := callerSubject(r)
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": sessionId,
+			"user_session_id": sessionID,
 			"user_id":         userSession.UserID,
 			"logged_in_user":  loggedInUser,
 			"reason":          audit.DeletedUserSessionEndedByAdministrator,

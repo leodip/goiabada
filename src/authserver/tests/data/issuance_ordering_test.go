@@ -26,11 +26,11 @@ type issuanceOutcome struct {
 func ceremonyCodeInput(client *record.Client, user *record.User, sessionIdentifier string) *issuance.CreateCodeInput {
 	authenticatedAt := time.Now().UTC().Add(-time.Minute)
 	return &issuance.CreateCodeInput{
-		ClientId:          client.ClientIdentifier,
-		UserId:            user.ID,
+		ClientID:          client.ClientIdentifier,
+		UserID:            user.ID,
 		RedirectURI:       "https://example.com/callback",
 		Scope:             "openid profile",
-		AcrLevel:          "urn:goiabada:level1",
+		ACRLevel:          "urn:goiabada:level1",
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   &authenticatedAt,
 		SessionIdentifier: sessionIdentifier,

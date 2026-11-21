@@ -18,21 +18,21 @@ import (
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
-	_, sessionUserId := SessionUserIdFrom(ctx)
+	_, sessionUserID := SessionUserIDFrom(ctx)
 	_, bearer := BearerTokenFrom(ctx)
 	_, validated := ValidatedTokenFrom(ctx)
 	_, reservation := CredentialReservationFrom(ctx)
-	_, actingUserId := ActingUserIdFrom(ctx)
+	_, actingUserID := ActingUserIDFrom(ctx)
 	_, dpopProof := DPoPProofFrom(ctx)
 	_, pageClient := PageClientFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
-		"sessionUserId":     sessionUserId,
+		"sessionUserID":     sessionUserID,
 		"bearer":            bearer,
 		"validated":         validated,
 		"reservation":       reservation,
-		"actingUserId":      actingUserId,
+		"actingUserID":      actingUserID,
 		"dpopProof":         dpopProof,
 		"pageClient":        pageClient,
 	}
@@ -55,13 +55,13 @@ func TestReqctx_RoundTrip(t *testing.T) {
 	})
 
 	t.Run("session user id", func(t *testing.T) {
-		got, ok := SessionUserIdFrom(WithSessionUserId(ctx, 7))
+		got, ok := SessionUserIDFrom(WithSessionUserID(ctx, 7))
 		require.True(t, ok)
 		assert.Equal(t, int64(7), got)
 	})
 
 	t.Run("acting user id", func(t *testing.T) {
-		got, ok := ActingUserIdFrom(WithActingUserId(ctx, 42))
+		got, ok := ActingUserIDFrom(WithActingUserID(ctx, 42))
 		require.True(t, ok)
 		assert.Equal(t, int64(42), got)
 	})
@@ -152,11 +152,11 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	cases := map[string]context.Context{
 		"settings":          WithSettings(ctx, &record.Settings{}),
 		"sessionIdentifier": WithSessionIdentifier(ctx, "session-1"),
-		"sessionUserId":     WithSessionUserId(ctx, 7),
+		"sessionUserID":     WithSessionUserID(ctx, 7),
 		"bearer":            WithBearerToken(ctx, token),
 		"validated":         WithValidatedToken(ctx, token),
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),
-		"actingUserId":      WithActingUserId(ctx, 7),
+		"actingUserID":      WithActingUserID(ctx, 7),
 		"dpopProof":         WithDPoPProof(ctx, &dpop.Proof{}),
 		"pageClient":        WithPageClient(ctx, &PageClient{}),
 	}

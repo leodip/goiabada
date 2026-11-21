@@ -21,10 +21,10 @@ type clientPermissionsDatabase interface {
 	clientTargetPolicyDatabase
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
-	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
-	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
-	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionID int64) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -129,10 +129,10 @@ func HandleClientPermissionsPut(
 		}
 
 		// Validate that all requested permissions exist
-		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionId)
+		for _, permissionID := range wanted {
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionID)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "client_id", client.ID)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionID, "client_id", client.ID)
 				return
 			}
 			if permission == nil {
@@ -155,7 +155,7 @@ func HandleClientPermissionsPut(
 		}
 
 		grantKey := func(cp record.ClientPermission) int64 { return cp.PermissionID }
-		grantId := func(cp record.ClientPermission) int64 { return cp.ID }
+		grantID := func(cp record.ClientPermission) int64 { return cp.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where
 		// the autocommitted writes this replaced could leave a grant made or a revocation done under
@@ -180,18 +180,18 @@ func HandleClientPermissionsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteClientPermission(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting client permission %d", rowId)
+			insert, remove := replaceSet(stored, grantKey, grantID, wanted)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteClientPermission(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting client permission %d", rowID)
 				}
 			}
-			for _, permissionId := range insert {
+			for _, permissionID := range insert {
 				if createErr := database.CreateClientPermission(r.Context(), tx, &record.ClientPermission{
 					ClientID:     client.ID,
-					PermissionID: permissionId,
+					PermissionID: permissionID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionID)
 				}
 			}
 			// Assigned only by an attempt that reached its end, as the user and group saves do.

@@ -46,8 +46,8 @@ func TestEventTypes_ContainsCriticalEvents(t *testing.T) {
 	criticalEvents := []string{
 		EventAuthSuccessPwd,
 		EventAuthFailedPwd,
-		EventAuthSuccessOtp,
-		EventAuthFailedOtp,
+		EventAuthSuccessOTP,
+		EventAuthFailedOTP,
 		EventCreatedUser,
 		EventDeletedUser,
 		// A user deleting their own account (#783 decision 7): the same class as deleted_user,
@@ -157,8 +157,8 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 	}{
 		{"EventAuthSuccessPwd", EventAuthSuccessPwd, "auth_success_pwd"},
 		{"EventAuthFailedPwd", EventAuthFailedPwd, "auth_failed_pwd"},
-		{"EventAuthSuccessOtp", EventAuthSuccessOtp, "auth_success_otp"},
-		{"EventAuthFailedOtp", EventAuthFailedOtp, "auth_failed_otp"},
+		{"EventAuthSuccessOTP", EventAuthSuccessOTP, "auth_success_otp"},
+		{"EventAuthFailedOTP", EventAuthFailedOTP, "auth_failed_otp"},
 		{"EventRevokedUserAuthState", EventRevokedUserAuthState, "revoked_user_auth_state"},
 		{"EventTerminatedUserSession", EventTerminatedUserSession, "terminated_user_session"},
 		{"EventRevokedClientGrants", EventRevokedClientGrants, "revoked_client_grants"},

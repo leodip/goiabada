@@ -71,7 +71,7 @@ func noticeRoutes() []noticeRoute {
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
 				stubOTPEnable(database, auditLogger, before)
 				return accountOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender),
-					withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t)),
+					withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOTPCode(t)),
 						passwordNoticeSettings())
 			},
 		},

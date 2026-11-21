@@ -25,9 +25,9 @@ import (
 // the browser holds afterwards is what the store reads, not what a mock was told.
 func TestHandleAuthorizeGet_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *testing.T) {
 	inProgress := &ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
+		CeremonyID: testCeremonyID,
 		AuthState:  ceremony.AuthStateLevel1Password,
-		ClientId:   "other-client",
+		ClientID:   "other-client",
 		State:      "the-first-request",
 	}
 

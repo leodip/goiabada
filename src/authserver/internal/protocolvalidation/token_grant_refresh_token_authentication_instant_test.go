@@ -33,7 +33,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 		for _, tc := range []struct {
 			name          string
 			instant       sql.NullTime
-			tokenClientId int64
+			tokenClientID int64
 			wantCode      string
 			wantDesc      string // empty means accepted
 		}{
@@ -59,7 +59,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 					RefreshTokenJTI: "ropc_jti",
 					CodeID:          sql.NullInt64{Valid: false},
 					UserID:          sql.NullInt64{Int64: 7, Valid: true},
-					ClientID:        sql.NullInt64{Int64: tc.tokenClientId, Valid: true},
+					ClientID:        sql.NullInt64{Int64: tc.tokenClientID, Valid: true},
 					AuthenticatedAt: tc.instant,
 					Scope:           "openid",
 					User:            user,
@@ -82,7 +82,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 
 				result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
-					ClientId:     "ropc_client",
+					ClientID:     "ropc_client",
 					RefreshToken: "ropc_refresh_token",
 				})
 
@@ -147,7 +147,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}, &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "test_client",
+			ClientID:     "test_client",
 			ClientSecret: "client_secret",
 			RefreshToken: "the-refresh-token",
 		})

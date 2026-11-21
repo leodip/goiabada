@@ -24,15 +24,15 @@ type legalAcceptanceDatabase interface {
 	consentReader
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // LegalAcceptanceDocument is one document the acceptance step lists.
 type LegalAcceptanceDocument struct {
 	Title     string
 	ShortName string
-	// VersionId is the id of the version shown, which the checkbox and the hidden field carry.
-	VersionId     int64
+	// VersionID is the id of the version shown, which the checkbox and the hidden field carry.
+	VersionID     int64
 	VersionNumber int
 	// Ticked is whether the box was ticked when the step is shown again after a submission.
 	Ticked bool
@@ -132,8 +132,8 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 	authContext *ceremony.AuthContext, body url.Values) (LegalAcceptanceResult, error) {
 
 	if !legalAcceptanceAccepted(body) {
-		client := clientProvenance(ctx, o.database, authContext.ClientId)
-		details := map[string]interface{}{"user_id": authContext.UserId}
+		client := clientProvenance(ctx, o.database, authContext.ClientID)
+		details := map[string]interface{}{"user_id": authContext.UserID}
 		if client != nil {
 			details["client_id"] = client.ID
 		}
@@ -141,7 +141,7 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 		return LegalAcceptanceResult{
 			ClientError: &ClientError{Client: client, Code: "access_denied",
 				Description: legalAcceptanceDeclinedDescription},
-			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr: browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 	}
 
@@ -195,14 +195,14 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 func (o *LegalAcceptance) load(ctx context.Context,
 	authContext *ceremony.AuthContext) (*record.Client, *record.User, error) {
 
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return nil, nil, err
 	}
 	if client == nil {
 		return nil, nil, errs.New("client not found")
 	}
-	user, err := o.database.GetUserByID(ctx, nil, authContext.UserId)
+	user, err := o.database.GetUserByID(ctx, nil, authContext.UserID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,7 +238,7 @@ func legalAcceptanceScreen(client *record.Client, owed []legaldocuments.InEffect
 		screen.Documents = append(screen.Documents, LegalAcceptanceDocument{
 			Title:         doc.Current.Title,
 			ShortName:     doc.Document.ShortName,
-			VersionId:     doc.Current.ID,
+			VersionID:     doc.Current.ID,
 			VersionNumber: doc.Current.VersionNumber,
 			Ticked:        ticked[doc.Current.ID],
 		})

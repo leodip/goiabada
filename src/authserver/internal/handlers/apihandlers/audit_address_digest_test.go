@@ -45,7 +45,7 @@ func captureAuditDetails(auditLogger *handlersmocks.AuditLogger, event string) *
 	return &details
 }
 
-func TestHandleUserCreatePost_AuditsTheCreatedUsersIdAndAddressDigest(t *testing.T) {
+func TestHandleUserCreatePost_AuditsTheCreatedUsersIDAndAddressDigest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	userCreator := accounthandlersmocks.NewUserCreator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -87,7 +87,7 @@ func TestHandleUserEmailVerificationCodePost_AuditsTheAddressDigest(t *testing.T
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectCodeGenRead(database)
-	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 		mock.Anything, mock.Anything).Return(true, nil).Once()
 	details := captureAuditDetails(auditLogger, audit.EventGeneratedEmailVerificationCode)
 
@@ -96,7 +96,7 @@ func TestHandleUserEmailVerificationCodePost_AuditsTheAddressDigest(t *testing.T
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, map[string]interface{}{
-		"user_id":        codeGenUserId,
+		"user_id":        codeGenUserID,
 		"email_digest":   lowercaseAddressDigest("read@example.com"),
 		"logged_in_user": adminSubject,
 	}, *details)

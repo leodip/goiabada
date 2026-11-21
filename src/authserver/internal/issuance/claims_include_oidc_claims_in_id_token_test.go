@@ -21,7 +21,7 @@ import (
 // Tests for IncludeOpenIDConnectClaimsInIDToken Setting
 // ============================================================================
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_GlobalEnabled(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -75,7 +75,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: sessionIdentifier,
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -84,7 +84,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -129,7 +129,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	assert.Equal(t, input.User.AddressCountry, address["country"])
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_GlobalDisabled(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -171,7 +171,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: sessionIdentifier,
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -181,7 +181,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 	// because the code doesn't check for pictures when OIDC claims aren't included
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -216,7 +216,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	assert.NotContains(t, claims, "picture")
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_ClientOverrideOn(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -252,7 +252,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: sessionIdentifier,
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -261,7 +261,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -281,7 +281,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	assert.Equal(t, input.User.EmailVerified, claims["email_verified"])
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_ClientOverrideOff(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -317,7 +317,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: sessionIdentifier,
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -326,7 +326,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -344,7 +344,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	assert.NotContains(t, claims, "email_verified")
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributesAlwaysIncluded(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_GroupsAndAttributesAlwaysIncluded(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -385,7 +385,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 		},
 		Scope:             "openid profile email groups attributes",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: sessionIdentifier,
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -394,7 +394,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -416,7 +416,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	assert.NotContains(t, attributes, "attr3")
 }
 
-func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlow(t *testing.T) {
+func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIDToken_FullFlow(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -525,7 +525,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	mockDB.AssertExpectations(t)
 }
 
-func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideFullFlow(t *testing.T) {
+func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIDToken_ClientOverrideFullFlow(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
@@ -620,7 +620,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	mockDB.AssertExpectations(t)
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAffected(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_MinimalScope_NotAffected(t *testing.T) {
 	// When scope is just "openid" with no profile/email/etc, setting should have no effect
 	// since there are no OIDC claims to include anyway
 	mockDB := datamocks.NewDatabase(t)
@@ -654,7 +654,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: "session-123",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -662,7 +662,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 
 	// NOTE: No UserHasProfilePicture mock needed when setting is disabled
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -680,7 +680,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	// Setting has no effect in this case - result is the same whether true or false
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_GlobalEnabled(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_MinimalScope_GlobalEnabled(t *testing.T) {
 	// When scope is just "openid" with no profile/email/etc, setting should have no effect
 	// even when global setting is enabled
 	mockDB := datamocks.NewDatabase(t)
@@ -714,7 +714,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: "session-456",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -722,7 +722,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 
 	// NOTE: No UserHasProfilePicture mock needed when scope excludes profile
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -738,7 +738,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	assert.NotContains(t, claims, "name")
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailOnly(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_PartialScope_EmailOnly(t *testing.T) {
 	// Test with only email scope (not profile, address, phone)
 	// Should only include email claims, not other OIDC claims
 	mockDB := datamocks.NewDatabase(t)
@@ -779,7 +779,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 		},
 		Scope:             "openid email", // Only email scope, NOT profile/address/phone
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: "session-email-only",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -788,7 +788,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 
 	// NOTE: No UserHasProfilePicture mock needed - email scope doesn't check for pictures
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -817,7 +817,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	assert.NotContains(t, claims, "address")
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_WithProfilePicture(t *testing.T) {
 	// Test that picture claim is included when user has profile picture
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
@@ -830,7 +830,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
-	userId := int64(999)
+	userID := int64(999)
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -840,7 +840,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 
 	input := &tokenGenerationInput{
 		User: &record.User{
-			ID:            userId,
+			ID:            userID,
 			Subject:       sub,
 			Email:         "picture@example.com",
 			EmailVerified: true,
@@ -854,7 +854,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: "session-picture",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -862,9 +862,9 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	}
 
 	// Mock: User HAS a profile picture
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), userId).Return(true, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), userID).Return(true, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -884,7 +884,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	assert.Equal(t, expectedPictureURL, claims["picture"])
 }
 
-func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *testing.T) {
+func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_EmptyUserFields(t *testing.T) {
 	// Test with user having empty/null optional fields
 	// Should only include non-empty claims
 	mockDB := datamocks.NewDatabase(t)
@@ -929,7 +929,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       []string{"pwd"},
 		SessionIdentifier: "session-minimal",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
@@ -938,7 +938,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.AnythingOfType("*sql.Tx"), mock.AnythingOfType("int64")).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIDTokenCore(context.Background(), nil, settings, input, now, privKey, "test-key-id")
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 

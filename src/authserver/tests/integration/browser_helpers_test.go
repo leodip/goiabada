@@ -71,7 +71,7 @@ func assertRedirect(t *testing.T, response *http.Response, location string) stri
 		ceremonyIds := redirectLocation.Query()[ceremony.QueryParameter]
 		if assert.Len(t, ceremonyIds, 1, "a redirect to %s names exactly one ceremony: %s", location,
 			redirectLocation.String()) {
-			assert.True(t, ceremony.IsWellFormedId(ceremonyIds[0]),
+			assert.True(t, ceremony.IsWellFormedID(ceremonyIds[0]),
 				"the ceremony a redirect to %s names is an id: %q", location, ceremonyIds[0])
 		}
 		assert.Len(t, redirectLocation.Query(), 1, "a redirect between ceremony routes carries the ceremony and nothing else")

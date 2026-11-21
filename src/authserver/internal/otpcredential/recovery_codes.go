@@ -122,10 +122,10 @@ type RecoveryCodeResult struct {
 // RecoveryCodeDatabase is what UseRecoveryCode reads and writes. data.Database satisfies it.
 type RecoveryCodeDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) (int, error)
 }
 
 // UseRecoveryCode checks a recovery code, as the user typed it, against user's set and claims it:
@@ -199,8 +199,8 @@ func IsBlankRecoveryCode(code string) bool {
 // satisfies it.
 type ReplaceRecoveryCodesDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error
 }
 
 // ReplaceRecoveryCodes gives the user a new set of recovery codes, which replaces the set they had,

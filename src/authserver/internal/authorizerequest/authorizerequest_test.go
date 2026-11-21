@@ -147,7 +147,7 @@ func TestConsume_AMalformedHandleReadsNothing(t *testing.T) {
 	}
 }
 
-func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsId(t *testing.T) {
+func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsID(t *testing.T) {
 	handle := strings.Repeat("A", 43)
 	form := url.Values{"client_id": {"c"}, "state": {"one", "two"}, "nonce": {"a&b=c;d%e+f"}}
 

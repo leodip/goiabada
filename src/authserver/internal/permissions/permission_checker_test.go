@@ -136,20 +136,20 @@ func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T)
 }
 
 // A permission identifier such as "read" is only unique within its resource.
-// Matching is done on permission Id precisely so that holding "read" on one
+// Matching is done on permission ID precisely so that holding "read" on one
 // resource does not grant "read" on another. This test guards that.
 func TestUserHasScopePermission_DeniedWhenIdentifierMatchesButResourceDiffers(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	// The user holds "read" (Id 77) on some other resource.
+	// The user holds "read" (ID 77) on some other resource.
 	user := &record.User{
 		ID:          1,
 		Permissions: []record.Permission{{ID: 77, PermissionIdentifier: "read", ResourceID: 20}},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	// On backend-svc, "read" is a different row (Id 5).
+	// On backend-svc, "read" is a different row (ID 5).
 	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
@@ -348,7 +348,7 @@ func TestFilterOutScopes_NilUser(t *testing.T) {
 
 // OIDC and offline_access scopes are returned without any database lookup.
 // NewDatabase(t) asserts no unexpected calls, so this also proves no lookup happens.
-func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T) {
+func TestFilterOutScopes_OIDCAndOfflineAccessBypassPermissionCheck(t *testing.T) {
 	testCases := []struct {
 		name  string
 		scope string
@@ -392,7 +392,7 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	// The user holds "read" (Id 5) but not "write" (Id 6).
+	// The user holds "read" (ID 5) but not "write" (ID 6).
 	user := &record.User{
 		ID:          1,
 		Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}},
@@ -413,7 +413,7 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 	assert.Equal(t, "backend-svc:read", result, "the unauthorized scope must be dropped")
 }
 
-func TestFilterOutScopes_PreservesOrderAndMixesOidcWithResourceScopes(t *testing.T) {
+func TestFilterOutScopes_PreservesOrderAndMixesOIDCWithResourceScopes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
@@ -676,7 +676,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 		want          ScopeOutcome
 		wantResource  string
 		wantPerm      string
-		wantPermRowId int64
+		wantPermRowID int64
 	}{
 		{name: "no separator", scope: "backendsvc", want: ScopeMalformed},
 		{name: "two separators", scope: "backend-svc:read:extra", want: ScopeMalformed},
@@ -705,7 +705,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
 				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
 			},
-			want: ScopeOK, wantResource: "backend-svc", wantPerm: "write", wantPermRowId: 6,
+			want: ScopeOK, wantResource: "backend-svc", wantPerm: "write", wantPermRowID: 6,
 		},
 	}
 
@@ -725,7 +725,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 			assert.Equal(t, tc.wantPerm, resolution.PermissionIdentifier)
 			if tc.want == ScopeOK {
 				if assert.NotNil(t, resolution.Permission) {
-					assert.Equal(t, tc.wantPermRowId, resolution.Permission.ID)
+					assert.Equal(t, tc.wantPermRowID, resolution.Permission.ID)
 				}
 			} else {
 				assert.Nil(t, resolution.Permission)
@@ -838,7 +838,7 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 // The scope filter reaches the database through the resolver and its one grant load, so the
 // context it was given has to survive both hops as well. An OIDC scope is answered without any read
 // at all, which is the reject arm: nothing to carry, nothing to get wrong.
-func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkipsOidcScopes(t *testing.T) {
+func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkipsOIDCScopes(t *testing.T) {
 	type marker struct{}
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 	callersContext := mock.MatchedBy(func(got context.Context) bool {

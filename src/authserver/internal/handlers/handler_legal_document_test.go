@@ -90,7 +90,7 @@ func TestHandleLegalDocumentGet_TheCurrentVersion(t *testing.T) {
 // too, so each is drawn in the brand LinkedSignInPageClient draws the page in (#812). An id of the
 // wrong shape is not echoed, and a page naming none binds none.
 func TestHandleLegalDocumentGet_TheSignInItsURLNamesIsCarriedOnItsLinks(t *testing.T) {
-	signIn := ceremony.NewId()
+	signIn := ceremony.NewID()
 	for _, tc := range []struct {
 		name  string
 		query string

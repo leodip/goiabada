@@ -234,11 +234,11 @@ func HandleAccountLogoutRequestPost(
 		}
 
 		// Build logout redirect URL
-		logoutUrl := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", baseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
+		logoutURL := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", baseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
 		if req.State != "" {
-			logoutUrl += "&state=" + url.QueryEscape(req.State)
+			logoutURL += "&state=" + url.QueryEscape(req.State)
 		}
-		resp := api.AccountLogoutRedirectResponse{LogoutURL: logoutUrl}
+		resp := api.AccountLogoutRedirectResponse{LogoutURL: logoutURL}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

@@ -202,7 +202,7 @@ func TestEndClientPartTx_RevokesTheDepartingClientsSessionBoundGrants(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, end.Ended, "the client's part ended")
 	assert.False(t, end.SessionDeleted, "the other client keeps the session")
-	assert.Equal(t, []string{g.live.RefreshTokenJTI}, end.RevokedRefreshTokenJtis,
+	assert.Equal(t, []string{g.live.RefreshTokenJTI}, end.RevokedRefreshTokenJTIs,
 		"the one token this call moved from live to revoked")
 	assert.Equal(t, int64(1), end.RevokedCodeCount, "the client's one unredeemed code from the session")
 
@@ -246,11 +246,11 @@ func TestEndClientPartTx_TheSessionsLastClientRevokesAsWell(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, end.Ended)
 	assert.True(t, end.SessionDeleted, "the client was the session's last")
-	assert.Equal(t, []string{bound.RefreshTokenJTI}, end.RevokedRefreshTokenJtis)
+	assert.Equal(t, []string{bound.RefreshTokenJTI}, end.RevokedRefreshTokenJTIs)
 	assertRefreshTokenRevoked(t, bound, true, "the lone client's session-bound token")
 
 	again, err := revocation.EndClientPartTx(ctx, database, session.SessionIdentifier, client.ClientIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, again.Ended, "a session already gone has no part to end")
-	assert.Empty(t, again.RevokedRefreshTokenJtis)
+	assert.Empty(t, again.RevokedRefreshTokenJTIs)
 }

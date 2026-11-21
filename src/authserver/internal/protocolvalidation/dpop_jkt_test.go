@@ -222,7 +222,7 @@ func TestValidateTokenRequest_CodeGrant_ABoundCodeNeedsAProofByItsKey(t *testing
 			capture := logtest.CaptureSlog(t)
 			grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 				GrantType:      "authorization_code",
-				ClientId:       "spa",
+				ClientID:       "spa",
 				Code:           "the_code",
 				RedirectURI:    redirectURI,
 				CodeVerifier:   verifier,

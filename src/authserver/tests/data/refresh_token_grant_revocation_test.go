@@ -101,7 +101,7 @@ func TestRevokeGrantTx(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{members[1].RefreshTokenJTI, members[2].RefreshTokenJTI},
-		result.RevokedRefreshTokenJtis, "the two live members, and not the one rotated before")
+		result.RevokedRefreshTokenJTIs, "the two live members, and not the one rotated before")
 
 	stored, err := database.GetRefreshTokensByFirstRefreshTokenJTI(ctx, nil, family)
 	require.NoError(t, err)
@@ -133,8 +133,8 @@ func TestRevokeGrantTx_AGrantAlreadyRevoked(t *testing.T) {
 		result, err := revocation.RevokeGrantTx(ctx, database, family)
 
 		require.NoError(t, err)
-		require.NotNil(t, result.RevokedRefreshTokenJtis)
-		assert.Empty(t, result.RevokedRefreshTokenJtis)
+		require.NotNil(t, result.RevokedRefreshTokenJTIs)
+		assert.Empty(t, result.RevokedRefreshTokenJTIs)
 		reason, _, found := familyRevocationRow(t, family)
 		require.True(t, found)
 		assert.Equal(t, "client_revoked", reason)
@@ -148,7 +148,7 @@ func TestRevokeGrantTx_AGrantAlreadyRevoked(t *testing.T) {
 		result, err := revocation.RevokeGrantTx(ctx, database, family)
 
 		require.NoError(t, err)
-		assert.Len(t, result.RevokedRefreshTokenJtis, 1, "the live member is still swept")
+		assert.Len(t, result.RevokedRefreshTokenJTIs, 1, "the live member is still swept")
 		reason, _, found := familyRevocationRow(t, family)
 		require.True(t, found)
 		assert.Equal(t, familyRevocationReason, reason, "the first record stays as it was")

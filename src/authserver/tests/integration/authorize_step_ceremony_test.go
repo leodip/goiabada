@@ -171,7 +171,7 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 	}{
 		{"no parameter at all, a hand-typed address", base},
 		{"the parameter present and empty", base + "?" + ceremony.QueryParameter + "="},
-		{"another ceremony's id", base + "?" + ceremony.QueryParameter + "=" + ceremony.NewId()},
+		{"another ceremony's id", base + "?" + ceremony.QueryParameter + "=" + ceremony.NewID()},
 		{"the stored id one character short", base + "?" + ceremony.QueryParameter + "=" + ceremonyId[:len(ceremonyId)-1]},
 		{"the stored id and more", base + "?" + ceremony.QueryParameter + "=" + ceremonyId + "x"},
 		{"the form field's name in place of the parameter", base + "?ceremonyId=" + url.QueryEscape(ceremonyId)},

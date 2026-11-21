@@ -68,7 +68,7 @@ func TestHandleLegalAcceptance_AFailureAnswers500AndMovesNothingOn(t *testing.T)
 			var req *http.Request
 			var handler http.HandlerFunc
 			if tc.method == http.MethodGet {
-				req = httptest.NewRequest(http.MethodGet, "/auth/legal-acceptance?ceremony="+testCeremonyId, nil)
+				req = httptest.NewRequest(http.MethodGet, "/auth/legal-acceptance?ceremony="+testCeremonyID, nil)
 				handler = buildLegalAcceptanceGet(deps)
 			} else {
 				req = httptest.NewRequest(http.MethodPost, "/auth/legal-acceptance", strings.NewReader(accept.Encode()))
@@ -79,10 +79,10 @@ func TestHandleLegalAcceptance_AFailureAnswers500AndMovesNothingOn(t *testing.T)
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-				CeremonyId: testCeremonyId,
+				CeremonyID: testCeremonyID,
 				AuthState:  ceremony.AuthStateRequiresLegalAcceptance,
-				ClientId:   "test-client",
-				UserId:     1,
+				ClientID:   "test-client",
+				UserID:     1,
 				Scope:      "openid",
 			}, nil).Once()
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").

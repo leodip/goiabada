@@ -296,7 +296,7 @@ func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	cfg := &config.Config{}
-	cfg.AuthServer.ListenHostHttps, cfg.AuthServer.ListenHostHttp = "", ""
+	cfg.AuthServer.ListenHostHTTPS, cfg.AuthServer.ListenHostHTTP = "", ""
 
 	s := &Server{cfg: cfg}
 	drained, err := s.Start(context.Background())

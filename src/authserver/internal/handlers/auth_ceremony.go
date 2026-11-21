@@ -108,14 +108,14 @@ func (b *CeremonyBoundary) rejectCeremonyMismatch(w http.ResponseWriter, r *http
 	}
 
 	details := map[string]interface{}{
-		"client_identifier": authContext.ClientId,
+		"client_identifier": authContext.ClientID,
 		"auth_state":        string(authContext.AuthState),
 		"ip":                clientIP,
 	}
 	// Absent rather than zero when the ceremony has not identified anyone yet, which is every
 	// submission of the password form: a payload naming user 0 asserts a row that does not exist.
-	if authContext.UserId != 0 {
-		details["user_id"] = authContext.UserId
+	if authContext.UserID != 0 {
+		details["user_id"] = authContext.UserID
 	}
 	b.auditLogger.Log(r.Context(), audit.EventAuthCeremonyMismatch, details)
 
@@ -172,7 +172,7 @@ func (b *CeremonyBoundary) answerCeremonyReplaced(w http.ResponseWriter, r *http
 // returns without writing anything.
 //
 // The store reads the ceremony the request names (ceremony.Store.GetAuthContext, through
-// ceremony.RequestedId): a form names its ceremony in its body and a page load in the URL every step
+// ceremony.RequestedID): a form names its ceremony in its body and a page load in the URL every step
 // redirect builds (stepRedirect). Without that, a tab of a sign-in the browser no longer holds that
 // reached its next step would act on another sign-in and could finish another application's
 // authorization (#246 decision 22).
@@ -192,9 +192,9 @@ func (b *CeremonyBoundary) loadAuthContext(w http.ResponseWriter, r *http.Reques
 	case err == nil:
 		return authContext, true
 	case errors.Is(err, ceremony.ErrNoAuthContext):
-		var profileUrl = profileURL(b.adminConsoleBaseURL)
-		slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
-		http.Redirect(w, r, profileUrl, redirectStatus(r))
+		var profileURL = profileURL(b.adminConsoleBaseURL)
+		slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileURL)
+		http.Redirect(w, r, profileURL, redirectStatus(r))
 	case errors.Is(err, ceremony.ErrCeremonyNotHeld):
 		latest, latestErr := b.ceremonyStore.LatestAuthContext(r)
 		if latestErr != nil {
@@ -213,7 +213,7 @@ func (b *CeremonyBoundary) loadAuthContext(w http.ResponseWriter, r *http.Reques
 // url.Values, so the parameter is written once and the id is encoded rather than trusted to need no
 // escaping.
 func ceremonyStepURL(baseURL string, path string, authContext *ceremony.AuthContext) string {
-	return baseURL + path + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyId}}.Encode()
+	return baseURL + path + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyID}}.Encode()
 }
 
 // stepRedirect redirects to the ceremony's next step, at path under the auth server's base URL and

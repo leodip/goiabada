@@ -190,7 +190,7 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 		if result.Changed() {
 			changed++
 		}
-		for _, jti := range result.RevokedRefreshTokenJtis {
+		for _, jti := range result.RevokedRefreshTokenJTIs {
 			if jti == token.RefreshTokenJTI {
 				reported++
 			}

@@ -26,7 +26,7 @@ func TestHandleGroupPermissionsGet_AFailedCountAnswers500(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
-	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5/permissions", "5"))
+	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIDRequest("/api/v1/admin/groups/5/permissions", "5"))
 
 	requireCountFailureAnswered500(t, rr, capture, 5)
 }

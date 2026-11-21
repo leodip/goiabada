@@ -182,7 +182,7 @@ func assertRevokedEverything(t *testing.T, f recoveryFixture, outcome recovery.O
 	assertTokenRevoked(t, f.sessionToken.ID, true, "the session-bound refresh token")
 	assertTokenRevoked(t, f.offlineToken.ID, true, "the offline refresh token")
 	assert.ElementsMatch(t, []string{f.sessionToken.RefreshTokenJTI, f.offlineToken.RefreshTokenJTI},
-		outcome.Revocation.RevokedRefreshTokenJtis)
+		outcome.Revocation.RevokedRefreshTokenJTIs)
 
 	bystander, err := database.GetUserSessionByID(ctx, nil, f.bystanderSession.ID)
 	require.NoError(t, err)
@@ -654,7 +654,7 @@ func TestRecovery_AGrantSweepsStateCommittedHoldingTheUsersRow(t *testing.T) {
 				assert.Contains(t, got.outcome.Revocation.TerminatedSessionIdentifiers, session.SessionIdentifier)
 			} else {
 				assertTokenRevoked(t, token.ID, true, "the child written while the recovery waited")
-				assert.Contains(t, got.outcome.Revocation.RevokedRefreshTokenJtis, token.RefreshTokenJTI)
+				assert.Contains(t, got.outcome.Revocation.RevokedRefreshTokenJTIs, token.RefreshTokenJTI)
 			}
 			assert.Equal(t, f.user.AuthStateGeneration+1, got.outcome.Revocation.NewGeneration)
 			assert.True(t, got.outcome.ManageGranted)
@@ -760,7 +760,7 @@ func TestRecovery_DisableTurnstileAloneTouchesNoUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, outcome.TurnstileDisabled)
-	assert.Zero(t, outcome.UserId, "no user was recovered")
+	assert.Zero(t, outcome.UserID, "no user was recovered")
 	assertTurnstile(t, false, "the challenge is off")
 
 	after, err := database.GetUserByID(ctx, nil, f.user.ID)

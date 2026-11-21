@@ -117,7 +117,7 @@ func dpopGuards(t *testing.T, surface, baseURL string, store *replayStore) *Bear
 
 // dpopChain is /userinfo's chain as routes.go mounts it, the session guard aside.
 func dpopChain(guards *BearerToken) http.Handler {
-	return guards.JwtAuthorizationHeaderToContext()(
+	return guards.JWTAuthorizationHeaderToContext()(
 		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) }))))
 }

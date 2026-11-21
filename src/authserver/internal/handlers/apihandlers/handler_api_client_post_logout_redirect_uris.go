@@ -90,7 +90,7 @@ func HandleClientPostLogoutRedirectURIsPut(
 		}
 
 		key := func(row record.PostLogoutRedirectURI) string { return strings.TrimSpace(row.URI) }
-		rowId := func(row record.PostLogoutRedirectURI) int64 { return row.ID }
+		rowID := func(row record.PostLogoutRedirectURI) int64 { return row.ID }
 
 		// One transaction, as the redirect URI save's: a failure part way through commits nothing,
 		// and the stored list is read on it, compared with the loaded one and planned from on every
@@ -104,7 +104,7 @@ func HandleClientPostLogoutRedirectURIsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.PostLogoutRedirectURIs, key, rowId, normalized)
+			insert, remove := replaceSet(client.PostLogoutRedirectURIs, key, rowID, normalized)
 			for _, removed := range remove {
 				if deleteErr := database.DeletePostLogoutRedirectURI(r.Context(), tx, removed); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting sign-out redirect URI %d", removed)

@@ -210,14 +210,14 @@ func TestValidateClientAndRedirectURI_AReadFaultNamesTheClientOnlyOnceItWasRead(
 		mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(readErr).Once()
 
 		err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(context.Background(),
-			&ValidateClientAndRedirectURIInput{ClientId: "known-client", RedirectURI: "https://example.com/callback",
+			&ValidateClientAndRedirectURIInput{ClientID: "known-client", RedirectURI: "https://example.com/callback",
 				ResponseType: "code"})
 
 		require.ErrorIs(t, err, readErr)
 		require.EqualError(t, err, "redirect URIs read fault")
 		var clientKnown *ClientKnownError
 		require.ErrorAs(t, err, &clientKnown)
-		assert.Equal(t, "known-client", clientKnown.ClientId)
+		assert.Equal(t, "known-client", clientKnown.ClientID)
 		var locErr *i18n.LocalizedError
 		assert.NotErrorAs(t, err, &locErr, "a read fault must not be reported as a refusal")
 	})
@@ -228,7 +228,7 @@ func TestValidateClientAndRedirectURI_AReadFaultNamesTheClientOnlyOnceItWasRead(
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "known-client").Return(nil, readErr).Once()
 
 		err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(context.Background(),
-			&ValidateClientAndRedirectURIInput{ClientId: "known-client", RedirectURI: "https://example.com/callback",
+			&ValidateClientAndRedirectURIInput{ClientID: "known-client", RedirectURI: "https://example.com/callback",
 				ResponseType: "code"})
 
 		require.ErrorIs(t, err, readErr)
@@ -239,17 +239,17 @@ func TestValidateClientAndRedirectURI_AReadFaultNamesTheClientOnlyOnceItWasRead(
 	})
 }
 
-func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
+func TestValidateClientAndRedirectURI_MissingClientID(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
+	input := ValidateClientAndRedirectURIInput{ClientID: "", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
 	var locErr *i18n.LocalizedError
 	require.ErrorAs(t, err, &locErr)
-	assert.Equal(t, errcode.AuthorizeClientIdMissing, locErr.Code)
+	assert.Equal(t, errcode.AuthorizeClientIDMissing, locErr.Code)
 	assert.Equal(t, "The client_id parameter is missing.", locErr.EnglishFallback())
 }
 
@@ -259,7 +259,7 @@ func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "non-existent").Return(nil, nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "non-existent", RedirectURI: "http://example.com"}
+	input := ValidateClientAndRedirectURIInput{ClientID: "non-existent", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
@@ -275,7 +275,7 @@ func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "disabled-client").Return(&record.Client{Enabled: false}, nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
+	input := ValidateClientAndRedirectURIInput{ClientID: "disabled-client", RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
@@ -306,7 +306,7 @@ func TestValidateClientAndRedirectURI_TheCodeFlowsEnablementIsNotAskedHere(t *te
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-auth-code-client").Return(client, nil)
 	mockDB.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "https://example.com/callback", ResponseType: "code"}
+	input := ValidateClientAndRedirectURIInput{ClientID: "no-auth-code-client", RedirectURI: "https://example.com/callback", ResponseType: "code"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.NoError(t, err)
@@ -319,7 +319,7 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid-client").Return(&record.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
+	input := ValidateClientAndRedirectURIInput{ClientID: "valid-client", RedirectURI: ""}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
@@ -392,7 +392,7 @@ func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
 			}).Return(nil)
 
 			input := ValidateClientAndRedirectURIInput{
-				ClientId:     "valid-client",
+				ClientID:     "valid-client",
 				RedirectURI:  tc.requested,
 				ResponseType: tc.responseType,
 			}
@@ -599,7 +599,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 			}).Return(nil).Maybe()
 
 			input := ValidateClientAndRedirectURIInput{
-				ClientId:     "valid-client",
+				ClientID:     "valid-client",
 				RedirectURI:  tc.requested,
 				ResponseType: tc.responseType,
 			}
@@ -645,7 +645,7 @@ func TestValidateClientAndRedirectURI_InsecureHTTPIsLoggedByClientBeforeAnyRead(
 
 	logs := logtest.CaptureSlog(t)
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &ValidateClientAndRedirectURIInput{
-		ClientId: "legacy-http-client", RedirectURI: requested, ResponseType: "code",
+		ClientID: "legacy-http-client", RedirectURI: requested, ResponseType: "code",
 	})
 
 	var locErr *i18n.LocalizedError
@@ -1083,14 +1083,14 @@ func TestValidateScopes_WithLeadingAndTrailingSpaces(t *testing.T) {
 	}
 }
 
-func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
+func TestValidateClientAndRedirectURI_ExtremelyLongClientID(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
-	longClientId := strings.Repeat("a", 1000)
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, longClientId).Return(nil, nil)
+	longClientID := strings.Repeat("a", 1000)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, longClientID).Return(nil, nil)
 
-	input := ValidateClientAndRedirectURIInput{ClientId: longClientId, RedirectURI: "http://example.com"}
+	input := ValidateClientAndRedirectURIInput{ClientID: longClientID, RedirectURI: "http://example.com"}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
@@ -1115,7 +1115,7 @@ func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
 	}).Return(nil)
 
 	longRedirectURI := "https://example.com/" + strings.Repeat("a", 2000)
-	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
+	input := ValidateClientAndRedirectURIInput{ClientID: "valid-client", RedirectURI: longRedirectURI}
 	err := validator.ValidateClientAndRedirectURI(context.Background(), &input)
 
 	require.Error(t, err)
@@ -1328,7 +1328,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeToken_Success(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_ResponseTypeIDToken_Success(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1344,7 +1344,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdToken_Success(t *testing.T) 
 	assert.NoError(t, err)
 }
 
-func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_ResponseTypeIDTokenToken_Success(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1360,7 +1360,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeIdTokenToken_Success(t *testin
 	assert.NoError(t, err)
 }
 
-func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIDToken_OrderIndependent(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1377,7 +1377,7 @@ func TestValidateRequest_ImplicitFlow_ResponseTypeTokenIdToken_OrderIndependent(
 	assert.NoError(t, err)
 }
 
-func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_IDToken_RequiresOpenIDScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1397,7 +1397,7 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresOpenIdScope(t *testing.T) 
 	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.Description())
 }
 
-func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_IDTokenToken_RequiresOpenIDScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1416,7 +1416,7 @@ func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresOpenIdScope(t *testin
 	assert.Equal(t, "The 'openid' scope is required when requesting an id_token.", customErr.Description())
 }
 
-func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_IDToken_RequiresNonce(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1436,7 +1436,7 @@ func TestValidateRequest_ImplicitFlow_IdToken_RequiresNonce(t *testing.T) {
 	assert.Equal(t, "The 'nonce' parameter is required for implicit flow when requesting an id_token.", customErr.Description())
 }
 
-func TestValidateRequest_ImplicitFlow_IdTokenToken_RequiresNonce(t *testing.T) {
+func TestValidateRequest_ImplicitFlow_IDTokenToken_RequiresNonce(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1543,7 +1543,7 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeToken(t *testing
 	assert.Contains(t, customErr.Description(), "Supported values: code, token, id_token, id_token token")
 }
 
-func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testing.T) {
+func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIDToken(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1561,7 +1561,7 @@ func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdToken(t *testi
 	assert.Equal(t, "unsupported_response_type", customErr.Code())
 }
 
-func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIdTokenToken(t *testing.T) {
+func TestValidateRequest_UnsupportedResponseTypeCombination_CodeIDTokenToken(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	validator := NewAuthorizeValidator(mockDB)
 
@@ -1653,7 +1653,7 @@ func TestValidateClientAndRedirectURI_ImplicitFlow_DoesNotRequireAuthCodeEnabled
 
 	// For implicit flow, AuthorizationCodeEnabled is not required
 	input := ValidateClientAndRedirectURIInput{
-		ClientId:     "implicit-only-client",
+		ClientID:     "implicit-only-client",
 		RedirectURI:  "https://example.com/callback",
 		ResponseType: "token", // Implicit flow
 	}

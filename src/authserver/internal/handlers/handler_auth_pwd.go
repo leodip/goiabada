@@ -155,7 +155,7 @@ func renderPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer Pag
 
 	bind := map[string]interface{}{
 		"error":       nil,
-		"ceremonyId":  authContext.CeremonyId,
+		"ceremonyId":  authContext.CeremonyID,
 		"smtpEnabled": settings.SMTPEnabled,
 		// The Register link goes to a page that answers not-found unless registration is available,
 		// so the form offers it only then (#526 decision 2).

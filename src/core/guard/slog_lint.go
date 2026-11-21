@@ -217,8 +217,8 @@ var slogSpreadSites = []slogSpreadSite{
 		forwarder: apihandlersImportPath + ".writeInternalServerError"},
 	{scope: "authserver/internal/handlers/apihandlers", name: "writeListSaveFailure",
 		forwarder: apihandlersImportPath + ".writeListSaveFailure"},
-	{scope: "authserver/internal/handlers", name: "rejectIdTokenHint",
-		forwarder: handlersImportPath + ".rejectIdTokenHint"},
+	{scope: "authserver/internal/handlers", name: "rejectIDTokenHint",
+		forwarder: handlersImportPath + ".rejectIDTokenHint"},
 	{scope: "authserver/internal/middleware", name: "reportTrip"},
 	{scope: "core/httpmw", name: "RequestLogger"},
 }

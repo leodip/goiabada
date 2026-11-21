@@ -18,20 +18,20 @@ import (
 // audit record. Values of their own, so an expectation copied from another fixture in this package
 // cannot match here by accident.
 const (
-	revokedAccessJti    = "at-revoked"
-	accessTokenUserId   = int64(71)
-	accessTokenClientId = int64(7171)
+	revokedAccessJTI    = "at-revoked"
+	accessTokenUserID   = int64(71)
+	accessTokenClientID = int64(7171)
 )
 
 var revokedAccessExpiry = time.Date(2031, 2, 3, 4, 5, 6, 0, time.UTC)
 
 // The jti is stored with the token's expiry, on no transaction, and the call reports that it stored
 // it.
-func TestRevokeAccessToken_StoresTheJti(t *testing.T) {
+func TestRevokeAccessToken_StoresTheJTI(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJti, revokedAccessExpiry).Return(true, nil).Once()
+	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJTI, revokedAccessExpiry).Return(true, nil).Once()
 
-	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJti, revokedAccessExpiry)
+	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJTI, revokedAccessExpiry)
 
 	require.NoError(t, err)
 	assert.True(t, stored)
@@ -39,11 +39,11 @@ func TestRevokeAccessToken_StoresTheJti(t *testing.T) {
 
 // A token whose jti another revocation stored first is not stored again, and the call says so, so
 // its caller records nothing: nothing happened.
-func TestRevokeAccessToken_AJtiStoredAlready(t *testing.T) {
+func TestRevokeAccessToken_AJTIStoredAlready(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJti, revokedAccessExpiry).Return(false, nil).Once()
+	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJTI, revokedAccessExpiry).Return(false, nil).Once()
 
-	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJti, revokedAccessExpiry)
+	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJTI, revokedAccessExpiry)
 
 	require.NoError(t, err)
 	assert.False(t, stored)
@@ -53,10 +53,10 @@ func TestRevokeAccessToken_AJtiStoredAlready(t *testing.T) {
 // revoked when it was not.
 func TestRevokeAccessToken_AFaultIsAnError(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJti, revokedAccessExpiry).
+	db.On("RecordAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), revokedAccessJTI, revokedAccessExpiry).
 		Return(false, errors.New("connection refused")).Once()
 
-	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJti, revokedAccessExpiry)
+	stored, err := RevokeAccessToken(context.Background(), db, revokedAccessJTI, revokedAccessExpiry)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection refused")
@@ -71,7 +71,7 @@ func TestRevokeAccessToken_RefusesATokenItCannotStore(t *testing.T) {
 		expiresAt time.Time
 	}{
 		"no jti":    {"", revokedAccessExpiry},
-		"no expiry": {revokedAccessJti, time.Time{}},
+		"no expiry": {revokedAccessJTI, time.Time{}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			db := datamocks.NewDatabase(t)
@@ -90,28 +90,28 @@ func TestLogRevokedAccessToken_Payload(t *testing.T) {
 	t.Run("a user's token, of the implicit flow", func(t *testing.T) {
 		recorder := &reuseAuditRecorder{}
 
-		LogRevokedAccessToken(context.Background(), recorder, accessTokenClientId, accessTokenUserId, revokedAccessJti)
+		LogRevokedAccessToken(context.Background(), recorder, accessTokenClientID, accessTokenUserID, revokedAccessJTI)
 
 		require.Equal(t, 1, recorder.calls)
 		assert.Equal(t, audit.EventRevokedAccessToken, recorder.event)
 		assert.Equal(t, "revoked_access_token", recorder.event)
 		assert.Equal(t, map[string]interface{}{
-			"client_id": accessTokenClientId,
-			"user_id":   accessTokenUserId,
-			"jti":       revokedAccessJti,
+			"client_id": accessTokenClientID,
+			"user_id":   accessTokenUserID,
+			"jti":       revokedAccessJTI,
 		}, recorder.details)
 	})
 
 	t.Run("a client's token, of the client credentials grant", func(t *testing.T) {
 		recorder := &reuseAuditRecorder{}
 
-		LogRevokedAccessToken(context.Background(), recorder, accessTokenClientId, 0, revokedAccessJti)
+		LogRevokedAccessToken(context.Background(), recorder, accessTokenClientID, 0, revokedAccessJTI)
 
 		require.Equal(t, 1, recorder.calls)
 		assert.Equal(t, "revoked_access_token", recorder.event)
 		assert.Equal(t, map[string]interface{}{
-			"client_id": accessTokenClientId,
-			"jti":       revokedAccessJti,
+			"client_id": accessTokenClientID,
+			"jti":       revokedAccessJTI,
 		}, recorder.details)
 	})
 }

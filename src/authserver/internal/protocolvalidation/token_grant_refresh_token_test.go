@@ -40,7 +40,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// authserver/internal/handlers/handler_token_test.go, which holds the whole truth
 		// table. Kept under this name because it is the case a git log -S on the deleted
 		// gate's sentence lands on.
-		const grantUserId = int64(7)
+		const grantUserID = int64(7)
 
 		mockDB := datamocks.NewDatabase(t)
 		mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
@@ -59,7 +59,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "some_refresh_token",
 			ClientSecret: "client_secret",
 		}
@@ -74,7 +74,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		// An authorization code flow token: CodeID valid, so the handler's gate would be the
 		// one to refuse it. Reaching the end of the arm is the assertion.
-		user := record.User{ID: grantUserId, Enabled: true}
+		user := record.User{ID: grantUserID, Enabled: true}
 		refreshToken := &record.RefreshToken{
 			RefreshTokenJTI:   "some_jti",
 			SessionIdentifier: "sid-1",
@@ -82,7 +82,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Code: record.Code{
 				ID:                5,
 				ClientID:          client.ID,
-				UserID:            grantUserId,
+				UserID:            grantUserID,
 				Scope:             "openid",
 				SessionIdentifier: "sid-1",
 				User:              user,
@@ -101,7 +101,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 			Return(&record.UserSession{
-				ID: 9, SessionIdentifier: "sid-1", UserID: grantUserId,
+				ID: 9, SessionIdentifier: "sid-1", UserID: grantUserID,
 				Started: now.Add(-10 * time.Minute), LastAccessed: now,
 			}, nil).Once()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Once()
@@ -126,7 +126,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "confidential_client",
+			ClientID:     "confidential_client",
 			RefreshToken: "some_refresh_token",
 			// ClientSecret is intentionally left empty
 		}
@@ -165,7 +165,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "confidential_client",
+			ClientID:     "confidential_client",
 			RefreshToken: "some_refresh_token",
 			ClientSecret: "incorrect_secret",
 		}
@@ -208,7 +208,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "refresh_token",
-			ClientId:  "client1",
+			ClientID:  "client1",
 			// RefreshToken is intentionally left empty
 		}
 
@@ -245,7 +245,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "invalid_refresh_token",
 		}
 
@@ -285,7 +285,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "refresh_token_without_jti",
 		}
 
@@ -299,9 +299,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
 		// Mock a JWTToken without a JTI claim
-		mockJwtToken := &oauth.JWTToken{}
+		mockJWTToken := &oauth.JWTToken{}
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "refresh_token_without_jti", true).
-			Return(mockJwtToken, nil).Once()
+			Return(mockJWTToken, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
@@ -322,7 +322,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "non_existent_refresh_token",
 		}
 
@@ -335,13 +335,13 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		mockJwtToken := &oauth.JWTToken{
+		mockJWTToken := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "non_existent_jti",
 			},
 		}
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "non_existent_refresh_token", true).
-			Return(mockJwtToken, nil).Once()
+			Return(mockJWTToken, nil).Once()
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, (*sql.Tx)(nil), "non_existent_jti").Return(nil, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -379,7 +379,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "mismatched_refresh_token",
 		}
 
@@ -391,7 +391,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "mismatched_jti",
 				"typ": "Refresh",
@@ -411,7 +411,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "mismatched_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "mismatched_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "mismatched_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -443,7 +443,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			RefreshToken: "disabled_user_refresh_token",
 		}
 
@@ -455,7 +455,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "disabled_user_jti",
 				"typ": "Refresh",
@@ -475,7 +475,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "disabled_user_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "disabled_user_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "disabled_user_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -489,7 +489,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		var disabled *UserDisabledError
 		require.ErrorAs(t, err, &disabled)
 		// The token's user, which the handler's user_disabled record names (#522 decision 7).
-		assert.Equal(t, int64(61), disabled.UserId)
+		assert.Equal(t, int64(61), disabled.UserID)
 		var customErr *oauth.ErrorDetail
 		require.ErrorAs(t, err, &customErr)
 		assert.Equal(t, "invalid_grant", customErr.Code())
@@ -512,7 +512,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "nil_session_refresh_token",
 		}
@@ -529,7 +529,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "nil_session_jti",
 				"typ": "Refresh",
@@ -550,7 +550,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "nil_session_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "nil_session_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "nil_session_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -584,7 +584,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "invalid_session_refresh_token",
 		}
@@ -601,7 +601,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_session_jti",
 				"typ": "Refresh",
@@ -629,7 +629,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_session_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_session_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "invalid_session_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -660,7 +660,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "expired_offline_refresh_token",
 		}
@@ -678,7 +678,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		pastTime := time.Now().UTC().Add(-24 * time.Hour)
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "expired_offline_jti",
 				"typ":                         "Offline",
@@ -699,7 +699,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_offline_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_offline_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "expired_offline_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -729,7 +729,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "invalid_offline_refresh_token",
 		}
@@ -746,7 +746,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_offline_jti",
 				"typ": "Offline",
@@ -767,7 +767,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_offline_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "invalid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -792,7 +792,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "invalid_typ_refresh_token",
 		}
@@ -809,7 +809,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_typ_jti",
 				"typ": "InvalidType", // Invalid typ claim
@@ -829,7 +829,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_typ_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_typ_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "invalid_typ_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -857,7 +857,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "invalid_scope_refresh_token",
 			Scope:        "openid profile email address", // 'address' is not in original scopes
@@ -875,7 +875,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_scope_jti",
 				"typ": "Refresh",
@@ -905,7 +905,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_scope_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_scope_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "invalid_scope_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -939,7 +939,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "valid_offline_refresh_token",
 		}
@@ -958,7 +958,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		futureTime := time.Now().UTC().Add(24 * time.Hour)
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "valid_offline_jti",
 				"typ":                         "Offline",
@@ -988,7 +988,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1016,7 +1016,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "valid_offline_refresh_token",
 		}
@@ -1035,7 +1035,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		futureTime := time.Now().UTC().Add(24 * time.Hour)
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "valid_offline_jti",
 				"typ":                         "Offline",
@@ -1065,7 +1065,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1096,7 +1096,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "valid_refresh_token",
 			Scope:        "openid srv1:read", // Reduced scope (should be allowed)
@@ -1114,7 +1114,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "valid_refresh_jti",
 				"typ": "Refresh",
@@ -1145,7 +1145,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "valid_refresh_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1179,7 +1179,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "revoked_consent_refresh_token",
 		}
@@ -1197,7 +1197,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ConsentRequired:          true,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "revoked_consent_jti",
 				"typ": "Refresh",
@@ -1228,7 +1228,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_consent_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_consent_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "revoked_consent_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1264,7 +1264,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "partial_consent_refresh_token",
 		}
@@ -1282,7 +1282,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ConsentRequired:          true,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "partial_consent_jti",
 				"typ": "Refresh",
@@ -1320,7 +1320,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "partial_consent_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "partial_consent_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1356,7 +1356,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "revoked_permission_refresh_token",
 		}
@@ -1373,7 +1373,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "revoked_permission_jti",
 				"typ": "Refresh",
@@ -1404,7 +1404,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
-		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_permission_refresh_token", true).Return(refreshTokenJwt, nil)
+		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_permission_refresh_token", true).Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "revoked_permission_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -1434,7 +1434,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 	t.Helper()
 
-	const grantUserId = int64(7)
+	const grantUserID = int64(7)
 
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
@@ -1456,7 +1456,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		RefreshToken: "the-refresh-token",
 	}
 
@@ -1467,7 +1467,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 		input.ClientSecret = "client_secret"
 	}
 
-	user := record.User{ID: grantUserId, Enabled: true}
+	user := record.User{ID: grantUserID, Enabled: true}
 	refreshToken := &record.RefreshToken{
 		RefreshTokenJTI:   "the-jti",
 		SessionIdentifier: "sid-1",
@@ -1475,7 +1475,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 		Code: record.Code{
 			ID:                5,
 			ClientID:          1,
-			UserID:            grantUserId,
+			UserID:            grantUserID,
 			Scope:             "openid",
 			SessionIdentifier: "sid-1",
 			CodeChallenge:     storedChallenge,
@@ -1496,7 +1496,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	now := time.Now().UTC()
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 		Return(&record.UserSession{
-			ID: 9, SessionIdentifier: "sid-1", UserID: grantUserId,
+			ID: 9, SessionIdentifier: "sid-1", UserID: grantUserID,
 			Started: now.Add(-10 * time.Minute), LastAccessed: now,
 		}, nil).Maybe()
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
@@ -1572,7 +1572,7 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		ClientSecret: "a_secret_this_client_does_not_have",
 		RefreshToken: "the-refresh-token",
 	})
@@ -1637,20 +1637,20 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	}
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     clientIdentifier,
+		ClientID:     clientIdentifier,
 		RefreshToken: "stored_grant_refresh_token",
 		Scope:        requestedScope,
 	}
 	user := record.User{ID: 1, Subject: "user123", Enabled: true}
 
 	var client *record.Client
-	var refreshTokenJwt *oauth.JWTToken
+	var refreshTokenJWT *oauth.JWTToken
 	var refreshToken *record.RefreshToken
 	if g.ropc {
 		// Always Offline, because ROPC creates no browser session, and presented by a public
 		// client, so no secret.
 		client = &record.Client{ID: 1, ClientIdentifier: clientIdentifier, Enabled: true, IsPublic: true}
-		refreshTokenJwt = &oauth.JWTToken{Claims: jwt.MapClaims{
+		refreshTokenJWT = &oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti":                         "stored_grant_jti",
 			"typ":                         "Offline",
 			"sub":                         "user123",
@@ -1682,7 +1682,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 			ConsentRequired:          g.consentScope != "" && !g.readsConsent,
 		}
 		input.ClientSecret = "client_secret"
-		refreshTokenJwt = &oauth.JWTToken{Claims: jwt.MapClaims{
+		refreshTokenJWT = &oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti": "stored_grant_jti",
 			"typ": "Refresh",
 			"sub": "user123",
@@ -1708,7 +1708,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).Return(client, nil).Once()
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "stored_grant_refresh_token", true).
-		Return(refreshTokenJwt, nil).Once()
+		Return(refreshTokenJWT, nil).Once()
 	mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "stored_grant_jti").Return(refreshToken, nil).Once()
 	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
@@ -2067,7 +2067,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		RefreshToken: "expired_refresh_token",
 	}
 
@@ -2107,7 +2107,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 // ownership rule #133 introduced: a normal refresh token names a session in its `sid`, and every
 // refresh compares that session's owner with the grant's user.
 //
-// The two subtests differ in exactly one field, the session's UserId, so neither can pass with
+// The two subtests differ in exactly one field, the session's UserID, so neither can pass with
 // the comparison removed. Everything else is the ordinary auth code flow refresh: the grant
 // belongs to user 1, the client matches, the session is well inside both its idle timeout and
 // its max lifetime.
@@ -2118,9 +2118,9 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 // session on the way, keeping it alive on someone else's activity, and would end when its owner
 // signs out.
 func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
-	const grantUserId = int64(1)
+	const grantUserID = int64(1)
 
-	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
+	setup := func(t *testing.T, sessionUserID int64) (*TokenValidator, *ValidateTokenRequestInput, *record.Settings) {
 		t.Helper()
 
 		mockDB := datamocks.NewDatabase(t)
@@ -2148,7 +2148,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JWTToken{
+		refreshTokenJWT := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "ownership_jti",
 				"typ": "Refresh",
@@ -2162,10 +2162,10 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			CodeID:            sql.NullInt64{Int64: 1, Valid: true}, // auth code flow token
 			Code: record.Code{
 				ClientID: 1,
-				UserID:   grantUserId,
+				UserID:   grantUserID,
 				Scope:    "openid",
 				User: record.User{
-					ID:      grantUserId,
+					ID:      grantUserID,
 					Enabled: true,
 				},
 			},
@@ -2173,14 +2173,14 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 
 		userSession := &record.UserSession{
 			SessionIdentifier: "session_of_interest",
-			UserID:            sessionUserId,
+			UserID:            sessionUserID,
 			Started:           time.Now().UTC().Add(-30 * time.Minute),
 			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ownership_refresh_token", true).
-			Return(refreshTokenJwt, nil)
+			Return(refreshTokenJWT, nil)
 		mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "ownership_jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -2189,11 +2189,11 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			Return(userSession, nil)
 		// Only reached once the session is accepted, so the refusing subtest never calls it.
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").
-			Return(&record.User{ID: grantUserId, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: grantUserID, Enabled: true}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "client_secret",
 			RefreshToken: "ownership_refresh_token",
 		}
@@ -2202,7 +2202,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	}
 
 	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
-		validator, input, settings := setup(t, grantUserId)
+		validator, input, settings := setup(t, grantUserID)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -2211,7 +2211,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, settings := setup(t, grantUserId+1)
+		validator, input, settings := setup(t, grantUserID+1)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -2250,7 +2250,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 // stores one of its own; for an Offline token the issuer puts the max lifetime in that column
 // instead, which is why the fixture leaves RefreshToken.SessionIdentifier empty.
 func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T) {
-	const grantUserId = int64(7)
+	const grantUserID = int64(7)
 	const sid = "sid-of-the-browser"
 
 	// lookupErr makes the session lookup fail. expired puts the grant past its offline
@@ -2281,7 +2281,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 			IsPublic:                 false,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
-		user := record.User{ID: grantUserId, Enabled: true}
+		user := record.User{ID: grantUserID, Enabled: true}
 
 		refreshToken := &record.RefreshToken{
 			RefreshTokenJTI: "the-jti",
@@ -2290,7 +2290,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 			// shortcut: the issuer stores the max lifetime in this column instead.
 			SessionIdentifier: "",
 			Code: record.Code{
-				ID: 5, ClientID: 1, UserID: grantUserId, Scope: "openid offline_access",
+				ID: 5, ClientID: 1, UserID: grantUserID, Scope: "openid offline_access",
 				SessionIdentifier: sid,
 				User:              user,
 			},
@@ -2329,12 +2329,12 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		// Only the accepted rows reach these two: an Offline refresh always re-checks
 		// consent, whatever the client's ConsentRequired says.
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
-		mockDB.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, grantUserId, int64(1)).
-			Return(&record.UserConsent{UserID: grantUserId, ClientID: 1, Scope: "openid offline_access"}, nil).Maybe()
+		mockDB.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, grantUserID, int64(1)).
+			Return(&record.UserConsent{UserID: grantUserID, ClientID: 1, Scope: "openid offline_access"}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "test_client",
+			ClientID:     "test_client",
 			ClientSecret: "client_secret",
 			RefreshToken: "the-refresh-token",
 		}
@@ -2345,7 +2345,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	owner := func(id int64) *int64 { return &id }
 
 	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
-		validator, input, settings := setup(t, owner(grantUserId), nil, false)
+		validator, input, settings := setup(t, owner(grantUserID), nil, false)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -2386,7 +2386,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		// is already past its offline maximum lifetime. Every other expired-offline fixture in
 		// this file has an empty code sid and so performs no lookup whatever the order. The strict
 		// mock carries the assertion; the error only confirms which gate did the refusing.
-		validator, input, settings := setup(t, owner(grantUserId+1), nil, true)
+		validator, input, settings := setup(t, owner(grantUserID+1), nil, true)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -2399,7 +2399,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, settings := setup(t, owner(grantUserId+1), nil, false)
+		validator, input, settings := setup(t, owner(grantUserID+1), nil, false)
 
 		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
@@ -2418,7 +2418,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 // TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser covers #123: GetUserBySubject
 // answers (nil, nil) for a subject that names no row, and the permission re-check dereferences
-// user.Id, so the process panicked.
+// user.ID, so the process panicked.
 //
 // The two rows pin the PLACEMENT of the refusal, not merely its existence. The dereference sits
 // inside a branch skipped for OIDC scopes and offline_access, so a
@@ -2445,7 +2445,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			storedScope: "openid",
 		},
 		{
-			// The panic path #123 reports: a resource scope takes the branch that reads user.Id.
+			// The panic path #123 reports: a resource scope takes the branch that reads user.ID.
 			// No UserHasScopePermission expectation is registered, and protocolvalidationmocks.NewPermissionChecker(t)
 			// fails on an unexpected call, so this also proves the refusal happens before the loop.
 			name:        "a resource scope is refused before the permission re-check",
@@ -2465,7 +2465,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 
 			input := &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
-				ClientId:     "ropc_client",
+				ClientID:     "ropc_client",
 				RefreshToken: "ropc_refresh_token",
 			}
 
@@ -2477,7 +2477,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 				IsPublic:                 true,
 			}
 
-			refreshTokenJwt := &oauth.JWTToken{
+			refreshTokenJWT := &oauth.JWTToken{
 				Claims: jwt.MapClaims{
 					"jti":                         "ropc_jti",
 					"typ":                         "Offline",
@@ -2501,7 +2501,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", true).
-				Return(refreshTokenJwt, nil)
+				Return(refreshTokenJWT, nil)
 			mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
 			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
@@ -2608,7 +2608,7 @@ func refreshGrantWithParser(t *testing.T, refreshToken string,
 	capture := logtest.CaptureSlog(t)
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		RefreshToken: refreshToken,
 	})
 	assert.Nil(t, result)

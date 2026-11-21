@@ -15,7 +15,7 @@ import (
 // clientLogoDatabase is what the client logo page needs: the client and its logo.
 type clientLogoDatabase interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
+	GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.ClientLogo, error)
 }
 
 // HandleClientLogoGet answers a client's logo, to anyone, kept five minutes and revalidated by its

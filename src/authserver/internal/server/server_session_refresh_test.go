@@ -120,9 +120,9 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 	}
 	assert.Equal(t, 1, backend.touches, "the page request touches the stale session")
 	require.Len(t, cookies, 1, "and sends its cookie again")
-	reissuedId, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, cookies[0].Value)
+	reissuedID, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, cookies[0].Value)
 	require.NoError(t, err)
-	assert.Equal(t, id, reissuedId, "naming the same session")
+	assert.Equal(t, id, reissuedID, "naming the same session")
 	row, err := backend.MemoryBackend.Load(context.Background(), id)
 	require.NoError(t, err)
 	assert.InDelta(t, time.Until(row.ExpiresAt).Seconds(), cookies[0].MaxAge, 2,

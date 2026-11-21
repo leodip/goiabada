@@ -10,7 +10,7 @@ import (
 
 // groupMemberCounter is what countGroupMembers needs: the one count every group response carries.
 type groupMemberCounter interface {
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
 }
 
 // countGroupMembers counts the members of every group given, or answers the first count that

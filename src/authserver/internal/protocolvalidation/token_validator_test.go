@@ -57,7 +57,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	t.Run("Missing required client_id", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			// ClientId is intentionally left empty
+			// ClientID is intentionally left empty
 		}
 
 		settings := &record.Settings{}
@@ -77,7 +77,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	t.Run("Client does not exist", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			ClientId:  "non_existent_client",
+			ClientID:  "non_existent_client",
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "non_existent_client").Return(nil, nil)
@@ -100,7 +100,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	t.Run("Client is disabled", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
-			ClientId:  "disabled_client",
+			ClientID:  "disabled_client",
 		}
 
 		disabledClient := &record.Client{
@@ -133,7 +133,7 @@ func TestValidateTokenRequest(t *testing.T) {
 
 	for _, grantType := range []string{"implicit", "PASSWORD", "urn:ietf:params:oauth:grant-type:device_code"} {
 		t.Run("grant the table does not accept: "+grantType, func(t *testing.T) {
-			input := &ValidateTokenRequestInput{GrantType: oidc.GrantType(grantType), ClientId: "grant_table_client"}
+			input := &ValidateTokenRequestInput{GrantType: oidc.GrantType(grantType), ClientID: "grant_table_client"}
 
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
 
@@ -152,7 +152,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	for _, grantType := range []oidc.GrantType{oidc.GrantTypeAuthorizationCode, oidc.GrantTypeRefreshToken,
 		oidc.GrantTypeClientCredentials, oidc.GrantTypePassword} {
 		t.Run("grant the table accepts reaches its arm: "+grantType.String(), func(t *testing.T) {
-			input := &ValidateTokenRequestInput{GrantType: grantType, ClientId: "grant_table_client"}
+			input := &ValidateTokenRequestInput{GrantType: grantType, ClientID: "grant_table_client"}
 
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
 
@@ -181,7 +181,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	// parameter (RFC 6749 section 5.2, invalid_request) rather than a value the server does not
 	// support. The answer used to be unsupported_grant_type (#573).
 	t.Run("an empty grant_type is invalid_request, not unsupported_grant_type", func(t *testing.T) {
-		input := &ValidateTokenRequestInput{GrantType: "", ClientId: "grant_table_client"}
+		input := &ValidateTokenRequestInput{GrantType: "", ClientID: "grant_table_client"}
 
 		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
 
@@ -209,7 +209,7 @@ func TestValidateTokenRequest(t *testing.T) {
 
 	t.Run("an empty grant_type from an unknown client answers invalid_client first", func(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown_client_no_grant").Return(nil, nil).Once()
-		input := &ValidateTokenRequestInput{GrantType: "", ClientId: "unknown_client_no_grant"}
+		input := &ValidateTokenRequestInput{GrantType: "", ClientID: "unknown_client_no_grant"}
 
 		result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, input)
 
@@ -284,7 +284,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 
 				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "authorization_code",
-					ClientId:     "test_client",
+					ClientID:     "test_client",
 					ClientSecret: "client_secret",
 					Code:         "the-code",
 					RedirectURI:  "https://example.com/cb",
@@ -384,7 +384,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 
 				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
-					ClientId:     "test_client",
+					ClientID:     "test_client",
 					ClientSecret: "client_secret",
 					RefreshToken: "the-refresh-token",
 				})
@@ -457,7 +457,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 
 				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
-					ClientId:     "ropc_client",
+					ClientID:     "ropc_client",
 					RefreshToken: "ropc_refresh_token",
 				})
 
@@ -532,7 +532,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
@@ -581,7 +581,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
@@ -618,7 +618,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
 				CodeVerifier: wrongCodeVerifier,
@@ -664,7 +664,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:   "authorization_code",
-				ClientId:    "test_client",
+				ClientID:    "test_client",
 				Code:        "the-code",
 				RedirectURI: "https://example.com/cb",
 				// No ClientSecret, on a confidential client.
@@ -718,7 +718,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
 				ClientSecret: "not_the_real_client_secret",
@@ -770,7 +770,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				Code:         "the-code",
 				RedirectURI:  "https://example.com/cb",
@@ -798,7 +798,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt("client_secret")
 		require.NoError(t, err)
 
-		build := func(revoked bool, clientIdOnCode int64) (*record.Client, *record.RefreshToken, record.User) {
+		build := func(revoked bool, clientIDOnCode int64) (*record.Client, *record.RefreshToken, record.User) {
 			client := &record.Client{
 				ID: 1, ClientIdentifier: "test_client", Enabled: true,
 				AuthorizationCodeEnabled: true, IsPublic: false,
@@ -810,7 +810,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				CodeID:            sql.NullInt64{Int64: 5, Valid: true},
 				SessionIdentifier: "",
 				Code: record.Code{
-					ID: 5, ClientID: clientIdOnCode, UserID: 7, Scope: "openid offline_access",
+					ID: 5, ClientID: clientIDOnCode, UserID: 7, Scope: "openid offline_access",
 					SessionIdentifier: "sid-1",
 					Revoked:           revoked,
 					User:              user,
@@ -842,7 +842,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
@@ -885,7 +885,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
@@ -913,7 +913,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
-				ClientId:     "test_client",
+				ClientID:     "test_client",
 				ClientSecret: "client_secret",
 				RefreshToken: "the-refresh-token",
 			})
@@ -969,7 +969,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
-			ClientId:     "ropc_client",
+			ClientID:     "ropc_client",
 			RefreshToken: "ropc_refresh_token",
 		})
 

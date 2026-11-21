@@ -153,8 +153,8 @@ func issueImplicitTokens(
 		)
 	}
 
-	if tokenResponse.IdToken != "" {
-		params = append(params, responseParam{"id_token", tokenResponse.IdToken})
+	if tokenResponse.IDToken != "" {
+		params = append(params, responseParam{"id_token", tokenResponse.IDToken})
 	}
 
 	if tokenResponse.Scope != "" {

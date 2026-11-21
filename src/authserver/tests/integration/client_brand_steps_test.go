@@ -87,7 +87,7 @@ func TestLegalDocumentPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 		{"a version it links", browser, versionPath + named, clientBrand, "light", versionPath + named},
 		{"the same link in another browser, which still names the sign-in", createHttpClient(t), documentPath + named,
 			defaultBrand, "dark", versionPath + named},
-		{"a sign-in the browser does not hold", browser, withCeremonyParameter(t, documentPath, ceremony.NewId()), defaultBrand, "dark", ""},
+		{"a sign-in the browser does not hold", browser, withCeremonyParameter(t, documentPath, ceremony.NewID()), defaultBrand, "dark", ""},
 		{"an id of the wrong shape, not echoed", browser, documentPath + named + "x", defaultBrand, "dark", versionPath},
 		{"no sign-in named", browser, documentPath, defaultBrand, "dark", versionPath},
 	} {

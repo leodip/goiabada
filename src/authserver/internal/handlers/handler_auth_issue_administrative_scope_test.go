@@ -38,7 +38,7 @@ func TestHandleIssueGet_AnAdministrativeScopeTheClientMayNotRequestIsAnsweredInv
 				"checkpoint":        "issue",
 				"user_id":           int64(123),
 			}).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -70,7 +70,7 @@ func TestHandleIssueGet_TheConsentedScopeIsWhatIsJudged(t *testing.T) {
 		Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 			State: "test-state"}, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 	f.serve()
 
@@ -89,7 +89,7 @@ func TestHandleIssueGet_AnAllowedClientIsIssuedTheAdministrativeScope(t *testing
 			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -105,7 +105,7 @@ func TestHandleIssueGet_AnAllowedClientIsIssuedTheAdministrativeScope(t *testing
 			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", TokenType: "Bearer", ExpiresIn: 60,
 				Scope: "openid authserver:manage"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 

@@ -29,9 +29,9 @@ import (
 
 // accountSessionDeleteRequest builds the DELETE with the path value, the settings its liveness
 // rule reads, and the validated token the handler reads.
-func accountSessionDeleteRequest(sessionId string, subject string) *http.Request {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionId, nil)
-	req.SetPathValue("id", sessionId)
+func accountSessionDeleteRequest(sessionID string, subject string) *http.Request {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionID, nil)
+	req.SetPathValue("id", sessionID)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }

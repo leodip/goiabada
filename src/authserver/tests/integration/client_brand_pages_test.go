@@ -174,7 +174,7 @@ func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 	// The page saying a sign-in is no longer active acts on no sign-in, whatever the browser holds.
 	t.Run("the page saying a sign-in is no longer active", func(t *testing.T) {
 		page := loadPage(t, browser, appConfig.AuthServer.BaseURL+"/auth/pwd?"+
-			url.Values{ceremony.QueryParameter: {ceremony.NewId()}}.Encode())
+			url.Values{ceremony.QueryParameter: {ceremony.NewID()}}.Encode())
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusBadRequest, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")

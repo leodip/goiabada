@@ -42,7 +42,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), database, tx, code, nil)
 		require.NoError(t, err, "the replay response on a session nothing else has touched yet")
-		assert.Equal(t, []string{token.RefreshTokenJTI}, result.RevokedRefreshTokenJtis,
+		assert.Equal(t, []string{token.RefreshTokenJTI}, result.RevokedRefreshTokenJTIs,
 			"the replay revokes the grant's token")
 
 		// The real termination, on the other handle, arriving while the replay holds the row.
@@ -113,8 +113,8 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// a snapshot taken before it, so it finds the token the termination already revoked and
 		// transitions nothing, which also keeps #77's guard from deleting anything. A replay that
 		// read the token before the termination committed would revoke it again and report it.
-		require.NotNil(t, outcome.result.RevokedRefreshTokenJtis)
-		assert.Empty(t, outcome.result.RevokedRefreshTokenJtis,
+		require.NotNil(t, outcome.result.RevokedRefreshTokenJTIs)
+		assert.Empty(t, outcome.result.RevokedRefreshTokenJTIs,
 			"the replay must see the termination's revocation, which is what waiting for it buys")
 
 		assertCodeRevoked(t, code.ID, true, "the code the termination revoked")

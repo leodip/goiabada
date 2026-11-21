@@ -49,10 +49,10 @@ func (m *startSessionMocks) appsOn(session record.UserSession, held bool) {
 // toldApp is the one delivery a removed live session sends.
 func toldApp(session record.UserSession) []backchannel.Delivery {
 	return []backchannel.Delivery{{
-		ClientId:          51,
+		ClientID:          51,
 		ClientIdentifier:  "told-app",
 		URI:               "https://told.example/bcl",
-		UserId:            123,
+		UserID:            123,
 		Subject:           "subject-123",
 		SessionIdentifier: session.SessionIdentifier,
 	}}
@@ -60,9 +60,9 @@ func toldApp(session record.UserSession) []backchannel.Delivery {
 
 func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 	limits := capLimits(2)
-	live := func(id int64, deviceId string) record.UserSession {
+	live := func(id int64, deviceID string) record.UserSession {
 		session := otherBrowser(id, 2*time.Hour, 10*time.Minute)
-		session.DeviceID = deviceId
+		session.DeviceID = deviceID
 		return session
 	}
 
@@ -74,17 +74,17 @@ func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 	}{
 		{
 			name:     "the same device's",
-			existing: []record.UserSession{live(42, thisDeviceId)},
+			existing: []record.UserSession{live(42, thisDeviceID)},
 			reason:   "same_device",
 		},
 		{
 			name:     "over the cap",
-			existing: []record.UserSession{live(42, otherDeviceId), live(43, otherDeviceId)},
+			existing: []record.UserSession{live(42, otherDeviceID), live(43, otherDeviceID)},
 			reason:   "session_cap",
 		},
 		{
 			name:      "replaced by the sign-in, still valid by the settings",
-			existing:  []record.UserSession{live(42, otherDeviceId)},
+			existing:  []record.UserSession{live(42, otherDeviceID)},
 			replacing: func(existing []record.UserSession) *record.UserSession { return &existing[0] },
 			reason:    "replaced_by_sign_in",
 		},
@@ -121,7 +121,7 @@ func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 func TestStartNewUserSession_AnExpiredRemovedSessionTellsNobody(t *testing.T) {
 	limits := capLimits(2)
 	idle := otherBrowser(42, 3*time.Hour, 2*time.Hour)
-	idle.DeviceID = thisDeviceId
+	idle.DeviceID = thisDeviceID
 	pastLifetime := otherBrowser(43, 25*time.Hour, time.Minute)
 	keptValid := otherBrowser(44, time.Hour, 5*time.Minute)
 
@@ -145,7 +145,7 @@ func TestStartNewUserSession_AnExpiredRemovedSessionTellsNobody(t *testing.T) {
 // tells them.
 func TestStartNewUserSession_ARemovedSessionAlreadyGoneTellsNobody(t *testing.T) {
 	gone := otherBrowser(42, time.Hour, time.Minute)
-	gone.DeviceID = thisDeviceId
+	gone.DeviceID = thisDeviceID
 
 	m := deliveryMocks(t)
 	m.expectPersistThroughCommit(123, []record.UserSession{gone})

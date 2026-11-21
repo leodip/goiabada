@@ -712,7 +712,7 @@ func TestToAccountConsentResponses_DescriptionAsTheConsentScreenShowsIt(t *testi
 }
 
 // Client details are only copied when the association was actually loaded,
-// which the mapper detects via a non-zero Client.Id.
+// which the mapper detects via a non-zero Client.ID.
 func TestToUserConsentResponse_OmitsClientDetailsWhenClientNotLoaded(t *testing.T) {
 	resp := ToUserConsentResponse(&record.UserConsent{
 		ID:       5,

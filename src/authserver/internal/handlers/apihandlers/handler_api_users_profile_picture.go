@@ -19,11 +19,11 @@ import (
 type usersProfilePictureDatabase interface {
 	userTargetPolicyDatabase
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) error
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
 	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 }
 
 // HandleUserProfilePicturePost - POST /api/v1/admin/users/{id}/profile-picture
@@ -42,14 +42,14 @@ func HandleUserProfilePicturePost(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -77,7 +77,7 @@ func HandleUserProfilePicturePost(
 		}
 
 		// Check if user already has a profile picture
-		existingPicture, err := database.GetUserProfilePictureByUserID(r.Context(), nil, userId)
+		existingPicture, err := database.GetUserProfilePictureByUserID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -91,7 +91,7 @@ func HandleUserProfilePicturePost(
 		} else {
 			// Create new picture
 			profilePicture := &record.UserProfilePicture{
-				UserID:      userId,
+				UserID:      userID,
 				Picture:     data,
 				ContentType: result.ContentType,
 			}
@@ -138,14 +138,14 @@ func HandleUserProfilePictureDelete(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -162,7 +162,7 @@ func HandleUserProfilePictureDelete(
 		}
 
 		// Delete the profile picture
-		err = database.DeleteUserProfilePicture(r.Context(), nil, userId)
+		err = database.DeleteUserProfilePicture(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -200,14 +200,14 @@ func HandleUserProfilePictureGet(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -219,7 +219,7 @@ func HandleUserProfilePictureGet(
 		}
 
 		// Check if user has profile picture
-		hasPicture, err := database.UserHasProfilePicture(r.Context(), nil, userId)
+		hasPicture, err := database.UserHasProfilePicture(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

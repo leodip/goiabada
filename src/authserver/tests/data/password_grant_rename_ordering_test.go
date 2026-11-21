@@ -179,7 +179,7 @@ func runPasswordGrantOrderingAgainstRename(t *testing.T, db data.Database, other
 
 		renamed := rename.await(t)
 		require.NoError(t, renamed.err, "the rename waits for the grant and then commits")
-		assert.Equal(t, []string{jti}, renamed.result.RevokedRefreshTokenJtis,
+		assert.Equal(t, []string{jti}, renamed.result.RevokedRefreshTokenJTIs,
 			"the rename's sweep ran after the grant committed, so it found the grant's refresh token")
 
 		row, err := db.GetRefreshTokenByJTI(ctx, nil, jti)

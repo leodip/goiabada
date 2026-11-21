@@ -169,10 +169,10 @@ func newHarness(t *testing.T) *harness {
 // confidential is a delivery to an administrator's confidential client at uri, about one session.
 func confidential(uri string) Delivery {
 	return Delivery{
-		ClientId:          7,
+		ClientID:          7,
 		ClientIdentifier:  "app-web",
 		URI:               uri,
-		UserId:            42,
+		UserID:            42,
 		Subject:           "5b9f4d3e-6c1a-4b7e-9a2d-0f3c8e1b2a44",
 		SessionIdentifier: "c0ffee00-1111-4222-8333-444455556666",
 	}
@@ -296,7 +296,7 @@ func TestSend_EachDeliveryIsAJobOfItsClientsClass(t *testing.T) {
 	admin := confidential(rc.server.URL)
 	selfRegistered := confidential(strings.Replace(rc.server.URL, "http://", "https://", 1))
 	selfRegistered.CreatedViaDCR = true
-	selfRegistered.ClientId = 8
+	selfRegistered.ClientID = 8
 
 	h.sender.Send(context.Background(), testIssuer, []Delivery{admin, selfRegistered})
 
@@ -573,7 +573,7 @@ func TestSendAndWait_StartsEveryDeliveryAtOnceAndReportsEachAsItFinishes(t *test
 
 	accepts, refuses := confidential(server.URL+"/accepts"), confidential(server.URL+"/refuses")
 	accepts.ClientIdentifier, refuses.ClientIdentifier = "app-accepts", "app-refuses"
-	accepts.ClientId, refuses.ClientId = 1, 2
+	accepts.ClientID, refuses.ClientID = 1, 2
 
 	got := map[string]Outcome{}
 	sender.SendAndWait(context.Background(), testIssuer, []Delivery{accepts, refuses}, func(d Delivery, o Outcome) {

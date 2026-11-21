@@ -25,10 +25,10 @@ type InEffect struct {
 // names, the documents that list it, and a user's acceptances. data.Database satisfies it.
 type Database interface {
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
-	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error)
 }
 
 // Reader reads the documents in effect.
@@ -76,7 +76,7 @@ func (r *Reader) forClientRecord(ctx context.Context, client *record.Client) ([]
 // version the user has not accepted. A document accepted once counts for every app it covers, and
 // a new version is owed again. The admin console's own client owes nothing and reads nothing: it
 // also serves My Account, which a user reaches without accepting anything (#622).
-func (r *Reader) Owed(ctx context.Context, client *record.Client, userId int64) ([]InEffect, error) {
+func (r *Reader) Owed(ctx context.Context, client *record.Client, userID int64) ([]InEffect, error) {
 	if client.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
 		return nil, nil
 	}
@@ -94,7 +94,7 @@ func (r *Reader) Owed(ctx context.Context, client *record.Client, userId int64) 
 		return nil, nil
 	}
 
-	acceptances, err := r.database.GetLegalDocumentAcceptancesByUserID(ctx, nil, userId)
+	acceptances, err := r.database.GetLegalDocumentAcceptancesByUserID(ctx, nil, userID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the user's legal document acceptances")
 	}

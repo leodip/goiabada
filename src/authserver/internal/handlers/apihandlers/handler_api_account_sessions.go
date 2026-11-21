@@ -23,8 +23,8 @@ type accountSessionsDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
-	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionID int64) (*record.UserSession, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -107,15 +107,15 @@ func HandleAccountSessionDelete(
 		}
 
 		// Parse session ID from URL
-		sessionIdStr := r.PathValue("id")
-		sessionId, err := strconv.ParseInt(sessionIdStr, 10, 64)
-		if err != nil || sessionId <= 0 {
+		sessionIDStr := r.PathValue("id")
+		sessionID, err := strconv.ParseInt(sessionIDStr, 10, 64)
+		if err != nil || sessionID <= 0 {
 			writeJSONError(w, "User session ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check that the session exists and belongs to the user
-		us, err := database.GetUserSessionByID(r.Context(), nil, sessionId)
+		us, err := database.GetUserSessionByID(r.Context(), nil, sessionID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -167,7 +167,7 @@ func HandleAccountSessionDelete(
 		// with the reason (#564 decision 7) and the session's user_id (#780) beside them, and
 		// terminated_user_session carries the security detail (decision 9).
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": sessionId,
+			"user_session_id": sessionID,
 			"user_id":         us.UserID,
 			"logged_in_user":  subject,
 			"reason":          audit.DeletedUserSessionEndedByUser,

@@ -60,22 +60,22 @@ type userExportStore struct {
 	reads map[string][]int64
 }
 
-func (d *userExportStore) read(name string, userId int64) error {
+func (d *userExportStore) read(name string, userID int64) error {
 	if d.reads == nil {
 		d.reads = map[string][]int64{}
 	}
-	d.reads[name] = append(d.reads[name], userId)
+	d.reads[name] = append(d.reads[name], userID)
 	if d.failing == name || d.failing == "*" {
 		return d.err
 	}
 	return nil
 }
 
-func (d *userExportStore) GetUserByID(_ context.Context, _ *sql.Tx, userId int64) (*record.User, error) {
-	if err := d.read("GetUserByID", userId); err != nil {
+func (d *userExportStore) GetUserByID(_ context.Context, _ *sql.Tx, userID int64) (*record.User, error) {
+	if err := d.read("GetUserByID", userID); err != nil {
 		return nil, err
 	}
-	user, ok := d.users[userId]
+	user, ok := d.users[userID]
 	if !ok {
 		return nil, nil
 	}
@@ -83,8 +83,8 @@ func (d *userExportStore) GetUserByID(_ context.Context, _ *sql.Tx, userId int64
 	return &copied, nil
 }
 
-func (d *userExportStore) GetUserAttributesByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserAttribute, error) {
-	if err := d.read("GetUserAttributesByUserID", userId); err != nil {
+func (d *userExportStore) GetUserAttributesByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]record.UserAttribute, error) {
+	if err := d.read("GetUserAttributesByUserID", userID); err != nil {
 		return nil, err
 	}
 	return slices.Clone(d.attributes), nil
@@ -98,18 +98,18 @@ func (d *userExportStore) UserLoadGroups(_ context.Context, _ *sql.Tx, user *rec
 	return nil
 }
 
-func (d *userExportStore) CountGroupMembers(_ context.Context, _ *sql.Tx, groupId int64) (int, error) {
+func (d *userExportStore) CountGroupMembers(_ context.Context, _ *sql.Tx, groupID int64) (int, error) {
 	if err := d.read("CountGroupMembers", 0); err != nil {
 		return 0, err
 	}
-	return d.memberCounts[groupId], nil
+	return d.memberCounts[groupID], nil
 }
 
-func (d *userExportStore) GetGroupAttributesByGroupID(_ context.Context, _ *sql.Tx, groupId int64) ([]record.GroupAttribute, error) {
+func (d *userExportStore) GetGroupAttributesByGroupID(_ context.Context, _ *sql.Tx, groupID int64) ([]record.GroupAttribute, error) {
 	if err := d.read("GetGroupAttributesByGroupID", 0); err != nil {
 		return nil, err
 	}
-	return slices.Clone(d.groupAttributes[groupId]), nil
+	return slices.Clone(d.groupAttributes[groupID]), nil
 }
 
 func (d *userExportStore) GroupLoadPermissions(_ context.Context, _ *sql.Tx, group *record.Group) error {
@@ -128,19 +128,19 @@ func (d *userExportStore) UserLoadPermissions(_ context.Context, _ *sql.Tx, user
 	return nil
 }
 
-func (d *userExportStore) GetResourceByID(_ context.Context, _ *sql.Tx, resourceId int64) (*record.Resource, error) {
+func (d *userExportStore) GetResourceByID(_ context.Context, _ *sql.Tx, resourceID int64) (*record.Resource, error) {
 	if err := d.read("GetResourceByID", 0); err != nil {
 		return nil, err
 	}
-	resource, ok := d.resources[resourceId]
+	resource, ok := d.resources[resourceID]
 	if !ok {
 		return nil, nil
 	}
 	return &resource, nil
 }
 
-func (d *userExportStore) GetConsentsByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserConsent, error) {
-	if err := d.read("GetConsentsByUserID", userId); err != nil {
+func (d *userExportStore) GetConsentsByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]record.UserConsent, error) {
+	if err := d.read("GetConsentsByUserID", userID); err != nil {
 		return nil, err
 	}
 	return slices.Clone(d.consents), nil
@@ -156,8 +156,8 @@ func (d *userExportStore) UserConsentsLoadClients(_ context.Context, _ *sql.Tx, 
 	return nil
 }
 
-func (d *userExportStore) GetUserSessionsByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]record.UserSession, error) {
-	if err := d.read("GetUserSessionsByUserID", userId); err != nil {
+func (d *userExportStore) GetUserSessionsByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]record.UserSession, error) {
+	if err := d.read("GetUserSessionsByUserID", userID); err != nil {
 		return nil, err
 	}
 	return slices.Clone(d.sessions), nil
@@ -173,12 +173,12 @@ func (d *userExportStore) UserSessionsLoadClients(_ context.Context, _ *sql.Tx, 
 	return nil
 }
 
-func (d *userExportStore) GetClientsByIDs(_ context.Context, _ *sql.Tx, clientIds []int64) ([]record.Client, error) {
+func (d *userExportStore) GetClientsByIDs(_ context.Context, _ *sql.Tx, clientIDs []int64) ([]record.Client, error) {
 	if err := d.read("GetClientsByIDs", 0); err != nil {
 		return nil, err
 	}
-	clients := make([]record.Client, 0, len(clientIds))
-	for _, id := range clientIds {
+	clients := make([]record.Client, 0, len(clientIDs))
+	for _, id := range clientIDs {
 		if client, ok := d.clients[id]; ok {
 			clients = append(clients, client)
 		}
@@ -186,8 +186,8 @@ func (d *userExportStore) GetClientsByIDs(_ context.Context, _ *sql.Tx, clientId
 	return clients, nil
 }
 
-func (d *userExportStore) GetLegalDocumentAcceptancesByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error) {
-	if err := d.read("GetLegalDocumentAcceptancesByUserID", userId); err != nil {
+func (d *userExportStore) GetLegalDocumentAcceptancesByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error) {
+	if err := d.read("GetLegalDocumentAcceptancesByUserID", userID); err != nil {
 		return nil, err
 	}
 	return slices.Clone(d.acceptances), nil
@@ -200,22 +200,22 @@ func (d *userExportStore) GetAllLegalDocuments(_ context.Context, _ *sql.Tx) ([]
 	return slices.Clone(d.legalDocuments), nil
 }
 
-func (d *userExportStore) GetLegalDocumentVersionsByLegalDocumentID(_ context.Context, _ *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error) {
+func (d *userExportStore) GetLegalDocumentVersionsByLegalDocumentID(_ context.Context, _ *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error) {
 	if err := d.read("GetLegalDocumentVersionsByLegalDocumentID", 0); err != nil {
 		return nil, err
 	}
-	return slices.Clone(d.legalVersions[legalDocumentId]), nil
+	return slices.Clone(d.legalVersions[legalDocumentID]), nil
 }
 
-func (d *userExportStore) GetUserProfilePictureByUserID(_ context.Context, _ *sql.Tx, userId int64) (*record.UserProfilePicture, error) {
-	if err := d.read("GetUserProfilePictureByUserID", userId); err != nil {
+func (d *userExportStore) GetUserProfilePictureByUserID(_ context.Context, _ *sql.Tx, userID int64) (*record.UserProfilePicture, error) {
+	if err := d.read("GetUserProfilePictureByUserID", userID); err != nil {
 		return nil, err
 	}
 	return d.picture, nil
 }
 
-func (d *userExportStore) GetRefreshTokensByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]*record.RefreshToken, error) {
-	if err := d.read("GetRefreshTokensByUserID", userId); err != nil {
+func (d *userExportStore) GetRefreshTokensByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]*record.RefreshToken, error) {
+	if err := d.read("GetRefreshTokensByUserID", userID); err != nil {
 		return nil, err
 	}
 	tokens := make([]*record.RefreshToken, 0, len(d.refreshTokens))
@@ -226,26 +226,26 @@ func (d *userExportStore) GetRefreshTokensByUserID(_ context.Context, _ *sql.Tx,
 	return tokens, nil
 }
 
-func (d *userExportStore) GetCodeByID(_ context.Context, _ *sql.Tx, codeId int64) (*record.Code, error) {
-	if err := d.read("GetCodeByID", codeId); err != nil {
+func (d *userExportStore) GetCodeByID(_ context.Context, _ *sql.Tx, codeID int64) (*record.Code, error) {
+	if err := d.read("GetCodeByID", codeID); err != nil {
 		return nil, err
 	}
-	code, ok := d.codes[codeId]
+	code, ok := d.codes[codeID]
 	if !ok {
 		return nil, nil
 	}
 	return &code, nil
 }
 
-func (d *userExportStore) IsRefreshTokenFamilyRevoked(_ context.Context, _ *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+func (d *userExportStore) IsRefreshTokenFamilyRevoked(_ context.Context, _ *sql.Tx, firstRefreshTokenJTI string) (bool, error) {
 	if err := d.read("IsRefreshTokenFamilyRevoked", 0); err != nil {
 		return false, err
 	}
-	return d.revokedFamilies[firstRefreshTokenJti], nil
+	return d.revokedFamilies[firstRefreshTokenJTI], nil
 }
 
-func (d *userExportStore) GetAuditLogsByUserID(_ context.Context, _ *sql.Tx, userId int64) ([]record.AuditLog, error) {
-	if err := d.read("GetAuditLogsByUserID", userId); err != nil {
+func (d *userExportStore) GetAuditLogsByUserID(_ context.Context, _ *sql.Tx, userID int64) ([]record.AuditLog, error) {
+	if err := d.read("GetAuditLogsByUserID", userID); err != nil {
 		return nil, err
 	}
 	return slices.Clone(d.auditLogs), nil

@@ -25,7 +25,7 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		TokenEndpoint:         testBaseURL + "/auth/token",
 		UserInfoEndpoint:      testBaseURL + "/userinfo",
 		EndSessionEndpoint:    testBaseURL + "/auth/logout",
-		JWKsURI:               testBaseURL + "/certs",
+		JWKSURI:               testBaseURL + "/certs",
 		// Every grant the server implements, in the grant table's order (#437).
 		GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
 		ResponseTypesSupported:           []string{"code", "token", "id_token", "id_token token"},
@@ -33,7 +33,7 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		PromptValuesSupported:            []string{"none", "login", "consent"},
 		ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 		SubjectTypesSupported:            []string{"public"},
-		IdTokenSigningAlgValuesSupported: []string{"RS256"},
+		IDTokenSigningAlgValuesSupported: []string{"RS256"},
 		// The roster is pinned literally in oidc_test.go; this asserts discovery publishes that one list.
 		ScopesSupported: oidc.SupportedScopes(),
 		ClaimsSupported: []string{

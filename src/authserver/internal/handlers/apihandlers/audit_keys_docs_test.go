@@ -813,8 +813,8 @@ func newAuditDetailsIndex(root string, fset *token.FileSet, info *types.Info, pk
 				if fn != nil {
 					index.calls[fn] = append(index.calls[fn], n)
 					for i, arg := range n.Args {
-						if argId, ok := ast.Unparen(arg).(*ast.Ident); ok {
-							if v, ok := info.Uses[argId].(*types.Var); ok {
+						if argID, ok := ast.Unparen(arg).(*ast.Ident); ok {
+							if v, ok := info.Uses[argID].(*types.Var); ok {
 								index.forwards[v] = append(index.forwards[v], auditForward{fn: fn, index: i})
 							}
 						}
@@ -898,8 +898,8 @@ func (x *auditDetailsIndex) isAuditLogCall(call *ast.CallExpr) bool {
 		return false
 	}
 	if event, isSelector := ast.Unparen(call.Args[1]).(*ast.SelectorExpr); isSelector {
-		if pkgId, isIdent := event.X.(*ast.Ident); isIdent {
-			if pkgName, isPkg := x.info.Uses[pkgId].(*types.PkgName); isPkg && pkgName.Imported().Path() == auditImportPath {
+		if pkgID, isIdent := event.X.(*ast.Ident); isIdent {
+			if pkgName, isPkg := x.info.Uses[pkgID].(*types.PkgName); isPkg && pkgName.Imported().Path() == auditImportPath {
 				return true
 			}
 		}

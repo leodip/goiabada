@@ -14,13 +14,13 @@ import (
 )
 
 // =============================================================================
-// Tests for shouldUpgradeAcrLevel
+// Tests for shouldUpgradeACRLevel
 // =============================================================================
 
-func TestShouldUpgradeAcrLevel(t *testing.T) {
+func TestShouldUpgradeACRLevel(t *testing.T) {
 	// Test all valid ACR level upgrade scenarios
 	t.Run("level1 to level2_optional should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel1,
 			record.ACRLevel2Optional,
 		)
@@ -28,7 +28,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level1 to level2_mandatory should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel1,
 			record.ACRLevel2Mandatory,
 		)
@@ -36,7 +36,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level2_optional to level2_mandatory should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Optional,
 			record.ACRLevel2Mandatory,
 		)
@@ -45,7 +45,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 
 	// Test all valid ACR level NO upgrade scenarios (same or downgrade)
 	t.Run("level2_optional to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Optional,
 			record.ACRLevel1,
 		)
@@ -53,7 +53,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level2_mandatory to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Mandatory,
 			record.ACRLevel1,
 		)
@@ -61,7 +61,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level2_mandatory to level2_optional should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Mandatory,
 			record.ACRLevel2Optional,
 		)
@@ -70,7 +70,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 
 	// Test same level scenarios
 	t.Run("level1 to level1 should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel1,
 			record.ACRLevel1,
 		)
@@ -78,7 +78,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level2_optional to level2_optional should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Optional,
 			record.ACRLevel2Optional,
 		)
@@ -86,7 +86,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("level2_mandatory to level2_mandatory should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel2Mandatory,
 			record.ACRLevel2Mandatory,
 		)
@@ -95,7 +95,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 
 	// Test unknown/invalid ACR levels (fail-safe behavior)
 	t.Run("unknown current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"unknown:acr:level",
 			record.ACRLevel2Mandatory,
 		)
@@ -103,7 +103,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("unknown new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel1,
 			"unknown:acr:level",
 		)
@@ -111,7 +111,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("both unknown ACRs should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"unknown:acr:level1",
 			"unknown:acr:level2",
 		)
@@ -119,7 +119,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("empty current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"",
 			record.ACRLevel2Mandatory,
 		)
@@ -127,7 +127,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("empty new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			record.ACRLevel1,
 			"",
 		)
@@ -135,7 +135,7 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("both empty ACRs should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel("", "")
+		result := shouldUpgradeACRLevel("", "")
 		assert.False(t, result, "both empty ACRs should return false (fail-safe)")
 	})
 }
@@ -367,7 +367,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("Empty acrLevel preserves existing AcrLevel", func(t *testing.T) {
+	t.Run("Empty acrLevel preserves existing ACRLevel", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
@@ -380,7 +380,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			// AcrLevel should remain level2_optional when empty string passed
+			// ACRLevel should remain level2_optional when empty string passed
 			return s.ACRLevel == record.ACRLevel2Optional
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -392,7 +392,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, record.ACRLevel2Optional, result.ACRLevel,
-			"AcrLevel should be preserved when empty string is passed")
+			"ACRLevel should be preserved when empty string is passed")
 
 		database.AssertExpectations(t)
 	})

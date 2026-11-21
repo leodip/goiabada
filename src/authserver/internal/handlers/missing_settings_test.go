@@ -96,7 +96,7 @@ func TestMissingSettings_ABrowserPageAnswersTheErrorPage(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyID, nil)
 	rr := httptest.NewRecorder()
 
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
@@ -146,7 +146,7 @@ func TestMissingSettings_TheRoutingHopsAnswerBeforeReadingTheirCeremony(t *testi
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
 
-			req := httptest.NewRequest(http.MethodGet, hop.path+"?ceremony="+testCeremonyId, nil)
+			req := httptest.NewRequest(http.MethodGet, hop.path+"?ceremony="+testCeremonyID, nil)
 			rr := httptest.NewRecorder()
 			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 

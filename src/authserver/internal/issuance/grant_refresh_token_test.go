@@ -114,7 +114,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "openid profile resource1:read", response.Scope)
 	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "remaining time based on session max lifetime")
 
-	// validate Id token --------------------------------------------
+	// validate ID token --------------------------------------------
 
 	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
@@ -203,7 +203,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
+func TestMintCodeRefreshTokens_Offline_NoIDToken(t *testing.T) {
 	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)

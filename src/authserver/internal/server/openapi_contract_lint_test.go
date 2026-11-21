@@ -225,7 +225,7 @@ func undeclaredStatusFindings(routes []routeRegistration, handlers map[string]ma
 			if !op.responses[code] {
 				findings = append(findings, fmt.Sprintf("%s (%s %s) can answer %d, which openapi.yaml "+
 					"does not declare: a generated client has no branch for it. Handler: %s",
-					op.operationId, strings.ToUpper(r.method), r.path, code, r.handler))
+					op.operationID, strings.ToUpper(r.method), r.path, code, r.handler))
 			}
 		}
 		for _, code := range sortedKeysInt(r.chain) {
@@ -234,7 +234,7 @@ func undeclaredStatusFindings(routes []routeRegistration, handlers map[string]ma
 			}
 			findings = append(findings, fmt.Sprintf("%s (%s %s) can answer %d from %s, which "+
 				"routes.go:%d mounts in front of %s, and openapi.yaml does not declare it: a "+
-				"generated client has no branch for it", op.operationId, strings.ToUpper(r.method),
+				"generated client has no branch for it", op.operationID, strings.ToUpper(r.method),
 				r.path, code, strings.Join(r.chain[code], " and "), r.line, r.handler))
 		}
 	}
@@ -262,7 +262,7 @@ func undeliverableStatusFindings(routes []routeRegistration, handlers map[string
 			}
 			findings = append(findings, fmt.Sprintf("%s (%s %s) declares %d, which neither %s nor the "+
 				"middleware routes.go:%d mounts in front of it writes: the spec is promising a failure "+
-				"that cannot arrive", op.operationId, strings.ToUpper(r.method), r.path, code, r.handler, r.line))
+				"that cannot arrive", op.operationID, strings.ToUpper(r.method), r.path, code, r.handler, r.line))
 		}
 	}
 	return findings, joined
@@ -314,7 +314,7 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 	for key, op := range spec {
 		if !routed[key] {
 			t.Errorf("openapi.yaml describes %s (%s), which routes.go does not register",
-				op.operationId, key)
+				op.operationID, key)
 		}
 	}
 
@@ -655,7 +655,7 @@ func pathParameterNameFindings(routes []routeRegistration, spec map[string]specO
 		if op.path != r.path {
 			findings = append(findings, fmt.Sprintf("routes.go:%d: %s %s is %s in openapi.yaml (%s): "+
 				"name the spec's path parameters as routes.go does", r.line,
-				strings.ToUpper(r.method), r.path, op.path, op.operationId))
+				strings.ToUpper(r.method), r.path, op.path, op.operationID))
 		}
 	}
 	return findings, joined
@@ -667,8 +667,8 @@ func pathParameterNamesFixture() ([]routeRegistration, map[string]specOperation)
 	route := func(method, path string, line int) routeRegistration {
 		return routeRegistration{method: method, path: path, key: routeKey(method, path), line: line}
 	}
-	operation := func(method, path, operationId string) (string, specOperation) {
-		return routeKey(method, path), specOperation{operationId: operationId, path: path}
+	operation := func(method, path, operationID string) (string, specOperation) {
+		return routeKey(method, path), specOperation{operationID: operationID, path: path}
 	}
 	routes := []routeRegistration{
 		route("get", "/api/v1/admin/user-sessions/{id}", 10),
@@ -677,12 +677,12 @@ func pathParameterNamesFixture() ([]routeRegistration, map[string]specOperation)
 		route("get", "/api/v1/admin/undocumented/{id}", 13),
 	}
 	spec := map[string]specOperation{}
-	for _, op := range []struct{ method, path, operationId string }{
+	for _, op := range []struct{ method, path, operationID string }{
 		{"get", "/api/v1/admin/user-sessions/{id}", "getUserSession"},
 		{"delete", "/api/v1/admin/user-sessions/{id}", "deleteUserSession"},
 		{"get", "/api/v1/admin/groups/{groupId}/members/{userId}", "getGroupMember"},
 	} {
-		key, value := operation(op.method, op.path, op.operationId)
+		key, value := operation(op.method, op.path, op.operationID)
 		spec[key] = value
 	}
 	return routes, spec
@@ -690,8 +690,8 @@ func pathParameterNamesFixture() ([]routeRegistration, map[string]specOperation)
 
 func TestPathParameterNames_ASpecNamingAParameterOtherwiseFails(t *testing.T) {
 	routes, spec := pathParameterNamesFixture()
-	rename := func(method, path, operationId string) {
-		spec[routeKey(method, path)] = specOperation{operationId: operationId, path: path}
+	rename := func(method, path, operationID string) {
+		spec[routeKey(method, path)] = specOperation{operationID: operationID, path: path}
 	}
 	rename("delete", "/api/v1/admin/user-sessions/{sessionIdentifier}", "deleteUserSession")
 	rename("get", "/api/v1/admin/groups/{userId}/members/{groupId}", "getGroupMember")
@@ -738,41 +738,41 @@ func TestPathParameterNames_AJoinThatMatchedNoRouteStops(t *testing.T) {
 	}
 }
 
-// TestOpenAPI_GivesEachOperationItsOwnId holds each operationId to one operation, as OpenAPI 3.0.3
+// TestOpenAPI_GivesEachOperationItsOwnID holds each operationId to one operation, as OpenAPI 3.0.3
 // section 4.7.10 requires ("The id MUST be unique among all operations described in the API"). The
 // API reference gives each operation a page under its id, and a client generator names a method
 // after it, so two operations sharing one leave one of them without a page and collide in a
 // generated client.
-func TestOpenAPI_GivesEachOperationItsOwnId(t *testing.T) {
-	assertOperationIdsUnique(t, parseSpec(t))
+func TestOpenAPI_GivesEachOperationItsOwnID(t *testing.T) {
+	assertOperationIDsUnique(t, parseSpec(t))
 }
 
-// assertOperationIdsUnique is the reporting half: one failure per finding of operationIdFindings,
+// assertOperationIDsUnique is the reporting half: one failure per finding of operationIDFindings,
 // and a stop for a spec holding no operation, since a check of nothing proves nothing.
-func assertOperationIdsUnique(r guard.Reporter, spec map[string]specOperation) {
+func assertOperationIDsUnique(r guard.Reporter, spec map[string]specOperation) {
 	r.Helper()
 	if len(spec) == 0 {
 		r.Fatalf("read no operation out of openapi.yaml; the check is no longer reaching the spec")
 		return
 	}
-	for _, finding := range operationIdFindings(spec) {
+	for _, finding := range operationIDFindings(spec) {
 		r.Errorf("%s", finding)
 	}
 }
 
-// operationIdFindings returns one finding per operationId that more than one operation carries,
+// operationIDFindings returns one finding per operationId that more than one operation carries,
 // naming each of those operations, and one per operation that has none.
-func operationIdFindings(spec map[string]specOperation) []string {
+func operationIDFindings(spec map[string]specOperation) []string {
 	carriers := map[string][]string{}
 	var findings []string
 	for key, op := range spec {
 		verb, _, _ := strings.Cut(key, " ")
 		operation := strings.ToUpper(verb) + " " + op.path
-		if op.operationId == "" {
+		if op.operationID == "" {
 			findings = append(findings, fmt.Sprintf("openapi.yaml: %s has no operationId", operation))
 			continue
 		}
-		carriers[op.operationId] = append(carriers[op.operationId], operation)
+		carriers[op.operationID] = append(carriers[op.operationID], operation)
 	}
 	for id, operations := range carriers {
 		if len(operations) > 1 {
@@ -785,26 +785,26 @@ func operationIdFindings(spec map[string]specOperation) []string {
 	return findings
 }
 
-// operationIdsFixture is a spec whose three operations each carry an id of their own.
-func operationIdsFixture() map[string]specOperation {
+// operationIDsFixture is a spec whose three operations each carry an id of their own.
+func operationIDsFixture() map[string]specOperation {
 	spec := map[string]specOperation{}
-	for _, op := range []struct{ method, path, operationId string }{
+	for _, op := range []struct{ method, path, operationID string }{
 		{"get", "/api/v1/admin/brand-assets/{id}", "getBrandAsset"},
 		{"get", "/brand-assets/{id}", "getBrandAssetFile"},
 		{"get", "/client/logo/{clientIdentifier}", "getClientLogoImage"},
 	} {
-		spec[routeKey(op.method, op.path)] = specOperation{operationId: op.operationId, path: op.path}
+		spec[routeKey(op.method, op.path)] = specOperation{operationID: op.operationID, path: op.path}
 	}
 	return spec
 }
 
-func TestOperationIds_AnIdTwoOperationsCarryFails(t *testing.T) {
-	spec := operationIdsFixture()
-	spec[routeKey("get", "/brand-assets/{id}")] = specOperation{operationId: "getBrandAsset", path: "/brand-assets/{id}"}
+func TestOperationIDs_AnIDTwoOperationsCarryFails(t *testing.T) {
+	spec := operationIDsFixture()
+	spec[routeKey("get", "/brand-assets/{id}")] = specOperation{operationID: "getBrandAsset", path: "/brand-assets/{id}"}
 	spec[routeKey("get", "/client/logo/{clientIdentifier}")] = specOperation{path: "/client/logo/{clientIdentifier}"}
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertOperationIdsUnique(r, spec)
+		assertOperationIDsUnique(r, spec)
 	})
 
 	if report.Stopped {
@@ -819,9 +819,9 @@ func TestOperationIds_AnIdTwoOperationsCarryFails(t *testing.T) {
 	}
 }
 
-func TestOperationIds_EachOperationWithItsOwnIdPasses(t *testing.T) {
+func TestOperationIDs_EachOperationWithItsOwnIDPasses(t *testing.T) {
 	report := guard.Run(func(r guard.Reporter) {
-		assertOperationIdsUnique(r, operationIdsFixture())
+		assertOperationIDsUnique(r, operationIDsFixture())
 	})
 
 	if report.Failed() {
@@ -829,9 +829,9 @@ func TestOperationIds_EachOperationWithItsOwnIdPasses(t *testing.T) {
 	}
 }
 
-func TestOperationIds_ASpecWithNoOperationStops(t *testing.T) {
+func TestOperationIDs_ASpecWithNoOperationStops(t *testing.T) {
 	report := guard.Run(func(r guard.Reporter) {
-		assertOperationIdsUnique(r, map[string]specOperation{})
+		assertOperationIDsUnique(r, map[string]specOperation{})
 	})
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "read no operation") {
@@ -1434,7 +1434,7 @@ func routeChainsFixtureSpec() map[string]specOperation {
 		for _, code := range codes {
 			responses[code] = true
 		}
-		return specOperation{operationId: id, responses: responses}
+		return specOperation{operationID: id, responses: responses}
 	}
 	return map[string]specOperation{
 		"get /api/v1/widgets/{}":      op("getWidget", 200, 400, 401, 404),
@@ -2287,7 +2287,7 @@ func NewChosen(swap bool) *Probed {
 		for _, code := range codes {
 			responses[code] = true
 		}
-		return map[string]specOperation{"get /swapped": {operationId: "getSwapped", responses: responses}}
+		return map[string]specOperation{"get /swapped": {operationID: "getSwapped", responses: responses}}
 	}
 	report = guard.Run(func(r guard.Reporter) {
 		assertDeclaresEveryStatus(r, routes, handlers, declaring(200))
@@ -2372,8 +2372,8 @@ func NewChosenRefusal(swap bool) *Probed {
 			responses[code] = true
 		}
 		return map[string]specOperation{
-			"get /configured": {operationId: "getConfigured", responses: responses},
-			"get /in-place":   {operationId: "getInPlace", responses: responses},
+			"get /configured": {operationID: "getConfigured", responses: responses},
+			"get /in-place":   {operationID: "getInPlace", responses: responses},
 		}
 	}
 	report = guard.Run(func(r guard.Reporter) {
@@ -2492,8 +2492,8 @@ func (c *Consulted) Check() func(http.Handler) http.Handler {
 			responses[code] = true
 		}
 		return map[string]specOperation{
-			"get /detailed": {operationId: "getDetailed", responses: responses},
-			"get /noted":    {operationId: "getNoted", responses: responses},
+			"get /detailed": {operationID: "getDetailed", responses: responses},
+			"get /noted":    {operationID: "getNoted", responses: responses},
 		}
 	}
 	report = guard.Run(func(r guard.Reporter) {
@@ -2522,7 +2522,7 @@ func declaringEach(ids map[string]string, codes ...int) map[string]specOperation
 	}
 	out := map[string]specOperation{}
 	for key, id := range ids {
-		out[key] = specOperation{operationId: id, responses: responses}
+		out[key] = specOperation{operationID: id, responses: responses}
 	}
 	return out
 }
@@ -6189,7 +6189,7 @@ func (c *chainResolver) declaredFuncTyped(q *goPackage, name string, seen map[*a
 
 // specOperation is the part of an operation these tests read.
 type specOperation struct {
-	operationId string
+	operationID string
 	path        string // as written, with the spec's own parameter names
 	responses   map[int]bool
 }
@@ -6201,7 +6201,7 @@ func parseSpec(t *testing.T) map[string]specOperation {
 
 	var doc struct {
 		Paths map[string]map[string]struct {
-			OperationId string               `yaml:"operationId"`
+			OperationID string               `yaml:"operationId"`
 			Responses   map[string]yaml.Node `yaml:"responses"`
 		} `yaml:"paths"`
 	}
@@ -6225,7 +6225,7 @@ func parseSpec(t *testing.T) map[string]specOperation {
 				}
 				responses[n] = true
 			}
-			out[routeKey(verb, path)] = specOperation{operationId: op.OperationId, path: path, responses: responses}
+			out[routeKey(verb, path)] = specOperation{operationID: op.OperationID, path: path, responses: responses}
 		}
 	}
 
@@ -7137,7 +7137,7 @@ func resolveSchemaRequired(t *testing.T, schemas map[string]yaml.Node, name stri
 func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 	var doc struct {
 		Paths map[string]map[string]struct {
-			OperationId string `yaml:"operationId"`
+			OperationID string `yaml:"operationId"`
 			Responses   map[string]struct {
 				Ref     string               `yaml:"$ref"`
 				Content map[string]yaml.Node `yaml:"content"`
@@ -7170,17 +7170,17 @@ func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 			if response.Ref == shared {
 				continue
 			}
-			if op.OperationId == inPlace {
+			if op.OperationID == inPlace {
 				if _, ok := response.Content["application/json"]; !ok || len(response.Content) != 1 {
 					t.Errorf("%s %s '500' (%s) is the one in-place API 500 and must declare "+
-						"application/json alone", strings.ToUpper(verb), path, op.OperationId)
+						"application/json alone", strings.ToUpper(verb), path, op.OperationID)
 				}
 				continue
 			}
 			t.Errorf("%s %s '500' (%s) is not $ref: '%s'. Every 500 on the API surface is "+
 				"writeInternalServerError's JSON envelope since #279 decision 7, and "+
 				"TestAPIHandlers_DoNotRenderPages in apihandlers keeps the handlers to it; the "+
-				"document has to say the same", strings.ToUpper(verb), path, op.OperationId, shared)
+				"document has to say the same", strings.ToUpper(verb), path, op.OperationID, shared)
 		}
 	}
 

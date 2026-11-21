@@ -38,7 +38,7 @@ import (
 
 const (
 	signInNoticeAddress   = "joana.reis@example.com"
-	signInNoticeRequestId = "req-sign-in-otp-0001"
+	signInNoticeRequestID = "req-sign-in-otp-0001"
 )
 
 // signInNoticeJobs holds every job handed to it rather than starting it, so a case asserts what
@@ -84,12 +84,12 @@ func signInNoticeUser() *record.User {
 func signInNoticeRequest(t *testing.T, settings *record.Settings, code string) *http.Request {
 	t.Helper()
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("otp", code)
 	req, err := http.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	ctx := requestid.NewContext(req.Context(), signInNoticeRequestId)
+	ctx := requestid.NewContext(req.Context(), signInNoticeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -107,10 +107,10 @@ func stubSignInEnrolment(database *datamocks.Database, auditLogger *handlersmock
 	database.On("GetUserByIDForUpdate", mock.Anything, otpEnrolTx, user.ID).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
-	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOTP, mock.Anything).Return().Once()
 }
 
-func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testing.T) {
+func TestHandleAuthOTPPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// saveErr is the rotation's failure, nil for a sign-in that goes on.
@@ -128,7 +128,7 @@ func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testi
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -142,15 +142,15 @@ func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testi
 
 			authContext := &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel2OTP,
-				CeremonyId: testCeremonyId,
-				UserId:     1,
-				ClientId:   "test-client",
+				CeremonyID: testCeremonyID,
+				UserID:     1,
+				ClientID:   "test-client",
 				OTPKeyURL:  otpTestKeyURL(secret),
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 			user := signInNoticeUser()
 			stubSignInEnrolment(database, auditLogger, user)
-			ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(tc.saveErr).Once()
+			ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(tc.saveErr).Once()
 			if tc.saveErr == nil {
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 			} else {
@@ -200,7 +200,7 @@ func TestHandleAuthOtpPost_TellsTheUserTwoFactorWasSetUpDuringTheSignIn(t *testi
 // Where no notice may go, the step hands nothing off: a code checked against the authenticator
 // the user already had, an enrolment lost to a change elsewhere, one rolled back, and one made
 // with an unverified address.
-func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
+func TestHandleAuthOTPPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		arrange func(t *testing.T, secret string, rr *httptest.ResponseRecorder, req *http.Request,
@@ -218,8 +218,8 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 				database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything, user.OTPConfigGeneration).
 					Return(true, nil).Once()
 				database.On("ClearUserOTPConsecutiveFailures", mock.Anything, mock.Anything, user.ID).Return(nil).Maybe()
-				auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOTP, mock.Anything).Return().Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 			}},
 		{"the enrolment is lost to a change elsewhere",
@@ -233,7 +233,7 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 				datamocks.ExpectRunInTransaction(database, otpEnrolTx)
 				database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 					Return(false, nil).Once()
-				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil).Once()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
 					Return(nil).Once()
 			}},
@@ -260,7 +260,7 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -270,9 +270,9 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 
 			authContext := &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel2OTP,
-				CeremonyId: testCeremonyId,
-				UserId:     1,
-				ClientId:   "test-client",
+				CeremonyID: testCeremonyID,
+				UserID:     1,
+				ClientID:   "test-client",
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -289,14 +289,14 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 }
 
 // An enrolment with an unverified address is answered as any other, and hands off nothing.
-func TestHandleAuthOtpPost_SendsNoSetUpNoticeToAnUnverifiedAddress(t *testing.T) {
+func TestHandleAuthOTPPost_SendsNoSetUpNoticeToAnUnverifiedAddress(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	jobs := &signInNoticeJobs{}
 
-	handler := buildAuthOtpPost(authOtpPostDeps{
+	handler := buildAuthOTPPost(authOTPPostDeps{
 		pageRenderer:  pageRenderer,
 		ceremonyStore: ceremonyStore,
 		database:      database,
@@ -309,16 +309,16 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeToAnUnverifiedAddress(t *testing.T)
 	rr := httptest.NewRecorder()
 	authContext := &ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel2OTP,
-		CeremonyId: testCeremonyId,
-		UserId:     1,
-		ClientId:   "test-client",
+		CeremonyID: testCeremonyID,
+		UserID:     1,
+		ClientID:   "test-client",
 		OTPKeyURL:  otpTestKeyURL(secret),
 	}
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 	user := signInNoticeUser()
 	user.EmailVerified = false
 	stubSignInEnrolment(database, auditLogger, user)
-	ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+	ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 	ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 
 	handler.ServeHTTP(rr, req)

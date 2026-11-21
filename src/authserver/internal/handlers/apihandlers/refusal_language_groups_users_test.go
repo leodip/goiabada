@@ -124,7 +124,7 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		return func(database *datamocks.Database) {
 			expectGroup(database, 5)
 			expectMember(database)
-			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, int64(5)).
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberID, int64(5)).
 				Return(existing, nil).Once()
 		}
 	}
@@ -139,13 +139,13 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			return rr
 		}
 	}
-	member := strconv.FormatInt(ceilingMemberId, 10)
+	member := strconv.FormatInt(ceilingMemberID, 10)
 
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name: "adding a member twice",
 			serve: serve(http.MethodPost, "/api/v1/admin/groups/5/members", `{"userId":`+member+`}`,
-				map[string]string{"id": "5"}, &record.UserGroup{ID: 9, UserID: ceilingMemberId, GroupID: 5},
+				map[string]string{"id": "5"}, &record.UserGroup{ID: 9, UserID: ceilingMemberID, GroupID: 5},
 				func(database *datamocks.Database) http.Handler {
 					return HandleGroupMemberAddPost(database, handlersmocks.NewAuditLogger(t))
 				}),
@@ -326,7 +326,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			return rr
 		}
 	}
-	tooManyGroups := make([]string, maxGroupIdsPerRequest+1)
+	tooManyGroups := make([]string, maxGroupIDsPerRequest+1)
 	for i := range tooManyGroups {
 		tooManyGroups[i] = strconv.Itoa(i + 1)
 	}
@@ -430,7 +430,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 				database := datamocks.NewDatabase(t)
 				expectCodeGenRead(database)
-				database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+				database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 					mock.Anything, mock.Anything).Return(false, nil).Once()
 				rr := httptest.NewRecorder()
 				HandleUserEmailVerificationCodePost(database, handlersmocks.NewAuditLogger(t), testDataCipher).

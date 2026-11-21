@@ -58,7 +58,7 @@ func newAuthorizeFaultEndpoint(t *testing.T, query string) *authorizeFaultEndpoi
 		"&redirect_uri=https%3A%2F%2Fexample.com%2Fcb&response_type=code&"+query, nil)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = requestid.NewContext(ctx, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestID)
 	e.req = req.WithContext(ctx)
 	e.rr = httptest.NewRecorder()
 

@@ -199,7 +199,7 @@ func silentStepUpRefusal(stepUp ceremony.StepUp, err error) (code, description s
 		return "", "", false
 	case ceremony.StepUpAuthenticatorMissing:
 		return oidc.ErrorInteractionRequired, "Additional authentication setup required", true
-	case ceremony.StepUpOtpConfigChanged:
+	case ceremony.StepUpOTPConfigChanged:
 		return oidc.ErrorInteractionRequired, "Authentication configuration has changed", true
 	default:
 		// ceremony.StepUpLevel, and any value this switch does not name.

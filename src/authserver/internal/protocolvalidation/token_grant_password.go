@@ -230,7 +230,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 			Detail: AdministrativeScopeRefusal(refused),
 			Client: client,
 			Scopes: refused,
-			UserId: user.ID,
+			UserID: user.ID,
 		}
 	}
 

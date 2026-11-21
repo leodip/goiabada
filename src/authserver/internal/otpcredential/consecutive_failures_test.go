@@ -27,7 +27,7 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(database, otpTx)
 		database.EXPECT().
-			IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
+			IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), "000000", now)
@@ -56,13 +56,13 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			if arm.replay {
 				database.EXPECT().
-					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
+					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserID, mock.Anything, otpReadGeneration).
 					Return(false, nil).Once()
 			}
 			var calls []string
 			datamocks.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 			database.EXPECT().
-				IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
+				IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID, otpReadGeneration).
 				RunAndReturn(func(context.Context, *sql.Tx, int64, int64) (bool, error) {
 					calls = append(calls, "increment")
 					return true, nil
@@ -85,12 +85,12 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 			writeErr := errors.New("increment failed")
 			if arm.replay {
 				database.EXPECT().
-					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
+					TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserID, mock.Anything, otpReadGeneration).
 					Return(false, nil).Once()
 			}
 			datamocks.ExpectRunInTransaction(database, otpTx)
 			database.EXPECT().
-				IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
+				IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID, otpReadGeneration).
 				Return(false, writeErr).Once()
 
 			result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), arm.code(), now)
@@ -104,11 +104,11 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 	t.Run("a replayed code advances the count: a failed attempt is a failed attempt", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
+			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserID, mock.Anything, otpReadGeneration).
 			Return(false, nil).Once()
 		datamocks.ExpectRunInTransaction(database, otpTx)
 		database.EXPECT().
-			IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId, otpReadGeneration).
+			IncrementUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID, otpReadGeneration).
 			Return(false, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -123,7 +123,7 @@ func TestVerifyStoredCountsConsecutiveFailures(t *testing.T) {
 	t.Run("a matched code advances nothing: the claim's own statement clears", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().
-			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserId, mock.Anything, otpReadGeneration).
+			TryConsumeEnrolledUserOTPStep(mock.Anything, (*sql.Tx)(nil), otpUserID, mock.Anything, otpReadGeneration).
 			Return(true, nil).Once()
 
 		result, err := VerifyStored(context.Background(), database, testDataCipher, enrolledUser(t), codeFor(t, otpSeed, now), now)
@@ -162,24 +162,24 @@ func TestEstablish_ClearsTheConsecutiveFailuresCountInTheRebind(t *testing.T) {
 	var calls []string
 	datamocks.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
-	database.EXPECT().TryEstablishUserOTP(mock.Anything, otpTx, otpUserId, otpReadGeneration, mock.Anything).
+	database.EXPECT().TryEstablishUserOTP(mock.Anything, otpTx, otpUserID, otpReadGeneration, mock.Anything).
 		Return(true, nil).Once()
-	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserID).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (int64, error) {
 			calls = append(calls, "increment")
 			return 9, nil
 		}).Once()
-	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserID).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) error {
 			calls = append(calls, "clear")
 			return nil
 		}).Once()
-	database.EXPECT().ClearUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().ClearUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) error {
 			calls = append(calls, "clear-count")
 			return nil
 		}).Once()
-	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserId, mock.Anything).Return(nil).Once()
+	database.EXPECT().ReplaceUserRecoveryCodes(mock.Anything, otpTx, otpUserID, mock.Anything).Return(nil).Once()
 	expectHeldRead(database, nil)
 
 	_, _, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
@@ -200,11 +200,11 @@ func TestEstablish_AFailedCountClearEstablishesNothing(t *testing.T) {
 	clearErr := errors.New("clear failed")
 
 	stub := datamocks.ExpectRunInTransaction(database, otpTx)
-	database.EXPECT().TryEstablishUserOTP(mock.Anything, otpTx, otpUserId, otpReadGeneration, mock.Anything).
+	database.EXPECT().TryEstablishUserOTP(mock.Anything, otpTx, otpUserID, otpReadGeneration, mock.Anything).
 		Return(true, nil).Once()
-	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserId).Return(9, nil).Once()
-	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
-	database.EXPECT().ClearUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId).Return(clearErr).Once()
+	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserID).Return(9, nil).Once()
+	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserID).Return(nil).Once()
+	database.EXPECT().ClearUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserID).Return(clearErr).Once()
 
 	generation, _, _, established, err := Establish(context.Background(), database, testDataCipher, user, otpSeed)
 

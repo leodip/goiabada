@@ -38,15 +38,15 @@ const ForgotPasswordPath = "/forgot-password"
 // for a request made on a page naming none, and for the setup link an administrator
 // sends a new user, whose links carry the code alone. The id's alphabet is RFC 3986
 // unreserved too.
-func ResetPasswordLink(baseURL, code, ceremonyId string) string {
-	return baseURL + linkWithSignIn(ResetPasswordPath, code, ceremonyId)
+func ResetPasswordLink(baseURL, code, ceremonyID string) string {
+	return baseURL + linkWithSignIn(ResetPasswordPath, code, ceremonyID)
 }
 
 // ResetPasswordContinuation is where the reset link's first hop sends the browser:
 // ResetPasswordPath with the code gone and the sign-in the link carried kept, or with no
 // query when it carried none.
-func ResetPasswordContinuation(ceremonyId string) string {
-	return continuationWithSignIn(ResetPasswordPath, ceremonyId)
+func ResetPasswordContinuation(ceremonyID string) string {
+	return continuationWithSignIn(ResetPasswordPath, ceremonyID)
 }
 
 // AccountActivateLink builds the account activation link emailed to someone who has
@@ -56,34 +56,34 @@ func ResetPasswordContinuation(ceremonyId string) string {
 // sign-in on into the app (#622 decision 9). Empty for a registration reached from
 // anywhere else, whose link carries the code alone. The id's alphabet is RFC 3986
 // unreserved too.
-func AccountActivateLink(baseURL, code, ceremonyId string) string {
-	return baseURL + linkWithSignIn(AccountActivatePath, code, ceremonyId)
+func AccountActivateLink(baseURL, code, ceremonyID string) string {
+	return baseURL + linkWithSignIn(AccountActivatePath, code, ceremonyID)
 }
 
 // AccountActivateContinuation is where the activation link's first hop sends the
 // browser: AccountActivatePath with the code gone and the sign-in the link carried
 // kept, or with no query when it carried none.
-func AccountActivateContinuation(ceremonyId string) string {
-	return continuationWithSignIn(AccountActivatePath, ceremonyId)
+func AccountActivateContinuation(ceremonyID string) string {
+	return continuationWithSignIn(AccountActivatePath, ceremonyID)
 }
 
 // linkWithSignIn is path with the code, and the sign-in when ceremonyId is not empty, as
 // its query: the shape both emailed links share.
-func linkWithSignIn(path, code, ceremonyId string) string {
-	if ceremonyId == "" {
+func linkWithSignIn(path, code, ceremonyID string) string {
+	if ceremonyID == "" {
 		return path + "?" + codeQuery(code)
 	}
-	return path + "?" + url.Values{"code": {code}, ceremony.QueryParameter: {ceremonyId}}.Encode()
+	return path + "?" + url.Values{"code": {code}, ceremony.QueryParameter: {ceremonyID}}.Encode()
 }
 
 // continuationWithSignIn is path with the sign-in alone as its query, or bare when
 // ceremonyId is empty: where both links' first hops send the browser once the code is
 // dropped.
-func continuationWithSignIn(path, ceremonyId string) string {
-	if ceremonyId == "" {
+func continuationWithSignIn(path, ceremonyID string) string {
+	if ceremonyID == "" {
 		return path
 	}
-	return path + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	return path + "?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()
 }
 
 // codeQuery encodes the one query parameter both links carry.

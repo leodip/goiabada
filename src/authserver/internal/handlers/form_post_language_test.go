@@ -23,7 +23,7 @@ func TestFormPost_ThePageIsMarkedWithTheCatalogLanguage(t *testing.T) {
 		"nl-BE,nl;q=0.9,pt-BR;q=0.8": "pt-BR",
 	} {
 		t.Run(acceptLanguage, func(t *testing.T) {
-			r := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/issue?ceremony="+testCeremonyId, nil))
+			r := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/issue?ceremony="+testCeremonyID, nil))
 			r.Header.Set("Accept-Language", acceptLanguage)
 			r = r.WithContext(i18n.ResolveRequestLocale(r.Context(), r))
 			w := httptest.NewRecorder()

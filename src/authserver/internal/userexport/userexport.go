@@ -75,15 +75,15 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		return api.UserExportResponse{}, err
 	}
 
-	// inIdOrder's copy is the one DeleteFunc changes, so the parts are left as they were.
-	attributes := slices.DeleteFunc(inIdOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.ID }),
+	// inIDOrder's copy is the one DeleteFunc changes, so the parts are left as they were.
+	attributes := slices.DeleteFunc(inIDOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.ID }),
 		func(a api.UserAttributeResponse) bool { return !a.IncludeInIDToken && !a.IncludeInAccessToken })
-	groups := inIdOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.ID })
+	groups := inIDOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.ID })
 	for i := range groups {
 		groups[i].Attributes = slices.DeleteFunc(
-			inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.ID }),
+			inIDOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.ID }),
 			func(a api.GroupAttributeResponse) bool { return !a.IncludeInIDToken && !a.IncludeInAccessToken })
-		groups[i].Permissions = inIdOrder(groups[i].Permissions, permissionId)
+		groups[i].Permissions = inIDOrder(groups[i].Permissions, permissionID)
 	}
 
 	var picture *api.UserExportProfilePictureResponse
@@ -109,18 +109,18 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		User:          *apimapping.ToUserResponse(user),
 		Attributes:    attributes,
 		Groups:        groups,
-		Permissions:   inIdOrder(parts.Permissions, permissionId),
-		Consents:      inIdOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.ID }),
-		Sessions:      inIdOrder(parts.Sessions, func(s api.UserSessionDetailResponse) int64 { return s.ID }),
+		Permissions:   inIDOrder(parts.Permissions, permissionID),
+		Consents:      inIDOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.ID }),
+		Sessions:      inIDOrder(parts.Sessions, func(s api.UserSessionDetailResponse) int64 { return s.ID }),
 		RefreshTokens: refreshTokens(parts.RefreshTokens),
-		LegalDocumentAcceptances: inIdOrder(parts.LegalDocumentAcceptances,
+		LegalDocumentAcceptances: inIDOrder(parts.LegalDocumentAcceptances,
 			func(a api.LegalDocumentAcceptanceResponse) int64 { return a.ID }),
 		ProfilePicture: picture,
 		AuditEvents:    events,
 	}, nil
 }
 
-func permissionId(p api.PermissionResponse) int64 { return p.ID }
+func permissionID(p api.PermissionResponse) int64 { return p.ID }
 
 // refreshTokens is each token's entry, in the rows' id order (#781 decision 4). A token is revoked
 // when any of the three marks that stop it is set: its own row, its authorization code's, or its
@@ -129,7 +129,7 @@ func permissionId(p api.PermissionResponse) int64 { return p.ID }
 // address and browser are empty and its sign-in time is its own row's, which rotation copies from
 // the parent, the moment the password was checked.
 func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
-	sorted := inIdOrder(tokens, func(t RefreshToken) int64 { return t.Row.ID })
+	sorted := inIDOrder(tokens, func(t RefreshToken) int64 { return t.Row.ID })
 	entries := make([]api.UserExportRefreshTokenResponse, 0, len(sorted))
 	for _, token := range sorted {
 		row := token.Row
@@ -172,15 +172,15 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 // session leaves out previous_user_id, that user. A row the user's own token made keeps whom it
 // acted on; a row no user's token made keeps its actor, a client or the recover command, neither a
 // person. Every other byte of a row is as stored.
-func auditEvents(userId int64, rows []record.AuditLog) ([]api.UserExportAuditEventResponse, error) {
-	sorted := inIdOrder(rows, func(row record.AuditLog) int64 { return row.ID })
+func auditEvents(userID int64, rows []record.AuditLog) ([]api.UserExportAuditEventResponse, error) {
+	sorted := inIDOrder(rows, func(row record.AuditLog) int64 { return row.ID })
 	entries := make([]api.UserExportAuditEventResponse, 0, len(sorted))
 	for i := range sorted {
 		row := &sorted[i]
 		entry := api.UserExportAuditEventResponse{AuditLogResponse: apimapping.ToAuditLogResponse(row)}
 
 		var hidden []string
-		if row.LoggedInUserID.Valid && row.LoggedInUserID.Int64 != userId {
+		if row.LoggedInUserID.Valid && row.LoggedInUserID.Int64 != userID {
 			entry.ActedByAdministrator = true
 			entry.LoggedInUserID = nil
 			hidden = append(hidden, "logged_in_user")
@@ -231,8 +231,8 @@ func nullTime(stored sql.NullTime) *time.Time {
 	return &instant
 }
 
-// inIdOrder is a copy of entries sorted by id, ascending, and never nil.
-func inIdOrder[T any](entries []T, id func(T) int64) []T {
+// inIDOrder is a copy of entries sorted by id, ascending, and never nil.
+func inIDOrder[T any](entries []T, id func(T) int64) []T {
 	sorted := make([]T, len(entries))
 	copy(sorted, entries)
 	slices.SortStableFunc(sorted, func(a, b T) int { return cmp.Compare(id(a), id(b)) })
@@ -242,6 +242,6 @@ func inIdOrder[T any](entries []T, id func(T) int64) []T {
 // FileName is the name the document is saved under: user-<id>-<date>.json, the date being
 // exportedAt's in UTC, as in user-42-2026-11-05.json. The id keeps the email address out of
 // download folders and mail attachments (#781 decision 6).
-func FileName(userId int64, exportedAt time.Time) string {
-	return fmt.Sprintf("user-%d-%s.json", userId, exportedAt.UTC().Format(time.DateOnly))
+func FileName(userID int64, exportedAt time.Time) string {
+	return fmt.Sprintf("user-%d-%s.json", userID, exportedAt.UTC().Format(time.DateOnly))
 }

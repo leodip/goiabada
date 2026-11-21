@@ -33,7 +33,7 @@ import (
 // what was this package's convention is the shared stub's rule (#422).
 var txSentinel = &sql.Tx{}
 
-const accountPermissionId = int64(31)
+const accountPermissionID = int64(31)
 
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
@@ -46,7 +46,7 @@ func expectAccountPermissionLookup(db *datamocks.Database, permissions []record.
 func accountPermissions() []record.Permission {
 	return []record.Permission{
 		{ID: 30, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier + "-lookalike"},
-		{ID: accountPermissionId, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
+		{ID: accountPermissionID, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
 	}
 }
 
@@ -62,7 +62,7 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
 	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.MatchedBy(func(up *record.UserPermission) bool {
-		return up.UserID == 77 && up.PermissionID == accountPermissionId
+		return up.UserID == 77 && up.PermissionID == accountPermissionID
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{
@@ -87,7 +87,7 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 	assert.Equal(t, "Lovelace", user.FamilyName)
 	assert.NotEmpty(t, user.Subject)
 	require.Len(t, user.Permissions, 1)
-	assert.Equal(t, accountPermissionId, user.Permissions[0].ID)
+	assert.Equal(t, accountPermissionID, user.Permissions[0].ID)
 }
 
 func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermission(t *testing.T) {
@@ -169,19 +169,19 @@ func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	}).Once()
 
 	ids := []int64{77, 78}
-	var permissionUserIds []int64
+	var permissionUserIDs []int64
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		args.Get(2).(*record.User).ID = ids[0]
 		ids = ids[1:]
 	}).Return(nil).Twice()
 	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		permissionUserIds = append(permissionUserIds, args.Get(2).(*record.UserPermission).UserID)
+		permissionUserIDs = append(permissionUserIDs, args.Get(2).(*record.UserPermission).UserID)
 	}).Return(nil).Twice()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 	require.NoError(t, err)
 
-	assert.Equal(t, []int64{77, 78}, permissionUserIds,
+	assert.Equal(t, []int64{77, 78}, permissionUserIDs,
 		"each attempt's permission row names the id that attempt's user insert assigned")
 	assert.Equal(t, int64(78), user.ID, "the caller sees the id of the attempt that committed")
 }
@@ -201,7 +201,7 @@ func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
 	db.On("CreateUserPermission", mock.Anything, txSentinel, mock.MatchedBy(func(up *record.UserPermission) bool {
-		return up.UserID == 77 && up.PermissionID == accountPermissionId
+		return up.UserID == 77 && up.PermissionID == accountPermissionID
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
 	user, err := New(db).CreateUserInTransaction(context.Background(), txSentinel, &Input{
@@ -218,7 +218,7 @@ func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t
 	assert.True(t, user.EmailVerified)
 	assert.Equal(t, "hash", user.PasswordHash)
 	require.Len(t, user.Permissions, 1)
-	assert.Equal(t, accountPermissionId, user.Permissions[0].ID)
+	assert.Equal(t, accountPermissionID, user.Permissions[0].ID)
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 

@@ -58,7 +58,7 @@ func implicitAnswerParameters(t *testing.T) []string {
 	err := issueImplicitTokens(rr, req, formPostTemplate{}, "", "https://app.example.com/callback", "af0ifjsldkj",
 		&issuance.ImplicitGrantResponse{
 			AccessToken: "an-access-token",
-			IdToken:     "an-id-token",
+			IDToken:     "an-id-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   300,
 			Scope:       "openid email",

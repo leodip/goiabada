@@ -122,7 +122,7 @@ func TestFingerprint_TheFirstTwelveHexDigitsOfTheSHA256(t *testing.T) {
 	assert.Equal(t, "e3b0c44298fc", Fingerprint(nil))
 }
 
-func TestPath_NamesTheAssetByIdAndItsFingerprint(t *testing.T) {
+func TestPath_NamesTheAssetByIDAndItsFingerprint(t *testing.T) {
 	asset := &record.BrandAsset{ID: 7, Fingerprint: "0123456789ab"}
 
 	assert.Equal(t, "/brand-assets/7?v=0123456789ab", Path(asset))
@@ -138,20 +138,20 @@ func slotsBrand() *record.Brand {
 	return &brand
 }
 
-func TestSlotIds_TheFilledSlotsInSlotOrder(t *testing.T) {
-	assert.Equal(t, []int64{11, 12, 13, 14, 15, 16}, SlotIds(slotsBrand()))
+func TestSlotIDs_TheFilledSlotsInSlotOrder(t *testing.T) {
+	assert.Equal(t, []int64{11, 12, 13, 14, 15, 16}, SlotIDs(slotsBrand()))
 
 	brand := slotsBrand()
 	brand.LogoAssetID, brand.FaviconAssetID, brand.BoldFontAssetID = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
-	assert.Equal(t, []int64{12, 14, 15}, SlotIds(brand))
+	assert.Equal(t, []int64{12, 14, 15}, SlotIDs(brand))
 
 	empty := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
-	assert.Empty(t, SlotIds(&empty))
+	assert.Empty(t, SlotIDs(&empty))
 
 	// An asset two slots name, as the two logo slots may, is read once.
 	brand = slotsBrand()
 	brand.DarkLogoAssetID = brand.LogoAssetID
-	assert.Equal(t, []int64{11, 13, 14, 15, 16}, SlotIds(brand))
+	assert.Equal(t, []int64{11, 13, 14, 15, 16}, SlotIDs(brand))
 }
 
 func TestSlotsOf_EachSlotTakesTheAssetItNames(t *testing.T) {

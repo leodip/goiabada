@@ -96,8 +96,8 @@ func write(w http.ResponseWriter, status int, body []byte) {
 // does it: it is the identity on anything this tree constructed, so the only value it changes is a
 // bare error from the standard library or a dependency, which would otherwise log with no frames.
 func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
-	requestId := LogInternalServerError(r, err, attrs...)
-	WriteError(w, fmt.Sprintf(internalServerErrorDescription, requestId),
+	requestID := LogInternalServerError(r, err, attrs...)
+	WriteError(w, fmt.Sprintf(internalServerErrorDescription, requestID),
 		internalServerErrorCode, http.StatusInternalServerError)
 }
 
@@ -106,7 +106,7 @@ func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 // registration is that surface: RFC 7591 section 3.2.2 fixes its body, so it takes the logging half
 // and keeps the shape on the wire (#279, plan finding 9).
 func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
-	requestId := requestid.FromContext(r.Context())
+	requestID := requestid.FromContext(r.Context())
 	// No request_id attribute: the installed handler reads it off the context this call
 	// passes it, so naming it here would write it twice. requestId is still read, because
 	// the caller puts it on the wire for whoever hit the error (#320 decision 2).
@@ -114,5 +114,5 @@ func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 	record = append(record, "error", errs.WithStack(err))
 	record = append(record, attrs...)
 	slog.ErrorContext(r.Context(), "internal server error", record...)
-	return requestId
+	return requestID
 }

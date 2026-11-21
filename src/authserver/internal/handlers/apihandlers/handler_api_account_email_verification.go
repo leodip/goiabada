@@ -29,9 +29,9 @@ import (
 // caller's own user row.
 type accountEmailVerificationDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		issuedAt time.Time, issuedNotAfter time.Time) (bool, error)
-	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
+	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte) (bool, error)
 }
 
 // emailVerificationCodeLifetime is how long an email verification code verifies, and also the
@@ -136,7 +136,7 @@ func HandleAccountEmailVerificationSendPost(
 		input := &emaildelivery.SendEmailInput{
 			To:       user.Email,
 			Subject:  message.Subject,
-			HtmlBody: message.HTML,
+			HTMLBody: message.HTML,
 		}
 		if _, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.ID)

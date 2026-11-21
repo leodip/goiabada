@@ -20,7 +20,7 @@ import (
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersEmailDatabase interface {
 	userTargetPolicyDatabase
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
@@ -46,7 +46,7 @@ func HandleUserEmailPut(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -60,7 +60,7 @@ func HandleUserEmailPut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

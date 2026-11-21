@@ -22,7 +22,7 @@ import (
 type userinfoDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -116,7 +116,7 @@ func HandleUserInfoGetPost(
 			Database:            database,
 			BaseURL:             baseURL,
 			AdminConsoleBaseURL: adminConsoleBaseURL,
-			Inclusion:           userclaims.InclusionIdToken,
+			Inclusion:           userclaims.InclusionIDToken,
 		}
 		mapper.AddOpenIDConnectClaims(r.Context(), nil, claims, user, scopes)
 		mapper.AddGroupClaims(claims, user, scopes)

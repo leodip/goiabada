@@ -23,9 +23,9 @@ import (
 // wire-bytes case can write down, and that it is one query however many rows there are -- so
 // they are asserted here, on the helper, rather than restated at the handler.
 
-func ownerSession(id int64, userId int64) api.UserSessionDetailResponse {
+func ownerSession(id int64, userID int64) api.UserSessionDetailResponse {
 	return api.UserSessionDetailResponse{
-		UserSessionResponse: api.UserSessionResponse{ID: id, UserID: userId},
+		UserSessionResponse: api.UserSessionResponse{ID: id, UserID: userID},
 	}
 }
 

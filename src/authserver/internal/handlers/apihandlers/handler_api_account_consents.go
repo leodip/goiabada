@@ -20,10 +20,10 @@ import (
 type accountConsentsDatabase interface {
 	revocation.Database
 
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
-	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentID int64) (bool, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserConsent, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserConsentByID(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
+	GetUserConsentByID(ctx context.Context, tx *sql.Tx, userConsentID int64) (*record.UserConsent, error)
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
 }
 
@@ -90,13 +90,13 @@ func HandleAccountConsentDelete(
 			writeJSONError(w, "Consent ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		consentId, err := strconv.ParseInt(idStr, 10, 64)
+		consentID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid consent ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		consent, err := database.GetUserConsentByID(r.Context(), nil, consentId)
+		consent, err := database.GetUserConsentByID(r.Context(), nil, consentID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -126,7 +126,7 @@ func HandleAccountConsentDelete(
 		// standing. It also collects the logout tokens that tell the client (#135 decision 3).
 		result, err := revocation.DisconnectClientTx(r.Context(), database, consent.UserID, consent.ClientID,
 			sessionLive(settings), func(tx *sql.Tx) (bool, error) {
-				return database.DeleteUserConsent(r.Context(), tx, consentId)
+				return database.DeleteUserConsent(r.Context(), tx, consentID)
 			})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -144,7 +144,7 @@ func HandleAccountConsentDelete(
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedOwnUserConsent, map[string]interface{}{
 				"user_id":        user.ID,
-				"consent_id":     consentId,
+				"consent_id":     consentID,
 				"logged_in_user": subject,
 			})
 		}

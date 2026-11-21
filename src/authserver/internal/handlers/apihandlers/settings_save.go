@@ -12,8 +12,8 @@ import (
 // lock, the read under it and the write.
 type settingsSaveDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
-	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
@@ -29,7 +29,7 @@ type settingsSaveDatabase interface {
 // given rather than accumulate anything; a value it records, such as what the section held before,
 // is the committed attempt's. The settings on the request's context are left as the request started
 // with them, which is what the audit logger reads its switches from.
-func saveSettingsSection(ctx context.Context, database settingsSaveDatabase, settingsId int64,
+func saveSettingsSection(ctx context.Context, database settingsSaveDatabase, settingsID int64,
 	apply func(stored *record.Settings)) (*record.Settings, error) {
 	return saveSettingsSectionOrRefuse(ctx, database, settingsId, func(stored *record.Settings) error {
 		apply(stored)
@@ -46,10 +46,10 @@ func saveSettingsSectionOrRefuse(ctx context.Context, database settingsSaveDatab
 	var saved *record.Settings
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		saved = nil
-		if acquireErr := database.AcquireSettingsRow(ctx, tx, settingsId); acquireErr != nil {
+		if acquireErr := database.AcquireSettingsRow(ctx, tx, settingsID); acquireErr != nil {
 			return errs.Wrap(acquireErr, "unable to acquire the settings row")
 		}
-		stored, readErr := database.GetSettingsByID(ctx, tx, settingsId)
+		stored, readErr := database.GetSettingsByID(ctx, tx, settingsID)
 		if readErr != nil {
 			return errs.Wrap(readErr, "unable to read the settings row")
 		}

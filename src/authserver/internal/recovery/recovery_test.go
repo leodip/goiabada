@@ -121,21 +121,21 @@ func TestRun_TheUserIsDecidedOnUnderItsRow(t *testing.T) {
 func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	user := &record.User{ID: 7, Email: "admin@example.com", Enabled: true}
-	const manageId = int64(11)
+	const manageID = int64(11)
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(user, nil)
 	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
 	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), builtin.AuthServerResourceIdentifier).
 		Return(&record.Resource{ID: 3, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil)
 	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(3)).
-		Return([]record.Permission{{ID: manageId, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceID: 3}}, nil)
+		Return([]record.Permission{{ID: manageID, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceID: 3}}, nil)
 	stub := datamocks.ExpectRunInTransactionRerun(database, recoveryTx)
-	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageId, nil).Twice()
+	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageID, nil).Twice()
 	database.On("AcquireUserRow", mock.Anything, recoveryTx, int64(7)).Return(nil).Twice()
 	database.On("GetUserByIDForUpdate", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
 	database.On("GetUserPermissionsByUserID", mock.Anything, recoveryTx, int64(7)).
 		Return([]record.UserPermission{}, nil).Once()
 	database.On("GetUserPermissionsByUserID", mock.Anything, recoveryTx, int64(7)).
-		Return([]record.UserPermission{{ID: 21, UserID: 7, PermissionID: manageId}}, nil).Once()
+		Return([]record.UserPermission{{ID: 21, UserID: 7, PermissionID: manageID}}, nil).Once()
 	database.On("CreateUserPermission", mock.Anything, recoveryTx, mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, recoveryTx, int64(7)).Return(int64(4), nil).Twice()
 	database.On("GetUserSessionsByUserID", mock.Anything, recoveryTx, int64(7)).Return([]record.UserSession{}, nil).Twice()

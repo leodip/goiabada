@@ -116,7 +116,7 @@ type membershipCeilingChange struct {
 	targetKind string
 }
 
-func (c membershipCeilingChange) targetId(userId, groupId int64) int64 {
+func (c membershipCeilingChange) targetID(userId, groupId int64) int64 {
 	if c.targetKind == "group" {
 		return groupId
 	}
@@ -225,8 +225,8 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 				assert.Equal(t, change.route, row["route"])
 				assert.Equal(t, "grant", row["ceiling"])
 				assert.Equal(t, change.targetKind, row["target_kind"])
-				assert.InDelta(t, float64(change.targetId(userId, groupId)), row["target_id"], 0)
-				assertUserIdNamesAUserTarget(t, row, change.targetKind, change.targetId(userId, groupId))
+				assert.InDelta(t, float64(change.targetID(userId, groupId)), row["target_id"], 0)
+				assertUserIdNamesAUserTarget(t, row, change.targetKind, change.targetID(userId, groupId))
 				assert.Equal(t, []any{float64(administrative)}, row["permission_ids"], "the administrative permission the group holds")
 				if change.targetKind == "user" {
 					assert.Equal(t, []any{float64(groupId)}, row["group_ids"], "the group whose membership was refused")

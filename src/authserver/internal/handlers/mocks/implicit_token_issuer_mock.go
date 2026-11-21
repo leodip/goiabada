@@ -54,8 +54,8 @@ func (_m *ImplicitTokenIssuer) EXPECT() *ImplicitTokenIssuer_Expecter {
 }
 
 // IssueImplicitTx provides a mock function for the type ImplicitTokenIssuer
-func (_mock *ImplicitTokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error) {
-	ret := _mock.Called(ctx, settings, input, issueAccessToken, issueIdToken)
+func (_mock *ImplicitTokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIDToken bool) (*issuance.ImplicitGrantResponse, error) {
+	ret := _mock.Called(ctx, settings, input, issueAccessToken, issueIDToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IssueImplicitTx")
@@ -64,17 +64,17 @@ func (_mock *ImplicitTokenIssuer) IssueImplicitTx(ctx context.Context, settings 
 	var r0 *issuance.ImplicitGrantResponse
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *issuance.ImplicitGrantInput, bool, bool) (*issuance.ImplicitGrantResponse, error)); ok {
-		return returnFunc(ctx, settings, input, issueAccessToken, issueIdToken)
+		return returnFunc(ctx, settings, input, issueAccessToken, issueIDToken)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *issuance.ImplicitGrantInput, bool, bool) *issuance.ImplicitGrantResponse); ok {
-		r0 = returnFunc(ctx, settings, input, issueAccessToken, issueIdToken)
+		r0 = returnFunc(ctx, settings, input, issueAccessToken, issueIDToken)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*issuance.ImplicitGrantResponse)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *issuance.ImplicitGrantInput, bool, bool) error); ok {
-		r1 = returnFunc(ctx, settings, input, issueAccessToken, issueIdToken)
+		r1 = returnFunc(ctx, settings, input, issueAccessToken, issueIDToken)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -91,12 +91,12 @@ type ImplicitTokenIssuer_IssueImplicitTx_Call struct {
 //   - settings *record.Settings
 //   - input *issuance.ImplicitGrantInput
 //   - issueAccessToken bool
-//   - issueIdToken bool
-func (_e *ImplicitTokenIssuer_Expecter) IssueImplicitTx(ctx any, settings any, input any, issueAccessToken any, issueIdToken any) *ImplicitTokenIssuer_IssueImplicitTx_Call {
-	return &ImplicitTokenIssuer_IssueImplicitTx_Call{Call: _e.mock.On("IssueImplicitTx", ctx, settings, input, issueAccessToken, issueIdToken)}
+//   - issueIDToken bool
+func (_e *ImplicitTokenIssuer_Expecter) IssueImplicitTx(ctx any, settings any, input any, issueAccessToken any, issueIDToken any) *ImplicitTokenIssuer_IssueImplicitTx_Call {
+	return &ImplicitTokenIssuer_IssueImplicitTx_Call{Call: _e.mock.On("IssueImplicitTx", ctx, settings, input, issueAccessToken, issueIDToken)}
 }
 
-func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) Run(run func(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
+func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) Run(run func(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIDToken bool)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -134,7 +134,7 @@ func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) Return(implicitGrantResponse
 	return _c
 }
 
-func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
+func (_c *ImplicitTokenIssuer_IssueImplicitTx_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIDToken bool) (*issuance.ImplicitGrantResponse, error)) *ImplicitTokenIssuer_IssueImplicitTx_Call {
 	_c.Call.Return(run)
 	return _c
 }

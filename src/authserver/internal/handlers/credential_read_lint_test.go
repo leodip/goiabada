@@ -75,7 +75,7 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		`"code_verifier"`,
 		`"refresh_token"`,
 		`"client_secret"`,
-		// The bearer token, read from a form body by JwtAuthorizationHeaderToContext in
+		// The bearer token, read from a form body by JWTAuthorizationHeaderToContext in
 		// internal/middleware. That read arrived in this module with the middleware in #385;
 		// before it, core/middleware/credential_read_lint_test.go was the only caller holding
 		// it, and neither application list carried the name, so the one lawful form-body token
@@ -100,10 +100,10 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		// They authorize nothing alone, but a marker supplied by a URL is not a submission,
 		// and reading one from a URL reintroduces the shape #201 removed from the reset
 		// link one indirection later. The ceremony's is read in its own package, by
-		// ceremony.RequestedId, and is listed under both the names a read could spell it with.
-		"IdField",
-		"ceremony.IdField",
-		"continuationIdField",
+		// ceremony.RequestedID, and is listed under both the names a read could spell it with.
+		"IDField",
+		"ceremony.IDField",
+		"continuationIDField",
 	}
 
 	guard.AssertNoCredentialQueryFallback(t, forbidden,

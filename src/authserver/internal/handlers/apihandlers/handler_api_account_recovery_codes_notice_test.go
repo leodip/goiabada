@@ -203,7 +203,7 @@ func TestHandleAccountRecoveryCodesPost_AFailedNoticeIsOneErrorRecord(t *testing
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "unable to render an account notice", records[0].Message)
 	assert.Equal(t, "recovery_codes_replaced", records[0].Attrs["notice"])
-	assert.Equal(t, otpNoticeRequestId, records[0].Attrs["request_id"])
+	assert.Equal(t, otpNoticeRequestID, records[0].Attrs["request_id"])
 	assert.Equal(t, user.ID, records[0].Attrs["user_id"])
 	assert.NotContains(t, capture.Text(), recoveryNoticeAddress, "the record names no address")
 }

@@ -52,7 +52,7 @@ import (
 // Both callers already hold a port carrying this method and hand it on unchanged, so neither
 // changes which database it reads.
 type Database interface {
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 }
 
 // Inclusion names which of the two include flags a group or an attribute is filtered by. The zero
@@ -61,8 +61,8 @@ type Database interface {
 type Inclusion int
 
 const (
-	// InclusionIdToken filters on include_in_id_token.
-	InclusionIdToken Inclusion = iota
+	// InclusionIDToken filters on include_in_id_token.
+	InclusionIDToken Inclusion = iota
 	// InclusionAccessToken filters on include_in_access_token.
 	InclusionAccessToken
 )

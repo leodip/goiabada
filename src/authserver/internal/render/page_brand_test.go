@@ -86,12 +86,12 @@ func readPageHead(t *testing.T, page string) pageHead {
 
 // brandStylesheetHref is the link a page draws a brand on theme with: the brand's own stylesheet
 // route, named by the fingerprint the stylesheet is served as current under.
-func brandStylesheetHref(t *testing.T, brandId string, theme string) string {
+func brandStylesheetHref(t *testing.T, brandID string, theme string) string {
 	t.Helper()
 	stylesheet, ok := brandthemes.StylesheetOf(theme)
 	require.True(t, ok, theme)
 	require.Regexp(t, `^[0-9a-f]{12}$`, stylesheet.Fingerprint)
-	return "/brand/" + brandId + "/stylesheet.css?v=" + stylesheet.Fingerprint
+	return "/brand/" + brandID + "/stylesheet.css?v=" + stylesheet.Fingerprint
 }
 
 // Both layouts are drawn in the default brand: the html element carries data-theme for a light or

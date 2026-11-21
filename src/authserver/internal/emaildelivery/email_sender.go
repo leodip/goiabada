@@ -120,7 +120,7 @@ func SMTPConfigFromSettings(settings *record.Settings) SMTPConfig {
 type SendEmailInput struct {
 	To       string
 	Subject  string
-	HtmlBody string
+	HTMLBody string
 }
 
 // SendResult is what a send that succeeded reports about how it went.
@@ -699,7 +699,7 @@ func isLocalHost(host string) bool {
 func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]byte, error) {
 
 	// No email is sent without its text (#817 decision 10).
-	text, err := PlainText(input.HtmlBody)
+	text, err := PlainText(input.HTMLBody)
 	if err != nil {
 		return nil, err
 	}
@@ -743,7 +743,7 @@ func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]
 	// the richest last.
 	for _, part := range []struct{ contentType, content string }{
 		{"text/plain; charset=UTF-8", text},
-		{"text/html; charset=UTF-8", input.HtmlBody},
+		{"text/html; charset=UTF-8", input.HTMLBody},
 	} {
 		w, err := parts.CreatePart(textproto.MIMEHeader{
 			"Content-Type":              {part.contentType},

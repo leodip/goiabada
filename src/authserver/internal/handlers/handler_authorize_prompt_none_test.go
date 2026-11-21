@@ -29,9 +29,9 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 	testCases := []struct {
 		name            string
 		target          record.ACRLevel
-		sessionAcr      record.ACRLevel
-		sessionOtpGen   int64
-		userOtpGen      int64
+		sessionACR      record.ACRLevel
+		sessionOTPGen   int64
+		userOTPGen      int64
 		userOTPEnabled  bool
 		wantDescription string
 	}{
@@ -39,14 +39,14 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			// Step 6 would refuse too; step 5 is asked first.
 			name:            "a target above the session's level, before the missing authenticator",
 			target:          record.ACRLevel2Mandatory,
-			sessionAcr:      record.ACRLevel1,
+			sessionACR:      record.ACRLevel1,
 			userOTPEnabled:  false,
 			wantDescription: "Higher authentication level required",
 		},
 		{
 			name:            "an unknown session level is insufficient",
 			target:          record.ACRLevel1,
-			sessionAcr:      "urn:goiabada:pwd",
+			sessionACR:      "urn:goiabada:pwd",
 			userOTPEnabled:  true,
 			wantDescription: "Higher authentication level required",
 		},
@@ -54,18 +54,18 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			// Step 7 would refuse too; step 6 is asked first.
 			name:            "a mandatory target with no authenticator, before the changed configuration",
 			target:          record.ACRLevel2Mandatory,
-			sessionAcr:      record.ACRLevel2Mandatory,
-			sessionOtpGen:   2,
-			userOtpGen:      3,
+			sessionACR:      record.ACRLevel2Mandatory,
+			sessionOTPGen:   2,
+			userOTPGen:      3,
 			userOTPEnabled:  false,
 			wantDescription: "Additional authentication setup required",
 		},
 		{
 			name:            "the authenticator changed since the session answered level 2",
 			target:          record.ACRLevel2Optional,
-			sessionAcr:      record.ACRLevel2Optional,
-			sessionOtpGen:   2,
-			userOtpGen:      3,
+			sessionACR:      record.ACRLevel2Optional,
+			sessionOTPGen:   2,
+			userOTPGen:      3,
 			userOTPEnabled:  true,
 			wantDescription: "Authentication configuration has changed",
 		},
@@ -113,14 +113,14 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			userSession := &record.UserSession{
 				ID:                  1,
 				UserID:              7,
-				ACRLevel:            tc.sessionAcr,
+				ACRLevel:            tc.sessionACR,
 				AuthMethods:         "pwd",
-				OTPConfigGeneration: tc.sessionOtpGen,
+				OTPConfigGeneration: tc.sessionOTPGen,
 				User: record.User{
 					ID:                  7,
 					Enabled:             true,
 					OTPEnabled:          tc.userOTPEnabled,
-					OTPConfigGeneration: tc.userOtpGen,
+					OTPConfigGeneration: tc.userOTPGen,
 				},
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
@@ -424,7 +424,7 @@ func newSilentSessionFixture(t *testing.T, authTime time.Time) *silentSessionFix
 	require.NoError(t, err)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = requestid.NewContext(ctx, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestID)
 	f.req = req.WithContext(ctx)
 	f.rr = httptest.NewRecorder()
 
@@ -473,7 +473,7 @@ func TestHandlePromptNone_TheCeremonyCarriesTheSessionsAuthTime(t *testing.T) {
 	f.handler.ServeHTTP(f.rr, f.req)
 
 	require.Equal(t, http.StatusFound, f.rr.Code)
-	assert.Equal(t, saved.CeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/issue"))
+	assert.Equal(t, saved.CeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/issue"))
 	require.NotNil(t, saved.AuthenticatedAt)
 	assert.Equal(t, authTime, *saved.AuthenticatedAt)
 	assert.Equal(t, ceremony.AuthStateReadyToIssueCode, saved.AuthState)

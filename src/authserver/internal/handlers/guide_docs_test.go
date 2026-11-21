@@ -153,13 +153,13 @@ func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 		auditLogger:        handlersmocks.NewAuditLogger(t),
 	})
 
-	req, _ := http.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "s"))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel1PasswordCompleted,
-		Level1AuthCompleted: true, ClientId: "app", UserId: 1,
+		CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateLevel1PasswordCompleted,
+		Level1AuthCompleted: true, ClientID: "app", UserID: 1,
 	}, nil)
 	session := &record.UserSession{ID: 1, UserID: 1, ACRLevel: record.ACRLevel2Mandatory, AuthMethods: "pwd otp",
 		OTPConfigGeneration: 2, User: record.User{ID: 1, OTPEnabled: true, OTPConfigGeneration: 2}}
@@ -170,7 +170,7 @@ func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 	ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	handler.ServeHTTP(rr, req)
-	if got := rr.Header().Get("Location"); got != testBaseURL+"/auth/level2?ceremony="+testCeremonyId {
+	if got := rr.Header().Get("Location"); got != testBaseURL+"/auth/level2?ceremony="+testCeremonyID {
 		t.Fatalf("prompt=login over a level 3 session went to %q rather than the code step, so the guide's sentences no longer hold", got)
 	}
 

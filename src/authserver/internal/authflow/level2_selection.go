@@ -13,7 +13,7 @@ import (
 // level, and the user, whose authenticator decides the arm. data.Database satisfies it.
 type level2SelectionDatabase interface {
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // Level2Selection is GET /auth/level2, the choice of level 2 method for a ceremony in
@@ -57,15 +57,15 @@ type Level2SelectionResult struct {
 func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 	authContext *ceremony.AuthContext) (Level2SelectionResult, error) {
 
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return Level2SelectionResult{}, err
 	}
 	if client == nil {
-		return Level2SelectionResult{}, errs.Errorf("client %v not found", authContext.ClientId)
+		return Level2SelectionResult{}, errs.Errorf("client %v not found", authContext.ClientID)
 	}
 
-	user, err := o.database.GetUserByID(ctx, nil, authContext.UserId)
+	user, err := o.database.GetUserByID(ctx, nil, authContext.UserID)
 	if err != nil {
 		return Level2SelectionResult{}, err
 	}
@@ -74,9 +74,9 @@ func (o *Level2Selection) Run(ctx context.Context, browser stepSaver,
 	}
 
 	otpConfigGeneration := user.OTPConfigGeneration
-	authContext.OtpConfigGeneration = &otpConfigGeneration
+	authContext.OTPConfigGeneration = &otpConfigGeneration
 
-	nextState, nextStep, err := decideLevel2Arm(authContext.GetTargetAcrLevel(client.DefaultACRLevel), user.OTPEnabled)
+	nextState, nextStep, err := decideLevel2Arm(authContext.GetTargetACRLevel(client.DefaultACRLevel), user.OTPEnabled)
 	if err != nil {
 		return Level2SelectionResult{}, err
 	}

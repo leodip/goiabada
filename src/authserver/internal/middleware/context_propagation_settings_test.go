@@ -23,16 +23,16 @@ import (
 // so a middleware that passed context.Background() matches nothing and the strict mock reports an
 // unexpected call.
 
-const settingsPropagatedRequestId = "goiabada/req-settings-propagation-1"
+const settingsPropagatedRequestID = "goiabada/req-settings-propagation-1"
 
-func settingsRequestCarryingId() *http.Request {
+func settingsRequestCarryingID() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	return req.WithContext(requestid.NewContext(req.Context(), settingsPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), settingsPropagatedRequestID))
 }
 
 func theSettingsRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == settingsPropagatedRequestId
+		return requestid.FromContext(ctx) == settingsPropagatedRequestID
 	})
 }
 
@@ -48,7 +48,7 @@ func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	}))
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, settingsRequestCarryingId())
+	handler.ServeHTTP(rr, settingsRequestCarryingID())
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.True(t, reached, "the next handler runs once the settings are on the context")

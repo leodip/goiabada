@@ -34,9 +34,9 @@ import (
 // it. These tests drive that seam the way the forgot-password tests drive theirs: the job is held,
 // what the request did before its response is asserted, then the job is run and what it did is.
 
-// registerRequestId is the request id registrationRequest carries, as requestid.Middleware
+// registerRequestID is the request id registrationRequest carries, as requestid.Middleware
 // puts one on every request.
-const registerRequestId = "req-register-0001"
+const registerRequestID = "req-register-0001"
 
 // registerSomeoneEmail is the address most of these tests register, whose digest is
 // someoneDigest.
@@ -65,7 +65,7 @@ func registrationRequest(email string) *http.Request {
 	form := url.Values{"email": {email}, "password": {"Str0ngP4ss!"}, "passwordConfirmation": {"Str0ngP4ss!"}}
 	req := httptest.NewRequest(http.MethodPost, "/account/register", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	ctx := requestid.NewContext(req.Context(), registerRequestId)
+	ctx := requestid.NewContext(req.Context(), registerRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, verificationSettings()))
 }
 
@@ -192,7 +192,7 @@ func TestHandleRegisterPost_WithVerificationAnswersAfterBothLookupsAlone(t *test
 			h.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, h.jobs.jobs, 1, "the rest is handed to one job")
-			assert.Equal(t, registerRequestId, requestid.FromContext(h.jobs.ctxs[0]),
+			assert.Equal(t, registerRequestID, requestid.FromContext(h.jobs.ctxs[0]),
 				"the job is handed the request's context, so what it records joins the request")
 		})
 	}
@@ -254,7 +254,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 			h.jobs.runAll(t, afterresponse.ClassRegistration)
 
 			assert.Equal(t, tc.wantDetails, *details)
-			assert.Equal(t, registerRequestId, requestid.FromContext(*auditCtx),
+			assert.Equal(t, registerRequestID, requestid.FromContext(*auditCtx),
 				"the record is written under the job's context, which carries the request's id")
 			h.assertNothingWrittenOrSent(t)
 		})
@@ -324,7 +324,7 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 	require.NotNil(t, sent)
 	assert.Equal(t, registerSomeoneEmail, sent.To)
 	assert.Equal(t, "Ative sua conta", sent.Subject, "the subject is the rendered email's")
-	assert.Equal(t, "activation mail", sent.HtmlBody)
+	assert.Equal(t, "activation mail", sent.HTMLBody)
 	h.userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 }
 
@@ -469,7 +469,7 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 			require.NotNil(t, sent)
 			assert.Equal(t, registerSomeoneEmail, sent.To)
 			assert.Equal(t, "the rendered subject", sent.Subject)
-			assert.Equal(t, "notice", sent.HtmlBody)
+			assert.Equal(t, "notice", sent.HTMLBody)
 
 			h.database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 			h.userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
@@ -665,7 +665,7 @@ func assertOneErrorRecordOnRegistration(t *testing.T, capture *logtest.SlogCaptu
 	records := capture.Records()
 	require.Len(t, records, 1, capture.Text())
 	assert.Equal(t, "ERROR", records[0].Level.String())
-	assert.Equal(t, registerRequestId, records[0].Attrs["request_id"])
+	assert.Equal(t, registerRequestID, records[0].Attrs["request_id"])
 	assert.NotNil(t, records[0].Attrs["error"])
 }
 

@@ -157,8 +157,8 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 
 			authContext := &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel1Password,
-				CeremonyId: "ceremony-id",
-				ClientId:   "test-client",
+				CeremonyID: "ceremony-id",
+				ClientID:   "test-client",
 			}
 
 			result, err := operation.Run(context.Background(), browser, authContext, tt.email, tt.password, nil)
@@ -176,7 +176,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 			assert.Zero(t, browser.rotations)
 			assert.Empty(t, browser.saves)
 			assert.Equal(t, ceremony.AuthStateLevel1Password, authContext.AuthState)
-			assert.Zero(t, authContext.UserId)
+			assert.Zero(t, authContext.UserID)
 		})
 	}
 }
@@ -194,8 +194,8 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	browser := &fakePasswordSubmissionBrowser{}
 	authContext := &ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel1Password,
-		CeremonyId: "ceremony-id",
-		ClientId:   "test-client",
+		CeremonyID: "ceremony-id",
+		ClientID:   "test-client",
 	}
 
 	result, err := NewPasswordSubmission(database, auditLogger).
@@ -228,7 +228,7 @@ func TestPasswordSubmission_SavesTheKeepMeSignedInAnswerWithThePassword(t *testi
 				user: &record.User{ID: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
 			}
 			browser := &fakePasswordSubmissionBrowser{}
-			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "ceremony-id"}
+			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: "ceremony-id"}
 
 			result, err := NewPasswordSubmission(database, &fakeAuditLogger{}).
 				Run(context.Background(), browser, authContext, "alice@example.com", "the-right-password", answer)

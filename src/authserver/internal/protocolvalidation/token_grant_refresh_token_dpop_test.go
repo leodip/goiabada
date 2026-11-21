@@ -163,7 +163,7 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 						grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 							&ValidateTokenRequestInput{
 								GrantType:      "refresh_token",
-								ClientId:       clientIdentifier,
+								ClientID:       clientIdentifier,
 								ClientSecret:   secret,
 								RefreshToken:   "the_refresh_token",
 								DPoPThumbprint: a.thumbprint,

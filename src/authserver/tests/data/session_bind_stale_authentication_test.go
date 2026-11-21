@@ -71,9 +71,9 @@ func parkTabA(t *testing.T, stalled *staleBindStaller, signaled <-chan error) {
 // signInOf answers what one completed sign-in hands its bind, at the instant given.
 func signInOf(userID int64, methods string, level record.ACRLevel, at time.Time, passwordAt *time.Time) usersession.Authentication {
 	return usersession.Authentication{
-		UserId:           userID,
+		UserID:           userID,
 		AuthMethods:      methods,
-		AcrLevel:         level,
+		ACRLevel:         level,
 		AuthTime:         &at,
 		PasswordAuthTime: passwordAt,
 	}
@@ -319,7 +319,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 		// The SSO bind: the methods and level the ceremony adopted, and the instant it adopted
 		// them at, entering no credential of its own.
 		_, bindErr := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID,
-			usersession.Authentication{UserId: user.ID, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory,
+			usersession.Authentication{UserID: user.ID, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 				AdoptedAuthTime: &adopted}, false, "")
 		signaled <- bindErr
 	}()
@@ -364,8 +364,8 @@ func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
 		require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
 
 		code := adopted.Add(time.Minute + 1600*time.Nanosecond)
-		stepUp := usersession.Authentication{UserId: user.ID, AuthMethods: "pwd otp",
-			AcrLevel: record.ACRLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
+		stepUp := usersession.Authentication{UserID: user.ID, AuthMethods: "pwd otp",
+			ACRLevel: record.ACRLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
 
 		manager := usersession.NewManager(database)
 		for attempt := 1; attempt <= 2; attempt++ {

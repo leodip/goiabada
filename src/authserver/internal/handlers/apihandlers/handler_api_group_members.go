@@ -22,11 +22,11 @@ type groupMembersDatabase interface {
 	userTargetPolicyDatabase
 	lastAdministratorDatabase
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
-	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
-	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
-	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]record.User, int, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserGroupByUserIDAndGroupID(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*record.UserGroup, error)
+	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupID int64) error
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
+	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupID int64, page int, pageSize int) ([]record.User, int, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserGroupByUserIDAndGroupID(ctx context.Context, tx *sql.Tx, userID, groupID int64) (*record.UserGroup, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -107,7 +107,7 @@ func HandleGroupMemberAddPost(
 			return
 		}
 
-		groupId, err := strconv.ParseInt(idStr, 10, 64)
+		groupID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid group ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -121,9 +121,9 @@ func HandleGroupMemberAddPost(
 		}
 
 		// Validate group exists
-		group, err := database.GetGroupByID(r.Context(), nil, groupId)
+		group, err := database.GetGroupByID(r.Context(), nil, groupID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for member add"), "group_id", groupId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for member add"), "group_id", groupID)
 			return
 		}
 		if group == nil {
@@ -134,7 +134,7 @@ func HandleGroupMemberAddPost(
 		// Validate user exists
 		user, err := database.GetUserByID(r.Context(), nil, addReq.UserID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member add"), "user_id", addReq.UserID, "group_id", groupId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member add"), "user_id", addReq.UserID, "group_id", groupID)
 			return
 		}
 		if user == nil {
@@ -200,34 +200,34 @@ func HandleGroupMemberDelete(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		groupIdStr := r.PathValue("id")
-		if groupIdStr == "" {
+		groupIDStr := r.PathValue("id")
+		if groupIDStr == "" {
 			writeJSONError(w, "Group ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
+		groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid group ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userIdStr := r.PathValue("userId")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("userId")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Validate group exists
-		group, err := database.GetGroupByID(r.Context(), nil, groupId)
+		group, err := database.GetGroupByID(r.Context(), nil, groupID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for member delete"), "group_id", groupId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for member delete"), "group_id", groupID)
 			return
 		}
 		if group == nil {
@@ -236,9 +236,9 @@ func HandleGroupMemberDelete(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member delete"), "user_id", userId, "group_id", groupId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member delete"), "user_id", userID, "group_id", groupID)
 			return
 		}
 		if user == nil {

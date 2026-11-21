@@ -35,18 +35,18 @@ var apiRevokeTx = &sql.Tx{}
 // stubSweep registers the sweep calls for a user with no sessions and no refresh tokens. Thin on
 // purpose: the sweep table is owned exhaustively by revocation_test.go in internal/revocation,
 // and restating it here would mean two places to update.
-func stubSweep(database *datamocks.Database, userId int64, newGeneration int64) {
+func stubSweep(database *datamocks.Database, userID int64, newGeneration int64) {
 	datamocks.ExpectRunInTransaction(database, apiRevokeTx)
-	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userID).
 		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserID", mock.Anything, apiRevokeTx, userId).
+	database.On("GetRefreshTokensByUserID", mock.Anything, apiRevokeTx, userID).
 		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
-	database.On("GetUserSessionsByUserID", mock.Anything, apiRevokeTx, userId).
+	database.On("GetUserSessionsByUserID", mock.Anything, apiRevokeTx, userID).
 		Return([]record.UserSession{}, nil).Once()
 	// A user-wide end of a user with a subject reads the apps holding the user's grants; none do.
-	database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, apiRevokeTx, userId, mock.Anything).
+	database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, apiRevokeTx, userID, mock.Anything).
 		Return([]int64(nil), nil).Maybe()
 }
 

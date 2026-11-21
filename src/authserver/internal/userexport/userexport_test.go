@@ -203,11 +203,11 @@ func TestBuild_CarriesNoSecret(t *testing.T) {
 }
 
 // The file is named user-<id>-<date>.json, the date being exportedAt's in UTC (decision 6).
-func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
+func TestFileName_IsTheUserIDAndTheUTCDate(t *testing.T) {
 	saoPaulo := time.FixedZone("BRT", -3*60*60)
 	for _, c := range []struct {
 		name       string
-		userId     int64
+		userID     int64
 		exportedAt time.Time
 		want       string
 	}{
@@ -216,7 +216,7 @@ func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
 		{"a single-digit month and day", 1, time.Date(2026, 3, 4, 0, 0, 0, 0, time.UTC), "user-1-2026-03-04.json"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, FileName(c.userId, c.exportedAt))
+			assert.Equal(t, c.want, FileName(c.userID, c.exportedAt))
 		})
 	}
 }

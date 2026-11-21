@@ -521,8 +521,8 @@ var healthcheckListeners = healthcheck.Listeners{
 	CertFile:         "GOIABADA_AUTHSERVER_CERTFILE",
 	KeyFile:          "GOIABADA_AUTHSERVER_KEYFILE",
 	DefaultHost:      config.DefaultListenHost,
-	DefaultHTTPPort:  config.DefaultListenPortHttp,
-	DefaultHTTPSPort: config.DefaultListenPortHttps,
+	DefaultHTTPPort:  config.DefaultListenPortHTTP,
+	DefaultHTTPSPort: config.DefaultListenPortHTTPS,
 }
 
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,

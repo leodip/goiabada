@@ -127,14 +127,14 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 
 	// The principal fields are populated uniformly for both linkage shapes, so a security-event
 	// consumer does not need flow-specific logic just to identify the client and user. This
-	// deliberately departs from EventTokenIssuedRefreshTokenResponse, which logs codeId on one shape
+	// deliberately departs from EventTokenIssuedRefreshTokenResponse, which logs codeID on one shape
 	// and userId/clientId on the other.
-	replayClientId := refreshToken.ClientID.Int64
-	replayUserId := refreshToken.UserID.Int64
+	replayClientID := refreshToken.ClientID.Int64
+	replayUserID := refreshToken.UserID.Int64
 	replayFlow := "ropc"
 	if !grant.IsROPC {
-		replayClientId = refreshToken.Code.ClientID
-		replayUserId = refreshToken.Code.UserID
+		replayClientID = refreshToken.Code.ClientID
+		replayUserID = refreshToken.Code.UserID
 		replayFlow = "auth_code"
 	}
 
@@ -142,8 +142,8 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 		"presented_refresh_token_jti": refreshToken.RefreshTokenJTI,
 		"first_refresh_token_jti":     refreshToken.FirstRefreshTokenJTI,
 		"revoked_count":               revokedCount,
-		"client_id":                   replayClientId,
-		"user_id":                     replayUserId,
+		"client_id":                   replayClientID,
+		"user_id":                     replayUserID,
 		"flow":                        replayFlow,
 	})
 }

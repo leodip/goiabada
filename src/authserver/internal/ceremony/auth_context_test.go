@@ -111,7 +111,7 @@ func TestHasPromptValue_SharedSeparators(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for GetTargetAcrLevel / parseAcrValuesFromAuthorizeRequest
+// Tests for GetTargetACRLevel / parseACRValuesFromAuthorizeRequest
 //
 // The target ACR level is what decides whether OTP is required for a request:
 // authflow's Level1Completion and Level2Selection and handler_auth_completed.go
@@ -127,7 +127,7 @@ func TestHasPromptValue_SharedSeparators(t *testing.T) {
 //
 // The grid is explicit rather than derived, because the two halves fail in opposite directions and
 // a derived expectation would hide one of them: see the "keep this" notes on the step-up rows.
-func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
+func TestGetTargetACRLevel_SingleValue(t *testing.T) {
 	testCases := []struct {
 		name          string
 		acrValues     string
@@ -209,9 +209,9 @@ func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
+			ac := &AuthContext{ACRValuesFromAuthorizeRequest: tc.acrValues}
 
-			assert.Equal(t, tc.want, ac.GetTargetAcrLevel(tc.clientDefault), tc.note)
+			assert.Equal(t, tc.want, ac.GetTargetACRLevel(tc.clientDefault), tc.note)
 		})
 	}
 }
@@ -219,7 +219,7 @@ func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
 // The first recognized acr_values entry still decides which level the request asked for. It is
 // then raised to the client's configured level, so a later entry in the list is never reached
 // even when it is higher.
-func TestGetTargetAcrLevel_FirstRecognizedValueWins(t *testing.T) {
+func TestGetTargetACRLevel_FirstRecognizedValueWins(t *testing.T) {
 	testCases := []struct {
 		name          string
 		acrValues     string
@@ -278,9 +278,9 @@ func TestGetTargetAcrLevel_FirstRecognizedValueWins(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
+			ac := &AuthContext{ACRValuesFromAuthorizeRequest: tc.acrValues}
 
-			assert.Equal(t, tc.want, ac.GetTargetAcrLevel(tc.clientDefault),
+			assert.Equal(t, tc.want, ac.GetTargetACRLevel(tc.clientDefault),
 				"the first recognized acr_values entry wins, raised to the client's configured level")
 		})
 	}
@@ -293,7 +293,7 @@ func TestGetTargetAcrLevel_FirstRecognizedValueWins(t *testing.T) {
 // it. That is why the cases here pass a bare client default and the two functions above own the
 // (requested, client default) grid instead: a third table asserting the same rule would be
 // duplication rather than coverage.
-func TestGetTargetAcrLevel_FallsBackToClientDefault(t *testing.T) {
+func TestGetTargetACRLevel_FallsBackToClientDefault(t *testing.T) {
 	testCases := []struct {
 		name      string
 		acrValues string
@@ -308,41 +308,41 @@ func TestGetTargetAcrLevel_FallsBackToClientDefault(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
+			ac := &AuthContext{ACRValuesFromAuthorizeRequest: tc.acrValues}
 
-			assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetAcrLevel(record.ACRLevel2Mandatory))
-			assert.Equal(t, record.ACRLevel1, ac.GetTargetAcrLevel(record.ACRLevel1))
+			assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetACRLevel(record.ACRLevel2Mandatory))
+			assert.Equal(t, record.ACRLevel1, ac.GetTargetACRLevel(record.ACRLevel1))
 		})
 	}
 }
 
 // The target is snapshotted when the authorization request is accepted, so a client row edited
 // while the ceremony is in flight cannot change what that ceremony was required to do (#240).
-func TestGetTargetAcrLevel_SnapshotWinsOverTheLiveClientDefault(t *testing.T) {
+func TestGetTargetACRLevel_SnapshotWinsOverTheLiveClientDefault(t *testing.T) {
 	t.Run("a client default raised mid-ceremony does not raise the target", func(t *testing.T) {
 		ac := &AuthContext{}
-		ac.SetTargetAcrLevel(record.ACRLevel1)
+		ac.SetTargetACRLevel(record.ACRLevel1)
 
 		// The administrator raises the row after the ceremony started. Reading it here is what
 		// would stamp an acr naming a second factor the user never performed.
-		assert.Equal(t, record.ACRLevel1, ac.GetTargetAcrLevel(record.ACRLevel2Mandatory))
+		assert.Equal(t, record.ACRLevel1, ac.GetTargetACRLevel(record.ACRLevel2Mandatory))
 	})
 
 	t.Run("a client default lowered mid-ceremony does not lower the target", func(t *testing.T) {
 		ac := &AuthContext{}
-		ac.SetTargetAcrLevel(record.ACRLevel2Mandatory)
+		ac.SetTargetACRLevel(record.ACRLevel2Mandatory)
 
 		// Reading the lowered row here is what takes /auth/level2's switch to its default branch
 		// and answers 500.
-		assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetAcrLevel(record.ACRLevel1))
+		assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetACRLevel(record.ACRLevel1))
 	})
 
 	t.Run("the snapshot carries the floor, not the raw request", func(t *testing.T) {
-		ac := &AuthContext{AcrValuesFromAuthorizeRequest: "urn:goiabada:level1"}
-		ac.SetTargetAcrLevel(record.ACRLevel2Mandatory)
+		ac := &AuthContext{ACRValuesFromAuthorizeRequest: "urn:goiabada:level1"}
+		ac.SetTargetACRLevel(record.ACRLevel2Mandatory)
 
-		assert.Equal(t, record.ACRLevel2Mandatory.String(), ac.TargetAcrLevel)
-		assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetAcrLevel(record.ACRLevel1))
+		assert.Equal(t, record.ACRLevel2Mandatory.String(), ac.TargetACRLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, ac.GetTargetACRLevel(record.ACRLevel1))
 	})
 }
 
@@ -350,7 +350,7 @@ func TestGetTargetAcrLevel_SnapshotWinsOverTheLiveClientDefault(t *testing.T) {
 // principle drop a level and leave one unreadable. Both fall back to computing the target from the
 // client's current row, which is the behaviour every handler had before the snapshot and is never
 // below what the request asked for.
-func TestGetTargetAcrLevel_UnusableSnapshotFallsBackToTheClientDefault(t *testing.T) {
+func TestGetTargetACRLevel_UnusableSnapshotFallsBackToTheClientDefault(t *testing.T) {
 	testCases := []struct {
 		name     string
 		snapshot string
@@ -362,33 +362,33 @@ func TestGetTargetAcrLevel_UnusableSnapshotFallsBackToTheClientDefault(t *testin
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{
-				AcrValuesFromAuthorizeRequest: "urn:goiabada:level1",
-				TargetAcrLevel:                tc.snapshot,
+				ACRValuesFromAuthorizeRequest: "urn:goiabada:level1",
+				TargetACRLevel:                tc.snapshot,
 			}
 
 			// The floor still applies on the fallback arm, so the answer is the client's level
 			// and not the level1 the request asked for.
-			assert.Equal(t, record.ACRLevel2Optional, ac.GetTargetAcrLevel(record.ACRLevel2Optional))
+			assert.Equal(t, record.ACRLevel2Optional, ac.GetTargetACRLevel(record.ACRLevel2Optional))
 		})
 	}
 }
 
-// SetTargetAcrLevel and GetTargetAcrLevel are pinned to each other rather than each only to
+// SetTargetACRLevel and GetTargetACRLevel are pinned to each other rather than each only to
 // itself: whatever the writer stores, the reader must give back unchanged for every level.
-func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
+func TestSetTargetACRLevel_RoundTripsEveryLevel(t *testing.T) {
 	for _, clientDefault := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory} {
 		t.Run(clientDefault.String(), func(t *testing.T) {
 			ac := &AuthContext{}
-			ac.SetTargetAcrLevel(clientDefault)
+			ac.SetTargetACRLevel(clientDefault)
 
-			assert.Equal(t, clientDefault.String(), ac.TargetAcrLevel)
+			assert.Equal(t, clientDefault.String(), ac.TargetACRLevel)
 			// Read back against a client default that differs from the snapshot wherever it can,
 			// so a reader ignoring the snapshot answers something else.
 			other := record.ACRLevel1
 			if clientDefault == record.ACRLevel1 {
 				other = record.ACRLevel2Mandatory
 			}
-			assert.Equal(t, clientDefault, ac.GetTargetAcrLevel(other))
+			assert.Equal(t, clientDefault, ac.GetTargetACRLevel(other))
 		})
 	}
 }
@@ -400,7 +400,7 @@ func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
 // and nothing is trimmed: a tab, a newline, a no-break space, U+0085 or a vertical tab joins two
 // levels into one value that names none. Until #244 a tab or a newline separated and a padded level
 // was trimmed and recognized.
-func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) {
+func TestSetTargetACRLevel_SplitsACRValuesAsTheSharedSplitterDoes(t *testing.T) {
 	testCases := []struct {
 		name          string
 		acrValues     string
@@ -467,22 +467,22 @@ func TestSetTargetAcrLevel_SplitsAcrValuesAsTheSharedSplitterDoes(t *testing.T) 
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
-			ac.SetTargetAcrLevel(tc.clientDefault)
+			ac := &AuthContext{ACRValuesFromAuthorizeRequest: tc.acrValues}
+			ac.SetTargetACRLevel(tc.clientDefault)
 
-			assert.Equal(t, tc.want.String(), ac.TargetAcrLevel)
-			assert.Equal(t, tc.want, ac.GetTargetAcrLevel(tc.clientDefault))
+			assert.Equal(t, tc.want.String(), ac.TargetACRLevel)
+			assert.Equal(t, tc.want, ac.GetTargetACRLevel(tc.clientDefault))
 		})
 	}
 }
 
-func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
+func TestParseACRValuesFromAuthorizeRequest(t *testing.T) {
 	t.Run("one space between two levels", func(t *testing.T) {
 		ac := &AuthContext{
-			AcrValuesFromAuthorizeRequest: "urn:goiabada:level1 urn:goiabada:level2_mandatory",
+			ACRValuesFromAuthorizeRequest: "urn:goiabada:level1 urn:goiabada:level2_mandatory",
 		}
 
-		result := ac.parseAcrValuesFromAuthorizeRequest()
+		result := ac.parseACRValuesFromAuthorizeRequest()
 
 		assert.Equal(t, []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Mandatory}, result)
 	})
@@ -496,103 +496,103 @@ func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 		" ",
 	} {
 		t.Run("a malformed value yields an empty slice: "+malformed, func(t *testing.T) {
-			ac := &AuthContext{AcrValuesFromAuthorizeRequest: malformed}
+			ac := &AuthContext{ACRValuesFromAuthorizeRequest: malformed}
 
-			assert.Empty(t, ac.parseAcrValuesFromAuthorizeRequest())
+			assert.Empty(t, ac.parseACRValuesFromAuthorizeRequest())
 		})
 	}
 
 	t.Run("deduplicates repeated values preserving first position", func(t *testing.T) {
 		ac := &AuthContext{
-			AcrValuesFromAuthorizeRequest: "urn:goiabada:level2_optional urn:goiabada:level1 urn:goiabada:level2_optional",
+			ACRValuesFromAuthorizeRequest: "urn:goiabada:level2_optional urn:goiabada:level1 urn:goiabada:level2_optional",
 		}
 
-		result := ac.parseAcrValuesFromAuthorizeRequest()
+		result := ac.parseACRValuesFromAuthorizeRequest()
 
 		assert.Equal(t, []record.ACRLevel{record.ACRLevel2Optional, record.ACRLevel1}, result)
 	})
 
 	t.Run("drops unrecognized values", func(t *testing.T) {
 		ac := &AuthContext{
-			AcrValuesFromAuthorizeRequest: "nonsense urn:goiabada:level1 more-nonsense",
+			ACRValuesFromAuthorizeRequest: "nonsense urn:goiabada:level1 more-nonsense",
 		}
 
-		result := ac.parseAcrValuesFromAuthorizeRequest()
+		result := ac.parseACRValuesFromAuthorizeRequest()
 
 		assert.Equal(t, []record.ACRLevel{record.ACRLevel1}, result)
 	})
 
 	t.Run("empty input yields an empty slice", func(t *testing.T) {
-		ac := &AuthContext{AcrValuesFromAuthorizeRequest: ""}
+		ac := &AuthContext{ACRValuesFromAuthorizeRequest: ""}
 
-		result := ac.parseAcrValuesFromAuthorizeRequest()
+		result := ac.parseACRValuesFromAuthorizeRequest()
 
 		assert.Empty(t, result)
 	})
 
 	t.Run("all values unrecognized yields an empty slice", func(t *testing.T) {
-		ac := &AuthContext{AcrValuesFromAuthorizeRequest: "a b c"}
+		ac := &AuthContext{ACRValuesFromAuthorizeRequest: "a b c"}
 
-		result := ac.parseAcrValuesFromAuthorizeRequest()
+		result := ac.parseACRValuesFromAuthorizeRequest()
 
 		assert.Empty(t, result)
 	})
 }
 
 // =============================================================================
-// Tests for SetAcrLevel
+// Tests for SetACRLevel
 //
 // The ACR written into the token is max(target, session), so an authenticated
 // session is never downgraded partway through.
 // =============================================================================
 
-func TestSetAcrLevel_NoSessionUsesTarget(t *testing.T) {
+func TestSetACRLevel_NoSessionUsesTarget(t *testing.T) {
 	for _, target := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory} {
 		t.Run(target.String(), func(t *testing.T) {
 			ac := &AuthContext{}
 
-			err := ac.SetAcrLevel(target, nil)
+			err := ac.SetACRLevel(target, nil)
 
 			require.NoError(t, err)
-			assert.Equal(t, target, ac.AcrLevel)
+			assert.Equal(t, target, ac.ACRLevel)
 		})
 	}
 }
 
-func TestSetAcrLevel_UsesHigherOfTargetAndSession(t *testing.T) {
+func TestSetACRLevel_UsesHigherOfTargetAndSession(t *testing.T) {
 	testCases := []struct {
 		name        string
 		target      record.ACRLevel
-		sessionAcr  record.ACRLevel
-		wantAcr     record.ACRLevel
+		sessionACR  record.ACRLevel
+		wantACR     record.ACRLevel
 		description string
 	}{
 		{
 			name:        "session higher than target is kept",
 			target:      record.ACRLevel1,
-			sessionAcr:  record.ACRLevel2Mandatory,
-			wantAcr:     record.ACRLevel2Mandatory,
+			sessionACR:  record.ACRLevel2Mandatory,
+			wantACR:     record.ACRLevel2Mandatory,
 			description: "a level2 session must not be downgraded by a level1 request",
 		},
 		{
 			name:        "target higher than session wins",
 			target:      record.ACRLevel2Mandatory,
-			sessionAcr:  record.ACRLevel1,
-			wantAcr:     record.ACRLevel2Mandatory,
+			sessionACR:  record.ACRLevel1,
+			wantACR:     record.ACRLevel2Mandatory,
 			description: "a step-up request must raise the ACR",
 		},
 		{
 			name:        "equal levels",
 			target:      record.ACRLevel2Optional,
-			sessionAcr:  record.ACRLevel2Optional,
-			wantAcr:     record.ACRLevel2Optional,
+			sessionACR:  record.ACRLevel2Optional,
+			wantACR:     record.ACRLevel2Optional,
 			description: "matching levels stay put",
 		},
 		{
 			name:        "optional session with mandatory target",
 			target:      record.ACRLevel2Mandatory,
-			sessionAcr:  record.ACRLevel2Optional,
-			wantAcr:     record.ACRLevel2Mandatory,
+			sessionACR:  record.ACRLevel2Optional,
+			wantACR:     record.ACRLevel2Mandatory,
 			description: "mandatory outranks optional",
 		},
 	}
@@ -600,26 +600,26 @@ func TestSetAcrLevel_UsesHigherOfTargetAndSession(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{}
-			session := &record.UserSession{ACRLevel: tc.sessionAcr}
+			session := &record.UserSession{ACRLevel: tc.sessionACR}
 
-			err := ac.SetAcrLevel(tc.target, session)
+			err := ac.SetACRLevel(tc.target, session)
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantAcr, ac.AcrLevel, tc.description)
+			assert.Equal(t, tc.wantACR, ac.ACRLevel, tc.description)
 		})
 	}
 }
 
 // A session row carrying an unrecognized ACR string must surface an error rather
 // than silently defaulting to some level.
-func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
+func TestSetACRLevel_InvalidSessionACRReturnsError(t *testing.T) {
 	ac := &AuthContext{}
 	session := &record.UserSession{ACRLevel: "urn:goiabada:bogus"}
 
-	err := ac.SetAcrLevel(record.ACRLevel1, session)
+	err := ac.SetACRLevel(record.ACRLevel1, session)
 
 	require.Error(t, err)
-	assert.Empty(t, ac.AcrLevel, "the ACR must not be set when the session level cannot be parsed")
+	assert.Empty(t, ac.ACRLevel, "the ACR must not be set when the session level cannot be parsed")
 }
 
 // =============================================================================
@@ -634,49 +634,49 @@ func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
 func TestOwnsSession(t *testing.T) {
 	testCases := []struct {
 		name          string
-		contextUserId int64
+		contextUserID int64
 		session       *record.UserSession
 		want          bool
 		description   string
 	}{
 		{
 			name:          "nil session with a known user",
-			contextUserId: 1,
+			contextUserID: 1,
 			session:       nil,
 			want:          false,
 			description:   "there is no session to own",
 		},
 		{
 			name:          "nil session with no user",
-			contextUserId: 0,
+			contextUserID: 0,
 			session:       nil,
 			want:          false,
 			description:   "neither side is known",
 		},
 		{
 			name:          "both zero",
-			contextUserId: 0,
+			contextUserID: 0,
 			session:       &record.UserSession{UserID: 0},
 			want:          false,
 			description:   "two zeros are not a match: an unidentified ceremony must not match an unsaved session",
 		},
 		{
 			name:          "no user with a real session",
-			contextUserId: 0,
+			contextUserID: 0,
 			session:       &record.UserSession{UserID: 1},
 			want:          false,
 			description:   "a ceremony that has not authenticated anyone owns nothing",
 		},
 		{
 			name:          "same user",
-			contextUserId: 1,
+			contextUserID: 1,
 			session:       &record.UserSession{UserID: 1},
 			want:          true,
 			description:   "the ordinary SSO path, the only true row",
 		},
 		{
 			name:          "different user",
-			contextUserId: 2,
+			contextUserID: 2,
 			session:       &record.UserSession{UserID: 1},
 			want:          false,
 			description:   "B's ceremony must not reuse A's session",
@@ -685,7 +685,7 @@ func TestOwnsSession(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{UserId: tc.contextUserId}
+			ac := &AuthContext{UserID: tc.contextUserID}
 
 			assert.Equal(t, tc.want, ac.OwnsSession(tc.session), tc.description)
 		})
@@ -997,9 +997,9 @@ func TestParkDeferredError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{
 				AuthState: AuthStateLevel1Password,
-				ClientId:  "client-1",
+				ClientID:  "client-1",
 				Scope:     "openid",
-				UserId:    7,
+				UserID:    7,
 			}
 
 			ac.ParkDeferredError(tc.code, tc.description)
@@ -1008,9 +1008,9 @@ func TestParkDeferredError(t *testing.T) {
 			assert.Equal(t, tc.wantDescription, ac.DeferredErrorDescription)
 			assert.Equal(t, AuthStateRequiresLevel1, ac.AuthState,
 				"a parked error is delivered after level 1, so the ceremony goes there")
-			assert.Equal(t, "client-1", ac.ClientId, "parking writes nothing else")
+			assert.Equal(t, "client-1", ac.ClientID, "parking writes nothing else")
 			assert.Equal(t, "openid", ac.Scope, "parking writes nothing else")
-			assert.Equal(t, int64(7), ac.UserId, "parking writes nothing else")
+			assert.Equal(t, int64(7), ac.UserID, "parking writes nothing else")
 		})
 	}
 }
@@ -1047,10 +1047,10 @@ func TestRecordPasswordVerified(t *testing.T) {
 
 			ac.RecordPasswordVerified(user, now, nil)
 
-			assert.Equal(t, int64(42), ac.UserId)
+			assert.Equal(t, int64(42), ac.UserID)
 			assert.Equal(t, int64(3), ac.AuthStateGeneration, "captured from the user the password was checked against (#106)")
-			require.NotNil(t, ac.OtpConfigGeneration)
-			assert.Equal(t, int64(5), *ac.OtpConfigGeneration, "captured for the create arm at /auth/completed (#242)")
+			require.NotNil(t, ac.OTPConfigGeneration)
+			assert.Equal(t, int64(5), *ac.OTPConfigGeneration, "captured for the create arm at /auth/completed (#242)")
 			assert.Equal(t, tc.wantMethods, ac.AuthMethods)
 			require.NotNil(t, ac.AuthenticatedAt)
 			assert.True(t, now.Equal(*ac.AuthenticatedAt), "the instant verified")
@@ -1065,7 +1065,7 @@ func TestRecordPasswordVerified(t *testing.T) {
 			// The capture is a copy: a later change to the user row read here does not reach the
 			// ceremony's snapshot.
 			user.OTPConfigGeneration = 6
-			assert.Equal(t, int64(5), *ac.OtpConfigGeneration)
+			assert.Equal(t, int64(5), *ac.OTPConfigGeneration)
 		})
 	}
 }
@@ -1123,13 +1123,13 @@ func TestAdoptSession(t *testing.T) {
 	ac := &AuthContext{
 		AuthState:           AuthStateRequiresLevel1,
 		Scope:               "openid",
-		OtpConfigGeneration: func() *int64 { g := int64(7); return &g }(),
+		OTPConfigGeneration: func() *int64 { g := int64(7); return &g }(),
 	}
 
 	ac.AdoptSession(userSession)
 
-	assert.Equal(t, int64(42), ac.UserId)
-	assert.Equal(t, record.ACRLevel2Optional, ac.AcrLevel)
+	assert.Equal(t, int64(42), ac.UserID)
+	assert.Equal(t, record.ACRLevel2Optional, ac.ACRLevel)
 	assert.Equal(t, "pwd otp", ac.AuthMethods)
 	assert.Equal(t, int64(3), ac.AuthStateGeneration,
 		"the session's generation and never the user's, or an old session is laundered into a newer one (#106)")
@@ -1137,13 +1137,13 @@ func TestAdoptSession(t *testing.T) {
 	assert.False(t, ac.Level1AuthCompleted, "level 1 was not performed in this ceremony (#129)")
 	assert.Equal(t, AuthStateRequiresLevel1, ac.AuthState, "the caller decides the next state")
 	assert.Equal(t, "openid", ac.Scope, "adopting writes no request field")
-	require.NotNil(t, ac.OtpConfigGeneration)
-	assert.Equal(t, int64(7), *ac.OtpConfigGeneration, "the OTP snapshot is not the session's to write")
+	require.NotNil(t, ac.OTPConfigGeneration)
+	assert.Equal(t, int64(7), *ac.OTPConfigGeneration, "the OTP snapshot is not the session's to write")
 	require.NotNil(t, ac.AdoptedSessionAuthTime)
 	assert.Truef(t, ac.AdoptedSessionAuthTime.Equal(userSession.AuthTime),
 		"the adopted auth_time is the session's, so the reuse bind can tell a session that moved from one that did not (#538): %v", ac.AdoptedSessionAuthTime)
-	require.NotNil(t, ac.OtpClaimGeneration)
-	assert.Equal(t, int64(5), *ac.OtpClaimGeneration,
+	require.NotNil(t, ac.OTPClaimGeneration)
+	assert.Equal(t, int64(5), *ac.OTPClaimGeneration,
 		"the claim is the session's snapshot and never the user's, or a removed authenticator's code is laundered into the next one's (#542)")
 	assert.Nil(t, ac.PasswordVerifiedAt, "adopting verifies no password")
 }
@@ -1161,8 +1161,8 @@ func TestRecordOTPVerified(t *testing.T) {
 		verifiedGeneration  int64
 		enrolled            bool
 		wantMethods         string
-		wantOtpConfigGenNil bool
-		wantOtpConfigGen    int64
+		wantOTPConfigGenNil bool
+		wantOTPConfigGen    int64
 	}{
 		{
 			name:               "an enrolled user after a password keeps what level 2 captured",
@@ -1171,7 +1171,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			level1Completed:    true,
 			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
-			wantOtpConfigGen:   4,
+			wantOTPConfigGen:   4,
 		},
 		{
 			// The ceremony moved the counter by enrolling, so it promotes the value the increment
@@ -1183,7 +1183,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			verifiedGeneration: 5,
 			enrolled:           true,
 			wantMethods:        "pwd otp",
-			wantOtpConfigGen:   5,
+			wantOTPConfigGen:   5,
 		},
 		{
 			name:               "an enrolment on a context with no capture sets it",
@@ -1191,14 +1191,14 @@ func TestRecordOTPVerified(t *testing.T) {
 			verifiedGeneration: 1,
 			enrolled:           true,
 			wantMethods:        "pwd otp",
-			wantOtpConfigGen:   1,
+			wantOTPConfigGen:   1,
 		},
 		{
 			name:                "no enrolment and no capture leaves nothing to promote",
 			existingMethods:     "pwd",
 			verifiedGeneration:  4,
 			wantMethods:         "pwd otp",
-			wantOtpConfigGenNil: true,
+			wantOTPConfigGenNil: true,
 		},
 		{
 			// A session reused at level 1 and stepping up: the session's methods came across, and
@@ -1209,7 +1209,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			level1Completed:    false,
 			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
-			wantOtpConfigGen:   4,
+			wantOTPConfigGen:   4,
 		},
 		{
 			// The adopted session's code came from generation 2; the claim is now this code's (#542).
@@ -1220,7 +1220,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			level1Completed:    true,
 			verifiedGeneration: 4,
 			wantMethods:        "pwd otp",
-			wantOtpConfigGen:   4,
+			wantOTPConfigGen:   4,
 		},
 	}
 
@@ -1229,25 +1229,25 @@ func TestRecordOTPVerified(t *testing.T) {
 			ac := &AuthContext{
 				AuthState:           AuthStateLevel2OTP,
 				AuthMethods:         tc.existingMethods,
-				OtpConfigGeneration: tc.existingGeneration,
-				OtpClaimGeneration:  tc.adoptedClaim,
+				OTPConfigGeneration: tc.existingGeneration,
+				OTPClaimGeneration:  tc.adoptedClaim,
 				Level1AuthCompleted: tc.level1Completed,
 				OTPKeyURL:           "otpauth://totp/spent",
-				UserId:              42,
+				UserID:              42,
 				Scope:               "openid",
 			}
 
 			ac.RecordOTPVerified(now, tc.verifiedGeneration, tc.enrolled)
 
 			assert.Equal(t, tc.wantMethods, ac.AuthMethods)
-			require.NotNil(t, ac.OtpClaimGeneration)
-			assert.Equal(t, tc.verifiedGeneration, *ac.OtpClaimGeneration,
+			require.NotNil(t, ac.OTPClaimGeneration)
+			assert.Equal(t, tc.verifiedGeneration, *ac.OTPClaimGeneration,
 				"the claim is the authenticator this code was checked against or enrolled at (#542)")
-			if tc.wantOtpConfigGenNil {
-				assert.Nil(t, ac.OtpConfigGeneration)
+			if tc.wantOTPConfigGenNil {
+				assert.Nil(t, ac.OTPConfigGeneration)
 			} else {
-				require.NotNil(t, ac.OtpConfigGeneration)
-				assert.Equal(t, tc.wantOtpConfigGen, *ac.OtpConfigGeneration)
+				require.NotNil(t, ac.OTPConfigGeneration)
+				assert.Equal(t, tc.wantOTPConfigGen, *ac.OTPConfigGeneration)
 			}
 			require.NotNil(t, ac.AuthenticatedAt)
 			assert.True(t, now.Equal(*ac.AuthenticatedAt), "the instant verified")
@@ -1255,7 +1255,7 @@ func TestRecordOTPVerified(t *testing.T) {
 			assert.Equal(t, tc.level1Completed, ac.Level1AuthCompleted, "OTP never writes level 1 (#129)")
 			assert.Equal(t, AuthStateAuthenticationCompleted, ac.AuthState)
 			assert.Empty(t, ac.OTPKeyURL, "the spent enrolment key is cleared (#247)")
-			assert.Equal(t, int64(42), ac.UserId, "OTP writes no user")
+			assert.Equal(t, int64(42), ac.UserID, "OTP writes no user")
 			assert.Equal(t, "openid", ac.Scope, "OTP writes no request field")
 		})
 	}
@@ -1272,26 +1272,26 @@ func TestRecordRecoveryCodeVerified(t *testing.T) {
 	ac := &AuthContext{
 		AuthState:           AuthStateLevel2OTP,
 		AuthMethods:         "pwd",
-		OtpConfigGeneration: &captured,
-		OtpClaimGeneration:  &adopted,
+		OTPConfigGeneration: &captured,
+		OTPClaimGeneration:  &adopted,
 		Level1AuthCompleted: true,
 		OTPKeyURL:           "otpauth://totp/spent",
-		UserId:              42,
+		UserID:              42,
 	}
 
 	ac.RecordRecoveryCodeVerified(now, 4)
 
 	assert.Equal(t, "pwd recovery_code", ac.AuthMethods)
 	assert.True(t, ac.ClaimsOTP())
-	require.NotNil(t, ac.OtpClaimGeneration)
-	assert.Equal(t, int64(4), *ac.OtpClaimGeneration)
-	require.NotNil(t, ac.OtpConfigGeneration)
-	assert.Equal(t, int64(4), *ac.OtpConfigGeneration, "what level 2 captured is kept")
+	require.NotNil(t, ac.OTPClaimGeneration)
+	assert.Equal(t, int64(4), *ac.OTPClaimGeneration)
+	require.NotNil(t, ac.OTPConfigGeneration)
+	assert.Equal(t, int64(4), *ac.OTPConfigGeneration, "what level 2 captured is kept")
 	require.NotNil(t, ac.AuthenticatedAt)
 	assert.True(t, now.Equal(*ac.AuthenticatedAt))
 	assert.Equal(t, time.UTC, ac.AuthenticatedAt.Location())
 	assert.True(t, ac.Level1AuthCompleted, "left as it was")
 	assert.Equal(t, AuthStateAuthenticationCompleted, ac.AuthState)
 	assert.Empty(t, ac.OTPKeyURL)
-	assert.Equal(t, int64(42), ac.UserId)
+	assert.Equal(t, int64(42), ac.UserID)
 }

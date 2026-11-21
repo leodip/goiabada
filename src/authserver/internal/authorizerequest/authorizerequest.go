@@ -56,7 +56,7 @@ type Parking interface {
 // that consumes it never parks.
 type Consuming interface {
 	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*record.AuthorizeRequest, error)
-	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)
+	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestID int64) (bool, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 

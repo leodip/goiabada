@@ -62,7 +62,7 @@ func TestBindUserSession_ChecksTheClaimUnderTheUserRowFirst(t *testing.T) {
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory,
+		UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 		OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 	}, false, "")
 
@@ -90,7 +90,7 @@ func TestBindUserSession_AClaimThatNoLongerStandsWritesNothing(t *testing.T) {
 			database.On("GetUserByID", mock.Anything, txSentinel, int64(123)).Return(tc.user, nil).Once()
 
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-				UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory,
+				UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 			}, false, "")
 
@@ -127,7 +127,7 @@ func TestBindUserSession_ReplaceWritesTheSignInsAuthentication(t *testing.T) {
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.ACRLevel1, AuthTime: &signedIn, PasswordAuthTime: &signedIn,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &signedIn, PasswordAuthTime: &signedIn,
 	}, true, "")
 
 	require.NoError(t, err)
@@ -155,7 +155,7 @@ func TestBindUserSession_AStepUpLeavesThePasswordInstant(t *testing.T) {
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Optional, AuthTime: &codeAt,
+		AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Optional, AuthTime: &codeAt,
 	}, false, "")
 
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestBindUserSession_ReplaceWithoutAPasswordInstantIsRefused(t *testing.T) {
 	signedIn := time.Now().UTC()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.ACRLevel1, AuthTime: &signedIn,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &signedIn,
 	}, true, "")
 
 	require.ErrorContains(t, err, "no password instant captured")
@@ -186,7 +186,7 @@ func TestBindUserSession_RefusesAnotherUsersSession(t *testing.T) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(bumpedSession(), nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 999, AuthMethods: "pwd", AcrLevel: record.ACRLevel1,
+		UserID: 999, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 	}, false, "")
 
 	require.ErrorContains(t, err, "refusing to bind user session")
@@ -203,7 +203,7 @@ func TestStartNewUserSession_RecordsThePasswordInstant(t *testing.T) {
 	codeAt := passwordAt.Add(time.Minute)
 
 	result, _, err := m.manager.StartNewUserSession(context.Background(), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
+		Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
 		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestStartNewUserSession_RefusesAMissingPasswordInstant(t *testing.T) {
 	at := time.Now().UTC()
 
 	_, _, err := m.manager.StartNewUserSession(context.Background(), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.ACRLevel1, AuthTime: &at},
+		Authentication{UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &at},
 		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorContains(t, err, "no password instant captured")
@@ -239,7 +239,7 @@ func TestStartNewUserSession_AClaimThatNoLongerStandsCreatesNothing(t *testing.T
 
 	result, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
 		Authentication{
-			UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
+			UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
 			OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 		},
 		0, &generation, thisBrowser(), "192.168.1.50", nil, SessionLimits{})

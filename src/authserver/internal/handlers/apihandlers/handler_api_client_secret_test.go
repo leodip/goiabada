@@ -89,7 +89,7 @@ func TestHandleClientSecretGet_AnUnknownClientIsNotFoundAndUnrecorded(t *testing
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestHandleClientSecretGet_AMalformedIdReadsNothing(t *testing.T) {
+func TestHandleClientSecretGet_AMalformedIDReadsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 

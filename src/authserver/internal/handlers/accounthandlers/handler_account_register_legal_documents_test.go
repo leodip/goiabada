@@ -59,8 +59,8 @@ func renderedRegisterBind(t *testing.T, pageRenderer *handlersmocks.PageRenderer
 }
 
 func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.T) {
-	held := heldCeremonies{aCeremonyId: {CeremonyId: aCeremonyId, ClientId: "shop"}}
-	otherHeld := heldCeremonies{"zBcDeFgHiJkLmNoPqRsTuVwXyZ012345": {ClientId: "blog"}}
+	held := heldCeremonies{aCeremonyID: {CeremonyID: aCeremonyID, ClientID: "shop"}}
+	otherHeld := heldCeremonies{"zBcDeFgHiJkLmNoPqRsTuVwXyZ012345": {ClientID: "blog"}}
 	allApps := []legalDocumentLink{{Title: "Privacy notice", ShortName: "privacy"}}
 	withShop := append(append([]legalDocumentLink{}, allApps...), legalDocumentLink{Title: "Shop terms", ShortName: "shop-terms"})
 
@@ -71,11 +71,11 @@ func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.
 		client     string
 		want       []legalDocumentLink
 	}{
-		{"from the app's sign-in, held by the browser", held, "?ceremony=" + aCeremonyId, "shop", withShop},
-		{"a sign-in this browser does not hold", otherHeld, "?ceremony=" + aCeremonyId, "", allApps},
-		{"a browser holding no sign-in", heldCeremonies{}, "?ceremony=" + aCeremonyId, "", allApps},
+		{"from the app's sign-in, held by the browser", held, "?ceremony=" + aCeremonyID, "shop", withShop},
+		{"a sign-in this browser does not hold", otherHeld, "?ceremony=" + aCeremonyID, "", allApps},
+		{"a browser holding no sign-in", heldCeremonies{}, "?ceremony=" + aCeremonyID, "", allApps},
 		{"reached from anywhere else", held, "", "", allApps},
-		{"a malformed id", held, "?ceremony=" + aCeremonyId + "x", "", allApps},
+		{"a malformed id", held, "?ceremony=" + aCeremonyID + "x", "", allApps},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var asked []string
@@ -92,14 +92,14 @@ func TestHandleRegisterGet_LinksTheAllAppsDocumentsAndTheSignInsApps(t *testing.
 // A refused submission draws the form again with the same documents.
 func TestHandleRegisterPost_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
 	var asked []string
-	held := heldCeremonies{aCeremonyId: {CeremonyId: aCeremonyId, ClientId: "shop"}}
+	held := heldCeremonies{aCeremonyID: {CeremonyID: aCeremonyID, ClientID: "shop"}}
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	handler := HandleRegisterPost(pageRenderer, held, shopDocuments(&asked), datamocks.NewDatabase(t),
 		accounthandlersmocks.NewUserCreator(t), accounthandlersmocks.NewEmailValidator(t),
 		accounthandlersmocks.NewPasswordValidator(t), accounthandlersmocks.NewEmailSender(t),
 		handlersmocks.NewAuditLogger(t), &heldJobs{}, testDataCipher, testBaseURL, testAdminConsoleBaseURL)
 
-	bind := renderedRegisterBind(t, pageRenderer, handler, registerRequest(http.MethodPost, "?ceremony="+aCeremonyId))
+	bind := renderedRegisterBind(t, pageRenderer, handler, registerRequest(http.MethodPost, "?ceremony="+aCeremonyID))
 
 	assert.Equal(t, "Email is required.", bind["error"])
 	assert.Equal(t, []legalDocumentLink{
@@ -111,14 +111,14 @@ func TestHandleRegisterPost_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
 // the handler's own refusals do (#642).
 func TestRequireRegistrationChallenge_TheRedrawnFormLinksTheSameDocuments(t *testing.T) {
 	var asked []string
-	held := heldCeremonies{aCeremonyId: {CeremonyId: aCeremonyId, ClientId: "shop"}}
+	held := heldCeremonies{aCeremonyID: {CeremonyID: aCeremonyID, ClientID: "shop"}}
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	unreached := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("a refused submission reached the handler")
 	})
 	handler := RequireRegistrationChallenge(pageRenderer, held, shopDocuments(&asked),
 		refusingVerifier{}, testAdminConsoleBaseURL)(unreached)
-	req := registerRequest(http.MethodPost, "?ceremony="+aCeremonyId)
+	req := registerRequest(http.MethodPost, "?ceremony="+aCeremonyID)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{
 		SelfRegistrationEnabled: true, TurnstileEnabled: true, TurnstileSiteKey: "1x00000000000000000000AA",
 	}))
@@ -157,7 +157,7 @@ func TestHandleRegisterGet_AFailedReadIsTheErrorPage(t *testing.T) {
 			})).Return().Once()
 
 			HandleRegisterGet(pageRenderer, tc.ceremonies, tc.documents, testAdminConsoleBaseURL).
-				ServeHTTP(httptest.NewRecorder(), registerRequest(http.MethodGet, "?ceremony="+aCeremonyId))
+				ServeHTTP(httptest.NewRecorder(), registerRequest(http.MethodGet, "?ceremony="+aCeremonyID))
 		})
 	}
 }

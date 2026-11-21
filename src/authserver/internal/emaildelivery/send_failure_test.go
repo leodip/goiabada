@@ -40,7 +40,7 @@ func sendReporting(t *testing.T, sender *Sender, smtpConfig SMTPConfig) (SendRes
 	return sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 }
 

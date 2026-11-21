@@ -23,10 +23,10 @@ import (
 type groupAttributesDatabase interface {
 	administrativeGroupPolicyDatabase
 	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
-	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
-	GetGroupAttributeByID(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error)
-	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
-	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeID int64) error
+	GetGroupAttributeByID(ctx context.Context, tx *sql.Tx, groupAttributeID int64) (*record.GroupAttribute, error)
+	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupAttribute, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
 	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 }
 

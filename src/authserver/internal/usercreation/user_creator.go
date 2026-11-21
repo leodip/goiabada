@@ -19,7 +19,7 @@ import (
 type userCreatorDatabase interface {
 	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }

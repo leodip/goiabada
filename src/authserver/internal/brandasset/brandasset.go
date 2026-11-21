@@ -125,11 +125,11 @@ type Slots struct {
 // SlotsReader is what reads a brand's slots: assets by their ids, without their bytes.
 // data.Database satisfies it.
 type SlotsReader interface {
-	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIDs []int64) ([]record.BrandAsset, error)
 }
 
-// SlotIds answers the ids of the assets brand's filled slots name, in slot order, each once.
-func SlotIds(brand *record.Brand) []int64 {
+// SlotIDs answers the ids of the assets brand's filled slots name, in slot order, each once.
+func SlotIDs(brand *record.Brand) []int64 {
 	var ids []int64
 	for _, slot := range slotsOf(brand) {
 		if slot.Valid && !slices.Contains(ids, slot.Int64) {
@@ -174,7 +174,7 @@ func SlotsOf(brand *record.Brand, assets []record.BrandAsset) Slots {
 // ReadSlots reads the assets brand's slots name, without their bytes, in tx when it is not nil, and
 // reads nothing when every slot is empty, as a brand nobody has given a file is.
 func ReadSlots(ctx context.Context, reader SlotsReader, tx *sql.Tx, brand *record.Brand) (Slots, error) {
-	ids := SlotIds(brand)
+	ids := SlotIDs(brand)
 	if len(ids) == 0 {
 		return Slots{}, nil
 	}

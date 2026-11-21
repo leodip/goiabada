@@ -45,13 +45,13 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a captured OTP generation is promoted for level2_optional",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.ACRLevel2Optional},
-			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOTPConfigGeneration: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_mandatory",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				otpConfigGenerationCaptured: true, target: record.ACRLevel2Mandatory},
-			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOTPConfigGeneration: true},
 		},
 		{
 			// The password handler captures too, and a level 1 target never addressed level 2 (#242
@@ -81,14 +81,14 @@ func TestDecideCompletion(t *testing.T) {
 			name: "a code entered over a reused session refreshes AuthTime and replaces nothing",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
 				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.ACRLevel2Mandatory},
-			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
+			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, promoteOTPConfigGeneration: true},
 		},
 		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
 				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.ACRLevel2Optional},
 			want: frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true, refreshAuthTime: true,
-				replaceAuthentication: true, promoteOtpConfigGeneration: true},
+				replaceAuthentication: true, promoteOTPConfigGeneration: true},
 		},
 
 		// Restart: no reusable session and no level 1 in this ceremony (#129 decision 6).

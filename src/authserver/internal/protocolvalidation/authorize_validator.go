@@ -36,8 +36,8 @@ type AuthorizeValidator struct {
 }
 
 type ValidateClientAndRedirectURIInput struct {
-	RequestId    string
-	ClientId     string
+	RequestID    string
+	ClientID     string
 	RedirectURI  string
 	ResponseType string // Needed to determine if auth code or implicit flow is being requested
 }
@@ -72,8 +72,8 @@ type ValidateRequestInput struct {
 // drawn in its brand, where a fault before that read is drawn in the default (#812). Error and
 // Unwrap are Err's, so the text logged is the fault's own and errors.Is and errors.As see through it.
 type ClientKnownError struct {
-	// ClientId is the request's client_id, which named the client that was read.
-	ClientId string
+	// ClientID is the request's client_id, which named the client that was read.
+	ClientID string
 	Err      error
 }
 
@@ -176,11 +176,11 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 // of the redirect URIs comes after the client was read, so it is returned as a *ClientKnownError
 // naming that client, which a failure of the client's own read never is (#812).
 func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *ValidateClientAndRedirectURIInput) error {
-	if len(input.ClientId) == 0 {
-		return i18n.NewLocalizedError(errcode.AuthorizeClientIdMissing, nil)
+	if len(input.ClientID) == 0 {
+		return i18n.NewLocalizedError(errcode.AuthorizeClientIDMissing, nil)
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientID)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 
 	err = val.database.ClientLoadRedirectURIs(ctx, nil, client)
 	if err != nil {
-		return &ClientKnownError{ClientId: input.ClientId, Err: err}
+		return &ClientKnownError{ClientID: input.ClientID, Err: err}
 	}
 
 	registered := make([]string, 0, len(client.RedirectURIs))
@@ -371,7 +371,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	if rtInfo.HasToken {
 		responseTypeCount++
 	}
-	if rtInfo.HasIdToken {
+	if rtInfo.HasIDToken {
 		responseTypeCount++
 	}
 
@@ -381,7 +381,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		validResponseType = true // Any single valid type is OK (code, token, or id_token)
 	case 2:
 		// Only "id_token token" or "token id_token" is valid for 2 tokens
-		validResponseType = rtInfo.HasToken && rtInfo.HasIdToken && !rtInfo.HasCode
+		validResponseType = rtInfo.HasToken && rtInfo.HasIDToken && !rtInfo.HasCode
 	}
 
 	// A value the parser did not recognise, or one it saw twice, makes the request unsupported
@@ -431,7 +431,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// OIDC: id_token requires openid scope
-	if rtInfo.HasIdToken {
+	if rtInfo.HasIDToken {
 		if !slices.Contains(oidc.SplitScope(input.Scope), "openid") {
 			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				"The 'openid' scope is required when requesting an id_token.",
@@ -440,7 +440,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// OIDC: nonce is REQUIRED for implicit flow with id_token (OIDC Core 3.2.2.1)
-	if rtInfo.HasIdToken && isImplicitFlow && input.Nonce == "" {
+	if rtInfo.HasIDToken && isImplicitFlow && input.Nonce == "" {
 		return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The 'nonce' parameter is required for implicit flow when requesting an id_token.",
 			http.StatusBadRequest)

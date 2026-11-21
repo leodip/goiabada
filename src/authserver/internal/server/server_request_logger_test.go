@@ -43,7 +43,7 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // request. middleware.CORS also holds the database but needs no stub: it looks an origin up only
 // for a request carrying an Origin header, and these send none. That is enforced
 // rather than assumed, since datamocks.NewDatabase(t) fails the test on any call nobody expected.
-func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
+func newLoggerTestServer(t *testing.T, logHTTPRequests bool, handlerRan *bool) *Server {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
@@ -53,7 +53,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 
 	// The flag initMiddleware reads when it mounts the request logger.
 	cfg := &config.Config{}
-	cfg.AuthServer.LogHttpRequests = logHttpRequests
+	cfg.AuthServer.LogHTTPRequests = logHTTPRequests
 
 	s := &Server{
 		router:       routing.New(),

@@ -33,7 +33,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -64,7 +64,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -72,7 +72,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateReadyToIssueCode, // This is an unexpected state
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -96,7 +96,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -104,7 +104,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateRequiresLevel1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -116,7 +116,7 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/pwd?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/pwd?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -139,7 +139,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -173,7 +173,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -181,7 +181,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -212,7 +212,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -220,10 +220,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -255,7 +255,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level2?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level2?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -280,17 +280,17 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "test-session"))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -324,7 +324,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -332,10 +332,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -367,7 +367,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -390,15 +390,15 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -430,7 +430,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -457,15 +457,15 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+		req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -501,7 +501,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level2?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level2?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		// Part 1.1. The handler used to clear a boolean here and commit it, so a visitor who
 		// closed the browser at the OTP form had already spent the re-prompt and the next
@@ -520,8 +520,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("ACR level transitions", func(t *testing.T) {
 		tests := []struct {
 			name             string
-			sessionAcrLevel  record.ACRLevel
-			targetAcrLevel   record.ACRLevel
+			sessionACRLevel  record.ACRLevel
+			targetACRLevel   record.ACRLevel
 			otpConfigChanged bool
 			// userHasNoAuthenticator is a user who removed their authenticator, or had it removed,
 			// after the session reached its level. Every other row's user has one.
@@ -530,69 +530,69 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		}{
 			{
 				name:             "ACRLevel1 to ACRLevel1",
-				sessionAcrLevel:  record.ACRLevel1,
-				targetAcrLevel:   record.ACRLevel1,
+				sessionACRLevel:  record.ACRLevel1,
+				targetACRLevel:   record.ACRLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel1 to ACRLevel2Optional",
-				sessionAcrLevel:  record.ACRLevel1,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel1,
+				targetACRLevel:   record.ACRLevel2Optional,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "ACRLevel1 to ACRLevel2Mandatory",
-				sessionAcrLevel:  record.ACRLevel1,
-				targetAcrLevel:   record.ACRLevel2Mandatory,
+				sessionACRLevel:  record.ACRLevel1,
+				targetACRLevel:   record.ACRLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "ACRLevel2Optional to ACRLevel1",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel1,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel2Optional to ACRLevel2Optional (no change)",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel2Optional,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel2Optional to ACRLevel2Optional (otp config generation moved)",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel2Optional,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "ACRLevel2Optional to ACRLevel2Mandatory",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel2Mandatory,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 			},
 			{
 				name:             "ACRLevel2Mandatory to ACRLevel1",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel1,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel1,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel2Mandatory to ACRLevel2Optional",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel2Optional,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel2Mandatory to ACRLevel2Mandatory",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel2Mandatory,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel2Mandatory,
 				expectedRedirect: "/auth/completed",
 			},
 			{
 				name:             "ACRLevel2Mandatory to ACRLevel2Mandatory (otp config generation moved)",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel2Mandatory,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel2Mandatory,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 			},
@@ -600,15 +600,15 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			// generation since by skipping the code. Level 3 still asks the user to set one up.
 			{
 				name:                   "ACRLevel2Mandatory to ACRLevel2Mandatory (authenticator removed, generation answered)",
-				sessionAcrLevel:        record.ACRLevel2Mandatory,
-				targetAcrLevel:         record.ACRLevel2Mandatory,
+				sessionACRLevel:        record.ACRLevel2Mandatory,
+				targetACRLevel:         record.ACRLevel2Mandatory,
 				userHasNoAuthenticator: true,
 				expectedRedirect:       "/auth/level2",
 			},
 			{
 				name:                   "ACRLevel2Mandatory to ACRLevel2Optional (authenticator removed, generation answered)",
-				sessionAcrLevel:        record.ACRLevel2Mandatory,
-				targetAcrLevel:         record.ACRLevel2Optional,
+				sessionACRLevel:        record.ACRLevel2Mandatory,
+				targetACRLevel:         record.ACRLevel2Optional,
 				userHasNoAuthenticator: true,
 				expectedRedirect:       "/auth/completed",
 			},
@@ -630,7 +630,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					auditLogger:        auditLogger,
 				})
 
-				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 				req = withSessionSettings(req)
 				rr := httptest.NewRecorder()
 
@@ -638,10 +638,10 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				// nothing itself. A ceremony that verified the password is decided without the
 				// session, which the next test pins (#537).
 				authContext := &ceremony.AuthContext{
-					CeremonyId: testCeremonyId,
+					CeremonyID: testCeremonyID,
 					AuthState:  ceremony.AuthStateLevel1ExistingSession,
-					ClientId:   "test-client",
-					UserId:     1,
+					ClientID:   "test-client",
+					UserID:     1,
 				}
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -659,7 +659,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSession := &record.UserSession{
 					ID:                  1,
 					UserID:              1,
-					ACRLevel:            tt.sessionAcrLevel,
+					ACRLevel:            tt.sessionACRLevel,
 					OTPConfigGeneration: 0,
 					User:                record.User{ID: 1, OTPEnabled: !tt.userHasNoAuthenticator, OTPConfigGeneration: userGeneration},
 				}
@@ -669,7 +669,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				client := &record.Client{
 					ID:               1,
 					ClientIdentifier: "test-client",
-					DefaultACRLevel:  tt.targetAcrLevel,
+					DefaultACRLevel:  tt.targetACRLevel,
 				}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -687,7 +687,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				handler.ServeHTTP(rr, req)
 
 				assert.Equal(t, http.StatusFound, rr.Code)
-				assert.Equal(t, testBaseURL+tt.expectedRedirect+"?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+				assert.Equal(t, testBaseURL+tt.expectedRedirect+"?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 				// Every row, not only the moved ones: this handler writes nothing at all now,
 				// which is what stops an abandoned ceremony spending its re-prompt (#242).
@@ -709,15 +709,15 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	// ["pwd"]. The session is not even asked whether it is valid.
 	t.Run("A ceremony that verified the password counts no session (#537)", func(t *testing.T) {
 		levels := []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory}
-		for _, sessionAcrLevel := range levels {
-			for _, targetAcrLevel := range levels {
+		for _, sessionACRLevel := range levels {
+			for _, targetACRLevel := range levels {
 				expectedRedirect := "/auth/level2"
 				expectedAuthState := ceremony.AuthStateRequiresLevel2
-				if targetAcrLevel == record.ACRLevel1 {
+				if targetACRLevel == record.ACRLevel1 {
 					expectedRedirect = "/auth/completed"
 					expectedAuthState = ceremony.AuthStateAuthenticationCompleted
 				}
-				name := "session " + string(sessionAcrLevel) + ", target " + string(targetAcrLevel)
+				name := "session " + string(sessionACRLevel) + ", target " + string(targetACRLevel)
 				t.Run(name, func(t *testing.T) {
 					pageRenderer := handlersmocks.NewPageRenderer(t)
 					ceremonyStore := handlersmocks.NewCeremonyStore(t)
@@ -733,16 +733,16 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 						auditLogger:        auditLogger,
 					})
 
-					req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+					req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 					req = withSessionSettings(req)
 					rr := httptest.NewRecorder()
 
 					authContext := &ceremony.AuthContext{
-						CeremonyId:          testCeremonyId,
+						CeremonyID:          testCeremonyID,
 						AuthState:           ceremony.AuthStateLevel1PasswordCompleted,
 						Level1AuthCompleted: true,
-						ClientId:            "test-client",
-						UserId:              1,
+						ClientID:            "test-client",
+						UserID:              1,
 					}
 					ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 					req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "test-session"))
@@ -752,7 +752,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					userSession := &record.UserSession{
 						ID:                  1,
 						UserID:              1,
-						ACRLevel:            sessionAcrLevel,
+						ACRLevel:            sessionACRLevel,
 						AuthMethods:         "pwd otp",
 						OTPConfigGeneration: 3,
 						User:                record.User{ID: 1, OTPEnabled: true, OTPConfigGeneration: 3},
@@ -760,7 +760,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 					database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-						Return(&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: targetAcrLevel}, nil)
+						Return(&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: targetACRLevel}, nil)
 
 					ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 						return ac.AuthState == expectedAuthState
@@ -769,7 +769,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					handler.ServeHTTP(rr, req)
 
 					assert.Equal(t, http.StatusFound, rr.Code)
-					assert.Equal(t, testBaseURL+expectedRedirect+"?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+					assert.Equal(t, testBaseURL+expectedRedirect+"?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 					database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 				})
 			}
@@ -783,44 +783,44 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Foreign session does not decide step-up", func(t *testing.T) {
 		tests := []struct {
 			name             string
-			sessionAcrLevel  record.ACRLevel
-			targetAcrLevel   record.ACRLevel
+			sessionACRLevel  record.ACRLevel
+			targetACRLevel   record.ACRLevel
 			otpConfigChanged bool
 			expectedRedirect string
 			description      string
 		}{
 			{
 				name:             "foreign session at the target still prompts for level2",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel2Optional,
 				expectedRedirect: "/auth/level2",
 				description:      "the second-factor bypass: user 1's ACR must not satisfy user 2's step-up",
 			},
 			{
 				name:             "foreign mandatory session still prompts for level2",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel2Mandatory,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel2Mandatory,
 				expectedRedirect: "/auth/level2",
 				description:      "the same bypass at the mandatory level, where the second factor is not optional",
 			},
 			{
 				name:             "level1 target is not raised by a foreign session",
-				sessionAcrLevel:  record.ACRLevel2Mandatory,
-				targetAcrLevel:   record.ACRLevel1,
+				sessionACRLevel:  record.ACRLevel2Mandatory,
+				targetACRLevel:   record.ACRLevel1,
 				expectedRedirect: "/auth/completed",
 				description:      "the guard must not invent a second factor a level1 client never asked for",
 			},
 			{
 				name:             "foreign session below the target",
-				sessionAcrLevel:  record.ACRLevel1,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel1,
+				targetACRLevel:   record.ACRLevel2Optional,
 				expectedRedirect: "/auth/level2",
 				description:      "control: the target arm already handled this, so a failure here means it broke",
 			},
 			{
 				name:             "the other user's snapshot is left alone",
-				sessionAcrLevel:  record.ACRLevel2Optional,
-				targetAcrLevel:   record.ACRLevel2Optional,
+				sessionACRLevel:  record.ACRLevel2Optional,
+				targetACRLevel:   record.ACRLevel2Optional,
 				otpConfigChanged: true,
 				expectedRedirect: "/auth/level2",
 				description:      "nothing may write to the other user's row, and nothing writes to any row now",
@@ -843,15 +843,15 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					auditLogger:        auditLogger,
 				})
 
-				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyId, nil)
+				req, _ := http.NewRequest("GET", "/auth/level1/completed?ceremony="+testCeremonyID, nil)
 				req = withSessionSettings(req)
 				rr := httptest.NewRecorder()
 
 				authContext := &ceremony.AuthContext{
-					CeremonyId: testCeremonyId,
+					CeremonyID: testCeremonyID,
 					AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-					ClientId:   "test-client",
-					UserId:     2,
+					ClientID:   "test-client",
+					UserID:     2,
 				}
 				ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -869,7 +869,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				userSession := &record.UserSession{
 					ID:                  1,
 					UserID:              1,
-					ACRLevel:            tt.sessionAcrLevel,
+					ACRLevel:            tt.sessionACRLevel,
 					OTPConfigGeneration: 0,
 					User:                record.User{ID: 1, OTPConfigGeneration: userGeneration},
 				}
@@ -879,7 +879,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				client := &record.Client{
 					ID:               1,
 					ClientIdentifier: "test-client",
-					DefaultACRLevel:  tt.targetAcrLevel,
+					DefaultACRLevel:  tt.targetACRLevel,
 				}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -897,7 +897,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				handler.ServeHTTP(rr, req)
 
 				assert.Equal(t, http.StatusFound, rr.Code)
-				assert.Equal(t, testBaseURL+tt.expectedRedirect+"?ceremony="+testCeremonyId, rr.Header().Get("Location"), tt.description)
+				assert.Equal(t, testBaseURL+tt.expectedRedirect+"?ceremony="+testCeremonyID, rr.Header().Get("Location"), tt.description)
 				assert.EqualValues(t, 0, userSession.OTPConfigGeneration,
 					"the other user's session must not be modified in memory either")
 				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
@@ -920,9 +920,9 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
 	newParkedContext := func(state ceremony.AuthState) *ceremony.AuthContext {
 		return &ceremony.AuthContext{
-			CeremonyId:               testCeremonyId,
+			CeremonyID:               testCeremonyID,
 			AuthState:                state,
-			ClientId:                 "test-client",
+			ClientID:                 "test-client",
 			RedirectURI:              "https://legit.example/cb",
 			ResponseType:             "code",
 			State:                    "abc123",
@@ -955,7 +955,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 				auditLogger:        auditLogger,
 			})
 
-			req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+			req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			rr := httptest.NewRecorder()
 
@@ -965,7 +965,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			// deletion through a Set-Cookie on w, and the answer commits the response, so a clear
 			// afterwards would leave the browser holding a context it could replay (#141).
 			const clearedContextCookie = "cleared-auth-context"
-			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 				args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 			}).Return(nil)
 
@@ -1007,7 +1007,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req := withSessionSettings(httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil))
+		req := withSessionSettings(httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil))
 		rr := httptest.NewRecorder()
 
 		parked := newParkedContext(ceremony.AuthStateLevel1PasswordCompleted)
@@ -1015,7 +1015,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		parked.DeferredErrorCode = "invalid_request"
 		parked.DeferredErrorDescription = "The max_age parameter must be a non-negative integer."
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(parked, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -1047,13 +1047,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(assert.AnError)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -1097,14 +1097,14 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := newParkedContext(ceremony.AuthStateLevel1PasswordCompleted)
 		authContext.ResponseMode = "form_post"
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
@@ -1133,13 +1133,13 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&record.Client{ID: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
@@ -1171,16 +1171,16 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			auditLogger:        auditLogger,
 		})
 
-		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest("GET", "/auth/level1completed?ceremony="+testCeremonyID, nil)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "sess-1"))
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1PasswordCompleted,
-			ClientId:   "test-client",
-			UserId:     1,
+			ClientID:   "test-client",
+			UserID:     1,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sess-1").Return(nil, nil)
@@ -1197,7 +1197,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		// The sentinel is DeferredErrorCode != "", so a context written by an older binary, where
 		// the field is absent and unmarshals to "", reads as "no parked error" and this handler
 		// behaves exactly as it did before #213.
-		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1273,14 +1273,14 @@ func TestHandleAuthLevel1CompletedGet_AFailedReadAnswers500AndSavesNothing(t *te
 				auditLogger:        handlersmocks.NewAuditLogger(t),
 			})
 
-			req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyId, nil))
+			req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyID, nil))
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "sess-1"))
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-				CeremonyId: testCeremonyId,
+				CeremonyID: testCeremonyID,
 				AuthState:  ceremony.AuthStateLevel1ExistingSession,
-				ClientId:   "test-client",
-				UserId:     1,
+				ClientID:   "test-client",
+				UserID:     1,
 			}, nil)
 			tc.arm(database)
 			pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(tc.wantErr)).Return().Once()

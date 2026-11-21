@@ -31,7 +31,7 @@ type refusal struct {
 // The refusals as the token endpoint answered them before this package existed, written out so a
 // change of wording or shape fails here.
 var (
-	missingClientId = refusal{"invalid_request", "Missing required client_id parameter.",
+	missingClientID = refusal{"invalid_request", "Missing required client_id parameter.",
 		http.StatusBadRequest, ""}
 	unknownClient = refusal{"invalid_client", "Client does not exist.",
 		http.StatusUnauthorized, `Basic realm="goiabada"`}
@@ -99,7 +99,7 @@ func TestFindClient(t *testing.T) {
 		client, err := authenticator.FindClient(context.Background(), "")
 
 		assert.Nil(t, client)
-		refusedWith(t, err, missingClientId)
+		refusedWith(t, err, missingClientID)
 	})
 
 	rows := []struct {
@@ -211,7 +211,7 @@ func TestAuthenticate(t *testing.T) {
 		secret     string
 		want       *refusal
 	}{
-		{"no client identifier", "", nil, theSecret, &missingClientId},
+		{"no client identifier", "", nil, theSecret, &missingClientID},
 		{"an unknown client", "the_client", func(*testing.T) *record.Client { return nil }, theSecret, &unknownClient},
 		// The right secret does not get a disabled client in.
 		{"a disabled client with its right secret", "the_client", func(t *testing.T) *record.Client {
@@ -264,7 +264,7 @@ func TestAuthenticateConfidential(t *testing.T) {
 		secret     string
 		want       *refusal
 	}{
-		{"no client identifier", "", nil, theSecret, &missingClientId},
+		{"no client identifier", "", nil, theSecret, &missingClientID},
 		{"an unknown client", "the_client", func(*testing.T) *record.Client { return nil }, theSecret, &unknownClient},
 		{"a disabled client with its right secret", "the_client", func(t *testing.T) *record.Client {
 			client := confidentialClient(t)

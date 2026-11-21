@@ -632,7 +632,7 @@ func TestLegalDocumentVersionGet(t *testing.T) {
 	}
 }
 
-func TestLegalDocumentGet_AnInvalidIdIsABadRequest(t *testing.T) {
+func TestLegalDocumentGet_AnInvalidIDIsABadRequest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	noApps(database)
 

@@ -58,7 +58,7 @@ var challengedForms = []challengedForm{
 		// Drawn back as typed, as the handler draws back a malformed address.
 		kept:        func(typed string) string { return typed },
 		reached:     forgotPasswordLinkSent,
-		emailBudget: forgotPwdEmailBudget, ipBudget: forgotPwdIpBudget, window: forgotPwdWindow,
+		emailBudget: forgotPwdEmailBudget, ipBudget: forgotPwdIPBudget, window: forgotPwdWindow,
 	},
 	{
 		name: "registration", form: turnstile.FormRegister, path: "/account/register",
@@ -339,16 +339,16 @@ func TestTurnstileChallenge_EveryForgotPasswordAndRegistrationFormCarriesTheWidg
 // A registration refused by the challenge keeps the sign-in the visitor came from: the redrawn
 // form's "Sign in" link carries the ceremony, as the handler's own refusals carry it.
 func TestTurnstileChallenge_ARefusedRegistrationKeepsTheSignInItCameFrom(t *testing.T) {
-	// An id of the shape ceremony.NewId draws, which the page alone echoes back.
-	ceremonyId := ceremony.NewId()
+	// An id of the shape ceremony.NewID draws, which the page alone echoes back.
+	ceremonyID := ceremony.NewID()
 	server, _ := newTurnstileRoutesTestServer(t, turnstile.Refused)
 	r := challengedForms[1].submission("victim@example.com", turnstileTestToken)
-	r.URL.RawQuery = url.Values{"ceremony": {ceremonyId}}.Encode()
+	r.URL.RawQuery = url.Values{"ceremony": {ceremonyID}}.Encode()
 
 	rr := serve(server, r)
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(rr.Body.String()))
 	require.NoError(t, err)
 	require.Contains(t, rr.Body.String(), challengeRefusal)
-	assert.Equal(t, "/auth/pwd?ceremony="+ceremonyId, doc.Find("p.auth-footer a").AttrOr("href", ""))
+	assert.Equal(t, "/auth/pwd?ceremony="+ceremonyID, doc.Find("p.auth-footer a").AttrOr("href", ""))
 }

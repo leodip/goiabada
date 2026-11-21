@@ -20,13 +20,13 @@ import (
 type otpStepDatabase interface {
 	ceremonyClientDisplayDatabase
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // loadOTPUser reads the ceremony's user, whom either OTP form is for. A failed read, or a user not
 // found, is returned as an error.
 func loadOTPUser(ctx context.Context, database otpStepDatabase, authContext *ceremony.AuthContext) (*record.User, error) {
-	user, err := database.GetUserByID(ctx, nil, authContext.UserId)
+	user, err := database.GetUserByID(ctx, nil, authContext.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,19 +284,19 @@ type OTPSubmissionResult struct {
 //     row either, and returns a user gone as step 2 does, charging and auditing nothing (#796
 //     decision 3). Not when the refusal disabled the authenticator: its count moved the user's row,
 //     so the user was there for the claim. A replay by a user still there: charges it to the rate
-//     limiter, audits EventOTPCodeReplayDetected and EventAuthFailedOtp, and answers OTPRefused. A
-//     wrong code: charges it, audits EventAuthFailedOtp, and answers OTPRefused. Every wrong code is
+//     limiter, audits EventOTPCodeReplayDetected and EventAuthFailedOTP, and answers OTPRefused. A
+//     wrong code: charges it, audits EventAuthFailedOTP, and answers OTPRefused. Every wrong code is
 //     a guess the OTP budget bounds (#219). The refusal that disabled the authenticator also audits
 //     EventOTPAuthenticatorDisabled, after the others (#489), and reports
 //     OTPNoticeAuthenticatorLockedOut for the handler to send (#724 decision 7). A code from the next
-//     step: audits EventAuthFailedOtp with the reason clock_ahead and answers OTPClockAhead, charging
+//     step: audits EventAuthFailedOTP with the reason clock_ahead and answers OTPClockAhead, charging
 //     nothing, since only the authenticator can produce it (#142).
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
 //     (below). Audits EventEnabledOTP, and reports OTPNoticeAuthenticatorSetUp for the handler to
 //     send (#724).
-//  9. Accepted: audits EventAuthSuccessOtp, records the code on the ceremony (RecordOTPVerified) with
+//  9. Accepted: audits EventAuthSuccessOTP, records the code on the ceremony (RecordOTPVerified) with
 //     the generation of the authenticator it was checked against, rotates the browser session's
 //     identifier, and only then saves the ceremony in authentication_completed, for /auth/completed.
 //     An enrolling user's ceremony is saved instead in level2_recovery_codes, holding the set of
@@ -344,7 +344,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	}
 
 	if keyURL != "" && user.OTPEnabled {
-		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
+		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyID), nil
 	}
 
 	if len(code) == 0 {
@@ -376,14 +376,14 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 			"user_id": user.ID,
 			"step":    verified.Step,
 		})
-		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
+		o.auditLogger.Log(ctx, audit.EventAuthFailedOTP, map[string]interface{}{
 			"user_id": user.ID,
 		})
 		result = o.reportDisabled(ctx, verified, user, result)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeWrong:
 		browser.RecordCredentialFailure()
-		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
+		o.auditLogger.Log(ctx, audit.EventAuthFailedOTP, map[string]interface{}{
 			"user_id": user.ID,
 		})
 		result = o.reportDisabled(ctx, verified, user, result)
@@ -391,9 +391,9 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 	case otpcredential.OutcomeClockAhead:
 		// Not charged to the rate limiter, and not counted against the authenticator by
 		// VerifyStored: a device whose clock runs ahead is no guess (#142).
-		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
+		o.auditLogger.Log(ctx, audit.EventAuthFailedOTP, map[string]interface{}{
 			"user_id": user.ID,
-			"reason":  audit.AuthFailedOtpClockAhead,
+			"reason":  audit.AuthFailedOTPClockAhead,
 		})
 		return o.refuse(ctx, authContext, result, OTPClockAhead)
 	}
@@ -407,7 +407,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 			return OTPSubmissionResult{}, establishErr
 		}
 		if !established {
-			return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
+			return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyID), nil
 		}
 		verifiedGeneration = generation
 		enrolled = true
@@ -427,7 +427,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		})
 	}
 
-	o.auditLogger.Log(ctx, audit.EventAuthSuccessOtp, map[string]interface{}{
+	o.auditLogger.Log(ctx, audit.EventAuthSuccessOTP, map[string]interface{}{
 		"user_id": user.ID,
 	})
 
@@ -441,7 +441,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		holdRecoveryCodes(authContext, recoveryCodes)
 		result.NextStep = recoveryCodesStep
 	}
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyID, authContext.UserID); result.SaveErr != nil {
 		return result, nil
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)
@@ -491,7 +491,7 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 	}
 
 	if authContext.OTPKeyURL != "" && user.OTPEnabled {
-		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
+		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyID), nil
 	}
 
 	if otpcredential.IsBlankRecoveryCode(code) {
@@ -528,7 +528,7 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 
 	result.Answer = OTPAccepted
 	result.NextStep = "/auth/completed"
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyID, authContext.UserID); result.SaveErr != nil {
 		return result, nil
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)
@@ -571,12 +571,12 @@ func (o *OTPSubmission) reportDisabled(ctx context.Context, verified otpcredenti
 // endLostEnrolment logs the lost enrolment and clears the ceremony, answering OTPEnrolmentLost with
 // the clear's failure in SaveErr.
 func (o *OTPSubmission) endLostEnrolment(ctx context.Context, browser otpSubmissionBrowser,
-	result OTPSubmissionResult, userId int64, ceremonyId string) OTPSubmissionResult {
+	result OTPSubmissionResult, userID int64, ceremonyID string) OTPSubmissionResult {
 
 	slog.WarnContext(ctx, "the account's authenticator changed during the enrolment, so nothing was stored and the sign-in ends",
-		"user_id", userId)
+		"user_id", userID)
 
 	result.Answer = OTPEnrolmentLost
-	result.SaveErr = browser.ClearAuthContext(ceremonyId)
+	result.SaveErr = browser.ClearAuthContext(ceremonyID)
 	return result
 }

@@ -351,8 +351,8 @@ func SafeColorsStylesheetPath(brand *record.Brand) (string, error) {
 	return linkPath(SafeColorsStylesheetRoute, brand.ID, stylesheet), nil
 }
 
-func linkPath(route string, brandId int64, stylesheet Stylesheet) string {
-	path := strings.Replace(route, "{id}", strconv.FormatInt(brandId, 10), 1)
+func linkPath(route string, brandID int64, stylesheet Stylesheet) string {
+	path := strings.Replace(route, "{id}", strconv.FormatInt(brandID, 10), 1)
 	return path + "?v=" + stylesheet.Fingerprint
 }
 

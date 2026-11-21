@@ -39,7 +39,7 @@ const (
 	passwordNoticeNew       = "N3wP4ss!word-that-is-long"
 	passwordNoticeSubject   = "the-subject"
 	passwordNoticeAddress   = "ana.silva@example.com"
-	passwordNoticeRequestId = "req-password-0001"
+	passwordNoticeRequestID = "req-password-0001"
 )
 
 // passwordNoticeUser is the caller: a verified address and a name, with the current password.
@@ -77,7 +77,7 @@ func passwordNoticeSettings() *record.Settings {
 func passwordNoticeRequest(t *testing.T, settings *record.Settings, current string) *http.Request {
 	t.Helper()
 	req := accountPasswordRequest(t, map[string]interface{}{"sub": passwordNoticeSubject}, current, passwordNoticeNew)
-	ctx := requestid.NewContext(req.Context(), passwordNoticeRequestId)
+	ctx := requestid.NewContext(req.Context(), passwordNoticeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -156,14 +156,14 @@ func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {
 			require.NotNil(t, sent)
 			assert.Equal(t, passwordNoticeAddress, sent.To, "the notice goes to the account's own address")
 			assert.Equal(t, tc.expectSubject, sent.Subject)
-			assert.Equal(t, "<p>rendered notice</p>", sent.HtmlBody)
+			assert.Equal(t, "<p>rendered notice</p>", sent.HTMLBody)
 			assert.Equal(t, tc.renderLocale, renderLocale, "the notice is rendered in the user's language")
 			assert.Equal(t, "Ana Silva", values.Name)
 			assert.Empty(t, values.Link, "the notice carries no link")
 			for _, secret := range []string{passwordNoticeNew, passwordNoticeCurrent} {
 				assert.NotContains(t, fmt.Sprintf("%+v", values), secret, "the notice carries no password")
 			}
-			assert.Equal(t, passwordNoticeRequestId, requestid.FromContext(sendCtx),
+			assert.Equal(t, passwordNoticeRequestID, requestid.FromContext(sendCtx),
 				"the job's records carry the request's id")
 		})
 	}
@@ -266,7 +266,7 @@ func TestHandleAccountPasswordPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *
 			records := capture.Records()
 			require.Len(t, records, 1, capture.Text())
 			assert.Equal(t, slog.LevelError, records[0].Level)
-			assert.Equal(t, passwordNoticeRequestId, records[0].Attrs["request_id"])
+			assert.Equal(t, passwordNoticeRequestID, records[0].Attrs["request_id"])
 			assert.Equal(t, int64(42), records[0].Attrs["user_id"])
 			assert.Equal(t, "password_changed", records[0].Attrs["notice"])
 			assert.NotNil(t, records[0].Attrs["error"])

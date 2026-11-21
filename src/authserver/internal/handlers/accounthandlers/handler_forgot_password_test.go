@@ -121,9 +121,9 @@ func (h *heldJobs) runAll(t *testing.T, class afterresponse.Class) {
 	}
 }
 
-// forgotPasswordRequestId is the request id forgotPasswordRequest carries, as requestid.Middleware
+// forgotPasswordRequestID is the request id forgotPasswordRequest carries, as requestid.Middleware
 // middleware puts one on every request.
-const forgotPasswordRequestId = "req-forgot-0001"
+const forgotPasswordRequestID = "req-forgot-0001"
 
 // forgotPasswordRequest is a submission of the forgot-password form for an address, carrying
 // the settings middleware.Settings puts on every request of the application branch and a request id.
@@ -132,7 +132,7 @@ func forgotPasswordRequest(email string) *http.Request {
 	form.Add("email", email)
 	req := httptest.NewRequest("POST", "/forgot-password", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	ctx := requestid.NewContext(req.Context(), forgotPasswordRequestId)
+	ctx := requestid.NewContext(req.Context(), forgotPasswordRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, &record.Settings{
 		AppName:       "TestApp",
 		SMTPEnabled:   true,
@@ -279,7 +279,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		// for the send (#433), and the message is the one rendered.
 		emailSender.On("SendEmail", mock.Anything,
 			emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
-			&emaildelivery.SendEmailInput{To: "existing@example.com", Subject: "the rendered subject", HtmlBody: "<p>the rendered email</p>"}).
+			&emaildelivery.SendEmailInput{To: "existing@example.com", Subject: "the rendered subject", HTMLBody: "<p>the rendered email</p>"}).
 			Return(emaildelivery.SendResult{}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventRequestedPasswordReset, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -431,7 +431,7 @@ func assertOneErrorRecordOnTheRequest(t *testing.T, capture *logtest.SlogCapture
 	records := capture.Records()
 	require.Len(t, records, 1, capture.Text())
 	assert.Equal(t, slog.LevelError, records[0].Level)
-	assert.Equal(t, forgotPasswordRequestId, records[0].Attrs["request_id"])
+	assert.Equal(t, forgotPasswordRequestID, records[0].Attrs["request_id"])
 	assert.NotNil(t, records[0].Attrs["error"])
 }
 
@@ -633,7 +633,7 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 			emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)
 
 			require.Len(t, jobs.jobs, 1, "the rest is handed to one job")
-			assert.Equal(t, forgotPasswordRequestId, requestid.FromContext(jobs.ctxs[0]),
+			assert.Equal(t, forgotPasswordRequestID, requestid.FromContext(jobs.ctxs[0]),
 				"the job is handed the request's context, so what it records joins the request")
 		})
 	}
@@ -743,7 +743,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		}, details)
 		assert.Equal(t, []string{"audit", "send"}, order,
 			"the record is written once the code is stored and before the mail is sent")
-		assert.Equal(t, forgotPasswordRequestId, requestid.FromContext(auditCtx),
+		assert.Equal(t, forgotPasswordRequestID, requestid.FromContext(auditCtx),
 			"the record is written under the job's context, which carries the request's id")
 	})
 
@@ -880,15 +880,15 @@ func TestHandleForgotPasswordPost_TheEmailSaysHowLongTheResetAcceptsTheLink(t *t
 // the code; one naming an id of the wrong shape, or none, mails the code alone. The id is echoed
 // without being looked up, so the answer is the same page whatever it names (#812 decision 9).
 func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T) {
-	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	const ceremonyID = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 	for _, tc := range []struct {
 		name      string
 		query     string
 		wantQuery []string
-		wantId    string
+		wantID    string
 	}{
-		{name: "a sign-in named", query: "?ceremony=" + ceremonyId, wantQuery: []string{"ceremony", "code"}, wantId: ceremonyId},
-		{name: "an id of the wrong shape", query: "?ceremony=" + ceremonyId + "x", wantQuery: []string{"code"}},
+		{name: "a sign-in named", query: "?ceremony=" + ceremonyID, wantQuery: []string{"ceremony", "code"}, wantID: ceremonyID},
+		{name: "an id of the wrong shape", query: "?ceremony=" + ceremonyID + "x", wantQuery: []string{"code"}},
 		{name: "none", query: "", wantQuery: []string{"code"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -929,7 +929,7 @@ func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T
 				keys = append(keys, key)
 			}
 			assert.ElementsMatch(t, tc.wantQuery, keys)
-			assert.Equal(t, tc.wantId, link.Query().Get("ceremony"))
+			assert.Equal(t, tc.wantID, link.Query().Get("ceremony"))
 			assert.NotEmpty(t, link.Query().Get("code"))
 		})
 	}

@@ -111,7 +111,7 @@ func (f *bindingFixture) start(thumbprint string) string {
 			Client: f.currentClient(), User: f.user, Scope: "openid", DPoPThumbprint: thumbprint,
 		})
 		require.NoError(f.t, err)
-		return refreshJti(f.t, response.RefreshToken)
+		return refreshJTI(f.t, response.RefreshToken)
 	}
 
 	// No session: the grant is offline, so nothing here depends on a session row.
@@ -131,7 +131,7 @@ func (f *bindingFixture) start(thumbprint string) string {
 	require.NoError(f.t, f.db.CreateCode(ctx, nil, code))
 	response, err := f.issuer.IssueAuthorizationCodeGrant(ctx, f.settings, code, thumbprint)
 	require.NoError(f.t, err)
-	return refreshJti(f.t, response.RefreshToken)
+	return refreshJTI(f.t, response.RefreshToken)
 }
 
 func (f *bindingFixture) currentClient() *record.Client {
@@ -165,7 +165,7 @@ func (f *bindingFixture) refresh(jti string, thumbprint string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return refreshJti(f.t, response.RefreshToken), nil
+	return refreshJTI(f.t, response.RefreshToken), nil
 }
 
 func (f *bindingFixture) row(jti string) *record.RefreshToken {
@@ -196,7 +196,7 @@ func (f *bindingFixture) makeConfidential() {
 	require.NoError(f.t, f.db.UpdateClient(context.Background(), nil, client))
 }
 
-func refreshJti(t *testing.T, refreshToken string) string {
+func refreshJTI(t *testing.T, refreshToken string) string {
 	t.Helper()
 	claims := jwt.MapClaims{}
 	_, _, err := jwt.NewParser().ParseUnverified(refreshToken, claims)
@@ -397,20 +397,20 @@ func raceRotations(t *testing.T, f *bindingFixture, jti string, rotations int, t
 			"a rotation that did not commit lost its claim or did not prove the key, got %v", err)
 	}
 	for i := range winners {
-		winners[i].child = refreshJti(t, winners[i].child)
+		winners[i].child = refreshJTI(t, winners[i].child)
 	}
 	return winners
 }
 
 // family is every refresh token of the family whose first token has this jti.
-func (f *bindingFixture) family(firstJti string) []*record.RefreshToken {
+func (f *bindingFixture) family(firstJTI string) []*record.RefreshToken {
 	f.t.Helper()
 	var tokens []*record.RefreshToken
 	var err error
 	if f.shape.ropc {
 		tokens, err = f.db.GetRefreshTokensByUserID(context.Background(), nil, f.user.ID)
 	} else {
-		tokens, err = f.db.GetRefreshTokensByCodeID(context.Background(), nil, f.row(firstJti).CodeID.Int64)
+		tokens, err = f.db.GetRefreshTokensByCodeID(context.Background(), nil, f.row(firstJTI).CodeID.Int64)
 	}
 	require.NoError(f.t, err)
 	require.NotEmpty(f.t, tokens)

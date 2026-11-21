@@ -24,7 +24,7 @@ import (
 // without its bytes.
 type brandAssetsDatabase interface {
 	CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error
-	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIDs []int64) ([]record.BrandAsset, error)
 }
 
 // HandleBrandAssetPost - POST /api/v1/admin/brand-assets/{logo,favicon,background,font}, one route

@@ -61,8 +61,8 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 var toldClient = record.Client{ID: 9, ClientIdentifier: "app-told", BackchannelLogoutURI: "https://app.example/bc"}
 
 func toldDelivery(userSession *record.UserSession) backchannel.Delivery {
-	return backchannel.Delivery{ClientId: 9, ClientIdentifier: "app-told", URI: "https://app.example/bc",
-		UserId: userSession.UserID, Subject: "subject-of-session-user", SessionIdentifier: userSession.SessionIdentifier}
+	return backchannel.Delivery{ClientID: 9, ClientIdentifier: "app-told", URI: "https://app.example/bc",
+		UserID: userSession.UserID, Subject: "subject-of-session-user", SessionIdentifier: userSession.SessionIdentifier}
 }
 
 // stubTerminationOpening registers what a termination of a live session does before its first
@@ -90,36 +90,36 @@ func stubTerminationOpening(database *datamocks.Database, userSession *record.Us
 // mocked AuthHelper.GetLoggedInSubject, which is why nothing here noticed that the real accessor
 // read a session key no auth server middleware writes and returned "" at every one of these sites
 // (#385). A caller with no token is a separate case, covered below.
-func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
-	return adminSessionDeleteRequestWithScope(sessionId, subject, "authserver:manage")
+func adminSessionDeleteRequest(sessionID string, subject string) *http.Request {
+	return adminSessionDeleteRequestWithScope(sessionID, subject, "authserver:manage")
 }
 
 // adminSessionDeleteRequestWithScope is adminSessionDeleteRequest with the token's scope named.
-func adminSessionDeleteRequestWithScope(sessionId string, subject string, scope string) *http.Request {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionId, nil)
-	req.SetPathValue("id", sessionId)
+func adminSessionDeleteRequestWithScope(sessionID string, subject string, scope string) *http.Request {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionID, nil)
+	req.SetPathValue("id", sessionID)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": scope, "sub": subject})
 }
 
 // liveSessionOf is liveSession for the user given: a session the DELETEs end, not one they answer
 // 404 as already gone (#651 decision 5).
-func liveSessionOf(id int64, identifier string, userId int64) *record.UserSession {
+func liveSessionOf(id int64, identifier string, userID int64) *record.UserSession {
 	session := liveSession(id, identifier)
-	session.UserID = userId
+	session.UserID = userID
 	return &session
 }
 
 // deadSessions are a session of the user given past the idle timeout and one past the maximum
 // lifetime under sessionSettings, each by a minute: stored rows the background worker has not swept
 // yet, which every session endpoint treats as gone (#651 decisions 4 and 5).
-func deadSessions(id int64, userId int64) map[string]*record.UserSession {
+func deadSessions(id int64, userID int64) map[string]*record.UserSession {
 	now := time.Now().UTC()
 
-	idle := liveSessionOf(id, "sid-idle", userId)
+	idle := liveSessionOf(id, "sid-idle", userID)
 	idle.LastAccessed = now.Add(-time.Duration(sessionSettings.UserSessionIdleTimeoutInSeconds+60) * time.Second)
 
-	old := liveSessionOf(id, "sid-old", userId)
+	old := liveSessionOf(id, "sid-old", userID)
 	old.Started = now.Add(-time.Duration(sessionSettings.UserSessionMaxLifetimeInSeconds+60) * time.Second)
 
 	return map[string]*record.UserSession{"past the idle timeout": idle, "past the maximum lifetime": old}
@@ -295,7 +295,7 @@ func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 // liveness 404 answers before it: the strict mock has none of the ceiling's reads registered and
 // the audit logger no record, so either one reached fails the test.
 func TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
-	for name, session := range deadSessions(100, targetUserId) {
+	for name, session := range deadSessions(100, targetUserID) {
 		t.Run(name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)

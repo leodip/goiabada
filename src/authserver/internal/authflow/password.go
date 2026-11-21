@@ -233,7 +233,7 @@ func (o *PasswordProof) Record(ctx context.Context, browser passwordProofBrowser
 	authContext.RecordPasswordVerified(user, time.Now(), keepSignedIn)
 
 	result := PasswordProofResult{NextStep: "/auth/level1completed"}
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyID, authContext.UserID); result.SaveErr != nil {
 		return result
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)

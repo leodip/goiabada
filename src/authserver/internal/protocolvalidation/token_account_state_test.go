@@ -158,7 +158,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "authorization_code",
-						ClientId:     "client1",
+						ClientID:     "client1",
 						ClientSecret: p.clientSecret,
 						Code:         "valid_code",
 						RedirectURI:  redirectURI,
@@ -283,7 +283,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 					grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 						&ValidateTokenRequestInput{
 							GrantType:    "refresh_token",
-							ClientId:     p.clientIdentifier,
+							ClientID:     p.clientIdentifier,
 							ClientSecret: p.clientSecret,
 							RefreshToken: "the_refresh_token",
 						})

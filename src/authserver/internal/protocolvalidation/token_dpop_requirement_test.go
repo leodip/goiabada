@@ -136,7 +136,7 @@ func TestValidateTokenRequest_AClientRequiringDPoPIsRefusedWithoutAProof(t *test
 				client := &record.Client{ID: 1, ClientIdentifier: "requires-dpop", Enabled: true,
 					AuthorizationCodeEnabled: true, IsPublic: g.public, DPoPBoundAccessTokens: true}
 				input := g.input
-				input.ClientId = client.ClientIdentifier
+				input.ClientID = client.ClientIdentifier
 				input.DPoPThumbprint = a.thumbprint
 				if !g.public {
 					encrypted, err := testDataCipher.Encrypt(clientSecret)
@@ -200,7 +200,7 @@ func TestValidateTokenRequest_AClientNotRequiringDPoPNeedsNoProof(t *testing.T) 
 		Return(nil, signingkeys.ErrTokenRefused).Once()
 
 	grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
-		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientId: "no-dpop", RefreshToken: "the_refresh_token"})
+		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientID: "no-dpop", RefreshToken: "the_refresh_token"})
 
 	assert.Nil(t, grant)
 	assertRefusal(t, err, wantRefusal{code: "invalid_grant", description: "The refresh token is invalid.", status: http.StatusBadRequest})

@@ -24,7 +24,7 @@ type accountRecoveryCodesDatabase interface {
 	otpcredential.ReplaceRecoveryCodesDatabase
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) (int, error)
 }
 
 // HandleAccountRecoveryCodesGet - GET /api/v1/account/otp/recovery-codes

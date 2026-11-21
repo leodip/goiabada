@@ -37,17 +37,17 @@ import (
 
 const (
 	introspectIssuer      = "https://auth.example.com"
-	introspectCallerId    = int64(81)
-	introspectOwnerId     = int64(82)
-	introspectUserId      = int64(83)
-	introspectGrantId     = "fam-of-the-grant"
-	introspectRefreshJti  = "rt-presented"
-	introspectAccessJti   = "at-presented"
+	introspectCallerID    = int64(81)
+	introspectOwnerID     = int64(82)
+	introspectUserID      = int64(83)
+	introspectGrantID     = "fam-of-the-grant"
+	introspectRefreshJTI  = "rt-presented"
+	introspectAccessJTI   = "at-presented"
 	introspectTokenString = "the.presented.token"
 	introspectCallerName  = "the-api"
 	introspectOwnerName   = "the-app"
 	introspectResource    = "product-api"
-	introspectResourceId  = int64(91)
+	introspectResourceID  = int64(91)
 )
 
 // introspectEndpoint is the handler over a mocked database and token parser, answering through the
@@ -80,13 +80,13 @@ func introspectingCaller(t *testing.T) *record.Client {
 	t.Helper()
 	encrypted, err := testDataCipher.Encrypt("api-secret")
 	require.NoError(t, err)
-	return &record.Client{ID: introspectCallerId, ClientIdentifier: introspectCallerName, Enabled: true,
+	return &record.Client{ID: introspectCallerID, ClientIdentifier: introspectCallerName, Enabled: true,
 		ClientSecretEncrypted: encrypted}
 }
 
 // tokenOwner is the client the presented access token was issued to.
 func tokenOwner() *record.Client {
-	return &record.Client{ID: introspectOwnerId, ClientIdentifier: introspectOwnerName, Enabled: true}
+	return &record.Client{ID: introspectOwnerID, ClientIdentifier: introspectOwnerName, Enabled: true}
 }
 
 func (e *introspectEndpoint) callerFound(client *record.Client) {
@@ -104,12 +104,12 @@ func (e *introspectEndpoint) lists(identifiers ...string) {
 	resources := []record.Resource{}
 	ids := []int64{}
 	for i, identifier := range identifiers {
-		id := introspectResourceId + int64(i)
-		links = append(links, record.ClientIntrospectionResource{ID: 500 + int64(i), ClientID: introspectCallerId, ResourceID: id})
+		id := introspectResourceID + int64(i)
+		links = append(links, record.ClientIntrospectionResource{ID: 500 + int64(i), ClientID: introspectCallerID, ResourceID: id})
 		resources = append(resources, record.Resource{ID: id, ResourceIdentifier: identifier})
 		ids = append(ids, id)
 	}
-	e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerId).
+	e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerID).
 		Return(links, nil).Once()
 	e.database.On("GetResourcesByIDs", mock.Anything, mock.Anything, ids).Return(resources, nil).Maybe()
 }
@@ -168,8 +168,8 @@ func apiAccessToken(aud interface{}) *oauth.JWTToken {
 		TokenBase64: introspectTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "at+jwt", "kid": "key-1"},
 		Claims: map[string]interface{}{
-			"iss": introspectIssuer, "sub": "the-subject", "client_id": introspectOwnerName, "grant_id": introspectGrantId,
-			"jti": introspectAccessJti, "typ": "Bearer", "aud": aud, "scope": "openid product-api:read",
+			"iss": introspectIssuer, "sub": "the-subject", "client_id": introspectOwnerName, "grant_id": introspectGrantID,
+			"jti": introspectAccessJTI, "typ": "Bearer", "aud": aud, "scope": "openid product-api:read",
 			"iat": float64(1800000000), "nbf": float64(1800000000), "exp": float64(1800000300),
 			"auth_time": float64(1799999990), "acr": "urn:goiabada:pwd", "auth_state_generation": float64(0),
 			"email": "user@example.com",
@@ -183,8 +183,8 @@ func (e *introspectEndpoint) accessTokenLive() {
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, introspectOwnerName).
 		Return(tokenOwner(), nil).Once()
 	e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-		Return(&record.User{ID: introspectUserId, Subject: "the-subject", Enabled: true}, nil).Once()
-	e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantId).Return(true, nil).Once()
+		Return(&record.User{ID: introspectUserID, Subject: "the-subject", Enabled: true}, nil).Once()
+	e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantID).Return(true, nil).Once()
 }
 
 // callerRefreshToken is a live offline refresh token of the password grant, with fixed times.
@@ -193,7 +193,7 @@ func callerRefreshToken() *oauth.JWTToken {
 		TokenBase64: introspectTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "JWT", "kid": "key-1"},
 		Claims: map[string]interface{}{
-			"iss": introspectIssuer, "aud": introspectIssuer, "sub": "the-subject", "jti": introspectRefreshJti,
+			"iss": introspectIssuer, "aud": introspectIssuer, "sub": "the-subject", "jti": introspectRefreshJTI,
 			"typ": "Offline", "scope": "openid offline_access", "iat": float64(1800000000), "nbf": float64(1800000000),
 			"exp":                         float64(1800086400),
 			"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix()),
@@ -202,18 +202,18 @@ func callerRefreshToken() *oauth.JWTToken {
 }
 
 // refreshTokenRow arms FindRefreshToken's reads of callerRefreshToken, a password grant token of the
-// client whose row id is ownerId, and returns the row.
-func (e *introspectEndpoint) refreshTokenRow(ownerId int64) *record.RefreshToken {
+// client whose row id is ownerID, and returns the row.
+func (e *introspectEndpoint) refreshTokenRow(ownerID int64) *record.RefreshToken {
 	row := &record.RefreshToken{
-		ID: 9, RefreshTokenJTI: introspectRefreshJti, FirstRefreshTokenJTI: introspectGrantId, RefreshTokenType: "Offline",
-		UserID:          sql.NullInt64{Int64: introspectUserId, Valid: true},
-		ClientID:        sql.NullInt64{Int64: ownerId, Valid: true},
+		ID: 9, RefreshTokenJTI: introspectRefreshJTI, FirstRefreshTokenJTI: introspectGrantID, RefreshTokenType: "Offline",
+		UserID:          sql.NullInt64{Int64: introspectUserID, Valid: true},
+		ClientID:        sql.NullInt64{Int64: ownerID, Valid: true},
 		AuthenticatedAt: sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
 		Scope:           "openid offline_access",
 	}
-	e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJti).Return(row, nil).Once()
+	e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJTI).Return(row, nil).Once()
 	e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.RefreshToken).User = record.User{ID: introspectUserId, Enabled: true}
+		args.Get(2).(*record.RefreshToken).User = record.User{ID: introspectUserID, Enabled: true}
 	}).Return(nil).Once()
 	e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
 	return row
@@ -366,8 +366,8 @@ func TestHandleIntrospectPost_ARefreshTokenIsActiveToItsOwnClient(t *testing.T) 
 	e := newIntrospectEndpoint(t)
 	e.callerFound(introspectingCaller(t))
 	e.parses(callerRefreshToken())
-	e.refreshTokenRow(introspectCallerId)
-	e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(false, nil).Once()
+	e.refreshTokenRow(introspectCallerID)
+	e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantID).Return(false, nil).Once()
 
 	rr := e.post(t, apiForm())
 
@@ -406,8 +406,8 @@ func TestHandleIntrospectPost_ARefreshTokenWhoseFlowIsSwitchedOffIsInactive(t *t
 			caller.ResourceOwnerPasswordCredentialsEnabled = tc.client
 			e.callerFound(caller)
 			e.parses(callerRefreshToken())
-			e.refreshTokenRow(introspectCallerId)
-			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(false, nil).Once()
+			e.refreshTokenRow(introspectCallerID)
+			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantID).Return(false, nil).Once()
 
 			rr := e.post(t, apiForm())
 
@@ -423,7 +423,7 @@ func TestHandleIntrospectPost_AnotherClientsRefreshTokenIsInactive(t *testing.T)
 	e := newIntrospectEndpoint(t)
 	e.callerFound(introspectingCaller(t))
 	e.parses(callerRefreshToken())
-	e.refreshTokenRow(introspectOwnerId)
+	e.refreshTokenRow(introspectOwnerID)
 
 	rr := e.post(t, apiForm())
 
@@ -449,8 +449,8 @@ func TestHandleIntrospectPost_ATokenThatIsNotLiveIsInactive(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, introspectOwnerName).
 				Return(tokenOwner(), nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{ID: introspectUserId, Enabled: true}, nil).Once()
-			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantId).Return(false, nil).Once()
+				Return(&record.User{ID: introspectUserID, Enabled: true}, nil).Once()
+			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantID).Return(false, nil).Once()
 		}},
 		{"an access token of a disabled client", func(e *introspectEndpoint) {
 			e.parses(apiAccessToken(introspectResource))
@@ -475,23 +475,23 @@ func TestHandleIntrospectPost_ATokenThatIsNotLiveIsInactive(t *testing.T) {
 		}},
 		{"a refresh token with no row", func(e *introspectEndpoint) {
 			e.parses(callerRefreshToken())
-			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJti).Return(nil, nil).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJTI).Return(nil, nil).Once()
 		}},
 		{"a refresh token of a revoked family", func(e *introspectEndpoint) {
 			e.parses(callerRefreshToken())
-			e.refreshTokenRow(introspectCallerId)
-			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(true, nil).Once()
+			e.refreshTokenRow(introspectCallerID)
+			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantID).Return(true, nil).Once()
 		}},
 		{"a live refresh token of an earlier issuer", func(e *introspectEndpoint) {
 			token := callerRefreshToken()
 			token.Claims["iss"] = "https://other.example.com"
 			token.Claims["aud"] = "https://other.example.com"
 			e.parses(token)
-			e.refreshTokenRow(introspectCallerId)
+			e.refreshTokenRow(introspectCallerID)
 		}},
 		{"a refresh token rotated out", func(e *introspectEndpoint) {
 			e.parses(callerRefreshToken())
-			row := e.refreshTokenRow(introspectCallerId)
+			row := e.refreshTokenRow(introspectCallerID)
 			row.Revoked = true
 		}},
 	}
@@ -517,8 +517,8 @@ func TestHandleIntrospectPost_IgnoresTheHint(t *testing.T) {
 	e := newIntrospectEndpoint(t)
 	e.callerFound(introspectingCaller(t))
 	e.parses(callerRefreshToken())
-	e.refreshTokenRow(introspectCallerId)
-	e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(false, nil).Once()
+	e.refreshTokenRow(introspectCallerID)
+	e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantID).Return(false, nil).Once()
 
 	rr := e.post(t, apiForm("token_type_hint", "access_token"))
 
@@ -549,34 +549,34 @@ func TestHandleIntrospectPost_AFaultAnswersInternalServerError(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, introspectOwnerName).
 				Return(tokenOwner(), nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{ID: introspectUserId, Enabled: true}, nil).Once()
-			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantId).Return(false, boom).Once()
+				Return(&record.User{ID: introspectUserID, Enabled: true}, nil).Once()
+			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, introspectGrantID).Return(false, boom).Once()
 		}},
 		{"the caller's list cannot be read", func(e *introspectEndpoint) {
 			e.callerFound(introspectingCaller(t))
 			e.parses(apiAccessToken(introspectResource))
 			e.accessTokenLive()
-			e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerId).
+			e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerID).
 				Return(nil, boom).Once()
 		}},
 		{"the listed resources cannot be read", func(e *introspectEndpoint) {
 			e.callerFound(introspectingCaller(t))
 			e.parses(apiAccessToken(introspectResource))
 			e.accessTokenLive()
-			e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerId).
-				Return([]record.ClientIntrospectionResource{{ID: 500, ClientID: introspectCallerId, ResourceID: introspectResourceId}}, nil).Once()
-			e.database.On("GetResourcesByIDs", mock.Anything, mock.Anything, []int64{introspectResourceId}).Return(nil, boom).Once()
+			e.database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, mock.Anything, introspectCallerID).
+				Return([]record.ClientIntrospectionResource{{ID: 500, ClientID: introspectCallerID, ResourceID: introspectResourceID}}, nil).Once()
+			e.database.On("GetResourcesByIDs", mock.Anything, mock.Anything, []int64{introspectResourceID}).Return(nil, boom).Once()
 		}},
 		{"the refresh token's row cannot be read", func(e *introspectEndpoint) {
 			e.callerFound(introspectingCaller(t))
 			e.parses(callerRefreshToken())
-			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJti).Return(nil, boom).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, introspectRefreshJTI).Return(nil, boom).Once()
 		}},
 		{"the refresh token's family cannot be read", func(e *introspectEndpoint) {
 			e.callerFound(introspectingCaller(t))
 			e.parses(callerRefreshToken())
-			e.refreshTokenRow(introspectCallerId)
-			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(false, boom).Once()
+			e.refreshTokenRow(introspectCallerID)
+			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantID).Return(false, boom).Once()
 		}},
 	}
 	for _, tc := range cases {

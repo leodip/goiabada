@@ -277,7 +277,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 	}
 	request := func(password, scope string) *ValidateTokenRequestInput {
 		return &ValidateTokenRequestInput{
-			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			GrantType: "password", ClientID: "ropc-client", Username: "user@example.com",
 			Password: password, Scope: scope,
 		}
 	}

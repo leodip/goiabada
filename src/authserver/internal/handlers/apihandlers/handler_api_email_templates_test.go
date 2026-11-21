@@ -23,7 +23,7 @@ import (
 // refusals, what it stores and audits, the reset, and the settings ceiling on both writes.
 
 // The 19 emails, by the identifiers #818 decision 6 fixes.
-var emailTemplateIds = []string{
+var emailTemplateIDs = []string{
 	"password_reset_link", "activation_link", "welcome", "registration_existing_account", "new_user_setup",
 	"verification_code", "test",
 	"email_address_changed", "password_changed", "password_changed_by_administrator", "password_reset",
@@ -118,7 +118,7 @@ func TestEmailTemplatesGet_ListsEveryEmailWithEachLanguagesStatus(t *testing.T) 
 		}
 		assert.Equal(t, emailTemplateLanguages, langs, id)
 	}
-	assert.ElementsMatch(t, emailTemplateIds, ids)
+	assert.ElementsMatch(t, emailTemplateIDs, ids)
 	assert.Len(t, ids, 19)
 
 	assert.Equal(t, "edited", statuses["password_reset_link"]["fr"])

@@ -263,14 +263,14 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 )
 
-func rejectIdTokenHint(ctx context.Context, gate string, args ...any) {}
+func rejectIDTokenHint(ctx context.Context, gate string, args ...any) {}
 
 func qualified(w http.ResponseWriter, r *http.Request, err error, attrs []any) {
 	apiresponse.WriteInternalServerError(w, r, err, attrs...)
 }
 
 func bareReject(ctx context.Context, attrs []any) {
-	rejectIdTokenHint(ctx, "aud", attrs...)
+	rejectIDTokenHint(ctx, "aud", attrs...)
 }
 `)
 	// The forwarders themselves, spreading their own run and each other's, and the two builders.
@@ -540,7 +540,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/caught/spreads.go:19 a run spread into a record outside slogSpreadSites",
 		"authserver/internal/handlers/apihandlers/caught.go:8 a run spread into writeInternalServerError outside slogSpreadSites",
 		"authserver/internal/handlers/caught.go:13 a run spread into WriteInternalServerError outside slogSpreadSites",
-		"authserver/internal/handlers/caught.go:17 a run spread into rejectIdTokenHint outside slogSpreadSites",
+		"authserver/internal/handlers/caught.go:17 a run spread into rejectIDTokenHint outside slogSpreadSites",
 		// rule 5
 		"authserver/internal/audit/audit.go:9 a plain slog.Error in a request-path package",
 		"authserver/internal/audit/log_to_console.go:5 a plain slog.Info in a request-path package",

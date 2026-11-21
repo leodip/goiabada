@@ -22,11 +22,11 @@ type userPermissionsDatabase interface {
 	userTargetPolicyDatabase
 	lastAdministratorDatabase
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
-	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
+	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionID int64) error
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserPermission, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -130,10 +130,10 @@ func HandleUserPermissionsPut(
 		wanted := firstOccurrences(request.PermissionIDs)
 
 		// Validate that all requested permissions exist
-		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionId)
+		for _, permissionID := range wanted {
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionID)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "failed to get permission by ID during validation"), "user_id", user.ID, "permission_id", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "failed to get permission by ID during validation"), "user_id", user.ID, "permission_id", permissionID)
 				return
 			}
 			if permission == nil {
@@ -156,7 +156,7 @@ func HandleUserPermissionsPut(
 		}
 
 		grantKey := func(up record.UserPermission) int64 { return up.PermissionID }
-		grantId := func(up record.UserPermission) int64 { return up.ID }
+		grantID := func(up record.UserPermission) int64 { return up.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator revoking one permission and granting another ends with both changes or
@@ -191,22 +191,22 @@ func HandleUserPermissionsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
+			insert, remove := replaceSet(stored, grantKey, grantID, wanted)
 			attemptRevoked := revokedKeys(stored, grantKey, wanted)
-			if decideErr := administrators.decide(r.Context(), slices.Contains(attemptRevoked, administrators.manageId)); decideErr != nil {
+			if decideErr := administrators.decide(r.Context(), slices.Contains(attemptRevoked, administrators.manageID)); decideErr != nil {
 				return decideErr
 			}
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteUserPermission(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting user permission %d", rowId)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteUserPermission(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting user permission %d", rowID)
 				}
 			}
-			for _, permissionId := range insert {
+			for _, permissionID := range insert {
 				if createErr := database.CreateUserPermission(r.Context(), tx, &record.UserPermission{
 					UserID:       user.ID,
-					PermissionID: permissionId,
+					PermissionID: permissionID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionID)
 				}
 			}
 			if guardErr := administrators.leavesAnAdministrator(r.Context()); guardErr != nil {
@@ -226,17 +226,17 @@ func HandleUserPermissionsPut(
 
 		// Audit, once the save has committed: one event per grant made and per grant withdrawn,
 		// from the plan of the attempt that committed (#428).
-		for _, permissionId := range granted {
+		for _, permissionID := range granted {
 			auditLogger.Log(r.Context(), audit.EventAddedUserPermission, map[string]interface{}{
 				"user_id":        user.ID,
-				"permission_id":  permissionId,
+				"permission_id":  permissionID,
 				"logged_in_user": callerSubject(r),
 			})
 		}
-		for _, permissionId := range revoked {
+		for _, permissionID := range revoked {
 			auditLogger.Log(r.Context(), audit.EventDeletedUserPermission, map[string]interface{}{
 				"user_id":        user.ID,
-				"permission_id":  permissionId,
+				"permission_id":  permissionID,
 				"logged_in_user": callerSubject(r),
 			})
 		}

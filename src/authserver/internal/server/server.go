@@ -165,12 +165,12 @@ func NewServer(router *routing.Router, database data.Database, sessionStore *ses
 // closes the database only then. A refusal before anything started has started nothing, so it is
 // drained too.
 func (s *Server) Start(ctx context.Context) (drained bool, err error) {
-	httpsHost := s.cfg.AuthServer.ListenHostHttps
-	httpsPort := s.cfg.AuthServer.ListenPortHttps
+	httpsHost := s.cfg.AuthServer.ListenHostHTTPS
+	httpsPort := s.cfg.AuthServer.ListenPortHTTPS
 	certFile := s.cfg.AuthServer.CertFile
 	keyFile := s.cfg.AuthServer.KeyFile
-	httpHost := s.cfg.AuthServer.ListenHostHttp
-	httpPort := s.cfg.AuthServer.ListenPortHttp
+	httpHost := s.cfg.AuthServer.ListenHostHTTP
+	httpPort := s.cfg.AuthServer.ListenPortHTTP
 	httpsEnabled, httpEnabled := s.logListenerConfiguration(ctx)
 
 	// The metrics listener is enabled by its own setting rather than by a host and port, since its
@@ -232,8 +232,8 @@ func (s *Server) Start(ctx context.Context) (drained bool, err error) {
 // logListenerConfiguration writes the start's records about the HTTPS and HTTP listeners, and
 // reports which of the two the configuration enables.
 func (s *Server) logListenerConfiguration(ctx context.Context) (httpsEnabled, httpEnabled bool) {
-	httpsHost := s.cfg.AuthServer.ListenHostHttps
-	httpsPort := s.cfg.AuthServer.ListenPortHttps
+	httpsHost := s.cfg.AuthServer.ListenHostHTTPS
+	httpsPort := s.cfg.AuthServer.ListenPortHTTPS
 	certFile := s.cfg.AuthServer.CertFile
 	keyFile := s.cfg.AuthServer.KeyFile
 	httpsEnabled = httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
@@ -248,8 +248,8 @@ func (s *Server) logListenerConfiguration(ctx context.Context) (httpsEnabled, ht
 		"cert_file", certFile,
 		"key_file", keyFile)
 
-	httpHost := s.cfg.AuthServer.ListenHostHttp
-	httpPort := s.cfg.AuthServer.ListenPortHttp
+	httpHost := s.cfg.AuthServer.ListenHostHTTP
+	httpPort := s.cfg.AuthServer.ListenPortHTTP
 	httpEnabled = httpHost != "" && httpPort > 0
 
 	if httpEnabled {
@@ -332,7 +332,7 @@ func (s *Server) redirectingRouter() *routing.Router {
 	r.Use(requestid.Middleware)
 	r.Use(httpmw.SecurityHeaders(false))
 	r.Use(httpmw.RealIP(false, s.trustedProxies))
-	r.Use(httpmw.RequestLogger(s.cfg.AuthServer.LogHttpRequests))
+	r.Use(httpmw.RequestLogger(s.cfg.AuthServer.LogHTTPRequests))
 	r.Use(s.httpMetrics)
 	r.Use(httpmw.Recoverer)
 
@@ -648,9 +648,9 @@ func (s *Server) initMiddleware() appBranches {
 	//
 	// It stays above StripTrailingSlash, which edits r.URL.Path in place, and renders the target
 	// before calling the next handler, so its record carries the path the client sent.
-	logHttpRequests := s.cfg.AuthServer.LogHttpRequests
-	slog.Info("http request logging configured", "enabled", logHttpRequests)
-	s.router.Use(httpmw.RequestLogger(logHttpRequests))
+	logHTTPRequests := s.cfg.AuthServer.LogHTTPRequests
+	slog.Info("http request logging configured", "enabled", logHTTPRequests)
+	s.router.Use(httpmw.RequestLogger(logHTTPRequests))
 
 	// HTTP metrics: every request this router answers, by route, method and status. Beside the
 	// request logger and for the same reason, above Recoverer, so a panicking request is counted as
@@ -906,9 +906,9 @@ func csrfPolicy() httpmw.CSRFPolicy {
 		// without ever being asked.
 		Conditional: map[string]func(*http.Request) bool{
 			// RP-initiated logout, exempt only for a POST carrying an id_token_hint. See
-			// middleware.LogoutIdTokenHintPresent for why presence is the test and why it is read
+			// middleware.LogoutIDTokenHintPresent for why presence is the test and why it is read
 			// through the same function the logout handler classifies the parameter with (#109).
-			"/auth/logout": middleware.LogoutIdTokenHintPresent,
+			"/auth/logout": middleware.LogoutIDTokenHintPresent,
 		},
 	}
 }

@@ -81,7 +81,7 @@ func TestHandleTokenPost(t *testing.T) {
 			refused := oauth.NewErrorDetailWithHTTPStatus("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
 			tokenValidator := handlersmocks.NewTokenValidator(t)
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
-				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
+				return input.GrantType == "client_credentials" && input.ClientID == "a-client" && input.ClientSecret == "a-secret"
 			})).Return(nil, refused).Once()
 			jsonWriter := handlersmocks.NewJSONWriter(t)
 
@@ -656,7 +656,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.AssertExpectations(t)
 
 	// Audit log must NOT fire when revocation fails: it is reserved for the
-	// post-commit success path where revokedJtis are real.
+	// post-commit success path where revokedJTIs are real.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
 	// The one JSONError call is the 500 matched above; a second would be the invalid_grant.
@@ -830,7 +830,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 //
 // Both linkage shapes are run against the same expectations on purpose. A security-event
 // consumer must not need flow-specific logic to identify the client and user, which is
-// where this departs from EventTokenIssuedRefreshTokenResponse (codeId on one shape,
+// where this departs from EventTokenIssuedRefreshTokenResponse (codeID on one shape,
 // userId/clientId on the other).
 //
 // The exact-key assertion is what pins the two negative requirements from decision 8: the
@@ -842,10 +842,10 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 // is the issuer's: issuance's TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther.
 func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 	const (
-		presentedJti = "jti-presented"
-		familyJti    = "jti-family"
-		clientId     = int64(123)
-		userId       = int64(456)
+		presentedJTI = "jti-presented"
+		familyJTI    = "jti-family"
+		clientID     = int64(123)
+		userID       = int64(456)
 	)
 
 	testCases := []struct {
@@ -887,11 +887,11 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 
 			require.Len(t, logged, 1, "exactly one replay event must be emitted")
 			assert.Equal(t, map[string]interface{}{
-				"presented_refresh_token_jti": presentedJti,
-				"first_refresh_token_jti":     familyJti,
+				"presented_refresh_token_jti": presentedJTI,
+				"first_refresh_token_jti":     familyJTI,
 				"revoked_count":               int64(2),
-				"client_id":                   clientId,
-				"user_id":                     userId,
+				"client_id":                   clientID,
+				"user_id":                     userID,
 				"flow":                        tc.wantFlow,
 			}, logged[0], "the replay payload must carry exactly these six fields")
 		})
@@ -1274,8 +1274,8 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedClientCredentialsResponse, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
-				clientId, ok := details["client_id"].(int64)
-				return ok && clientId == mockClient.ID && details["scope"] == "billing-api:read"
+				clientID, ok := details["client_id"].(int64)
+				return ok && clientID == mockClient.ID && details["scope"] == "billing-api:read"
 			})).Return()
 
 		jsonWriter.On("EncodeJSON", rr, req, tokenResponse).Return()
@@ -1520,7 +1520,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// the account, and the wrapper must not hide the detail from it (#137).
 	t.Run("a disabled user spends the budget and emits both user_disabled and ropc_auth_failed", func(t *testing.T) {
 		disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
-			"invalid_grant", "The user account is disabled.", http.StatusBadRequest), UserId: 42}
+			"invalid_grant", "The user account is disabled.", http.StatusBadRequest), UserID: 42}
 		assert.True(t, spends(t, disabled), "a disabled user's refusal compared the password, so it is charged")
 
 		handler, auditLogger := newHandler(t, disabled)

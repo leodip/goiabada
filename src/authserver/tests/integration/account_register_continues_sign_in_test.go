@@ -57,7 +57,7 @@ func (f *legalAcceptanceFixture) createAnAccountLink(t *testing.T, browser *http
 	link, err := url.Parse(href)
 	require.NoError(t, err)
 	ceremonyId := link.Query().Get(ceremony.QueryParameter)
-	require.True(t, ceremony.IsWellFormedId(ceremonyId), "the link names the sign-in: %s", href)
+	require.True(t, ceremony.IsWellFormedID(ceremonyId), "the link names the sign-in: %s", href)
 	return appConfig.AuthServer.BaseURL + href, ceremonyId
 }
 

@@ -24,12 +24,12 @@ import (
 type groupsDatabase interface {
 	administrativeGroupPolicyDatabase
 	lastAdministratorDatabase
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
-	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
+	DeleteGroup(ctx context.Context, tx *sql.Tx, groupID int64) error
 	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error)
 	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error)
-	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 }

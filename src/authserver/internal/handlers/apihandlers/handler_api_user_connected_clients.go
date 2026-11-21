@@ -22,7 +22,7 @@ type userConnectedClientsDatabase interface {
 	connectedClientsDatabase
 	userTargetPolicyDatabase
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // GET /api/v1/admin/users/{id}/connected-clients
@@ -39,12 +39,12 @@ func HandleUserConnectedClientsGet(
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -97,12 +97,12 @@ func HandleUserConnectedClientDelete(
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -112,18 +112,18 @@ func HandleUserConnectedClientDelete(
 			return
 		}
 
-		clientIdStr := r.PathValue("clientId")
-		if clientIdStr == "" {
+		clientIDStr := r.PathValue("clientId")
+		if clientIDStr == "" {
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
+		clientID, err := strconv.ParseInt(clientIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		client, err := database.GetClientByID(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -143,7 +143,7 @@ func HandleUserConnectedClientDelete(
 			return
 		}
 
-		result, consentId, err := disconnectClient(r.Context(), database, user.ID, client.ID, settings)
+		result, consentID, err := disconnectClient(r.Context(), database, user.ID, client.ID, settings)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -158,7 +158,7 @@ func HandleUserConnectedClientDelete(
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedUserConsent, map[string]interface{}{
 				"user_id":        user.ID,
-				"consent_id":     consentId,
+				"consent_id":     consentID,
 				"logged_in_user": callerSubject(r),
 			})
 		}

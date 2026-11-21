@@ -11,10 +11,10 @@ const (
 	// StepUpLevel means the target is above the level the session reached, or there is no session
 	// to reuse and the target is above level 1.
 	StepUpLevel
-	// StepUpOtpConfigChanged means the session reached the target's level, but the user's
+	// StepUpOTPConfigChanged means the session reached the target's level, but the user's
 	// authenticator has changed since the session last answered the level 2 question, and the
 	// target asks that question.
-	StepUpOtpConfigChanged
+	StepUpOTPConfigChanged
 	// StepUpAuthenticatorMissing means the target is urn:goiabada:level2_mandatory and the session
 	// reached it, but the user has no authenticator now: they or an administrator removed it since.
 	// The code the session answered can't be asked again, so the user sets one up, as at a sign-in
@@ -54,11 +54,11 @@ func StepUpOwed(target record.ACRLevel, session *record.UserSession) (StepUp, er
 		return StepUpNone, nil
 	}
 
-	sessionAcrLevel, err := record.ACRLevelFromString(session.ACRLevel.String())
+	sessionACRLevel, err := record.ACRLevelFromString(session.ACRLevel.String())
 	if err != nil {
 		return StepUpNone, err
 	}
-	if target.IsHigherThan(sessionAcrLevel) {
+	if target.IsHigherThan(sessionACRLevel) {
 		return StepUpLevel, nil
 	}
 	// Checked apart from the generation, because a level 2 optional ceremony answers a changed
@@ -70,7 +70,7 @@ func StepUpOwed(target record.ACRLevel, session *record.UserSession) (StepUp, er
 		return StepUpAuthenticatorMissing, nil
 	}
 	if session.OTPConfigGeneration != session.User.OTPConfigGeneration && TargetRequiresSecondFactor(target) {
-		return StepUpOtpConfigChanged, nil
+		return StepUpOTPConfigChanged, nil
 	}
 	return StepUpNone, nil
 }

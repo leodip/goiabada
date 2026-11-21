@@ -80,16 +80,16 @@ type logoutPost struct {
 type logoutReceiver struct {
 	t        *testing.T
 	db       *sqlitedb.Database
-	userId   int64
+	userID   int64
 	server   *httptest.Server
 	statuses map[string]int
 	mu       sync.Mutex
 	posts    []logoutPost
 }
 
-func newLogoutReceiver(t *testing.T, db *sqlitedb.Database, userId int64, statuses map[string]int) *logoutReceiver {
+func newLogoutReceiver(t *testing.T, db *sqlitedb.Database, userID int64, statuses map[string]int) *logoutReceiver {
 	t.Helper()
-	rc := &logoutReceiver{t: t, db: db, userId: userId, statuses: statuses}
+	rc := &logoutReceiver{t: t, db: db, userID: userID, statuses: statuses}
 	rc.server = httptest.NewServer(http.HandlerFunc(rc.serve))
 	t.Cleanup(rc.server.Close)
 	return rc
@@ -108,7 +108,7 @@ func (rc *logoutReceiver) serve(w http.ResponseWriter, r *http.Request) {
 	if token != nil {
 		header = token.Header
 	}
-	sessions, err := rc.db.GetUserSessionsByUserID(context.Background(), nil, rc.userId)
+	sessions, err := rc.db.GetUserSessionsByUserID(context.Background(), nil, rc.userID)
 	assert.NoError(rc.t, err)
 
 	rc.mu.Lock()
@@ -169,7 +169,7 @@ func seedLogoutClient(t *testing.T, db *sqlitedb.Database, identifier, uri strin
 
 // seedLogoutSession stores a session of the user, last used lastUsedAgo before now, that served
 // each of clients.
-func seedLogoutSession(t *testing.T, db *sqlitedb.Database, userId int64, sid string, lastUsedAgo time.Duration,
+func seedLogoutSession(t *testing.T, db *sqlitedb.Database, userID int64, sid string, lastUsedAgo time.Duration,
 	clients ...*record.Client) {
 	t.Helper()
 	ctx := context.Background()
@@ -184,7 +184,7 @@ func seedLogoutSession(t *testing.T, db *sqlitedb.Database, userId int64, sid st
 		PasswordAuthTime:  now.Add(-lastUsedAgo),
 		IPAddress:         "192.0.2.10",
 		DeviceType:        "desktop",
-		UserID:            userId,
+		UserID:            userID,
 	}
 	require.NoError(t, db.CreateUserSession(ctx, nil, session))
 	for _, client := range clients {

@@ -1133,10 +1133,10 @@ func TestRequireValidSession(t *testing.T) {
 func TestRequireValidSession_Table(t *testing.T) {
 	const sid = "sid-table"
 
-	// Every user fixture in this table is Id 1, so a session left at the zero UserId would
+	// Every user fixture in this table is ID 1, so a session left at the zero UserID would
 	// read as belonging to somebody else. The harness gives each returned session the
 	// caller's id unless the row asks for a foreign one.
-	const callerId = int64(1)
+	const callerID = int64(1)
 
 	type sessionSpec struct {
 		missing    bool
@@ -1434,9 +1434,9 @@ func TestRequireValidSession_Table(t *testing.T) {
 						// Past the 3600s idle timeout the harness puts in context.
 						lastAccessed = now.Add(-2 * time.Hour)
 					}
-					owner := callerId
+					owner := callerID
 					if tc.session.foreign {
-						owner = callerId + 1
+						owner = callerID + 1
 					}
 					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 						Return(&record.UserSession{
@@ -1642,8 +1642,8 @@ func TestRequireUserBoundToken(t *testing.T) {
 // The bearer middleware's three 500s answered INTERNAL_ERROR with no request id on the wire and
 // logged without one, so an operator holding a caller's report had nothing to join it to. They now
 // go through the same primitive every handler 500 goes through (#279 decision 7, plan finding 9).
-func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testing.T) {
-	const requestId = "req-bearer-1"
+func TestRequireValidSession_AFiveHundredCarriesTheRequestIDAndLogsOnce(t *testing.T) {
+	const requestID = "req-bearer-1"
 
 	mockDB := datamocks.NewDatabase(t)
 	armGuardClient(mockDB)
@@ -1658,7 +1658,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
 	ctx := reqctx.WithBearerToken(req.Context(), token)
 	ctx = reqctx.WithSettings(ctx, guardSettings())
-	ctx = requestid.NewContext(ctx, requestId)
+	ctx = requestid.NewContext(ctx, requestID)
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
@@ -1675,12 +1675,12 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	var body api.ErrorResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", body.ErrorCode)
-	assert.Contains(t, body.ErrorDescription, requestId)
+	assert.Contains(t, body.ErrorDescription, requestID)
 
 	logged := capture.Text()
 	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
 	assert.Contains(t, logged, "the database is down")
-	assert.Contains(t, logged, "request_id="+requestId)
+	assert.Contains(t, logged, "request_id="+requestID)
 	assert.Contains(t, logged, "sid=sid-boom", "the site's own attribute survives the move")
 }
 
@@ -1694,16 +1694,16 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 // the client read and the user read. The other arm is a token with no auth_time --
 // client_credentials, no user -- which reads its client under the request's context and no user.
 func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
-	const requestId = "goiabada/req-valid-session-1"
+	const requestID = "goiabada/req-valid-session-1"
 
-	requestWithId := func() *http.Request {
+	requestWithID := func() *http.Request {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := requestid.NewContext(req.Context(), requestId)
+		ctx := requestid.NewContext(req.Context(), requestID)
 		ctx = reqctx.WithSettings(ctx, guardSettings())
 		return req.WithContext(ctx)
 	}
 	theRequestsContext := mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == requestId
+		return requestid.FromContext(ctx) == requestID
 	})
 	enabledClient := &record.Client{ID: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}
 
@@ -1720,9 +1720,9 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 				Started:           now.Add(-1 * time.Hour),
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil).Once()
-		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJti).Return(false, nil).Once()
+		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJTI).Return(false, nil).Once()
 
-		req := requestWithId()
+		req := requestWithID()
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(
 			map[string]interface{}{"sid": "sid-abc", "auth_time": float64(1), "sub": "user-1"},
 		)))
@@ -1741,9 +1741,9 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	t.Run("a client_credentials token reads its client, its jti and no user", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetClientByClientIdentifier", theRequestsContext, mock.Anything, guardClientIdentifier).Return(enabledClient, nil).Once()
-		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJti).Return(false, nil).Once()
+		mockDB.On("IsAccessTokenRevoked", theRequestsContext, mock.Anything, guardJTI).Return(false, nil).Once()
 
-		req := requestWithId()
+		req := requestWithID()
 		req = req.WithContext(reqctx.WithBearerToken(req.Context(), issuedAccessToken(
 			map[string]interface{}{"sub": guardClientIdentifier},
 		)))

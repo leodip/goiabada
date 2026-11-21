@@ -33,8 +33,8 @@ const (
 	testIssuer = "https://auth.example.com"
 	// clientIdentifier is the client every token in these tests was issued to.
 	clientIdentifier = "client-1"
-	// testJti is the jti every token in these tests carries, unless a row says otherwise.
-	testJti = "at-of-the-test"
+	// testJTI is the jti every token in these tests carries, unless a row says otherwise.
+	testJTI = "at-of-the-test"
 )
 
 // enabledClient is the client every token names: it exists and is enabled.
@@ -44,7 +44,7 @@ var enabledClient = &record.Client{ID: 7, ClientIdentifier: clientIdentifier, En
 // issuer, the client it was issued to and its jti, with claims on top, which may replace any of the
 // four.
 func accessToken(claims map[string]interface{}) oauth.JWTToken {
-	all := map[string]interface{}{"iss": testIssuer, "client_id": clientIdentifier, "jti": testJti}
+	all := map[string]interface{}{"iss": testIssuer, "client_id": clientIdentifier, "jti": testJTI}
 	for name, value := range claims {
 		all[name] = value
 	}
@@ -232,7 +232,7 @@ func TestAccessToken(t *testing.T) {
 			}
 			if tc.wantRefusal == Live {
 				// A live token without grant_id is judged last by its jti (#676 decision 1).
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 
 			verdict, err := AccessToken(context.Background(), database, accessToken(tc.claims), settings, checkedAt)
@@ -349,7 +349,7 @@ func TestAccessToken_RFC9068(t *testing.T) {
 			}
 			if tc.wantRefusal == Live {
 				// A live token without grant_id is judged last by its jti (#676 decision 1).
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 
 			verdict, err := AccessToken(context.Background(), database, token, settings, checkedAt)
@@ -476,9 +476,9 @@ func TestAccessToken_Faults(t *testing.T) {
 // family is, which the family's own query answers. It runs last, once everything else has passed,
 // so a token refused for its user or its session keeps that refusal and reads no grant; a token
 // without grant_id, a client's or one from the implicit flow, never reads one, and is judged by its
-// jti instead (TestAccessToken_RevokedJti).
+// jti instead (TestAccessToken_RevokedJTI).
 func TestAccessToken_Grant(t *testing.T) {
-	const grantId = "grant-1"
+	const grantID = "grant-1"
 	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	type grantRead int
@@ -497,27 +497,27 @@ func TestAccessToken_Grant(t *testing.T) {
 		wantRefusal Refusal
 	}{
 		{label: "an offline token of a live grant",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantID},
 			user:   enabledUser, grant: live, wantRefusal: Live},
 		{label: "an offline token of a revoked grant",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantID},
 			user:   enabledUser, grant: dead, wantRefusal: GrantRevoked},
 		{label: "a session-bound token of a live grant",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantID},
 			user:   enabledUser, session: liveSession(0), grant: live, wantRefusal: Live},
 		{label: "a session-bound token of a revoked grant",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantID},
 			user:   enabledUser, session: liveSession(0), grant: dead, wantRefusal: GrantRevoked},
 
 		// Refused before the grant: the earlier refusal stands, and no grant is read.
 		{label: "a disabled user's token",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantID},
 			user:   &record.User{ID: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
 		{label: "a superseded generation",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantID},
 			user:   &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1}, wantRefusal: TokenGenerationSuperseded},
 		{label: "a session past its idle timeout",
-			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
+			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantID},
 			user:   enabledUser, session: func() *record.UserSession {
 				s := liveSession(0)
 				s.LastAccessed = checkedAt.Add(-2 * time.Hour)
@@ -551,13 +551,13 @@ func TestAccessToken_Grant(t *testing.T) {
 			}
 			switch tc.grant {
 			case live:
-				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(true, nil).Once()
+				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantID).Return(true, nil).Once()
 			case dead:
-				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(false, nil).Once()
+				database.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantID).Return(false, nil).Once()
 			}
 			if tc.wantRefusal == Live && tc.grant == notRead {
 				// A live token without grant_id is judged last by its jti (#676 decision 1).
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 
 			verdict, err := AccessToken(context.Background(), database, accessToken(tc.claims), settings, checkedAt)
@@ -613,7 +613,7 @@ func TestSubject(t *testing.T) {
 // implicit flow, is live only while its jti is not stored as revoked. It is read last, once
 // everything else has passed, so a token refused for its client, its user or its session keeps that
 // refusal and reads no jti; a token carrying grant_id never reads one, since its grant answers.
-func TestAccessToken_RevokedJti(t *testing.T) {
+func TestAccessToken_RevokedJTI(t *testing.T) {
 	const jti = "at-1"
 	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
@@ -680,7 +680,7 @@ func TestAccessToken_RevokedJti(t *testing.T) {
 				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), jti).Return(true, nil).Once()
 			}
 			token := accessToken(tc.claims)
-			if _, hasJti := tc.claims["jti"]; !hasJti {
+			if _, hasJTI := tc.claims["jti"]; !hasJTI {
 				delete(token.Claims, "jti")
 			}
 
@@ -699,7 +699,7 @@ func TestAccessToken_RevokedJti(t *testing.T) {
 
 // A fault reading the stored jti is an error and never a refusal, as every other read's is: a
 // revocation answered as a dead token would tell the client a live one was revoked.
-func TestAccessToken_RevokedJtiFault(t *testing.T) {
+func TestAccessToken_RevokedJTIFault(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	expectEnabledClient(database)
 	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, "at-1").Return(false, errors.New("the database is down"))
@@ -768,7 +768,7 @@ func TestAccessToken_AClientCreatedAfterTheToken(t *testing.T) {
 					Return(&record.DeletedClient{ClientIdentifier: clientIdentifier, DeletedAt: created.Add(-100 * time.Millisecond)}, nil).Once()
 			}
 			if tc.wantRefusal == Live {
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 			claims := map[string]interface{}{"sub": clientIdentifier}
 			if tc.iat != nil {
@@ -857,7 +857,7 @@ func TestAccessToken_ClientRow(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(holder, nil).Once()
 			}
 			if tc.wantRefusal == Live {
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 			claims := map[string]interface{}{"sub": clientIdentifier, "iat": tc.iat}
 			if !tc.omitClaim {

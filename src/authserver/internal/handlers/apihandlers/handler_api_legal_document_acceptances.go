@@ -56,7 +56,7 @@ func HandleAccountLegalDocumentAcceptancesGet(database accountLegalDocumentAccep
 type userLegalDocumentAcceptancesDatabase interface {
 	legaldocuments.AcceptedDatabase
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // HandleUserLegalDocumentAcceptancesGet - GET /api/v1/admin/users/{id}/legal-document-acceptances

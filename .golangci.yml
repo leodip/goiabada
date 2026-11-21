@@ -208,7 +208,7 @@ linters:
         - name: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers.writeListSaveFailure
           msg-pos: -1
           args-pos: 3
-        - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIdTokenHint
+        - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIDTokenHint
           msg-pos: -1
           args-pos: 2
   exclusions:
@@ -278,45 +278,4 @@ linters:
       - {path: '^src/adminconsole/internal/server/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/adminconsole/internal/sessionbackend/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/adminconsole/web/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/cmd/goiabada-authserver/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/accountnotice/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/accountvalidation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/afterresponse/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/apimapping/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/apiresponse/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/audit/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/authflow/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/authorizerequest/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/backchannel/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/brandthemes/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/ceremony/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/cleanup/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/clientauth/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/config/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/emaildelivery/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/emaillinks/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/errcode/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/handlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/handlers/accounthandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/handlers/apihandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/issuance/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/legaldocuments/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/liveness/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/middleware/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/oidc/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/otpcredential/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/permissions/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/protocolvalidation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/recovery/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/render/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/reqctx/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/revocation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/server/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/sessionbackend/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/signingkeys/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/userclaims/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/userconsent/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/usercreation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/userexport/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/usersession/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/tests/integration/[^/]+$', linters: [staticcheck], text: '^ST1003:'}

@@ -246,7 +246,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	enrollment := func(user *record.User) func(*testing.T, string) *httptest.ResponseRecorder {
 		return serveAccount(http.MethodGet, "/api/v1/account/otp/enrollment", nil, settings, callerIs(user),
 			func(t *testing.T, database *datamocks.Database) http.Handler {
-				return HandleAccountOTPEnrollmentGet(database, handlersmocks.NewOtpSecretGenerator(t), testDataCipher)
+				return HandleAccountOTPEnrollmentGet(database, handlersmocks.NewOTPSecretGenerator(t), testDataCipher)
 			})
 	}
 	put := func(body map[string]interface{}, user func(t *testing.T) *record.User) func(*testing.T, string) *httptest.ResponseRecorder {
@@ -433,7 +433,7 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "a client identifier naming no client",
-			serve: logout(logoutPostLogoutUri, logoutClientIdent, func(database *datamocks.Database) {
+			serve: logout(logoutPostLogoutURI, logoutClientIdent, func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), logoutClientIdent).Return(nil, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
@@ -443,8 +443,8 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "a sign-out redirect URI no client holds",
-			serve: logout(logoutPostLogoutUri, "", func(database *datamocks.Database) {
-				database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, (*sql.Tx)(nil), logoutPostLogoutUri).
+			serve: logout(logoutPostLogoutURI, "", func(database *datamocks.Database) {
+				database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, (*sql.Tx)(nil), logoutPostLogoutURI).
 					Return([]record.Client{}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
@@ -454,7 +454,7 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "a sign-out redirect URI the client does not hold",
-			serve: logout(logoutPostLogoutUri, logoutClientIdent, func(database *datamocks.Database) {
+			serve: logout(logoutPostLogoutURI, logoutClientIdent, func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), logoutClientIdent).
 					Return(&record.Client{ID: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()

@@ -94,7 +94,7 @@ func TestInitRoutes_AuthorizeAdmissionBoundsWrites(t *testing.T) {
 }
 
 const (
-	authorizeAdmissionClientId    = "admission-client"
+	authorizeAdmissionClientID    = "admission-client"
 	authorizeAdmissionRedirectURI = "https://app.example.com/callback"
 )
 
@@ -116,8 +116,8 @@ func newAuthorizeWriteCounter(t *testing.T) authorizeWriteCounter {
 	// a request naming it passes every validation and the endpoint writes its row.
 	database, ok := s.database.(*datamocks.Database)
 	require.True(t, ok)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, authorizeAdmissionClientId).
-		Return(&record.Client{ID: 3, ClientIdentifier: authorizeAdmissionClientId, Enabled: true,
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, authorizeAdmissionClientID).
+		Return(&record.Client{ID: 3, ClientIdentifier: authorizeAdmissionClientID, Enabled: true,
 			AuthorizationCodeEnabled: true, DefaultACRLevel: record.ACRLevel1}, nil).Maybe()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -156,7 +156,7 @@ func (b *creationCountingBackend) Create(ctx context.Context, id string, data []
 // authorizeParameters is a valid code-flow request naming the counted client.
 func authorizeParameters() url.Values {
 	return url.Values{
-		"client_id":     {authorizeAdmissionClientId},
+		"client_id":     {authorizeAdmissionClientID},
 		"redirect_uri":  {authorizeAdmissionRedirectURI},
 		"response_type": {"code"},
 		"scope":         {"openid"},

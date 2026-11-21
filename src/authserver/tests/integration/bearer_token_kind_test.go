@@ -21,7 +21,7 @@ import (
 // The bearer path admits only an access token issued for authserver (#401). Every token this server
 // signs verifies against the same key, so before this a refresh token or an ID token presented as a
 // bearer credential got as far as each route's own checks, and a refresh token whose scope carried a
-// route's permission passed that route's scope check. Now JwtAuthorizationHeaderToContext requires
+// route's permission passed that route's scope check. Now JWTAuthorizationHeaderToContext requires
 // typ Bearer and an aud naming authserver, and a token failing either is answered exactly as one
 // that does not parse.
 

@@ -38,7 +38,7 @@ import (
 func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherGates(t *testing.T) {
 	const (
 		clientSecret = "client_secret"
-		familyJti    = "family-jti"
+		familyJTI    = "family-jti"
 	)
 
 	type attempt struct {
@@ -120,7 +120,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 
 				user := record.User{ID: 7, Enabled: a.userEnabled, AuthStateGeneration: 3}
 				refreshToken := &record.RefreshToken{
-					RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: familyJti, AuthStateGeneration: 3, Revoked: a.tokenRevoked,
+					RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: familyJTI, AuthStateGeneration: 3, Revoked: a.tokenRevoked,
 				}
 				if ropc {
 					refreshToken.ClientID = sql.NullInt64{Int64: 1, Valid: true}
@@ -138,7 +138,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 					Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
 				mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 				// The record is asked about by the family's first jti, never the presented token's.
-				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).
+				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).
 					Return(a.familyRevoked, a.familyLookup).Maybe()
 				// A token bound to no session, which is what a revoked token's row is refused for below.
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "").Return(nil, nil).Maybe()
@@ -153,7 +153,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "refresh_token",
-						ClientId:     a.clientIdentifier,
+						ClientID:     a.clientIdentifier,
 						ClientSecret: a.clientSecret,
 						RefreshToken: "the_refresh_token",
 					})
@@ -165,7 +165,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 					require.ErrorIs(t, err, a.familyLookup)
 				}
 				if a.reachesFamily {
-					mockDB.AssertCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti)
+					mockDB.AssertCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI)
 				} else {
 					mockDB.AssertNotCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything)
 				}

@@ -74,7 +74,7 @@ func someCredentialInstant() *time.Time {
 }
 
 // thisBrowser is a sign-in from the browser holding thisDevice, the device identifier whose digest
-// the sweep's same-device rows carry as thisDeviceId, with Chrome's labels.
+// the sweep's same-device rows carry as thisDeviceID, with Chrome's labels.
 func thisBrowser() Device {
 	return Device{Identifier: thisDevice, Name: "Chrome 120.0.0.0", Type: "Desktop", OS: "Windows 10.0",
 		UserAgent: chromeUserAgent}
@@ -98,7 +98,7 @@ func aNewDevice() Device {
 // strict mock fails it as unexpected.
 //
 // The returned pointer receives the session that was handed to CreateUserSession.
-func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSessions []record.UserSession) **record.UserSession {
+func (m *startSessionMocks) expectPersistThroughCommit(userID int64, existingSessions []record.UserSession) **record.UserSession {
 	captured := new(*record.UserSession)
 
 	datamocks.ExpectRunInTransaction(m.db, txSentinel)
@@ -108,7 +108,7 @@ func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSes
 		*captured = created
 	}).Return(nil).Once()
 	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	m.db.On("GetUserSessionsByUserID", mock.Anything, txSentinel, userId).Return(existingSessions, nil).Once()
+	m.db.On("GetUserSessionsByUserID", mock.Anything, txSentinel, userID).Return(existingSessions, nil).Once()
 
 	return captured
 }
@@ -172,7 +172,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	// the string the browser sent, not a parse of it. The sweep reads none of the four: it keys on
 	// the device identifier's digest, never the identifier itself (#564 decision 4).
 	assert.Equal(t, chromeUserAgent, result.UserAgent)
-	assert.Equal(t, thisDeviceId, result.DeviceID)
+	assert.Equal(t, thisDeviceID, result.DeviceID)
 	assert.NotEqual(t, thisDevice, result.DeviceID)
 }
 
@@ -244,7 +244,7 @@ func TestStartNewUserSession_DeletesTheSessionsOfTheSameDevice(t *testing.T) {
 		SessionIdentifier: "an-older-session",
 		IPAddress:         "10.0.0.9",
 		UserAgent:         firefoxUserAgent,
-		DeviceID:          thisDeviceId,
+		DeviceID:          thisDeviceID,
 	}
 
 	m.expectPersistThroughCommit(123, []record.UserSession{stale})
@@ -254,14 +254,14 @@ func TestStartNewUserSession_DeletesTheSessionsOfTheSameDevice(t *testing.T) {
 		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, device, "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, removedIds(removed), "the swept row is reported so the caller can audit it")
+	assert.Equal(t, []int64{42}, removedIDs(removed), "the swept row is reported so the caller can audit it")
 	assert.Equal(t, map[int64]string{42: "same_device"}, removedReasons(removed),
 		"a row the sweep matched is reported as the same device's")
 }
 
-// removedIds is the ids of the rows StartNewUserSession reported removed, in order: the row id is
+// removedIDs is the ids of the rows StartNewUserSession reported removed, in order: the row id is
 // what the caller's audit event names.
-func removedIds(removed []Removal) []int64 {
+func removedIDs(removed []Removal) []int64 {
 	ids := []int64{}
 	for _, removal := range removed {
 		ids = append(ids, removal.Session.ID)
@@ -294,7 +294,7 @@ func TestStartNewUserSession_KeepsTheSessionsOfOtherDevices(t *testing.T) {
 			name: "another device with the same header and address",
 			session: record.UserSession{
 				ID: 42, SessionIdentifier: "other", IPAddress: "192.168.1.50",
-				UserAgent: chromeUserAgent, DeviceID: otherDeviceId,
+				UserAgent: chromeUserAgent, DeviceID: otherDeviceID,
 			},
 		},
 		{
@@ -311,7 +311,7 @@ func TestStartNewUserSession_KeepsTheSessionsOfOtherDevices(t *testing.T) {
 			name: "the three labels match but the identifier does not",
 			session: record.UserSession{
 				ID: 42, SessionIdentifier: "other", IPAddress: "192.168.1.50",
-				UserAgent: chromeUserAgent, DeviceID: otherDeviceId,
+				UserAgent: chromeUserAgent, DeviceID: otherDeviceID,
 				DeviceName: "Chrome 120.0.0.0", DeviceType: "Desktop", DeviceOS: "Windows 10.0",
 			},
 		},
@@ -350,7 +350,7 @@ func TestStartNewUserSession_ABrowserWithNoDeviceCookieSweepsNothing(t *testing.
 	device := aNewDevice()
 	device.UserAgent = ""
 	m.expectPersistThroughCommit(123, []record.UserSession{
-		{ID: 41, SessionIdentifier: "this-browser-before-its-cookies-were-cleared", IPAddress: "192.168.1.50", DeviceID: thisDeviceId},
+		{ID: 41, SessionIdentifier: "this-browser-before-its-cookies-were-cleared", IPAddress: "192.168.1.50", DeviceID: thisDeviceID},
 		{ID: 42, SessionIdentifier: "legacy", IPAddress: "192.168.1.50", UserAgent: "", DeviceID: ""},
 	})
 
@@ -386,7 +386,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 				IPAddress:         "192.168.1.50",
 				// The new key, so this row reaches the self-identifier guard rather than
 				// being skipped by a mismatch and passing vacuously.
-				DeviceID: thisDeviceId,
+				DeviceID: thisDeviceID,
 			}}, nil
 		}).Once()
 
@@ -429,11 +429,11 @@ func TestStartNewUserSession_DeletesTheSessionItReplacesWhereverItWasSeen(t *tes
 	m := newStartSessionMocks(t)
 	replaced := record.UserSession{
 		ID: 42, SessionIdentifier: "the-cookie-named-this", UserID: 123,
-		IPAddress: "198.51.100.20", UserAgent: firefoxUserAgent, DeviceID: otherDeviceId,
+		IPAddress: "198.51.100.20", UserAgent: firefoxUserAgent, DeviceID: otherDeviceID,
 	}
 	m.expectPersistThroughCommit(123, []record.UserSession{
 		replaced,
-		{ID: 43, SessionIdentifier: "another-device", UserID: 123, IPAddress: "198.51.100.21", UserAgent: firefoxUserAgent, DeviceID: otherDeviceId},
+		{ID: 43, SessionIdentifier: "another-device", UserID: 123, IPAddress: "198.51.100.21", UserAgent: firefoxUserAgent, DeviceID: otherDeviceID},
 	})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
@@ -441,7 +441,7 @@ func TestStartNewUserSession_DeletesTheSessionItReplacesWhereverItWasSeen(t *tes
 		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, removedIds(removed))
+	assert.Equal(t, []int64{42}, removedIDs(removed))
 	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in"}, removedReasons(removed),
 		"the row the browser's cookie named is reported as the one this sign-in replaced")
 }
@@ -454,7 +454,7 @@ func TestStartNewUserSession_AReplacedSessionThatAlsoMatchesTheSweepIsRemovedOnc
 	m := newStartSessionMocks(t)
 	replaced := record.UserSession{
 		ID: 42, SessionIdentifier: "the-cookie-named-this", UserID: 123,
-		IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: thisDeviceId,
+		IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: thisDeviceID,
 	}
 	m.expectPersistThroughCommit(123, []record.UserSession{replaced})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
@@ -463,7 +463,7 @@ func TestStartNewUserSession_AReplacedSessionThatAlsoMatchesTheSweepIsRemovedOnc
 		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, removedIds(removed))
+	assert.Equal(t, []int64{42}, removedIDs(removed))
 	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in"}, removedReasons(removed))
 }
 
@@ -474,12 +474,12 @@ func TestStartNewUserSession_EachRemovalIsReportedWithItsOwnReason(t *testing.T)
 	m := newStartSessionMocks(t)
 	replaced := record.UserSession{
 		ID: 42, SessionIdentifier: "the-cookie-named-this", UserID: 123,
-		IPAddress: "198.51.100.20", UserAgent: firefoxUserAgent, DeviceID: otherDeviceId,
+		IPAddress: "198.51.100.20", UserAgent: firefoxUserAgent, DeviceID: otherDeviceID,
 	}
 	m.expectPersistThroughCommit(123, []record.UserSession{
 		replaced,
-		{ID: 43, SessionIdentifier: "same-device", UserID: 123, IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: thisDeviceId},
-		{ID: 44, SessionIdentifier: "another-device", UserID: 123, IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: otherDeviceId},
+		{ID: 43, SessionIdentifier: "same-device", UserID: 123, IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: thisDeviceID},
+		{ID: 44, SessionIdentifier: "another-device", UserID: 123, IPAddress: "192.168.1.50", UserAgent: chromeUserAgent, DeviceID: otherDeviceID},
 	})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
@@ -488,7 +488,7 @@ func TestStartNewUserSession_EachRemovalIsReportedWithItsOwnReason(t *testing.T)
 		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, SessionLimits{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42, 43}, removedIds(removed))
+	assert.Equal(t, []int64{42, 43}, removedIDs(removed))
 	assert.Equal(t, map[int64]string{42: "replaced_by_sign_in", 43: "same_device"}, removedReasons(removed))
 }
 
@@ -553,7 +553,7 @@ func TestStartNewUserSession_RefusesAMissingDeviceIdentifier(t *testing.T) {
 func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsRemovalsOnce(t *testing.T) {
 	m := newStartSessionMocks(t)
 	sameDevice := func(id int64) record.UserSession {
-		return record.UserSession{ID: id, SessionIdentifier: fmt.Sprintf("row-%d", id), IPAddress: "192.168.1.50", DeviceID: thisDeviceId}
+		return record.UserSession{ID: id, SessionIdentifier: fmt.Sprintf("row-%d", id), IPAddress: "192.168.1.50", DeviceID: thisDeviceID}
 	}
 
 	datamocks.ExpectRunInTransactionRerun(m.db, txSentinel)
@@ -572,7 +572,7 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsRemovalsOnce(t *te
 		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
-	assert.Equal(t, []int64{42}, removedIds(removed))
+	assert.Equal(t, []int64{42}, removedIDs(removed))
 }
 
 // A transaction that does not commit reports nothing, even when the body had already deleted rows
@@ -581,8 +581,8 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsRemovalsOnce(t *te
 func TestStartNewUserSession_AnUncommittedTransactionReportsNoRemovals(t *testing.T) {
 	dbErr := errors.New("database is down")
 	sweep := []record.UserSession{
-		{ID: 41, SessionIdentifier: "row-41", IPAddress: "192.168.1.50", DeviceID: thisDeviceId},
-		{ID: 42, SessionIdentifier: "row-42", IPAddress: "192.168.1.50", DeviceID: thisDeviceId},
+		{ID: 41, SessionIdentifier: "row-41", IPAddress: "192.168.1.50", DeviceID: thisDeviceID},
+		{ID: 42, SessionIdentifier: "row-42", IPAddress: "192.168.1.50", DeviceID: thisDeviceID},
 	}
 
 	t.Run("a later delete fails and the body rolls back", func(t *testing.T) {
@@ -703,7 +703,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 					SessionIdentifier: "an-older-session",
 					IPAddress:         "192.168.1.50",
 					// The request's device, so the sweep still reaches the delete that fails here.
-					DeviceID: thisDeviceId,
+					DeviceID: thisDeviceID,
 				}}, nil).Once()
 				m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(dbErr).Once()
 				return func(t *testing.T) {
@@ -861,7 +861,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 //
 // 9 rather than a small number, and different from the auth state generation above, so the
 // two parameters cannot be confused with each other or with a zero default.
-func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
+func TestStartNewUserSession_StampsOTPConfigGeneration(t *testing.T) {
 	m := newStartSessionMocks(t)
 	captured := m.expectPersistThroughCommit(123, nil)
 
@@ -883,7 +883,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 // 0 owes a level 2 re-prompt on this brand new session, which costs one prompt, where the
 // alternative of reading the counter live here would silently satisfy an obligation the
 // ceremony never addressed.
-func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
+func TestStartNewUserSession_NilOTPConfigGenerationLandsAtZero(t *testing.T) {
 	m := newStartSessionMocks(t)
 	captured := m.expectPersistThroughCommit(123, nil)
 
@@ -998,6 +998,6 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 
 // authenticationOf is a sign-in by userId with a password and nothing after it, so the credential
 // instant is the password's too.
-func authenticationOf(userId int64, methods string, acr record.ACRLevel, at *time.Time) Authentication {
-	return Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at, PasswordAuthTime: at}
+func authenticationOf(userID int64, methods string, acr record.ACRLevel, at *time.Time) Authentication {
+	return Authentication{UserID: userID, AuthMethods: methods, ACRLevel: acr, AuthTime: at, PasswordAuthTime: at}
 }

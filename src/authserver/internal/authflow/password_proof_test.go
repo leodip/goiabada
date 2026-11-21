@@ -21,16 +21,16 @@ import (
 // test names.
 type proofBrowser struct {
 	steps     []string
-	rotatedId string
+	rotatedID string
 	rotatedTo int64
 	saved     *ceremony.AuthContext
 	rotateErr error
 	saveErr   error
 }
 
-func (b *proofBrowser) RegenerateSession(ceremonyId string, userId int64) error {
+func (b *proofBrowser) RegenerateSession(ceremonyID string, userID int64) error {
 	b.steps = append(b.steps, "rotate")
-	b.rotatedId, b.rotatedTo = ceremonyId, userId
+	b.rotatedID, b.rotatedTo = ceremonyID, userID
 	return b.rotateErr
 }
 
@@ -46,8 +46,8 @@ func TestPasswordProof_RecordsThePasswordRotatesAndThenSaves(t *testing.T) {
 	browser := &proofBrowser{}
 	authContext := &ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel1Password,
-		CeremonyId: "the-sign-in",
-		ClientId:   "shop",
+		CeremonyID: "the-sign-in",
+		ClientID:   "shop",
 	}
 	user := &record.User{ID: 57, Email: "new@example.com", Enabled: true, AuthStateGeneration: 3, OTPConfigGeneration: 2}
 
@@ -56,16 +56,16 @@ func TestPasswordProof_RecordsThePasswordRotatesAndThenSaves(t *testing.T) {
 
 	assert.Equal(t, PasswordProofResult{NextStep: "/auth/level1completed"}, result)
 	assert.Equal(t, []string{"rotate", "save"}, browser.steps, "the identifier is rotated before the save")
-	assert.Equal(t, "the-sign-in", browser.rotatedId)
+	assert.Equal(t, "the-sign-in", browser.rotatedID)
 	assert.Equal(t, int64(57), browser.rotatedTo, "the rotation keeps the ceremonies of the user who proved it")
 
 	require.NotNil(t, browser.saved)
 	assert.Equal(t, ceremony.AuthStateLevel1PasswordCompleted, browser.saved.AuthState)
-	assert.Equal(t, int64(57), browser.saved.UserId)
+	assert.Equal(t, int64(57), browser.saved.UserID)
 	assert.True(t, browser.saved.Level1AuthCompleted)
 	assert.Equal(t, int64(3), browser.saved.AuthStateGeneration)
-	require.NotNil(t, browser.saved.OtpConfigGeneration)
-	assert.Equal(t, int64(2), *browser.saved.OtpConfigGeneration)
+	require.NotNil(t, browser.saved.OTPConfigGeneration)
+	assert.Equal(t, int64(2), *browser.saved.OTPConfigGeneration)
 	assert.Equal(t, "pwd", browser.saved.AuthMethods)
 	require.NotNil(t, browser.saved.PasswordVerifiedAt)
 	assert.False(t, browser.saved.PasswordVerifiedAt.Before(before.Truncate(time.Second)))
@@ -77,7 +77,7 @@ func TestPasswordProof_RecordsThePasswordRotatesAndThenSaves(t *testing.T) {
 
 func TestPasswordProof_AFailedRotationIsNeverFollowedByTheSave(t *testing.T) {
 	browser := &proofBrowser{rotateErr: errs.WithStack(ceremony.ErrCeremonyReplaced)}
-	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
+	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
 		&record.User{ID: 57, Enabled: true}, nil)
@@ -88,7 +88,7 @@ func TestPasswordProof_AFailedRotationIsNeverFollowedByTheSave(t *testing.T) {
 
 func TestPasswordProof_AFailedSaveIsAnswered(t *testing.T) {
 	browser := &proofBrowser{saveErr: errs.WithStack(ceremony.ErrCeremonyReplaced)}
-	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
+	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
 		&record.User{ID: 57, Enabled: true}, nil)
@@ -104,7 +104,7 @@ func TestPasswordProof_RecordsTheKeepMeSignedInAnswer(t *testing.T) {
 	for name, answer := range map[string]*bool{"ticked": &ticked, "unticked": &unticked, "no box": nil} {
 		t.Run(name, func(t *testing.T) {
 			browser := &proofBrowser{}
-			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
+			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: "the-sign-in"}
 
 			result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
 				&record.User{ID: 57, Enabled: true}, answer)

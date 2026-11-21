@@ -22,7 +22,7 @@ import (
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
 type accountEmailDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
+	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userID int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
 }
 
 // accountEmailValidator is the self-service change check: the address rules, and that no other
@@ -137,7 +137,7 @@ func HandleAccountEmailPut(
 		// hold and then change away from it, so an unverified one would let them mail any address
 		// on demand, one password-checked request per message (#404).
 		notifier.Send(r, accountnotice.EmailAddressChanged, accountnotice.Recipient{
-			UserId:        user.ID,
+			UserID:        user.ID,
 			Email:         previousEmail,
 			EmailVerified: previousEmailVerified,
 			Name:          user.FullName(),

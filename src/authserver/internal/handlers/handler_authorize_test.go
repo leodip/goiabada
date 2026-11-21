@@ -143,8 +143,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
-				ac.UserId == 123 &&
-				ac.AcrLevel == userSession.ACRLevel &&
+				ac.UserID == 123 &&
+				ac.ACRLevel == userSession.ACRLevel &&
 				ac.AuthMethods == userSession.AuthMethods &&
 				// From the session, not the user. Thin on purpose: the tables live in
 				// issuance/auth_state_generation_test.go.
@@ -472,12 +472,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 
 			if assert.NotNil(t, saved) {
-				assert.Len(t, saved.CeremonyId, ceremony.IdLength,
+				assert.Len(t, saved.CeremonyID, ceremony.IDLength,
 					"the ceremony id must be generated at the full length, not left empty")
 				// A ceremony id shared between two authorization requests would bind neither:
 				// the second request's form would satisfy the first's check.
-				assert.False(t, seen[saved.CeremonyId], "each authorization request gets its own ceremony id")
-				seen[saved.CeremonyId] = true
+				assert.False(t, seen[saved.CeremonyID], "each authorization request gets its own ceremony id")
+				seen[saved.CeremonyID] = true
 			}
 		}
 
@@ -868,8 +868,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
-				ac.UserId == 123 &&
-				ac.ClientId == "test-client" &&
+				ac.UserID == 123 &&
+				ac.ClientID == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
 				ac.Scope == "openid"
@@ -2161,7 +2161,7 @@ func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *tes
 		r := withResponseIssuer(httptest.NewRequest("GET", "/authorize", nil))
 
 		// The clear fails, which is the only path that builds the fallback at all.
-		ceremonyStore.On("ClearAuthContext", w, r, testCeremonyId).Return(errors.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", w, r, testCeremonyID).Return(errors.New("the session store is unreachable"))
 
 		return pageRenderer, ceremonyStore, w, r
 	}
@@ -2182,7 +2182,7 @@ func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *tes
 		// does: a registration read reaching this mock fails the case. That is stronger than stubbing a
 		// recovered read and asserting it was ignored, because it proves the second read never happens.
 		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil), input,
-			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyID))
 
 		assert.Empty(t, w.Header().Get("Location"),
 			"swapping the code for server_error must not launder away a refusal the request already earned: "+
@@ -2202,7 +2202,7 @@ func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *tes
 			"http://127.0.0.1:49152/cb", "", "code")
 
 		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
-			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyID))
 
 		assert.Contains(t, w.Header().Get("Location"), "http://127.0.0.1:49152/cb?error=server_error",
 			"the fallback runs the registration gate again with its own copy, so a dropped response type "+
@@ -2222,7 +2222,7 @@ func TestAnswerClientAfterStepClear_TheFallbackPreservesWhatItDoesNotSwap(t *tes
 			"abc123", "code")
 
 		answerClientAfterStepClear(w, r, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(database, pageRenderer, nil), input,
-			ceremonyStore.ClearAuthContext(w, r, testCeremonyId))
+			ceremonyStore.ClearAuthContext(w, r, testCeremonyID))
 
 		location := w.Header().Get("Location")
 		assert.Contains(t, location, "error=server_error")
@@ -2528,7 +2528,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 }
 
-func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
+func TestHandleAuthorizeGet_IDTokenHint(t *testing.T) {
 	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
@@ -2963,7 +2963,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
+			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserID == 123 && ac.IDTokenHintSub == userSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3057,7 +3057,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123 && ac.IdTokenHintSub == userSubject
+			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserID == 123 && ac.IDTokenHintSub == userSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3153,7 +3153,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.IdTokenHintSub == hintSubject
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && ac.IDTokenHintSub == hintSubject
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3268,19 +3268,19 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		// The one save the silent path makes, just before code issuance. It carries the hint and
 		// the prompt, and it inherits the session's generation rather than the user's.
-		var savedCeremonyId string
+		var savedCeremonyID string
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.IdTokenHintSub == userSubject && ac.Prompt == "none" &&
-				ac.UserId == 789 && ac.AuthStateGeneration == 7
+				ac.IDTokenHintSub == userSubject && ac.Prompt == "none" &&
+				ac.UserID == 789 && ac.AuthStateGeneration == 7
 		})).Run(func(args mock.Arguments) {
-			savedCeremonyId = args.Get(2).(*ceremony.AuthContext).CeremonyId
+			savedCeremonyID = args.Get(2).(*ceremony.AuthContext).CeremonyID
 		}).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, savedCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
+		assert.Equal(t, savedCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
 			"the silent path's redirect names the ceremony it just saved")
 
 		pageRenderer.AssertExpectations(t)
@@ -3392,18 +3392,18 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
 		})).Return()
 
-		var savedCeremonyId string
+		var savedCeremonyID string
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope &&
-				ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
+				ac.IDTokenHintSub == userSubject && ac.Prompt == "none"
 		})).Run(func(args mock.Arguments) {
-			savedCeremonyId = args.Get(2).(*ceremony.AuthContext).CeremonyId
+			savedCeremonyID = args.Get(2).(*ceremony.AuthContext).CeremonyID
 		}).Return(nil).Once()
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, savedCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
+		assert.Equal(t, savedCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
 			"the silent path's redirect names the ceremony it just saved")
 		database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 

@@ -243,7 +243,7 @@ func TestClientAuthentication_SpacesAfterBasic(t *testing.T) {
 			validator := handlersmocks.NewTokenValidator(t)
 			validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
-					return input.ClientId == headerClientIdentifier && input.ClientSecret == headerClientSecret
+					return input.ClientID == headerClientIdentifier && input.ClientSecret == headerClientSecret
 				})).Return(nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client", "Stops here.", http.StatusBadRequest)).Once()
 			handler := HandleTokenPost(render.New(nil, nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 

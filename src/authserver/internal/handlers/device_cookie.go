@@ -21,8 +21,8 @@ const (
 	deviceCookieName = "authserver_device"
 	hostCookiePrefix = "__Host-"
 
-	// deviceIdBytes is how many bytes of the CSPRNG an identifier holds, hex encoded in the cookie.
-	deviceIdBytes = 32
+	// deviceIDBytes is how many bytes of the CSPRNG an identifier holds, hex encoded in the cookie.
+	deviceIDBytes = 32
 )
 
 // DeviceCookie reads and writes the device cookie /auth/completed's create arm records a new user
@@ -56,19 +56,19 @@ func (d *DeviceCookie) read(r *http.Request) usersession.Device {
 		device.Identifier = cookie.Value
 		return device
 	}
-	buf := make([]byte, deviceIdBytes)
+	buf := make([]byte, deviceIDBytes)
 	_, _ = rand.Read(buf) // cannot fail: crypto/rand ends the process rather than return an error
 	device.Identifier = hex.EncodeToString(buf)
 	device.New = true
 	return device
 }
 
-// isDeviceIdentifier is whether value has the shape this server mints: deviceIdBytes as lower-case
+// isDeviceIdentifier is whether value has the shape this server mints: deviceIDBytes as lower-case
 // hex. Only the shape is checked, so a browser can present any such value, which is why the
 // identifier only ever ends that user's own earlier sessions (#564).
 func isDeviceIdentifier(value string) bool {
 	decoded, err := hex.DecodeString(value)
-	return err == nil && len(decoded) == deviceIdBytes && hex.EncodeToString(decoded) == value
+	return err == nil && len(decoded) == deviceIDBytes && hex.EncodeToString(decoded) == value
 }
 
 // write gives the browser identifier with the session cookie's attributes, for as long as a session

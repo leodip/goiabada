@@ -16,7 +16,7 @@ func TestTokenType_String(t *testing.T) {
 		tokenType TokenType
 		want      string
 	}{
-		{"id is the zero value", TokenTypeId, "ID"},
+		{"id is the zero value", TokenTypeID, "ID"},
 		{"bearer", TokenTypeBearer, "Bearer"},
 		{"refresh", TokenTypeRefresh, "Refresh"},
 		{"offline, the top of the range", TokenTypeOffline, "Offline"},

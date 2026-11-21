@@ -21,13 +21,13 @@ import (
 type groupPermissionsDatabase interface {
 	administrativeGroupPolicyDatabase
 	lastAdministratorDatabase
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
-	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
-	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
-	GetGroupPermissionsByGroupID(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupPermission, error)
-	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionID int64) error
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
+	GetGroupPermissionsByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
 	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -135,10 +135,10 @@ func HandleGroupPermissionsPut(
 		wanted := firstOccurrences(request.PermissionIDs)
 
 		// Validate that all requested permissions exist
-		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionId)
+		for _, permissionID := range wanted {
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionID)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.ID)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionID, "group_id", group.ID)
 				return
 			}
 			if permission == nil {
@@ -161,7 +161,7 @@ func HandleGroupPermissionsPut(
 		}
 
 		grantKey := func(gp record.GroupPermission) int64 { return gp.PermissionID }
-		grantId := func(gp record.GroupPermission) int64 { return gp.ID }
+		grantID := func(gp record.GroupPermission) int64 { return gp.ID }
 
 		// One transaction, as the user permission save: a failure part way through commits
 		// nothing, overlapping saves merge item by item with no row lock (group_permissions has no
@@ -194,22 +194,22 @@ func HandleGroupPermissionsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
+			insert, remove := replaceSet(stored, grantKey, grantID, wanted)
 			attemptRevoked := revokedKeys(stored, grantKey, wanted)
-			if decideErr := administrators.decide(r.Context(), slices.Contains(attemptRevoked, administrators.manageId)); decideErr != nil {
+			if decideErr := administrators.decide(r.Context(), slices.Contains(attemptRevoked, administrators.manageID)); decideErr != nil {
 				return decideErr
 			}
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteGroupPermission(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting group permission %d", rowId)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteGroupPermission(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting group permission %d", rowID)
 				}
 			}
-			for _, permissionId := range insert {
+			for _, permissionID := range insert {
 				if createErr := database.CreateGroupPermission(r.Context(), tx, &record.GroupPermission{
 					GroupID:      group.ID,
-					PermissionID: permissionId,
+					PermissionID: permissionID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionID)
 				}
 			}
 			if guardErr := administrators.leavesAnAdministrator(r.Context()); guardErr != nil {
@@ -229,17 +229,17 @@ func HandleGroupPermissionsPut(
 
 		// Audit, once the save has committed: one event per grant made and per grant withdrawn,
 		// from the plan of the attempt that committed (#428).
-		for _, permissionId := range granted {
+		for _, permissionID := range granted {
 			auditLogger.Log(r.Context(), audit.EventAddedGroupPermission, map[string]interface{}{
 				"group_id":       group.ID,
-				"permission_id":  permissionId,
+				"permission_id":  permissionID,
 				"logged_in_user": callerSubject(r),
 			})
 		}
-		for _, permissionId := range revoked {
+		for _, permissionID := range revoked {
 			auditLogger.Log(r.Context(), audit.EventDeletedGroupPermission, map[string]interface{}{
 				"group_id":       group.ID,
-				"permission_id":  permissionId,
+				"permission_id":  permissionID,
 				"logged_in_user": callerSubject(r),
 			})
 		}

@@ -31,7 +31,7 @@ type frozenCompletionPlan struct {
 	rotateIdentifier           bool
 	refreshAuthTime            bool
 	replaceAuthentication      bool
-	promoteOtpConfigGeneration bool
+	promoteOTPConfigGeneration bool
 
 	terminateForeignSession bool
 	replaceOwnSession       bool
@@ -47,7 +47,7 @@ func (p frozenCompletionPlan) String() string {
 		{p.rotateIdentifier, "rotateIdentifier"},
 		{p.refreshAuthTime, "refreshAuthTime"},
 		{p.replaceAuthentication, "replaceAuthentication"},
-		{p.promoteOtpConfigGeneration, "promoteOtpConfigGeneration"},
+		{p.promoteOTPConfigGeneration, "promoteOTPConfigGeneration"},
 		{p.terminateForeignSession, "terminateForeignSession"},
 		{p.replaceOwnSession, "replaceOwnSession"},
 	}
@@ -68,7 +68,7 @@ func frozenDecideCompletion(f completionFacts) frozenCompletionPlan {
 			rotateIdentifier:           f.raisesPrivilege,
 			refreshAuthTime:            f.credentialEntered,
 			replaceAuthentication:      f.level1Completed,
-			promoteOtpConfigGeneration: f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target),
+			promoteOTPConfigGeneration: f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target),
 		}
 	}
 	if !f.level1Completed {
@@ -93,7 +93,7 @@ func frozenShapeOf(t *testing.T, plan completionPlan) frozenCompletionPlan {
 			rotateIdentifier:           p.rotateIdentifier,
 			refreshAuthTime:            p.refreshAuthTime,
 			replaceAuthentication:      p.replaceAuthentication,
-			promoteOtpConfigGeneration: p.promoteOtpConfigGeneration,
+			promoteOTPConfigGeneration: p.promoteOTPConfigGeneration,
 		}
 	case createSessionPlan:
 		return frozenCompletionPlan{
@@ -152,7 +152,7 @@ func TestCompletionPlanModes_TheirConstructors(t *testing.T) {
 	assert.Equal(t, reuseSessionPlan{rotateIdentifier: true}, reuseSession(true, false, false, false))
 	assert.Equal(t, reuseSessionPlan{refreshAuthTime: true}, reuseSession(false, true, false, false))
 	assert.Equal(t, reuseSessionPlan{replaceAuthentication: true}, reuseSession(false, false, true, false))
-	assert.Equal(t, reuseSessionPlan{promoteOtpConfigGeneration: true}, reuseSession(false, false, false, true))
+	assert.Equal(t, reuseSessionPlan{promoteOTPConfigGeneration: true}, reuseSession(false, false, false, true))
 
 	assert.Equal(t, createSessionPlan{arrivedWith: arrivedWithNoSession}, createSession(arrivedWithNoSession))
 	assert.Equal(t, createSessionPlan{arrivedWith: arrivedWithForeignSession}, createSession(arrivedWithForeignSession))

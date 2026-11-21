@@ -164,8 +164,8 @@ func credentialRoutes() []credentialRoute {
 			keys: passwordKeys, shape: rejectOAuth, faultTier: "pwd_account_net",
 		},
 		{
-			name:      "LimitOtp",
-			limit:     func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOtp },
+			name:      "LimitOTP",
+			limit:     func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOTP },
 			request:   func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
 			keys:      []string{sharedKey("otp", "user_7")},
 			shape:     rejectBrowser,
@@ -297,7 +297,7 @@ func TestSharedCredentialTiers_TwoInstancesSpendOneBudget(t *testing.T) {
 // nothing once its charge is refunded.
 func TestSharedCredentialTiers_KeepTheirBudgetsAndSpendOnlyFailures(t *testing.T) {
 	budgets := map[string]int{
-		"LimitPwd": 10, "LimitROPC": 10, "LimitOtp": 5, "LimitEmailVerification": 5, "LimitAccountPassword": 5,
+		"LimitPwd": 10, "LimitROPC": 10, "LimitOTP": 5, "LimitEmailVerification": 5, "LimitAccountPassword": 5,
 	}
 	for _, route := range credentialRoutes() {
 		t.Run(route.name, func(t *testing.T) {
@@ -387,7 +387,7 @@ func assertServerFaultShape(t *testing.T, rr *httptest.ResponseRecorder, shape r
 		if got := rr.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/html") {
 			t.Errorf("Content-Type = %q, want the error page", got)
 		}
-		if !strings.Contains(rr.Body.String(), `id="requestId">`+limiterRequestId) {
+		if !strings.Contains(rr.Body.String(), `id="requestId">`+limiterRequestID) {
 			t.Errorf("the body is not the error page carrying the request id:\n%s", rr.Body.String())
 		}
 	case rejectOAuth:

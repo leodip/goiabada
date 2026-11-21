@@ -28,7 +28,7 @@ var sessionSettings = &record.Settings{
 	UserSessionMaxLifetimeInSeconds: 604800,
 }
 
-func liveSession(id int64, identifier string, clientIds ...int64) record.UserSession {
+func liveSession(id int64, identifier string, clientIDs ...int64) record.UserSession {
 	now := time.Now().UTC()
 	session := record.UserSession{
 		ID:                id,
@@ -37,10 +37,10 @@ func liveSession(id int64, identifier string, clientIds ...int64) record.UserSes
 		LastAccessed:      now.Add(-time.Minute),
 		UserID:            42,
 	}
-	for _, clientId := range clientIds {
+	for _, clientID := range clientIDs {
 		session.Clients = append(session.Clients, record.UserSessionClient{
 			UserSessionID: id,
-			ClientID:      clientId,
+			ClientID:      clientID,
 			Started:       now.Add(-time.Hour),
 			LastAccessed:  now.Add(-time.Minute),
 		})
@@ -62,9 +62,9 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 		liveSession(3, "sid-3", 6),
 	}
 
-	var gotClientIds []int64
+	var gotClientIDs []int64
 	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
+		Run(func(args mock.Arguments) { gotClientIDs = args.Get(2).([]int64) }).
 		Return([]record.Client{
 			{ID: 5, ClientIdentifier: "portal"},
 			{ID: 6, ClientIdentifier: "backoffice"},
@@ -78,8 +78,8 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 
 	// The union, deduplicated: client 5 is on two sessions and client 6 on two, and asking for
 	// four ids would still answer correctly while costing part of the query it was meant to save.
-	assert.ElementsMatch(t, []int64{5, 6}, gotClientIds)
-	assert.Len(t, gotClientIds, 2)
+	assert.ElementsMatch(t, []int64{5, 6}, gotClientIDs)
+	assert.Len(t, gotClientIDs, 2)
 
 	assert.Equal(t, []string{"portal", "backoffice"}, details[0].ClientIdentifiers)
 	assert.Equal(t, []string{"portal"}, details[1].ClientIdentifiers)
@@ -113,9 +113,9 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 
 	sessions := []record.UserSession{liveSession(1, "sid-live", 5), idle, expired}
 
-	var gotClientIds []int64
+	var gotClientIDs []int64
 	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
+		Run(func(args mock.Arguments) { gotClientIDs = args.Get(2).([]int64) }).
 		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
@@ -127,7 +127,7 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 	// Client 9 belongs only to the dropped sessions, so filtering before hydrating is what keeps
 	// it out of the query. Asking for it would be harmless and wasteful, and this is the only
 	// place that could say so.
-	assert.Equal(t, []int64{5}, gotClientIds)
+	assert.Equal(t, []int64{5}, gotClientIDs)
 }
 
 // currentSid reaches the mapper. The mapper owns the comparison; this owns the wiring, which is
@@ -164,7 +164,7 @@ func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 // A session naming a client with no row is a broken row, and UserSessionClientsLoadClients
 // refused it before this helper replaced that call. Keeping the refusal is deliberate: answering
 // 200 with the client quietly absent from clientIdentifiers would hide it for good.
-func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
+func TestBuildSessionDetails_RefusesAClientIDWithNoRow(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).

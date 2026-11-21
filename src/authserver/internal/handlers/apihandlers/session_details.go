@@ -13,7 +13,7 @@ import (
 
 // sessionDetailsDatabase is what buildSessionDetails needs: the clients a session authorized.
 type sessionDetailsDatabase interface {
-	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
+	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error)
 }
 
 // buildSessionDetails is the one loop behind all three session list endpoints: filter to the
@@ -84,33 +84,33 @@ func sessionIsLive(session *record.UserSession, settings *record.Settings) bool 
 // GetClientsByIDs is the one that decides how many ids a single statement may bind; an id list
 // longer than that is read in several statements there rather than refused by the engine (#373).
 func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, sessions []record.UserSession) error {
-	clientIds := make([]int64, 0)
+	clientIDs := make([]int64, 0)
 	seen := make(map[int64]bool)
 	for _, session := range sessions {
 		for _, usc := range session.Clients {
 			if !seen[usc.ClientID] {
 				seen[usc.ClientID] = true
-				clientIds = append(clientIds, usc.ClientID)
+				clientIDs = append(clientIDs, usc.ClientID)
 			}
 		}
 	}
-	if len(clientIds) == 0 {
+	if len(clientIDs) == 0 {
 		return nil
 	}
 
-	clients, err := database.GetClientsByIDs(ctx, nil, clientIds)
+	clients, err := database.GetClientsByIDs(ctx, nil, clientIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
-	clientsById := make(map[int64]record.Client, len(clients))
+	clientsByID := make(map[int64]record.Client, len(clients))
 	for _, client := range clients {
-		clientsById[client.ID] = client
+		clientsByID[client.ID] = client
 	}
 
 	for _, session := range sessions {
 		for i, usc := range session.Clients {
-			client, ok := clientsById[usc.ClientID]
+			client, ok := clientsByID[usc.ClientID]
 			if !ok {
 				return errs.Errorf("client with id %d not found", usc.ClientID)
 			}

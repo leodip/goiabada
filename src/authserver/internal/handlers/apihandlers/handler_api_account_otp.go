@@ -79,10 +79,10 @@ func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record
 //
 // Shared by the account API's two branches and the administrator's disable, which is why it takes
 // the narrow reader rather than either handler's port.
-func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByIdReader, userId int64,
+func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByIDReader, userID int64,
 	wantEnabled bool) {
 
-	current, err := database.GetUserByID(r.Context(), nil, userId)
+	current, err := database.GetUserByID(r.Context(), nil, userID)
 	if err != nil {
 		writeInternalServerError(w, r, err)
 		return
@@ -102,9 +102,9 @@ func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByI
 	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountChangedSinceLoaded, nil), "CONCURRENT_UPDATE", http.StatusConflict)
 }
 
-// userByIdReader is the one read writeLostOTPChange makes.
-type userByIdReader interface {
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+// userByIDReader is the one read writeLostOTPChange makes.
+type userByIDReader interface {
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // accountOTPDatabase is what the account OTP endpoints need: the caller's user row, the pending
@@ -116,16 +116,16 @@ type userByIdReader interface {
 type accountOTPDatabase interface {
 	otpcredential.Database
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
+	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
 }
 
 // HandleAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
 func HandleAccountOTPEnrollmentGet(
 	database accountOTPDatabase,
-	otpSecretGenerator OtpSecretGenerator,
+	otpSecretGenerator OTPSecretGenerator,
 	dataCipher *encryption.DataCipher,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +409,7 @@ func HandleAccountOTPPut(
 
 			// A replayed code must be indistinguishable from a wrong one to the caller, so
 			// both branches below write this same body (#111).
-			incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
+			incorrectOTPCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
 
 			// VerifySupplied rather than VerifyStored, because this code is checked against
 			// the seed the server issued and recorded and not against an enrolled
@@ -437,7 +437,7 @@ func HandleAccountOTPPut(
 					writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 					return
 				}
-				// No EventAuthFailedOtp beside it, unlike the browser sites: this endpoint
+				// No EventAuthFailedOTP beside it, unlike the browser sites: this endpoint
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the
 				// existing failure event, and here there is none. That is why the verification
@@ -447,10 +447,10 @@ func HandleAccountOTPPut(
 					"step":           verified.Step,
 					"logged_in_user": subject,
 				})
-				writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, incorrectOTPCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			case otpcredential.OutcomeWrong:
-				writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+				writeLocalizedError(w, r, incorrectOTPCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			case otpcredential.OutcomeClockAhead:
 				// A code from the next step, which only an authenticator whose clock runs ahead
@@ -458,12 +458,12 @@ func HandleAccountOTPPut(
 				// time, and audited, unlike a wrong code here, so an operator can tell a device's
 				// clock from guessing everywhere a code is checked. Nothing was claimed, so the
 				// user's next code still enables (#142).
-				auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.EventAuthFailedOTP, map[string]interface{}{
 					"user_id":        user.ID,
 					"logged_in_user": subject,
-					"reason":         audit.AuthFailedOtpClockAhead,
+					"reason":         audit.AuthFailedOTPClockAhead,
 				})
-				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpClockAhead, nil),
+				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OTPClockAhead, nil),
 					"OTP_CLOCK_AHEAD", http.StatusBadRequest)
 				return
 			}

@@ -253,7 +253,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 
 		return validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: secret,
 			Code:         "valid_code",
 			RedirectURI:  redirectURI,
@@ -354,7 +354,7 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 
 	_, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		Code:         "reused_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: testCodeVerifier[:42],

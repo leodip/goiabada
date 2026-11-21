@@ -329,7 +329,7 @@ func TestHandleUserConsentDelete_TellsTheClientAfterTheCommit(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, [][]backchannel.Delivery{{{
-		ClientId: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserId: 7, Subject: "subject-of-7",
+		ClientID: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserID: 7, Subject: "subject-of-7",
 		SessionIdentifier: "sid-live",
 	}}}, logoutTokens.sent)
 	assert.Equal(t, "https://issuer.example", logoutTokens.issuer)

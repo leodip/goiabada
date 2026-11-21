@@ -23,9 +23,9 @@ import (
 
 // accountConsentDeleteRequest builds the DELETE with the path value and the validated token
 // the handler reads.
-func accountConsentDeleteRequest(consentId string, subject string) *http.Request {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/consents/"+consentId, nil)
-	req.SetPathValue("id", consentId)
+func accountConsentDeleteRequest(consentID string, subject string) *http.Request {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/consents/"+consentID, nil)
+	req.SetPathValue("id", consentID)
 	return withSessionSettings(setTokenContextWithClaims(req, map[string]interface{}{"sub": subject}))
 }
 
@@ -282,7 +282,7 @@ func TestHandleAccountConsentDelete_TellsTheClientAfterTheCommit(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	require.NoError(t, stub.BodyErr)
 	assert.Equal(t, [][]backchannel.Delivery{{{
-		ClientId: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserId: 42, Subject: subject,
+		ClientID: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserID: 42, Subject: subject,
 	}}}, logoutTokens.sent)
 	assert.Equal(t, "https://issuer.example", logoutTokens.issuer)
 }

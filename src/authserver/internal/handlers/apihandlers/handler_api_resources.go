@@ -23,10 +23,10 @@ import (
 // an identifier may not name (#151).
 type resourcesDatabase interface {
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
-	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
+	DeleteResource(ctx context.Context, tx *sql.Tx, resourceID int64) error
 	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 }

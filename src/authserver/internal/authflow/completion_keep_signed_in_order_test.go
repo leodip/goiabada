@@ -93,7 +93,7 @@ func TestBindReusedSession_AnOlderCompletionLeavesTheNewerPasswordEntrysAnswer(t
 			olderAt := time.Now().UTC().Add(-2 * time.Minute).Truncate(time.Second)
 			newerAt := olderAt.Add(time.Minute)
 			completed := func(id string, at time.Time, answer *bool) *ceremony.AuthContext {
-				return &ceremony.AuthContext{CeremonyId: id, ClientId: "the-client", UserId: 1,
+				return &ceremony.AuthContext{CeremonyID: id, ClientID: "the-client", UserID: 1,
 					AuthState: ceremony.AuthStateAuthenticationCompleted, AuthMethods: "pwd",
 					Level1AuthCompleted: true, AuthenticatedAt: &at, PasswordVerifiedAt: &at, KeepSignedIn: answer}
 			}

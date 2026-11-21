@@ -32,7 +32,7 @@ const zeroAuthContextJSON = `{"ClientId":"","RedirectURI":"","ResponseType":"","
 
 // The two literals above as this binary writes them back: identical but for the keys of the fields
 // declared after them, appended last in the order the struct declares them: RequestedScope (#436),
-// PasswordVerifiedAt and OtpClaimGeneration (#542), AdoptedSessionAuthTime (#538), RecoveryCodes
+// PasswordVerifiedAt and OTPClaimGeneration (#542), AdoptedSessionAuthTime (#538), RecoveryCodes
 // (#257), KeepSignedIn (#743), DPoPJkt (#42) and SafeMode (#816). A key
 // anywhere else would mean a field had moved.
 const populatedAuthContextJSONReencoded = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null,"DPoPJkt":"","SafeMode":false}`
@@ -48,7 +48,7 @@ func populatedAuthContext() AuthContext {
 	authenticatedAt := time.Date(2026, 9, 15, 12, 34, 56, 0, time.UTC)
 	otpConfigGeneration := int64(7)
 	return AuthContext{
-		ClientId:                      "client-one",
+		ClientID:                      "client-one",
 		RedirectURI:                   "https://rp.example/cb",
 		ResponseType:                  "code",
 		CodeChallengeMethod:           "S256",
@@ -57,27 +57,27 @@ func populatedAuthContext() AuthContext {
 		Scope:                         "openid profile",
 		ConsentedScope:                "openid",
 		MaxAge:                        "300",
-		AcrValuesFromAuthorizeRequest: "urn:goiabada:level2_optional",
+		ACRValuesFromAuthorizeRequest: "urn:goiabada:level2_optional",
 		State:                         "state-value",
 		Nonce:                         "nonce-value",
 		UserAgent:                     "probe/1.0",
-		IpAddress:                     "203.0.113.7",
-		AcrLevel:                      "urn:goiabada:level1",
+		IPAddress:                     "203.0.113.7",
+		ACRLevel:                      "urn:goiabada:level1",
 		AuthMethods:                   "pwd otp",
-		UserId:                        42,
+		UserID:                        42,
 		AuthState:                     AuthStateReadyToIssueCode,
 		Prompt:                        "consent",
 		AuthenticatedAt:               &authenticatedAt,
-		IdTokenHintSub:                "sub-value",
+		IDTokenHintSub:                "sub-value",
 		Level1AuthCompleted:           true,
 		AuthStateGeneration:           3,
-		OtpConfigGeneration:           &otpConfigGeneration,
+		OTPConfigGeneration:           &otpConfigGeneration,
 		OTPKeyURL:                     "otpauth://totp/x",
-		CeremonyId:                    "ceremony-1",
+		CeremonyID:                    "ceremony-1",
 		UILocales:                     []string{"pt-BR", "en"},
 		DeferredErrorCode:             "invalid_scope",
 		DeferredErrorDescription:      "bad scope",
-		TargetAcrLevel:                "urn:goiabada:level2_mandatory",
+		TargetACRLevel:                "urn:goiabada:level2_mandatory",
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 // administrative policy reads to judge whether the user is an administrator.
 type usersProfileDatabase interface {
 	userTargetPolicyDatabase
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error
 	SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -43,7 +43,7 @@ func HandleUserProfilePut(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -57,7 +57,7 @@ func HandleUserProfilePut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -186,7 +186,7 @@ func HandleUserAddressPut(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -200,7 +200,7 @@ func HandleUserAddressPut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserByID(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

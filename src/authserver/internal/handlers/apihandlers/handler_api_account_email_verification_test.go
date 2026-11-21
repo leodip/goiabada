@@ -808,7 +808,7 @@ func TestHandleAccountEmailVerificationPost_OnlyTheComparedCodeIsWrittenOnceMore
 
 // A verification email the relay refuses is logged naming the account by its id, never by its
 // address (#779).
-func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIdOnly(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIDOnly(t *testing.T) {
 	const address = "someone@example.com"
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)

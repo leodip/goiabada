@@ -15,7 +15,7 @@ import (
 type silentAuthenticationDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
-	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
 }
 
 // silentAuthenticationSessions is what SilentAuthentication asks of the user sessions: whether the
@@ -23,7 +23,7 @@ type silentAuthenticationDatabase interface {
 // it.
 type silentAuthenticationSessions interface {
 	sessionValidity
-	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	BumpUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
 		authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error)
 }
 
@@ -92,8 +92,8 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	requestedMaxAge := authContext.RequestedMaxAge()
 	facts := silentAuthenticationFacts{
 		MaxAgeRequested:  requestedMaxAge != nil,
-		HintSubject:      authContext.IdTokenHintSub,
-		Target:           authContext.GetTargetAcrLevel(client.DefaultACRLevel),
+		HintSubject:      authContext.IDTokenHintSub,
+		Target:           authContext.GetTargetACRLevel(client.DefaultACRLevel),
 		ConsentRequired:  client.ConsentRequired,
 		ClientIdentifier: client.ClientIdentifier,
 		RemembersConsent: client.RemembersConsent(),
@@ -170,7 +170,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	}
 	authContext.AuthenticatedAt = &userSession.AuthTime
 
-	err := authContext.SetAcrLevel(facts.Target, userSession)
+	err := authContext.SetACRLevel(facts.Target, userSession)
 	if err != nil {
 		return SilentAuthenticationResult{}, err
 	}
@@ -180,7 +180,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 		return SilentAuthenticationResult{}, err
 	}
 	o.auditLogger.Log(ctx, audit.EventBumpedUserSession, map[string]interface{}{
-		"user_id":   authContext.UserId,
+		"user_id":   authContext.UserID,
 		"client_id": client.ID,
 	})
 

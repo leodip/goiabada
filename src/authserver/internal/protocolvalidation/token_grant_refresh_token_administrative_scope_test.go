@@ -116,7 +116,7 @@ func TestValidateTokenRequest_RefreshToken_AdministrativeScope(t *testing.T) {
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
 			assert.Equal(t, int64(1), refused.Client.ID)
 			assert.Equal(t, "client1", refused.Client.ClientIdentifier)
-			assert.Equal(t, int64(1), refused.UserId)
+			assert.Equal(t, int64(1), refused.UserID)
 
 			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const familyJti = "family-1"
+const familyJTI = "family-1"
 
 func TestFindRefreshToken(t *testing.T) {
 	t.Run("a code-descended token names its code's user, client and scope", func(t *testing.T) {
@@ -37,8 +37,8 @@ func TestFindRefreshToken(t *testing.T) {
 		require.NotNil(t, stored)
 		assert.Same(t, row, stored.Row)
 		assert.False(t, stored.IsROPC)
-		assert.Equal(t, int64(4), stored.ClientId)
-		assert.Equal(t, int64(1), stored.UserId)
+		assert.Equal(t, int64(4), stored.ClientID)
+		assert.Equal(t, int64(1), stored.UserID)
 		assert.Equal(t, "openid email", stored.Scope)
 		require.NotNil(t, stored.User)
 		assert.Equal(t, "user-1", stored.User.Subject)
@@ -65,8 +65,8 @@ func TestFindRefreshToken(t *testing.T) {
 		require.NotNil(t, stored)
 		assert.Same(t, row, stored.Row)
 		assert.True(t, stored.IsROPC)
-		assert.Equal(t, int64(5), stored.ClientId)
-		assert.Equal(t, int64(2), stored.UserId)
+		assert.Equal(t, int64(5), stored.ClientID)
+		assert.Equal(t, int64(2), stored.UserID)
 		assert.Equal(t, "openid profile", stored.Scope)
 		require.NotNil(t, stored.User)
 		assert.Equal(t, "user-2", stored.User.Subject)
@@ -149,15 +149,15 @@ func codeDescended() *StoredRefreshToken {
 	return &StoredRefreshToken{
 		Row: &record.RefreshToken{
 			RefreshTokenJTI:      "jti-1",
-			FirstRefreshTokenJTI: familyJti,
+			FirstRefreshTokenJTI: familyJTI,
 			CodeID:               sql.NullInt64{Int64: 11, Valid: true},
 			Code: record.Code{ID: 11, ClientID: 4, UserID: 1, SessionIdentifier: sid,
 				CodeChallenge: sql.NullString{String: "challenge", Valid: true}, AuthStateGeneration: 2},
 			SessionIdentifier:   sid,
 			AuthStateGeneration: 2,
 		},
-		ClientId: 4,
-		UserId:   1,
+		ClientID: 4,
+		UserID:   1,
 		User:     user,
 		Scope:    "openid",
 	}
@@ -169,15 +169,15 @@ func passwordGrant() *StoredRefreshToken {
 	return &StoredRefreshToken{
 		Row: &record.RefreshToken{
 			RefreshTokenJTI:      "jti-1",
-			FirstRefreshTokenJTI: familyJti,
+			FirstRefreshTokenJTI: familyJTI,
 			UserID:               sql.NullInt64{Int64: 1, Valid: true},
 			ClientID:             sql.NullInt64{Int64: 4, Valid: true},
 			AuthenticatedAt:      sql.NullTime{Time: checkedAt.Add(-time.Hour), Valid: true},
 			AuthStateGeneration:  2,
 		},
 		IsROPC:   true,
-		ClientId: 4,
-		UserId:   1,
+		ClientID: 4,
+		UserID:   1,
 		User:     &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 2},
 		Scope:    "openid",
 	}
@@ -214,9 +214,9 @@ func withClaims(claims map[string]interface{}, changes map[string]interface{}) m
 func TestRefreshToken(t *testing.T) {
 	inAnHour := checkedAt.Add(time.Hour)
 
-	sessionOfUser := func(userId int64) *record.UserSession {
+	sessionOfUser := func(userID int64) *record.UserSession {
 		session := liveSession(2)
-		session.UserID = userId
+		session.UserID = userID
 		return session
 	}
 	idleSession := liveSession(2)
@@ -617,7 +617,7 @@ func TestRefreshToken(t *testing.T) {
 		t.Run(tc.label, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			if tc.family != nil {
-				database.On("IsRefreshTokenFamilyRevoked", mock.Anything, (*sql.Tx)(nil), familyJti).Return(*tc.family, nil).Once()
+				database.On("IsRefreshTokenFamilyRevoked", mock.Anything, (*sql.Tx)(nil), familyJTI).Return(*tc.family, nil).Once()
 			}
 			if tc.readsSession != "" {
 				if tc.session == nil {
@@ -642,7 +642,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 
 	t.Run("reading the family's record fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, down)
+		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).Return(false, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
 			oauth.JWTToken{Claims: sessionBoundClaims()}, settings, checkedAt)
@@ -653,7 +653,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 
 	t.Run("reading the session fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
+		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).Return(false, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
@@ -665,7 +665,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 
 	t.Run("reading an offline token's session fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
+		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).Return(false, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
@@ -677,7 +677,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 
 	t.Run("an offline token without its maximum lifetime", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
+		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).Return(false, nil)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
 			oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1", "typ": "Offline", "iss": testIssuer, "aud": testIssuer}}, settings, checkedAt)
@@ -694,7 +694,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		}
 		t.Run("a token typed neither Refresh nor Offline", func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
+			database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).Return(false, nil)
 
 			refusal, err := RefreshToken(context.Background(), database, codeDescended(),
 				oauth.JWTToken{Claims: claims}, settings, checkedAt)

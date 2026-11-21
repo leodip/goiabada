@@ -10,8 +10,8 @@
 //
 // **The audit call stays at the caller**, as revocation requires of its own callers and for the
 // same reason: the two verification sites raise deliberately different event sets. The browser,
-// which verifies a stored authenticator or one being enrolled, raises EventAuthFailedOtp on a
-// wrong code and EventAuthSuccessOtp on a good one; the account API raises neither, because
+// which verifies a stored authenticator or one being enrolled, raises EventAuthFailedOTP on a
+// wrong code and EventAuthSuccessOTP on a good one; the account API raises neither, because
 // enabling an authenticator is not an authentication ceremony; both raise
 // EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for instead of deciding
 // anything itself.
@@ -52,26 +52,26 @@ import (
 // ceremony never reaches. Three ports in a package this small would name the same six methods
 // between them and leave each consumer choosing which to embed.
 type Database interface {
-	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64) error
 	// GetUserByIDForUpdate reads the user's row, which the operation's own write already holds,
 	// after that write: the account as the change commits it, which a caller notifying the user
 	// addresses (#724).
-	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	IncrementUserOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
-	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
-	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
-	IncrementUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	IncrementUserOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error)
+	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userID int64, passwordMethods string) error
+	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64) error
+	IncrementUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64,
 		expectedGeneration int64) (bool, error)
-	ClearUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
+	ClearUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64,
 		expectedGeneration int64) (bool, error)
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)
-	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64) (bool, error)
+	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
-	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
-	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
-	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
+	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64) (bool, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) error
 }
 
 // VerifyOutcome is what a passcode check concluded. The first three values are the three arms

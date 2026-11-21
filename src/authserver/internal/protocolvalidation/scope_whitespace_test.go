@@ -146,7 +146,7 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 
 	return validator, mockDB, &ValidateTokenRequestInput{
 		GrantType:    "client_credentials",
-		ClientId:     "cc_client",
+		ClientID:     "cc_client",
 		ClientSecret: "valid_secret",
 		Scope:        scope,
 	}
@@ -205,7 +205,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.
 
 	return validator, mockDB, mockPermissionChecker, settings, &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     scope,

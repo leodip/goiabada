@@ -62,7 +62,7 @@ const (
 // write, refused outside the writer like an assignment, and its own body is where that write
 // happens, so the body is exempt. A method writing a request field that is not listed here is
 // therefore refused for the write in its body.
-var requestFieldSetters = []string{"SetTargetAcrLevel", "ParkDeferredError"}
+var requestFieldSetters = []string{"SetTargetACRLevel", "ParkDeferredError"}
 
 // requestFieldWriter names the one function whose body may write a request field: the operation
 // that accepts the authorization request and creates its ceremony. Function literals inside it are
@@ -445,7 +445,7 @@ func requestFieldStrings(writes []requestFieldWrite) []string {
 
 // requestFieldFixtureFields are the request fields a fixture's AuthContext declares, one string and
 // the slice, which between them take every write form.
-var requestFieldFixtureFields = []string{"State", "UILocales", "TargetAcrLevel"}
+var requestFieldFixtureFields = []string{"State", "UILocales", "TargetACRLevel"}
 
 // requestFieldCeremonyFixture is the ceremony package in a fixture tree: AuthContext with the fixture
 // request fields and one attempt field, the setter, and the reads production makes.
@@ -456,12 +456,12 @@ import "encoding/json"
 type AuthContext struct {
 	State          string
 	UILocales      []string
-	TargetAcrLevel string
+	TargetACRLevel string
 	Scope          string
 }
 
-func (ac *AuthContext) SetTargetAcrLevel(level string) {
-	ac.TargetAcrLevel = level
+func (ac *AuthContext) SetTargetACRLevel(level string) {
+	ac.TargetACRLevel = level
 }
 
 func (ac *AuthContext) ParkDeferredError(code, description string) {
@@ -509,7 +509,7 @@ func (o *Authorization) Run(state string) func() *ceremony.AuthContext {
 		p := &ac.State
 		*p = "x"
 		*ac = ceremony.AuthContext{"s", nil, "t", "u"}
-		ac.SetTargetAcrLevel("urn:goiabada:level1")
+		ac.SetTargetACRLevel("urn:goiabada:level1")
 		ac.ParkDeferredError("invalid_request", "parked")
 		return ac
 	}
@@ -551,11 +551,11 @@ func issue(authContext *ceremony.AuthContext, other ceremony.AuthContext, w wrap
 	_ = append(authContext.UILocales, "f")
 	clear(authContext.UILocales)
 	_ = ceremony.AuthContext{State: "g", Scope: "h"}
-	_ = []ceremony.AuthContext{{TargetAcrLevel: "i"}}
+	_ = []ceremony.AuthContext{{TargetACRLevel: "i"}}
 	_ = &ceremony.AuthContext{"j", nil, "k", "l"}
-	authContext.SetTargetAcrLevel("m")
-	set := authContext.SetTargetAcrLevel
-	(*ceremony.AuthContext).SetTargetAcrLevel(authContext, "n")
+	authContext.SetTargetACRLevel("m")
+	set := authContext.SetTargetACRLevel
+	(*ceremony.AuthContext).SetTargetACRLevel(authContext, "n")
 	authContext.ParkDeferredError("o", "p")
 	_, _, _ = p, q, set
 }
@@ -664,11 +664,11 @@ func fixture(ac *ceremony.AuthContext) {
 		"authserver/internal/handlers/handler_auth_issue.go:21: passes to append UILocales",
 		"authserver/internal/handlers/handler_auth_issue.go:22: passes to clear UILocales",
 		"authserver/internal/handlers/handler_auth_issue.go:23: sets State in an AuthContext literal",
-		"authserver/internal/handlers/handler_auth_issue.go:24: sets TargetAcrLevel in an AuthContext literal",
+		"authserver/internal/handlers/handler_auth_issue.go:24: sets TargetACRLevel in an AuthContext literal",
 		"authserver/internal/handlers/handler_auth_issue.go:25: builds an AuthContext literal positionally",
-		"authserver/internal/handlers/handler_auth_issue.go:26: calls SetTargetAcrLevel",
-		"authserver/internal/handlers/handler_auth_issue.go:27: calls SetTargetAcrLevel",
-		"authserver/internal/handlers/handler_auth_issue.go:28: calls SetTargetAcrLevel",
+		"authserver/internal/handlers/handler_auth_issue.go:26: calls SetTargetACRLevel",
+		"authserver/internal/handlers/handler_auth_issue.go:27: calls SetTargetACRLevel",
+		"authserver/internal/handlers/handler_auth_issue.go:28: calls SetTargetACRLevel",
 		"authserver/internal/handlers/handler_auth_issue.go:29: calls ParkDeferredError",
 		"authserver/internal/authflow/silent_authentication.go:8: assigns State",
 		"authserver/internal/authflow/silent_authentication.go:12: assigns State",
@@ -894,7 +894,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnUndeclaredName(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope,
-			append(slices.Clone(requestFieldFixtureFields), "Nonce"), []string{"SetTargetAcrLevel", "SetNonce"}, requestFieldWriter)
+			append(slices.Clone(requestFieldFixtureFields), "Nonce"), []string{"SetTargetACRLevel", "SetNonce"}, requestFieldWriter)
 	})
 
 	require.True(t, report.Stopped, "an undeclared name must be fatal rather than a pass")

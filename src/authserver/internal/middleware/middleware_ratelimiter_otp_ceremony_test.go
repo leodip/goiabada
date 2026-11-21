@@ -17,7 +17,7 @@ import (
 )
 
 // The one-time-code budget an OTP submission spends belongs to the user of the ceremony the
-// submitted form names, read through the real ceremony store and ceremony.RequestedId, the one rule
+// submitted form names, read through the real ceremony store and ceremony.RequestedID, the one rule
 // the step boundary loads the ceremony the code is checked for by. So the user whose budget a
 // submission spends is always the user whose code the step checks (#246).
 
@@ -43,17 +43,17 @@ func otpCeremonyBrowser(t *testing.T, held *ceremony.AuthContext) (*ceremony.Sto
 	return ceremonyStore, cookies
 }
 
-func TestLimitOtp_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
+func TestLimitOTP_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
 	const budget = 5
-	const heldId, otherId = "ceremony-held-0123456789abcdefgh", "ceremony-other-0123456789abcdefg"
+	const heldID, otherID = "ceremony-held-0123456789abcdefgh", "ceremony-other-0123456789abcdefg"
 
 	// submit posts a wrong code naming ceremonyId in the form, as the OTP page's form does, to the URL
 	// that page was loaded with, and reports the status and whether the handler ran. The handler reads
 	// the form after the limiter has, as the OTP handler does.
-	submit := func(t *testing.T, m *RateLimiter, cookies []*http.Cookie, ceremonyId string) (int, bool) {
+	submit := func(t *testing.T, m *RateLimiter, cookies []*http.Cookie, ceremonyID string) (int, bool) {
 		t.Helper()
-		form := url.Values{ceremony.IdField: {ceremonyId}, "otp": {"000000"}}
-		req := limiterRequest(http.MethodPost, "/auth/otp?"+url.Values{ceremony.QueryParameter: {heldId}}.Encode(),
+		form := url.Values{ceremony.IDField: {ceremonyID}, "otp": {"000000"}}
+		req := limiterRequest(http.MethodPost, "/auth/otp?"+url.Values{ceremony.QueryParameter: {heldID}}.Encode(),
 			strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		for _, c := range cookies {
@@ -61,10 +61,10 @@ func TestLimitOtp_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
 		}
 		rr := httptest.NewRecorder()
 		reached := false
-		m.LimitOtp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.LimitOTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reached = true
 			assert.Equal(t, "000000", r.PostFormValue("otp"), "the handler reads the code the limiter left in the form")
-			assert.Equal(t, ceremonyId, ceremony.RequestedId(r), "and the ceremony the form names")
+			assert.Equal(t, ceremonyID, ceremony.RequestedID(r), "and the ceremony the form names")
 			m.RecordCredentialFailure(r)
 			w.WriteHeader(http.StatusTeapot)
 		})).ServeHTTP(rr, req)
@@ -73,14 +73,14 @@ func TestLimitOtp_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
 
 	t.Run("a form naming a ceremony the browser does not hold spends no one's budget", func(t *testing.T) {
 		ceremonyStore, cookies := otpCeremonyBrowser(t, &ceremony.AuthContext{
-			CeremonyId: heldId, UserId: 7, AuthState: ceremony.AuthStateLevel2OTP,
+			CeremonyID: heldID, UserID: 7, AuthState: ceremony.AuthStateLevel2OTP,
 		})
 		m := newTestMiddleware(ceremonyStore, true)
 
 		// Well past the budget. The step answers each of these with the "no longer active" page
 		// before it checks any code, so there is no one whose code they guess.
 		for i := 0; i < budget*2; i++ {
-			if code, reached := submit(t, m, cookies, otherId); code != http.StatusTeapot || !reached {
+			if code, reached := submit(t, m, cookies, otherID); code != http.StatusTeapot || !reached {
 				t.Fatalf("submission %d naming another ceremony: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
@@ -88,12 +88,12 @@ func TestLimitOtp_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
 
 		// The held ceremony's user still has the whole budget.
 		for i := 0; i < budget; i++ {
-			if code, reached := submit(t, m, cookies, heldId); code != http.StatusTeapot || !reached {
+			if code, reached := submit(t, m, cookies, heldID); code != http.StatusTeapot || !reached {
 				t.Fatalf("failure %d naming the held ceremony: got code %d, handler reached %v; want %d and true",
 					i+1, code, reached, http.StatusTeapot)
 			}
 		}
-		if code, reached := submit(t, m, cookies, heldId); code != http.StatusTooManyRequests || reached {
+		if code, reached := submit(t, m, cookies, heldID); code != http.StatusTooManyRequests || reached {
 			t.Errorf("failure %d naming the held ceremony: got code %d, handler reached %v; want %d and false",
 				budget+1, code, reached, http.StatusTooManyRequests)
 		}
@@ -101,16 +101,16 @@ func TestLimitOtp_SpendsTheBudgetOfTheCeremonyTheFormNames(t *testing.T) {
 
 	t.Run("a form naming the held ceremony spends its user's budget", func(t *testing.T) {
 		ceremonyStore, cookies := otpCeremonyBrowser(t, &ceremony.AuthContext{
-			CeremonyId: heldId, UserId: 7, AuthState: ceremony.AuthStateLevel2OTP,
+			CeremonyID: heldID, UserID: 7, AuthState: ceremony.AuthStateLevel2OTP,
 		})
 		m, auditLog := newAuditedTestMiddleware(ceremonyStore, true)
 
 		for i := 0; i < budget; i++ {
-			if code, _ := submit(t, m, cookies, heldId); code != http.StatusTeapot {
+			if code, _ := submit(t, m, cookies, heldID); code != http.StatusTeapot {
 				t.Fatalf("failure %d: got code %d, want %d", i+1, code, http.StatusTeapot)
 			}
 		}
-		code, reached := submit(t, m, cookies, heldId)
+		code, reached := submit(t, m, cookies, heldID)
 		assert.Equal(t, http.StatusTooManyRequests, code)
 		assert.False(t, reached)
 

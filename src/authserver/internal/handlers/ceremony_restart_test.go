@@ -33,8 +33,8 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 	authenticatedAt := time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
 	otpConfigGeneration := int64(4)
 	return &ceremony.AuthContext{
-		CeremonyId:          testCeremonyId,
-		ClientId:            "test-client",
+		CeremonyID:          testCeremonyID,
+		ClientID:            "test-client",
 		RedirectURI:         "https://example.com/callback",
 		ResponseType:        "code",
 		CodeChallengeMethod: "S256",
@@ -43,22 +43,22 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 		State:               "some-state",
 		Nonce:               "some-nonce",
 		UserAgent:           "probe/1.0",
-		IpAddress:           "203.0.113.7",
+		IPAddress:           "203.0.113.7",
 		UILocales:           []string{"pt-BR"},
 		Prompt:              "login",
-		TargetAcrLevel:      record.ACRLevel1.String(),
+		TargetACRLevel:      record.ACRLevel1.String(),
 		RequestedScope:      "openid profile email",
 
 		AuthState:           state,
 		Scope:               "openid profile",
 		ConsentedScope:      "openid",
-		UserId:              1,
-		AcrLevel:            record.ACRLevel2Optional,
+		UserID:              1,
+		ACRLevel:            record.ACRLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		Level1AuthCompleted: false,
 		AuthStateGeneration: 7,
-		OtpConfigGeneration: &otpConfigGeneration,
+		OTPConfigGeneration: &otpConfigGeneration,
 	}
 }
 
@@ -66,8 +66,8 @@ func abandonedAttempt(state ceremony.AuthState) *ceremony.AuthContext {
 // RequestedScope, the state requires_level_1 and nothing else.
 func restartedRequest() ceremony.AuthContext {
 	return ceremony.AuthContext{
-		CeremonyId:          testCeremonyId,
-		ClientId:            "test-client",
+		CeremonyID:          testCeremonyID,
+		ClientID:            "test-client",
 		RedirectURI:         "https://example.com/callback",
 		ResponseType:        "code",
 		CodeChallengeMethod: "S256",
@@ -76,10 +76,10 @@ func restartedRequest() ceremony.AuthContext {
 		State:               "some-state",
 		Nonce:               "some-nonce",
 		UserAgent:           "probe/1.0",
-		IpAddress:           "203.0.113.7",
+		IPAddress:           "203.0.113.7",
 		UILocales:           []string{"pt-BR"},
 		Prompt:              "login",
-		TargetAcrLevel:      record.ACRLevel1.String(),
+		TargetACRLevel:      record.ACRLevel1.String(),
 		RequestedScope:      "openid profile email",
 
 		AuthState: ceremony.AuthStateRequiresLevel1,
@@ -106,7 +106,7 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	})
 
 	sessionIdentifier := "terminated-session"
-	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 	rr := httptest.NewRecorder()
@@ -130,7 +130,7 @@ func TestRestartRoute1_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+	assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 		"the restart goes on naming the ceremony it kept")
 	require.NotNil(t, saved)
 	assert.Equal(t, restartedRequest(), *saved)
@@ -177,7 +177,7 @@ func TestRestartRoute2_SavesTheRequestWithTheAttemptDiscarded(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+	assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 		"the restart goes on naming the ceremony it kept")
 	require.NotNil(t, saved)
 	assert.Equal(t, restartedRequest(), *saved)
@@ -208,20 +208,20 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	})
 
 	sessionIdentifier := "new-test-session"
-	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 	rr := httptest.NewRecorder()
 
 	pwdAuthTime := time.Now().UTC().Add(-time.Minute)
 	authContext := &ceremony.AuthContext{
-		CeremonyId:          testCeremonyId,
+		CeremonyID:          testCeremonyID,
 		AuthState:           ceremony.AuthStateAuthenticationCompleted,
-		ClientId:            "test-client",
+		ClientID:            "test-client",
 		RedirectURI:         "https://example.com/callback",
 		ResponseMode:        "query",
 		State:               "some-state",
-		UserId:              1,
+		UserID:              1,
 		AuthMethods:         "pwd",
 		AuthenticatedAt:     &pwdAuthTime,
 		PasswordVerifiedAt:  &pwdAuthTime,
@@ -245,7 +245,7 @@ func TestAuthCompleted_ALegacyRestartedContextIsDeniedAnEmptyScope(t *testing.T)
 	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1, Enabled: true}, nil)
 
 	const clearedContextCookie = "cleared-auth-context"
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 		args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 	}).Return(nil)
 

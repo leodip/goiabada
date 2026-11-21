@@ -26,27 +26,27 @@ type Database interface {
 	backchannel.SessionDatabase
 
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetRefreshTokensByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByCodeID(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByFirstRefreshTokenJTI(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error
+	GetRefreshTokensByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByCodeID(ctx context.Context, tx *sql.Tx, codeID int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByFirstRefreshTokenJTI(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
-	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) ([]*record.RefreshToken, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
-	GetUserSessionClientsByUserSessionIDs(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
-	GetUsableRefreshTokenClientIDsByUserID(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
-	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
-	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
-	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
-	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
-	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
-	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
-	RevokeCodesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
+	GetUserSessionClientsByUserSessionIDs(ctx context.Context, tx *sql.Tx, userSessionIDs []int64) ([]record.UserSessionClient, error)
+	GetUsableRefreshTokenClientIDsByUserID(ctx context.Context, tx *sql.Tx, userID int64, now time.Time) ([]int64, error)
+	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error)
+	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (bool, error)
+	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIDs []int64, generation int64) error
+	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string, reason string) (bool, error)
+	RevokeCodesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (int64, error)
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
-	RevokeUnusedCodesByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
+	RevokeUnusedCodesByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 }
@@ -64,7 +64,7 @@ type Database interface {
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
 func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
-	revokedJtis := make([]string, 0, len(tokens))
+	revokedJTIs := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
 			continue
@@ -73,9 +73,9 @@ func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx,
 		if err := db.UpdateRefreshToken(ctx, tx, rt); err != nil {
 			return nil, err
 		}
-		revokedJtis = append(revokedJtis, rt.RefreshTokenJTI)
+		revokedJTIs = append(revokedJTIs, rt.RefreshTokenJTI)
 	}
-	return revokedJtis, nil
+	return revokedJTIs, nil
 }
 
 // refreshTokenWriter is the one write RevokeRefreshTokens makes.
@@ -94,7 +94,7 @@ type refreshTokenWriter interface {
 func markRefreshTokensRevoked(ctx context.Context, db refreshTokenMarker, tx *sql.Tx,
 	tokens []*record.RefreshToken) ([]string, error) {
 
-	revokedJtis := make([]string, 0, len(tokens))
+	revokedJTIs := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
 			continue
@@ -105,21 +105,21 @@ func markRefreshTokensRevoked(ctx context.Context, db refreshTokenMarker, tx *sq
 		}
 		if marked {
 			rt.Revoked = true
-			revokedJtis = append(revokedJtis, rt.RefreshTokenJTI)
+			revokedJTIs = append(revokedJTIs, rt.RefreshTokenJTI)
 		}
 	}
-	return revokedJtis, nil
+	return revokedJTIs, nil
 }
 
 // refreshTokenMarker is the one write markRefreshTokensRevoked makes, so a port narrower than
 // Database, EndClientPartTx's, can sweep with it.
 type refreshTokenMarker interface {
-	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (bool, error)
 }
 
 // familyRecorder is the one write recordFamilies makes, for the reason refreshTokenWriter is apart.
 type familyRecorder interface {
-	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string, reason string) (bool, error)
 }
 
 // UserAuthStateResult reports what revoking a user's authentication state actually did. Its
@@ -130,9 +130,9 @@ type familyRecorder interface {
 type UserAuthStateResult struct {
 	// TerminatedSessionIdentifiers lists the sessions deleted, excluding any preserved one.
 	TerminatedSessionIdentifiers []string
-	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the tokens this call transitioned, per
 	// RevokeRefreshTokens. A token already revoked before the call is absent.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 	// PreservedSessionIdentifier is the session identifier the preservation exception was
 	// applied to, or "" when the sweep was unconditional. It identifies the GRANT ORIGIN that
 	// was exempted, and does not assert that a session row still existed: the background
@@ -196,11 +196,11 @@ func (n LogoutNotice) live(session *record.UserSession) bool {
 //
 // notice says which apps are told that their sessions ended, and how; the deliveries are collected
 // under each session's row before the sweep deletes it (see LogoutNotice).
-func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string,
+func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userID int64, exceptSid string,
 	notice LogoutNotice) (UserAuthStateResult, error) {
 	result := UserAuthStateResult{
 		TerminatedSessionIdentifiers: []string{},
-		RevokedRefreshTokenJtis:      []string{},
+		RevokedRefreshTokenJTIs:      []string{},
 	}
 
 	// A nil tx is rejected HERE rather than being left to the first data method that happens
@@ -221,7 +221,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	//
 	// An unknown user needs no separate lookup either: IncrementUserAuthStateGeneration
 	// requires exactly one affected row and errors otherwise.
-	newGeneration, err := db.IncrementUserAuthStateGeneration(ctx, tx, userId)
+	newGeneration, err := db.IncrementUserAuthStateGeneration(ctx, tx, userID)
 	if err != nil {
 		return result, err
 	}
@@ -243,7 +243,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// operation: the codes carry auth_state_generation, so advancing it is what invalidates
 	// them, and a sweep that ran first would leave a gap in which a code issued under the old
 	// generation is still valid.
-	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userID)
 	if err != nil {
 		return result, err
 	}
@@ -260,7 +260,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	if notice.Subject != "" {
 		var deliveries []backchannel.Delivery
 		if notice.UserWide {
-			deliveries, err = userWideDeliveries(ctx, db, tx, userId, sessions, exceptSid, notice)
+			deliveries, err = userWideDeliveries(ctx, db, tx, userID, sessions, exceptSid, notice)
 		} else {
 			deliveries, err = endedSessionDeliveries(ctx, db, tx, sessions, exceptSid, notice)
 		}
@@ -303,7 +303,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// never worse, and on some engines better, but it does NOT close the race: a child
 	// committed outside this transaction's view keeps the old generation and is rejected on
 	// next use. Fail-closed, accepted as a residual in decision 16, tracked in #131.
-	tokens, err := db.GetRefreshTokensByUserID(ctx, tx, userId)
+	tokens, err := db.GetRefreshTokensByUserID(ctx, tx, userID)
 	if err != nil {
 		return result, err
 	}
@@ -315,8 +315,8 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// codes.session_identifier, so it does return the preserved session's offline tokens.
 	// Deriving the set from the user-scoped rows instead revokes exactly those, which is the
 	// bug decision 4 exists to prevent.
-	preservedIds := make(map[int64]bool)
-	promoteIds := []int64{}
+	preservedIDs := make(map[int64]bool)
+	promoteIDs := []int64{}
 	if exceptSid != "" {
 		result.PreservedSessionIdentifier = exceptSid
 		preservedTokens, getRefreshTokensErr := db.GetRefreshTokensBySessionIdentifier(ctx, tx, exceptSid)
@@ -324,32 +324,32 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 			return result, getRefreshTokensErr
 		}
 		for _, rt := range preservedTokens {
-			preservedIds[rt.ID] = true
+			preservedIDs[rt.ID] = true
 			// Promote from THIS query's rows, not from the intersection with the
 			// user-scoped ones. A child committed between the two queries appears only
 			// here, and promoting it is the whole point of querying in this order.
-			promoteIds = append(promoteIds, rt.ID)
+			promoteIDs = append(promoteIDs, rt.ID)
 		}
 	}
 
 	toRevoke := make([]*record.RefreshToken, 0, len(tokens))
 	for _, rt := range tokens {
-		if preservedIds[rt.ID] {
+		if preservedIDs[rt.ID] {
 			continue
 		}
 		toRevoke = append(toRevoke, rt)
 	}
 
-	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, toRevoke)
+	revokedJTIs, err := RevokeRefreshTokens(ctx, db, tx, toRevoke)
 	if err != nil {
 		return result, err
 	}
-	result.RevokedRefreshTokenJtis = revokedJtis
+	result.RevokedRefreshTokenJTIs = revokedJTIs
 
 	// Promotion is what keeps the preserved session usable: its tokens carry the old
 	// generation, which the validator now rejects. An already-revoked token in this set stays
 	// revoked, because PromoteRefreshTokenGenerations only touches unrevoked rows.
-	if err := db.PromoteRefreshTokenGenerations(ctx, tx, promoteIds, newGeneration); err != nil {
+	if err := db.PromoteRefreshTokenGenerations(ctx, tx, promoteIDs, newGeneration); err != nil {
 		return result, err
 	}
 
@@ -363,7 +363,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// list. The field names the exempted grant origin, not a surviving session row.
 	if exceptSid != "" && !preservedSessionFound {
 		slog.WarnContext(ctx, "revocation exempted a grant origin whose session row no longer exists",
-			"user_id", userId, "except_session_identifier", exceptSid)
+			"user_id", userID, "except_session_identifier", exceptSid)
 	}
 
 	return result, nil
@@ -439,7 +439,7 @@ const (
 // side and a gap on the forensic side. Closing that gap needs a transactional outbox or a
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
-func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, exceptSid string,
+func RevokeUserAuthStateTx(ctx context.Context, db Database, userID int64, exceptSid string,
 	notice LogoutNotice, write func(tx *sql.Tx) error) (UserAuthStateResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
@@ -453,7 +453,7 @@ func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, excep
 		}
 
 		var err error
-		result, err = RevokeUserAuthState(ctx, db, tx, userId, exceptSid, notice)
+		result, err = RevokeUserAuthState(ctx, db, tx, userID, exceptSid, notice)
 		return err
 	})
 	if err != nil {
@@ -473,23 +473,23 @@ func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, excep
 // the user, whose cascade takes the sessions and grants it reads: every deletion of a user, the
 // administrator's and the user's own, calls it inside the deletion's transaction, holding the user's
 // row, before the deletion. A revocation collects the same through RevokeUserAuthState's notice.
-func UserWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, subject string,
+func UserWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userID int64, subject string,
 	live SessionLive) ([]backchannel.Delivery, error) {
 
 	if subject == "" {
 		return nil, nil
 	}
-	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userID)
 	if err != nil {
 		return nil, err
 	}
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
-	return userWideDeliveries(ctx, db, tx, userId, sessions, "", LogoutNotice{Subject: subject, UserWide: true, Live: live})
+	return userWideDeliveries(ctx, db, tx, userID, sessions, "", LogoutNotice{Subject: subject, UserWide: true, Live: live})
 }
 
 // userWideDeliveries is UserWideDeliveries over the user's sessions, already read and in id order,
 // leaving out exceptSid's.
-func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, sessions []record.UserSession,
+func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userID int64, sessions []record.UserSession,
 	exceptSid string, notice LogoutNotice) ([]backchannel.Delivery, error) {
 
 	var deliveries []backchannel.Delivery
@@ -526,14 +526,14 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 
 	// The apps holding a grant that still works, read before the sweep revokes it. A grant alone tells
 	// an app requiring sid nothing, since no session of its ended.
-	holderIds, err := db.GetUsableRefreshTokenClientIDsByUserID(ctx, tx, userId, time.Now().UTC())
+	holderIDs, err := db.GetUsableRefreshTokenClientIDsByUserID(ctx, tx, userID, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
 	var unread []int64
-	for _, clientId := range holderIds {
-		if _, read := subOnly[clientId]; !read {
-			unread = append(unread, clientId)
+	for _, clientID := range holderIDs {
+		if _, read := subOnly[clientID]; !read {
+			unread = append(unread, clientID)
 		}
 	}
 	if len(unread) > 0 {
@@ -548,20 +548,20 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 		}
 	}
 
-	clientIds := make([]int64, 0, len(subOnly))
-	for clientId := range subOnly {
-		clientIds = append(clientIds, clientId)
+	clientIDs := make([]int64, 0, len(subOnly))
+	for clientID := range subOnly {
+		clientIDs = append(clientIDs, clientID)
 	}
-	sort.Slice(clientIds, func(i, j int) bool { return clientIds[i] < clientIds[j] })
-	for _, clientId := range clientIds {
-		client := subOnly[clientId]
+	sort.Slice(clientIDs, func(i, j int) bool { return clientIDs[i] < clientIDs[j] })
+	for _, clientID := range clientIDs {
+		client := subOnly[clientID]
 		deliveries = append(deliveries, backchannel.Delivery{
-			ClientId:         client.ID,
+			ClientID:         client.ID,
 			ClientIdentifier: client.ClientIdentifier,
 			URI:              client.BackchannelLogoutURI,
 			IsPublic:         client.IsPublic,
 			CreatedViaDCR:    client.CreatedViaDCR,
-			UserId:           userId,
+			UserID:           userID,
 			Subject:          notice.Subject,
 		})
 	}
@@ -619,10 +619,10 @@ type TerminationResult struct {
 	// makes the audit event answer the only question an auditor asks of it, whether this action
 	// revoked anything.
 	RevokedCodeCount int64
-	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the tokens this call transitioned, per
 	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 	// LogoutDeliveries is a logout token for each app on the session with a back-channel logout URI,
 	// collected under the session's row before its deletion, when the caller said the session was
 	// still live; nil otherwise. The caller hands it to the back-channel sender after the commit,
@@ -775,14 +775,14 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 			return err
 		}
 
-		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+		revokedJTIs, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 		if err != nil {
 			return err
 		}
 
 		result = TerminationResult{
 			RevokedCodeCount:        revokedCodeCount,
-			RevokedRefreshTokenJtis: revokedJtis,
+			RevokedRefreshTokenJTIs: revokedJTIs,
 			LogoutDeliveries:        deliveries,
 		}
 		return nil
@@ -800,14 +800,14 @@ type ClientPartDatabase interface {
 	refreshTokenMarker
 
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
-	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error
+	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientID int64) error
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionID int64) ([]record.UserSessionClient, error)
 	GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
-		clientId int64) ([]*record.RefreshToken, error)
+		clientID int64) ([]*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	RevokeUnusedCodesBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
-		clientId int64) (int64, error)
+		clientID int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -824,10 +824,10 @@ type ClientPartEnd struct {
 	// RevokedCodeCount is how many of the app's codes from the session not yet redeemed this call
 	// TRANSITIONED from live to revoked (#135 decision 9).
 	RevokedCodeCount int64
-	// RevokedRefreshTokenJtis lists the app's session-bound refresh tokens from the session this
+	// RevokedRefreshTokenJTIs lists the app's session-bound refresh tokens from the session this
 	// call transitioned, per markRefreshTokensRevoked. Non-nil when the app's part ended, so a JSON audit
 	// payload carries [] rather than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 }
 
 // EndClientPartTx ends one app's part of a session, the teardown a confirmed id_token_hint earns at
@@ -874,9 +874,9 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 	var ended *record.UserSessionClient
 	sessionDeleted := false
 	var revokedCodeCount int64
-	var revokedJtis []string
+	var revokedJTIs []string
 	err = data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		ended, sessionDeleted, revokedCodeCount, revokedJtis = nil, false, 0, nil
+		ended, sessionDeleted, revokedCodeCount, revokedJTIs = nil, false, 0, nil
 		held, acquireErr := db.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
 		if acquireErr != nil {
 			return acquireErr
@@ -904,7 +904,7 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 			found := sessionClients[i]
 
 			var sweepErr error
-			revokedCodeCount, revokedJtis, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.ID)
+			revokedCodeCount, revokedJTIs, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.ID)
 			if sweepErr != nil {
 				return sweepErr
 			}
@@ -917,7 +917,7 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 		return ClientPartEnd{}, err
 	}
 	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted,
-		RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJtis: revokedJtis}, nil
+		RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJTIs: revokedJTIs}, nil
 }
 
 // revokeSignOutGrants is EndClientPartTx's sweep of the client clientId's session-bound grants from
@@ -925,13 +925,13 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 // every other sweep, and each family is recorded before its tokens are flipped (#259). It answers
 // the codes it marked and the tokens it moved from live to revoked, never a nil list.
 func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx, sessionIdentifier string,
-	clientId int64) (int64, []string, error) {
+	clientID int64) (int64, []string, error) {
 
-	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientId)
+	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientID)
 	if err != nil {
 		return 0, nil, err
 	}
-	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientId)
+	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -939,21 +939,21 @@ func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx,
 	if err != nil {
 		return 0, nil, err
 	}
-	revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
+	revokedJTIs, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
 	if err != nil {
 		return 0, nil, err
 	}
-	return revokedCodeCount, revokedJtis, nil
+	return revokedCodeCount, revokedJTIs, nil
 }
 
 // AuthCodeReuseResult reports what the response to a reused authorization code actually did. It
 // carries what the auth_code_reuse_detected payload needs beyond the code the caller already holds.
 type AuthCodeReuseResult struct {
-	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the tokens this call transitioned, per
 	// RevokeRefreshTokens. A token already revoked before the call is absent, which is what tells a
 	// losing racer of a concurrent redemption apart from a real replay (#77). Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 	// LogoutDeliveries is a logout token for each app on the session the response ended, with a
 	// back-channel logout URI, when the caller's live said the session was still valid; nil
 	// otherwise. The caller hands it to the back-channel sender after the commit, beside the audit
@@ -1050,7 +1050,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 		return AuthCodeReuseResult{}, err
 	}
 
-	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, refreshTokens)
+	revokedJTIs, err := RevokeRefreshTokens(ctx, db, tx, refreshTokens)
 	if err != nil {
 		return AuthCodeReuseResult{}, err
 	}
@@ -1058,7 +1058,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 	// Tear down the session only when we actually revoked tokens issued from the replayed code.
 	// If there were none to revoke, there is nothing to contain, and deleting the session would
 	// disrupt an unrelated/in-flight session. That is what makes concurrent redemption safe: a
-	// losing racer finds no committed tokens yet (revokedJtis is empty), so it leaves the winner's
+	// losing racer finds no committed tokens yet (revokedJTIs is empty), so it leaves the winner's
 	// live session row in place instead of tearing it down out from under the winner's in-progress
 	// mint, which read that session for its refresh-token lifetime. (#77)
 	//
@@ -1073,7 +1073,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 	// holds. Paying it is what buys the absence of the deadlock the acquisition's own comment
 	// describes. (#139)
 	var deliveries []backchannel.Delivery
-	if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
+	if code.SessionIdentifier != "" && len(revokedJTIs) > 0 {
 		session, err := db.GetUserSessionBySessionIdentifier(ctx, tx, code.SessionIdentifier)
 		if err != nil {
 			return AuthCodeReuseResult{}, err
@@ -1094,7 +1094,7 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 		}
 	}
 
-	return AuthCodeReuseResult{RevokedRefreshTokenJtis: revokedJtis, LogoutDeliveries: deliveries}, nil
+	return AuthCodeReuseResult{RevokedRefreshTokenJTIs: revokedJTIs, LogoutDeliveries: deliveries}, nil
 }
 
 // RevokeOnAuthCodeReuseTx runs RevokeOnAuthCodeReuse in one transaction it opens and commits, so
@@ -1223,14 +1223,14 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // EventTerminatedUserSession beside EventDeletedUserSession, one a lifecycle fact and one the
 // security action. On any error the result is the zero value, so a caller cannot audit a
 // rolled-back revocation.
-func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId int64, live SessionLive,
+func DisconnectClientTx(ctx context.Context, db Database, userID int64, clientID int64, live SessionLive,
 	deleteConsent func(tx *sql.Tx) (bool, error)) (DisconnectResult, error) {
 
 	var result DisconnectResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		// The logout tokens, read before any write, so these reads wait for nothing while this
 		// transaction holds a row another transaction wants (see disconnectDeliveries).
-		deliveries, err := disconnectDeliveries(ctx, db, tx, userId, clientId, live)
+		deliveries, err := disconnectDeliveries(ctx, db, tx, userID, clientID, live)
 		if err != nil {
 			return err
 		}
@@ -1244,12 +1244,12 @@ func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId
 			consentDeleted = deleted
 		}
 
-		revokedCodeCount, err := db.RevokeUnusedCodesByUserIDAndClientID(ctx, tx, userId, clientId)
+		revokedCodeCount, err := db.RevokeUnusedCodesByUserIDAndClientID(ctx, tx, userID, clientID)
 		if err != nil {
 			return err
 		}
 
-		tokens, err := db.GetRefreshTokensByUserIDAndClientID(ctx, tx, userId, clientId)
+		tokens, err := db.GetRefreshTokensByUserIDAndClientID(ctx, tx, userID, clientID)
 		if err != nil {
 			return err
 		}
@@ -1259,14 +1259,14 @@ func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId
 			return err
 		}
 
-		revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
+		revokedJTIs, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
 		if err != nil {
 			return err
 		}
 		result = DisconnectResult{
 			ConsentDeleted:          consentDeleted,
 			RevokedCodeCount:        revokedCodeCount,
-			RevokedRefreshTokenJtis: revokedJtis,
+			RevokedRefreshTokenJTIs: revokedJTIs,
 			RecordedFamilyCount:     recordedFamilyCount,
 		}
 		// A call that changed nothing had nothing to end, and tells nobody (#135 decision 2).
@@ -1292,11 +1292,11 @@ type DisconnectResult struct {
 	ConsentDeleted bool
 	// RevokedCodeCount is how many unused codes this call TRANSITIONED from live to revoked.
 	RevokedCodeCount int64
-	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the tokens this call transitioned, per
 	// markRefreshTokensRevoked. A token already revoked before the call, or revoked by an
 	// overlapping call that committed first, is absent. Non-nil on the success path, so a JSON
 	// audit payload carries [] rather than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 	// RecordedFamilyCount is how many rotation families this call newly recorded revoked. A
 	// family whose members were all revoked already and that had no record yet counts: the record
 	// is what refuses a child that a rotation in flight inserts after the commit (#259).
@@ -1324,10 +1324,10 @@ type DisconnectResult struct {
 // termination while the termination waits for the refresh tokens the sweep holds. A sign-in that
 // adds the client to a session meanwhile is a grant the sweep may not reach either, the code
 // exchange already under way of decision 11.
-func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, clientId int64,
+func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userID int64, clientID int64,
 	live SessionLive) ([]backchannel.Delivery, error) {
 
-	clients, err := db.GetClientsByIDs(ctx, tx, []int64{clientId})
+	clients, err := db.GetClientsByIDs(ctx, tx, []int64{clientID})
 	if err != nil {
 		return nil, err
 	}
@@ -1337,19 +1337,19 @@ func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId i
 	client := &clients[0]
 
 	// The user's sub, which every logout token names. A user being deleted tells their apps itself.
-	user, err := db.GetUserByID(ctx, tx, userId)
+	user, err := db.GetUserByID(ctx, tx, userID)
 	if err != nil || user == nil {
 		return nil, err
 	}
 
 	if !client.BackchannelLogoutSessionRequired {
 		return []backchannel.Delivery{{
-			ClientId:         client.ID,
+			ClientID:         client.ID,
 			ClientIdentifier: client.ClientIdentifier,
 			URI:              client.BackchannelLogoutURI,
 			IsPublic:         client.IsPublic,
 			CreatedViaDCR:    client.CreatedViaDCR,
-			UserId:           userId,
+			UserID:           userID,
 			Subject:          user.Subject,
 		}}, nil
 	}
@@ -1357,27 +1357,27 @@ func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId i
 	if live == nil {
 		return nil, nil
 	}
-	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userID)
 	if err != nil {
 		return nil, err
 	}
 	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
-	liveSessionIds := make([]int64, 0, len(sessions))
+	liveSessionIDs := make([]int64, 0, len(sessions))
 	for i := range sessions {
 		if live(&sessions[i]) {
-			liveSessionIds = append(liveSessionIds, sessions[i].ID)
+			liveSessionIDs = append(liveSessionIDs, sessions[i].ID)
 		}
 	}
-	if len(liveSessionIds) == 0 {
+	if len(liveSessionIDs) == 0 {
 		return nil, nil
 	}
-	sessionClients, err := db.GetUserSessionClientsByUserSessionIDs(ctx, tx, liveSessionIds)
+	sessionClients, err := db.GetUserSessionClientsByUserSessionIDs(ctx, tx, liveSessionIDs)
 	if err != nil {
 		return nil, err
 	}
 	onSession := map[int64]bool{}
 	for _, sessionClient := range sessionClients {
-		if sessionClient.ClientID == clientId {
+		if sessionClient.ClientID == clientID {
 			onSession[sessionClient.UserSessionID] = true
 		}
 	}
@@ -1399,7 +1399,7 @@ func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId i
 // marked a code, revoked a refresh token or recorded a family. A call that changed nothing had
 // nothing to end, and its caller answers 404 and writes no audit entry (#135 decision 2).
 func (r DisconnectResult) Changed() bool {
-	return r.ConsentDeleted || r.RevokedCodeCount > 0 || len(r.RevokedRefreshTokenJtis) > 0 ||
+	return r.ConsentDeleted || r.RevokedCodeCount > 0 || len(r.RevokedRefreshTokenJTIs) > 0 ||
 		r.RecordedFamilyCount > 0
 }
 
@@ -1416,10 +1416,10 @@ type ClientGrantResult struct {
 	// audit event answer the only question an auditor asks of it, whether this action revoked
 	// anything.
 	RevokedCodeCount int64
-	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the tokens this call transitioned, per
 	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 }
 
 // RevokeClientGrants cuts off every grant one client holds: it writes the durable fact that the
@@ -1468,19 +1468,19 @@ type ClientGrantResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64, reason string) (ClientGrantResult, error) {
-	result := ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
+func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientID int64, reason string) (ClientGrantResult, error) {
+	result := ClientGrantResult{RevokedRefreshTokenJTIs: []string{}}
 
 	if tx == nil {
 		return result, errs.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable")
 	}
 
-	revokedCodeCount, err := db.RevokeCodesByClientID(ctx, tx, clientId)
+	revokedCodeCount, err := db.RevokeCodesByClientID(ctx, tx, clientID)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
 
-	tokens, err := db.GetRefreshTokensByClientID(ctx, tx, clientId)
+	tokens, err := db.GetRefreshTokensByClientID(ctx, tx, clientID)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
@@ -1497,14 +1497,14 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 		return ClientGrantResult{}, err
 	}
 
-	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+	revokedJTIs, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
 
 	return ClientGrantResult{
 		RevokedCodeCount:        revokedCodeCount,
-		RevokedRefreshTokenJtis: revokedJtis,
+		RevokedRefreshTokenJTIs: revokedJTIs,
 	}, nil
 }
 
@@ -1581,7 +1581,7 @@ func recordNewFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, token
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
-func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64, reason string,
+func RevokeClientGrantsTx(ctx context.Context, db Database, clientID int64, reason string,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
@@ -1599,9 +1599,9 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64, reas
 			return err
 		}
 
-		result = ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
+		result = ClientGrantResult{RevokedRefreshTokenJTIs: []string{}}
 		if revoke {
-			result, err = RevokeClientGrants(ctx, db, tx, clientId, reason)
+			result, err = RevokeClientGrants(ctx, db, tx, clientID, reason)
 			if err != nil {
 				return err
 			}
@@ -1616,11 +1616,11 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64, reas
 
 // GrantRevocationResult reports what a client's revocation of one grant actually did (#676).
 type GrantRevocationResult struct {
-	// RevokedRefreshTokenJtis lists only the members this call transitioned, per
+	// RevokedRefreshTokenJTIs lists only the members this call transitioned, per
 	// RevokeRefreshTokens. A member already revoked before the call, by a rotation or an earlier
 	// revocation, is absent. Non-nil on the success path, so a JSON audit payload carries [] rather
 	// than null.
-	RevokedRefreshTokenJtis []string
+	RevokedRefreshTokenJTIs []string
 }
 
 // RevokeGrantTx ends one grant at its client's request, the revocation endpoint's operation (RFC
@@ -1653,29 +1653,29 @@ type GrantRevocationResult struct {
 // result is the zero value, so a caller cannot audit a rolled-back revocation, and the commit
 // contract RevokeUserAuthStateTx documents holds: a reported commit failure's outcome is
 // indeterminate, and the caller answers it as a fault, never as a revocation.
-func RevokeGrantTx(ctx context.Context, db Database, grantId string) (GrantRevocationResult, error) {
+func RevokeGrantTx(ctx context.Context, db Database, grantID string) (GrantRevocationResult, error) {
 	// Refused before a transaction is opened, so a caller bug is not reported as a database failure
 	// after a round trip.
-	if grantId == "" {
+	if grantID == "" {
 		return GrantRevocationResult{}, errs.New("revoking a grant requires its family identifier")
 	}
 
 	var result GrantRevocationResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, grantId, ReasonClientRevoked); err != nil {
+		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, grantID, ReasonClientRevoked); err != nil {
 			return err
 		}
 
-		members, err := db.GetRefreshTokensByFirstRefreshTokenJTI(ctx, tx, grantId)
+		members, err := db.GetRefreshTokensByFirstRefreshTokenJTI(ctx, tx, grantID)
 		if err != nil {
 			return err
 		}
 
-		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, members)
+		revokedJTIs, err := RevokeRefreshTokens(ctx, db, tx, members)
 		if err != nil {
 			return err
 		}
-		result = GrantRevocationResult{RevokedRefreshTokenJtis: revokedJtis}
+		result = GrantRevocationResult{RevokedRefreshTokenJTIs: revokedJTIs}
 		return nil
 	})
 	if err != nil {
@@ -1705,11 +1705,11 @@ type AuditLogger interface {
 // ctx is the request's, taken as a parameter rather than reached for because this helper has
 // neither an *http.Request nor a context of its own and the event it raises has to be correlated
 // to the request that caused the revocation (#328). All of its callers are handlers.
-func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientId int64, reason string,
+func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientID int64, reason string,
 	loggedInUser string, result ClientGrantResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedClientGrants, map[string]interface{}{
-		"client_id":      clientId,
+		"client_id":      clientID,
 		"reason":         reason,
 		"logged_in_user": loggedInUser,
 		// What this call TRANSITIONED, not what the client had. A second flip reports 0 and an
@@ -1717,7 +1717,7 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 		// event.
 		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: the success path initialises it.
-		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJTIs,
 	})
 }
 
@@ -1732,18 +1732,18 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 // fields stay as they were.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogDisconnectedClient(ctx context.Context, auditLogger AuditLogger, userId int64, clientId int64,
+func LogDisconnectedClient(ctx context.Context, auditLogger AuditLogger, userID int64, clientID int64,
 	loggedInUser string, result DisconnectResult) {
 
 	auditLogger.Log(ctx, audit.EventDisconnectedClient, map[string]interface{}{
-		"user_id":        userId,
-		"client_id":      clientId,
+		"user_id":        userID,
+		"client_id":      clientID,
 		"logged_in_user": loggedInUser,
 		// The unused codes this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
 		"revoked_code_count": result.RevokedCodeCount,
 		// What this call TRANSITIONED, not what the user held. Always a list rather than null:
 		// the success path fills it from RevokeRefreshTokens.
-		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJTIs,
 	})
 }
 
@@ -1766,7 +1766,7 @@ func LogRevokedSignOutGrants(ctx context.Context, auditLogger AuditLogger, end C
 		// What this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
 		"revoked_code_count": end.RevokedCodeCount,
 		// Always a list rather than null: EndClientPartTx fills it from RevokeRefreshTokens.
-		"revoked_refresh_token_jtis": end.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": end.RevokedRefreshTokenJTIs,
 	})
 }
 
@@ -1777,10 +1777,10 @@ func LogRevokedSignOutGrants(ctx context.Context, auditLogger AuditLogger, end C
 // Call this only after RevokeUserAuthStateTx returned without error.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
+func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userID int64, reason string,
 	loggedInUser string, result UserAuthStateResult) {
 
-	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, revokedUserAuthStateDetails(userId, reason,
+	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, revokedUserAuthStateDetails(userID, reason,
 		loggedInUser, result))
 }
 
@@ -1788,27 +1788,27 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 // `recover` subcommand: logged_in_user is empty, as at the sign-in sites, and the command is
 // named under `command`, the key the recovery's other entries name it under, so one recovery
 // names its actor under one key (#498).
-func LogRevokedUserAuthStateByCommand(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
+func LogRevokedUserAuthStateByCommand(ctx context.Context, auditLogger AuditLogger, userID int64, reason string,
 	command string, result UserAuthStateResult) {
 
-	details := revokedUserAuthStateDetails(userId, reason, "", result)
+	details := revokedUserAuthStateDetails(userID, reason, "", result)
 	details["command"] = command
 	auditLogger.Log(ctx, audit.EventRevokedUserAuthState, details)
 }
 
 // revokedUserAuthStateDetails is EventRevokedUserAuthState's payload, the one shape both of its
 // writers log.
-func revokedUserAuthStateDetails(userId int64, reason string, loggedInUser string,
+func revokedUserAuthStateDetails(userID int64, reason string, loggedInUser string,
 	result UserAuthStateResult) map[string]interface{} {
 
 	return map[string]interface{}{
-		"user_id":        userId,
+		"user_id":        userID,
 		"reason":         reason,
 		"logged_in_user": loggedInUser,
 		// Always present, and always a list rather than null: UserAuthStateResult initialises
 		// both slices, so an action that swept nothing logs [] (finding 8).
 		"terminated_session_identifiers": result.TerminatedSessionIdentifiers,
-		"revoked_refresh_token_jtis":     result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis":     result.RevokedRefreshTokenJTIs,
 		// "" on the three sites that preserve nothing, never absent.
 		"preserved_session_identifier": result.PreservedSessionIdentifier,
 		"old_generation":               result.OldGeneration,
@@ -1831,7 +1831,7 @@ func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record
 		"code_id":            code.ID,
 		"session_identifier": code.SessionIdentifier,
 		// Always a list rather than null: AuthCodeReuseResult initialises it on the success path.
-		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJTIs,
 	})
 }
 
@@ -1862,7 +1862,7 @@ func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, user
 		// auditor asks of this event.
 		"revoked_code_count": result.RevokedCodeCount,
 		// Always a list rather than null: TerminationResult initialises it on the success path.
-		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJTIs,
 	})
 }
 
@@ -1883,33 +1883,33 @@ const (
 // Call this only after RevokeGrantTx returned without error.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogRevokedGrant(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, grantId string,
+func LogRevokedGrant(ctx context.Context, auditLogger AuditLogger, clientID int64, userID int64, grantID string,
 	tokenType string, result GrantRevocationResult) {
 
 	auditLogger.Log(ctx, audit.EventRevokedGrant, map[string]interface{}{
-		"client_id":  clientId,
-		"user_id":    userId,
-		"grant_id":   grantId,
+		"client_id":  clientID,
+		"user_id":    userID,
+		"grant_id":   grantID,
 		"token_type": tokenType,
 		// What this call TRANSITIONED, not what the family had. Always a list rather than null:
 		// the success path fills it from RevokeRefreshTokens.
-		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJTIs,
 	})
 }
 
 // LogTokenRevocationRefused emits EventTokenRevocationRefused, the record of a client that sent the
 // revocation endpoint another client's live token and was refused (#676 decisions 8 and 11).
 // Nothing is revoked, so there is no operation to wait for. clientId is the client that called,
-// which client authentication proved; tokenClientId the client the token was issued to, which the
+// which client authentication proved; tokenClientID the client the token was issued to, which the
 // token's signature or row proves; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogTokenRevocationRefused(ctx context.Context, auditLogger AuditLogger, clientId int64, tokenClientId int64,
+func LogTokenRevocationRefused(ctx context.Context, auditLogger AuditLogger, clientID int64, tokenClientID int64,
 	tokenType string) {
 
 	auditLogger.Log(ctx, audit.EventTokenRevocationRefused, map[string]interface{}{
-		"client_id":       clientId,
-		"token_client_id": tokenClientId,
+		"client_id":       clientID,
+		"token_client_id": tokenClientID,
 		"token_type":      tokenType,
 	})
 }
@@ -1962,13 +1962,13 @@ func RevokeAccessToken(ctx context.Context, db AccessTokenDatabase, jti string, 
 // Call this only after RevokeAccessToken returned true.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogRevokedAccessToken(ctx context.Context, auditLogger AuditLogger, clientId int64, userId int64, jti string) {
+func LogRevokedAccessToken(ctx context.Context, auditLogger AuditLogger, clientID int64, userID int64, jti string) {
 	details := map[string]interface{}{
-		"client_id": clientId,
+		"client_id": clientID,
 		"jti":       jti,
 	}
-	if userId != 0 {
-		details["user_id"] = userId
+	if userID != 0 {
+		details["user_id"] = userID
 	}
 	auditLogger.Log(ctx, audit.EventRevokedAccessToken, details)
 }

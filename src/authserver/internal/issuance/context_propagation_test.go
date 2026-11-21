@@ -38,13 +38,13 @@ func issuanceCallerContext() context.Context {
 
 func propagationCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		Scope:             "openid profile",
 		RedirectURI:       "https://example.com/callback",
 		ResponseMode:      "query",
-		IpAddress:         "127.0.0.1",
-		AcrLevel:          record.ACRLevel1,
+		IPAddress:         "127.0.0.1",
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session-propagation",

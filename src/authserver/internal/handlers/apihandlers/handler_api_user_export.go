@@ -44,22 +44,22 @@ type userExportDatabase interface {
 	groupMemberCounter
 	legaldocuments.AcceptedDatabase
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserAttribute, error)
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
-	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
+	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupAttribute, error)
 	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
-	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserConsent, error)
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
-	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
-	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
-	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
-	GetCodeByID(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
-	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
-	GetAuditLogsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
+	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]*record.RefreshToken, error)
+	GetCodeByID(ctx context.Context, tx *sql.Tx, codeID int64) (*record.Code, error)
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
+	GetAuditLogsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.AuditLog, error)
 }
 
 // HandleUserExportGet - GET /api/v1/admin/users/{id}/export
@@ -127,7 +127,7 @@ func buildUserExport(ctx context.Context, database userExportDatabase, user *rec
 		return api.UserExportResponse{}, errs.Wrap(err, "unable to read the user's attributes for the export")
 	}
 
-	resources := permissionResources{database: database, byId: map[int64]*record.Resource{}}
+	resources := permissionResources{database: database, byID: map[int64]*record.Resource{}}
 	groups, err := readUserExportGroups(ctx, database, user, &resources)
 	if err != nil {
 		return api.UserExportResponse{}, err
@@ -248,15 +248,15 @@ func readUserExportGroups(ctx context.Context, database userExportDatabase, user
 // revoked rows included, each with its code, its client and whether its family is recorded as
 // revoked (#781 decision 4). A grant rotated every few minutes keeps thousands of rows of one code
 // and one family, so each code and family is read once, and the clients in one read.
-func readUserExportRefreshTokens(ctx context.Context, database userExportDatabase, userId int64) ([]userexport.RefreshToken, error) {
-	rows, err := database.GetRefreshTokensByUserID(ctx, nil, userId)
+func readUserExportRefreshTokens(ctx context.Context, database userExportDatabase, userID int64) ([]userexport.RefreshToken, error) {
+	rows, err := database.GetRefreshTokensByUserID(ctx, nil, userID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the user's refresh tokens for the export")
 	}
 
 	codes := map[int64]*record.Code{}
 	families := map[string]bool{}
-	clientIds := []int64{}
+	clientIDs := []int64{}
 	tokens := make([]userexport.RefreshToken, 0, len(rows))
 	for _, row := range rows {
 		token := userexport.RefreshToken{Row: row}
@@ -271,8 +271,8 @@ func readUserExportRefreshTokens(ctx context.Context, database userExportDatabas
 			}
 			token.Code = code
 		}
-		if clientId, ok := refreshTokenClientId(token); ok && !slices.Contains(clientIds, clientId) {
-			clientIds = append(clientIds, clientId)
+		if clientID, ok := refreshTokenClientID(token); ok && !slices.Contains(clientIDs, clientID) {
+			clientIDs = append(clientIDs, clientID)
 		}
 
 		// Every row records the first jti of its family; one that does not belongs to no family
@@ -291,25 +291,25 @@ func readUserExportRefreshTokens(ctx context.Context, database userExportDatabas
 		tokens = append(tokens, token)
 	}
 
-	clients, err := database.GetClientsByIDs(ctx, nil, clientIds)
+	clients, err := database.GetClientsByIDs(ctx, nil, clientIDs)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the clients of the user's refresh tokens for the export")
 	}
-	byId := make(map[int64]*record.Client, len(clients))
+	byID := make(map[int64]*record.Client, len(clients))
 	for i := range clients {
-		byId[clients[i].ID] = &clients[i]
+		byID[clients[i].ID] = &clients[i]
 	}
 	for i := range tokens {
-		if clientId, ok := refreshTokenClientId(tokens[i]); ok {
-			tokens[i].Client = byId[clientId]
+		if clientID, ok := refreshTokenClientID(tokens[i]); ok {
+			tokens[i].Client = byID[clientID]
 		}
 	}
 	return tokens, nil
 }
 
-// refreshTokenClientId is the token's client: its code's for a code-flow token, its row's own for a
+// refreshTokenClientID is the token's client: its code's for a code-flow token, its row's own for a
 // password-grant one. ok is false when there is none to read, as for a code that is gone.
-func refreshTokenClientId(token userexport.RefreshToken) (clientId int64, ok bool) {
+func refreshTokenClientID(token userexport.RefreshToken) (clientID int64, ok bool) {
 	if token.Row.CodeID.Valid {
 		if token.Code == nil {
 			return 0, false
@@ -323,20 +323,20 @@ func refreshTokenClientId(token userexport.RefreshToken) (clientId int64, ok boo
 // do, reading each resource once however many permissions name it.
 type permissionResources struct {
 	database userExportDatabase
-	byId     map[int64]*record.Resource
+	byID     map[int64]*record.Resource
 }
 
 func (p *permissionResources) load(ctx context.Context, permissions []record.Permission) error {
 	for i := range permissions {
-		resourceId := permissions[i].ResourceID
-		resource, read := p.byId[resourceId]
+		resourceID := permissions[i].ResourceID
+		resource, read := p.byID[resourceID]
 		if !read {
 			var err error
-			resource, err = p.database.GetResourceByID(ctx, nil, resourceId)
+			resource, err = p.database.GetResourceByID(ctx, nil, resourceID)
 			if err != nil {
-				return errs.Wrapf(err, "unable to read resource %d for the export", resourceId)
+				return errs.Wrapf(err, "unable to read resource %d for the export", resourceID)
 			}
-			p.byId[resourceId] = resource
+			p.byID[resourceID] = resource
 		}
 		if resource != nil {
 			permissions[i].Resource = *resource

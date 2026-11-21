@@ -223,7 +223,7 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(surface.name+"/"+tc.name, func(t *testing.T) {
 				guards := surface.build()
-				chain := guards.JwtAuthorizationHeaderToContext()(
+				chain := guards.JWTAuthorizationHeaderToContext()(
 					guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(http.HandlerFunc(
 						func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) }))))
 
@@ -275,7 +275,7 @@ func TestBearerGuardChain_AParserFaultOnEachSurface(t *testing.T) {
 		t.Run(surface.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			guards := surface.build()
-			chain := guards.JwtAuthorizationHeaderToContext()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			chain := guards.JWTAuthorizationHeaderToContext()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				t.Error("a token the parser could not check must not reach the handler")
 			}))
 

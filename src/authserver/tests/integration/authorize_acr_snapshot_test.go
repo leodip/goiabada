@@ -23,7 +23,7 @@ import (
 // mid-ceremony therefore redefined, retroactively, what that ceremony had been required to do.
 //
 // This is the case that could not be caught anywhere else: every unit case can pass with
-// authflow.Authorization.Run never calling SetTargetAcrLevel at all, because they call the reader and the
+// authflow.Authorization.Run never calling SetTargetACRLevel at all, because they call the reader and the
 // writer directly. Only a real ceremony proves the snapshot is taken and carried.
 
 // TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr drives a password-only ceremony on a
@@ -31,7 +31,7 @@ import (
 // and the code being stamped.
 //
 // Without the snapshot /auth/completed reads the raised row, hands level2_mandatory to
-// BumpUserSession and SetAcrLevel, and the authorization code goes out claiming
+// BumpUserSession and SetACRLevel, and the authorization code goes out claiming
 // acr: urn:goiabada:level2_mandatory over amr: ["pwd"]. No second factor was ever presented, and
 // OIDC Core section 2 defines acr as the class "the authentication performed satisfied", so that
 // claim is false in the direction a relying party doing OIDC Core 3.1.2.2's check trusts.

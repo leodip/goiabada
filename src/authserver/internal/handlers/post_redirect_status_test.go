@@ -36,13 +36,13 @@ func TestRedirectStatus_TheStepRedirect(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.method, func(t *testing.T) {
 			rr := httptest.NewRecorder()
-			req := stepRequestFor(tc.method, "/auth/pwd", testCeremonyId, testCeremonyId)
+			req := stepRequestFor(tc.method, "/auth/pwd", testCeremonyID, testCeremonyID)
 
 			testCeremonyBoundary(nil, nil, nil).stepRedirect(rr, req, "/auth/level1completed",
-				&ceremony.AuthContext{CeremonyId: testCeremonyId})
+				&ceremony.AuthContext{CeremonyID: testCeremonyID})
 
 			assert.Equal(t, tc.status, rr.Code)
-			assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+			assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 		})
 	}
 }
@@ -61,7 +61,7 @@ func TestRedirectStatus_TheNoCeremonyRedirect(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			rr := httptest.NewRecorder()
-			req := stepRequestFor(tc.method, "/auth/pwd", testCeremonyId, testCeremonyId)
+			req := stepRequestFor(tc.method, "/auth/pwd", testCeremonyID, testCeremonyID)
 			ceremonyStore.On("GetAuthContext", req).Return(nil, ceremony.ErrNoAuthContext).Once()
 
 			_, ok := testCeremonyBoundary(handlersmocks.NewPageRenderer(t), ceremonyStore,
@@ -136,7 +136,7 @@ func TestRedirectStatus_TheDeclinedConsent(t *testing.T) {
 
 			form := url.Values{}
 			form.Add("btnCancel", "cancel")
-			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add(ceremony.IDField, testCeremonyID)
 			req := httptest.NewRequest(http.MethodPost, "/auth/consent", strings.NewReader(form.Encode()))
 			req = withSettings(req, &record.Settings{Issuer: "https://auth.example.com"})
 			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -144,14 +144,14 @@ func TestRedirectStatus_TheDeclinedConsent(t *testing.T) {
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				AuthState:    ceremony.AuthStateRequiresConsent,
-				CeremonyId:   testCeremonyId,
-				ClientId:     "test-client",
+				CeremonyID:   testCeremonyID,
+				ClientID:     "test-client",
 				ResponseType: "code",
 				ResponseMode: tc.responseMode,
 				RedirectURI:  "https://example.com/callback",
 				State:        "test-state",
 			}, nil)
-			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
 

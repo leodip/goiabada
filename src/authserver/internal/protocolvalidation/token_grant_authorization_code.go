@@ -88,7 +88,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		return nil, err
 	}
 
-	if codeEntity.Client.ClientIdentifier != input.ClientId {
+	if codeEntity.Client.ClientIdentifier != input.ClientID {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The client_id provided does not match the client_id from code.",
 			http.StatusBadRequest)
@@ -232,7 +232,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	//
 	// What such a bind cost was one claim. Before the fix the browser could hold A's session
 	// while B authenticated, and the code carried B as its user, A's session identifier, and
-	// A's session level, since SetAcrLevel took the maximum of the target and the session's: an
+	// A's session level, since SetACRLevel took the maximum of the target and the session's: an
 	// acr claiming a second factor B never presented, beside B's own amr. Every refresh copies
 	// the code's acr, so the claim lasted as long as the grant. Migration 000097 lowered every
 	// stored sign-in whose level claims a second factor its methods do not name, these among
@@ -276,7 +276,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 				AdministrativeScopeRefusal(refused).Description(), http.StatusBadRequest),
 			Client: client,
 			Scopes: refused,
-			UserId: codeEntity.UserID,
+			UserID: codeEntity.UserID,
 		}
 	}
 

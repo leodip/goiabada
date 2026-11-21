@@ -28,9 +28,9 @@ var passwordGrantTx = &sql.Tx{}
 
 // expectPasswordGrantClientRow registers that transaction and the locking read of the client in it,
 // answering row.
-func expectPasswordGrantClientRow(db *datamocks.Database, clientId int64, row *record.Client) *datamocks.RunInTransactionStub {
+func expectPasswordGrantClientRow(db *datamocks.Database, clientID int64, row *record.Client) *datamocks.RunInTransactionStub {
 	stub := datamocks.ExpectRunInTransaction(db, passwordGrantTx)
-	db.On("GetClientByIDForUpdate", mock.Anything, passwordGrantTx, clientId).Return(row, nil).Once()
+	db.On("GetClientByIDForUpdate", mock.Anything, passwordGrantTx, clientID).Return(row, nil).Once()
 	return stub
 }
 

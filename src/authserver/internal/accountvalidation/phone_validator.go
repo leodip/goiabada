@@ -20,15 +20,15 @@ func NewPhoneValidator() *PhoneValidator {
 }
 
 type ValidatePhoneInput struct {
-	PhoneCountryUniqueId string
+	PhoneCountryUniqueID string
 	PhoneNumber          string
 	PhoneNumberVerified  bool
 }
 
 func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 	// i18n surface: C — admin/account API.
-	if len(input.PhoneCountryUniqueId) > 0 {
-		if _, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId); !found {
+	if len(input.PhoneCountryUniqueID) > 0 {
+		if _, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueID); !found {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil)
 		}
 
@@ -58,7 +58,7 @@ func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneNumberTooLong, map[string]any{"max": 30})
 		}
 
-		if len(input.PhoneCountryUniqueId) == 0 {
+		if len(input.PhoneCountryUniqueID) == 0 {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneCountryRequired, nil)
 		}
 	}

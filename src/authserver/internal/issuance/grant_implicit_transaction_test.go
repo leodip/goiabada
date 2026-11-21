@@ -59,7 +59,7 @@ func newImplicitFixture(t *testing.T) *implicitFixture {
 			Client:              &record.Client{ID: 1, ClientIdentifier: "implicit-client"},
 			User:                &record.User{ID: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
 			Scope:               "openid profile",
-			AcrLevel:            record.ACRLevel1,
+			ACRLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			SessionIdentifier:   "sid-implicit",
 			Nonce:               "implicit-nonce",
@@ -123,7 +123,7 @@ func TestIssueImplicitTx_KeepsThePictureInBothTokens(t *testing.T) {
 	publicKey := getTestPublicKey(t)
 	want := implicitBaseURL + "/userinfo/picture/" + f.input.User.Subject
 	assert.Equal(t, want, verifyAndDecodeToken(t, response.AccessToken, publicKey)["picture"], "access token")
-	assert.Equal(t, want, verifyAndDecodeToken(t, response.IdToken, publicKey)["picture"], "ID token")
+	assert.Equal(t, want, verifyAndDecodeToken(t, response.IDToken, publicKey)["picture"], "ID token")
 }
 
 // A user with no picture gets no claim, so the case above is about the lookup and not about the
@@ -140,7 +140,7 @@ func TestIssueImplicitTx_NoPictureNoClaim(t *testing.T) {
 
 	publicKey := getTestPublicKey(t)
 	assert.NotContains(t, verifyAndDecodeToken(t, response.AccessToken, publicKey), "picture")
-	assert.NotContains(t, verifyAndDecodeToken(t, response.IdToken, publicKey), "picture")
+	assert.NotContains(t, verifyAndDecodeToken(t, response.IDToken, publicKey), "picture")
 }
 
 // No row is the answer decision 16 gives an ended session, and nothing after the acquisition may
@@ -283,7 +283,7 @@ func TestIssueImplicitTx_ARerunBodySignsAgainFromScratch(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 }
 
 // IssueImplicit is the form the data tier holds open across a termination, and like IssueAuthCode it
@@ -320,7 +320,7 @@ func TestIssueImplicitTx_SignsWhatTheInputSays(t *testing.T) {
 
 	publicKey := getTestPublicKey(t)
 	access := verifyAndDecodeToken(t, response.AccessToken, publicKey)
-	id := verifyAndDecodeToken(t, response.IdToken, publicKey)
+	id := verifyAndDecodeToken(t, response.IDToken, publicKey)
 	assert.Equal(t, "sid-implicit", access["sid"])
 	assert.Equal(t, "sid-implicit", id["sid"])
 	assert.EqualValues(t, 3, access["auth_state_generation"])

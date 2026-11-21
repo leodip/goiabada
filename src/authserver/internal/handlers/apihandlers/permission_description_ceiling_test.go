@@ -29,13 +29,13 @@ import (
 func descriptionCeilingStored() []record.Permission {
 	stored := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers())+1)
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		stored = append(stored, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		stored = append(stored, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsID, PermissionIdentifier: identifier, Description: identifier})
 	}
-	return append(stored, record.Permission{ID: 60, ResourceID: resourcePermsId, PermissionIdentifier: "reports", Description: "Reports"})
+	return append(stored, record.Permission{ID: 60, ResourceID: resourcePermsID, PermissionIdentifier: "reports", Description: "Reports"})
 }
 
-// descriptionCeilingIdOf is the stored id of the permission identified so.
-func descriptionCeilingIdOf(t *testing.T, stored []record.Permission, identifier string) int64 {
+// descriptionCeilingIDOf is the stored id of the permission identified so.
+func descriptionCeilingIDOf(t *testing.T, stored []record.Permission, identifier string) int64 {
 	t.Helper()
 	for _, p := range stored {
 		if p.PermissionIdentifier == identifier {
@@ -106,8 +106,8 @@ func TestPermissionDescriptionCeiling_EveryCallerBelowManageIsRefused(t *testing
 				assert.Equal(t, http.MethodPut, refusal.details["method"])
 				assert.Equal(t, "target", refusal.details["ceiling"])
 				assert.Equal(t, "resource", refusal.details["target_kind"])
-				assert.Equal(t, resourcePermsId, refusal.details["target_id"])
-				assert.Equal(t, []int64{descriptionCeilingIdOf(t, stored, identifier)}, refusal.details["permission_ids"])
+				assert.Equal(t, resourcePermsID, refusal.details["target_id"])
+				assert.Equal(t, []int64{descriptionCeilingIDOf(t, stored, identifier)}, refusal.details["permission_ids"])
 				if caller.scope != "" {
 					assert.Equal(t, grantCaller, refusal.details["logged_in_user"])
 				}
@@ -128,10 +128,10 @@ func TestPermissionDescriptionCeiling_AnAdministrativeRowTheLoadedListLeavesOutI
 	expectResourcePermsChecked(database, stored)
 	records := recordLoggedEvents(auditLogger)
 
-	manageId := descriptionCeilingIdOf(t, stored, builtin.ManagePermissionIdentifier)
+	manageID := descriptionCeilingIDOf(t, stored, builtin.ManagePermissionIdentifier)
 	loaded := make([]api.ResourcePermissionUpsert, 0, len(stored))
 	for _, entry := range loadedEntries(stored) {
-		if entry.ID != manageId {
+		if entry.ID != manageID {
 			loaded = append(loaded, entry)
 		}
 	}
@@ -142,7 +142,7 @@ func TestPermissionDescriptionCeiling_AnAdministrativeRowTheLoadedListLeavesOutI
 	assertManageScopeRequired(t, rr, status, code, description)
 	assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction")
 	require.Len(t, *records, 1)
-	assert.Equal(t, []int64{manageId}, (*records)[0].details["permission_ids"])
+	assert.Equal(t, []int64{manageID}, (*records)[0].details["permission_ids"])
 }
 
 // The refusal comes after the save's own answers: a built-in renamed or a row that is not the
@@ -220,7 +220,7 @@ func TestPermissionDescriptionCeiling_WhatItDoesNotReachSaves(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.NoError(t, stub.BodyErr)
 			require.Len(t, updated, 1)
-			assert.Equal(t, descriptionCeilingIdOf(t, stored, c.identifier), updated[0].ID)
+			assert.Equal(t, descriptionCeilingIDOf(t, stored, c.identifier), updated[0].ID)
 			assert.Equal(t, "Re-described", updated[0].Description)
 			require.Len(t, *records, 1)
 			assert.Equal(t, "updated_resource_permissions", (*records)[0].event)

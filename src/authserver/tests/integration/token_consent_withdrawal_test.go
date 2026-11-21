@@ -70,7 +70,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 		})
 	require.NoError(t, err)
 	assert.True(t, result.ConsentDeleted, "this call deleted the consent")
-	assert.Len(t, result.RevokedRefreshTokenJtis, 1, "the rotated token is the one live token it revoked")
+	assert.Len(t, result.RevokedRefreshTokenJTIs, 1, "the rotated token is the one live token it revoked")
 	assert.Equal(t, 1, result.RecordedFamilyCount, "the grant's one family is newly recorded")
 
 	// The same disconnect again finds nothing left to end, and says so.

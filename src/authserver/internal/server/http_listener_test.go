@@ -58,9 +58,9 @@ func newStartableTestServer(t *testing.T, configure func(*config.AuthServerConfi
 
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
-	cfg.AuthServer.LogHttpRequests = true
-	cfg.AuthServer.ListenHostHttp = "127.0.0.1"
-	cfg.AuthServer.ListenPortHttp = 9090
+	cfg.AuthServer.LogHTTPRequests = true
+	cfg.AuthServer.ListenHostHTTP = "127.0.0.1"
+	cfg.AuthServer.ListenPortHTTP = 9090
 	configure(&cfg.AuthServer)
 
 	return NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
@@ -366,11 +366,11 @@ func TestStart_TheHTTPListenerAndItsRecords(t *testing.T) {
 				c.BaseURL = tt.baseURL
 				c.TrustProxyHeaders = tt.trusted
 				if tt.httpsEnabled {
-					c.ListenHostHttps, c.ListenPortHttps = "127.0.0.1", 9443
+					c.ListenHostHTTPS, c.ListenPortHTTPS = "127.0.0.1", 9443
 					c.CertFile, c.KeyFile = "/certs/cert.pem", "/certs/key.pem"
 				}
 				if !tt.httpEnabled {
-					c.ListenHostHttp = ""
+					c.ListenHostHTTP = ""
 				}
 			})
 			logs := logtest.CaptureSlog(t)
@@ -434,7 +434,7 @@ func TestStart_AnHTTPSBaseURLsHTTPListenerOnlyRedirects(t *testing.T) {
 
 	s := newStartableTestServer(t, func(c *config.AuthServerConfig) {
 		c.BaseURL = "https://auth.example.com"
-		c.ListenPortHttp = port
+		c.ListenPortHTTP = port
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

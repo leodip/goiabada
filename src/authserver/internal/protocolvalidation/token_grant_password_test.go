@@ -79,7 +79,7 @@ func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
 
 	result, err := validator.ValidateTokenRequest(context.Background(),
 		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}, &ValidateTokenRequestInput{
-			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			GrantType: "password", ClientID: "ropc-client", Username: "user@example.com",
 			Password: "correctpassword", Scope: "openid",
 		})
 
@@ -116,7 +116,7 @@ func TestValidateTokenRequest_ROPC_AFailedReadOfTheDocumentsOwedIsAnError(t *tes
 
 	result, err := validator.ValidateTokenRequest(context.Background(),
 		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}, &ValidateTokenRequestInput{
-			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			GrantType: "password", ClientID: "ropc-client", Username: "user@example.com",
 			Password: "correctpassword", Scope: "openid",
 		})
 
@@ -157,7 +157,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid",
@@ -198,7 +198,7 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "password",
 	}
@@ -248,7 +248,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid",
@@ -289,7 +289,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "password",
 	}
@@ -328,7 +328,7 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "", // Missing
 		Password:  "password",
 	}
@@ -369,7 +369,7 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "", // Missing
 	}
@@ -413,7 +413,7 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	// Username and password are both present, so nothing above the rejection can answer.
 	input := &ValidateTokenRequestInput{
 		GrantType:    "password",
-		ClientId:     "ropc-client",
+		ClientID:     "ropc-client",
 		ClientSecret: "a_secret_this_client_does_not_have",
 		Username:     "user@example.com",
 		Password:     "the-password",
@@ -457,7 +457,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "nonexistent@example.com",
 		Password:  "password",
 	}
@@ -518,7 +518,7 @@ func TestValidateTokenRequest_ROPC_UserWithoutPassword(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "guessedpassword",
 	}
@@ -576,7 +576,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "  Bob@Example.com  ",
 		Password:  "password",
 	}
@@ -622,7 +622,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "   ",
 		Password:  "password",
 	}
@@ -669,7 +669,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "wrongpassword",
 	}
@@ -725,7 +725,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 	}
@@ -741,7 +741,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	var disabled *UserDisabledError
 	require.ErrorAs(t, err, &disabled)
 	// The user refused, which the handler's user_disabled record names (#522 decision 7).
-	assert.Equal(t, int64(47), disabled.UserId)
+	assert.Equal(t, int64(47), disabled.UserID)
 	var customErr *oauth.ErrorDetail
 	require.ErrorAs(t, err, &customErr)
 	assert.Equal(t, "invalid_grant", customErr.Code())
@@ -780,7 +780,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 	}
@@ -804,7 +804,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 // looked up, as unauthorized_client: the answer depends on the client alone, so the mock fails
 // if GetUserByEmail is called, and a right password and a wrong one get the same answer, which
 // the token handler neither charges to the account's budget nor audits as a guess (#533).
-func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
+func TestValidateTokenRequest_ROPC_ClientACRLevel2MandatoryRefused(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		password string
@@ -837,7 +837,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T)
 
 			input := &ValidateTokenRequestInput{
 				GrantType: "password",
-				ClientId:  "ropc-client",
+				ClientID:  "ropc-client",
 				Username:  "user@example.com",
 				Password:  tc.password,
 			}
@@ -862,7 +862,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T)
 // With the authorization code flow off, a client's default ACR level is not applicable: the
 // admin console hides it and the Admin API refuses to change it, so a level 2 (mandatory) value
 // stored while the flow was on does not refuse the password grant (#533).
-func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillValidates(t *testing.T) {
+func TestValidateTokenRequest_ROPC_ClientACRLevel2MandatoryWithCodeFlowOffStillValidates(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
@@ -896,7 +896,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid",
@@ -921,7 +921,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 // password-only grants. Refusing it too would turn the grant off for every client left at its
 // default, since the admin console, the Admin API and the seed create clients at level 2
 // optional (#533).
-func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *testing.T) {
+func TestValidateTokenRequest_ROPC_ClientACRLevel2OptionalStillValidates(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
@@ -955,7 +955,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *test
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid",
@@ -998,7 +998,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "password",
-		ClientId:     "ropc-client",
+		ClientID:     "ropc-client",
 		ClientSecret: "", // Missing secret
 		Username:     "user@example.com",
 		Password:     "password",
@@ -1044,7 +1044,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "password",
-		ClientId:     "ropc-client",
+		ClientID:     "ropc-client",
 		ClientSecret: "wrong-secret",
 		Username:     "user@example.com",
 		Password:     "password",
@@ -1095,7 +1095,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_OpensTheSecretWithItsOwnCi
 		&record.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
 		&ValidateTokenRequestInput{
 			GrantType:    "password",
-			ClientId:     "ropc-client",
+			ClientID:     "ropc-client",
 			ClientSecret: "correct-secret",
 			Username:     "user@example.com",
 			Password:     "password",
@@ -1142,7 +1142,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "password",
-		ClientId:     "ropc-client",
+		ClientID:     "ropc-client",
 		ClientSecret: "correct-secret",
 		Username:     "user@example.com",
 		Password:     "userpassword",
@@ -1164,7 +1164,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	assert.Equal(t, "openid profile", grantAs[*PasswordGrant](t, result).Scope)
 }
 
-func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
+func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenID(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	mockPermissionChecker := protocolvalidationmocks.NewPermissionChecker(t)
@@ -1195,7 +1195,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "", // Empty scope
@@ -1245,7 +1245,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid offline_access",
@@ -1302,7 +1302,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 
 			input := &ValidateTokenRequestInput{
 				GrantType: "password",
-				ClientId:  "ropc-client",
+				ClientID:  "ropc-client",
 				Username:  "user@example.com",
 				Password:  "correctpassword",
 				Scope:     scope,
@@ -1355,7 +1355,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid invalid_scope_without_colon",
@@ -1419,7 +1419,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid api:read",
@@ -1481,7 +1481,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 
 	input := &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     "openid api:read",
@@ -1589,7 +1589,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType: "password",
-				ClientId:  "ropc-client",
+				ClientID:  "ropc-client",
 				Username:  "user@example.com",
 				Password:  "correctpassword",
 				Scope:     tc.scope,

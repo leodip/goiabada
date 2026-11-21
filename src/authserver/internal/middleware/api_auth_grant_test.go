@@ -22,7 +22,7 @@ import (
 // invalid_token with the sentence a token that does not parse gets, and logs it once as a warning
 // naming the grant. A token of a live grant goes through and logs nothing.
 func TestRequireValidSession_Grant(t *testing.T) {
-	const grantId = "grant-1"
+	const grantID = "grant-1"
 
 	for _, tc := range []struct {
 		label     string
@@ -37,9 +37,9 @@ func TestRequireValidSession_Grant(t *testing.T) {
 			armGuardClient(mockDB)
 			mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 				Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil).Once()
-			mockDB.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(tc.grantLive, nil).Once()
+			mockDB.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantID).Return(tc.grantLive, nil).Once()
 
-			token := issuedAccessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId})
+			token := issuedAccessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantID})
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			ctx := reqctx.WithBearerToken(req.Context(), token)
 			req = req.WithContext(reqctx.WithSettings(ctx, guardSettings()))
@@ -67,7 +67,7 @@ func TestRequireValidSession_Grant(t *testing.T) {
 			require.Len(t, records, 1, "one record per refusal")
 			assert.Equal(t, slog.LevelWarn, records[0].Level)
 			assert.Equal(t, "rejecting bearer token: its grant has been revoked", records[0].Message)
-			assert.Equal(t, grantId, records[0].Attrs["grant_id"])
+			assert.Equal(t, grantID, records[0].Attrs["grant_id"])
 		})
 	}
 }
@@ -76,7 +76,7 @@ func TestRequireValidSession_Grant(t *testing.T) {
 // decision 1), a client's or one from the implicit flow, as 401 invalid_token with the sentence a
 // token that does not parse gets, and logs it once as a warning naming the jti. Such a token whose
 // jti is not stored goes through and logs nothing.
-func TestRequireValidSession_RevokedJti(t *testing.T) {
+func TestRequireValidSession_RevokedJTI(t *testing.T) {
 	const jti = "at-1"
 
 	for _, tc := range []struct {

@@ -245,14 +245,14 @@ const guardIssuer = "https://issuer.example"
 // user enabled, at the generation the token, carrying none, names. Registered ahead of
 // answerEveryOtherCallWithNothing, whose nothing would refuse it.
 func armGuardBearerToken(database *datamocks.Database) {
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
-		Return(&record.Client{ID: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientID).
+		Return(&record.Client{ID: 3, ClientIdentifier: routesTestAPIClientID, Enabled: true}, nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
 		Return(&record.User{ID: 7, Subject: routesTestSubject, Enabled: true}, nil).Maybe()
 }
 
 // guardRequest is the request the guard sends a route, by the method and the name the walk gives it.
-// One to the API carries guardBearerToken where JwtAuthorizationHeaderToContext leaves a token it
+// One to the API carries guardBearerToken where JWTAuthorizationHeaderToContext leaves a token it
 // has verified, since the signature is not what the guard claims.
 func guardRequest(method, route string) *http.Request {
 	if method == "*" {
@@ -413,8 +413,8 @@ func TestRegisterRoutes_AnErrorPageOutsideThePageBranchIsInTheLanguageTheRequest
 		httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
 		&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: ceremony.NewId(),
-			ClientId:   routesTestClientId,
+			CeremonyID: ceremony.NewID(),
+			ClientID:   routesTestClientID,
 			UILocales:  []string{"fr"},
 		}))
 	cookies := signIn.Result().Cookies()

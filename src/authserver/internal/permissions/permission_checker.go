@@ -46,7 +46,7 @@ type ScopeResolution struct {
 // shape #386 decision 3 rejected when it chose a port per file over a port per package.
 type ScopeResolverDatabase interface {
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
-	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 }
 
 // IsResourceScope reports whether a scope has the resource:permission shape, which is exactly one
@@ -118,7 +118,7 @@ func ResolveScope(ctx context.Context, db ScopeResolverDatabase, scopeStr string
 type permissionCheckerDatabase interface {
 	ScopeResolverDatabase
 
-	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
@@ -141,8 +141,8 @@ func NewChecker(database permissionCheckerDatabase) *Checker {
 // The fresh row is the point: the caller's *record.User is never loaded onto, so a check cannot
 // mutate a struct its caller goes on to use, and a user deleted since the caller read it holds
 // nothing rather than whatever the caller's copy still says.
-func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*record.User, error) {
-	user, err := pc.database.GetUserByID(ctx, nil, userId)
+func (pc *Checker) loadGrantHolder(ctx context.Context, userID int64) (*record.User, error) {
+	user, err := pc.database.GetUserByID(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,16 +171,16 @@ func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*record.U
 // holdsPermission reports whether the loaded user holds the permission row, directly or through
 // any of their groups. It compares row ids, never identifiers, because a permission identifier is
 // only unique within its resource (#104).
-func holdsPermission(user *record.User, permissionId int64) bool {
+func holdsPermission(user *record.User, permissionID int64) bool {
 	for _, userPerm := range user.Permissions {
-		if userPerm.ID == permissionId {
+		if userPerm.ID == permissionID {
 			return true
 		}
 	}
 
 	for _, group := range user.Groups {
 		for _, groupPerm := range group.Permissions {
-			if groupPerm.ID == permissionId {
+			if groupPerm.ID == permissionID {
 				return true
 			}
 		}
@@ -189,8 +189,8 @@ func holdsPermission(user *record.User, permissionId int64) bool {
 	return false
 }
 
-func (pc *Checker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
-	user, err := pc.loadGrantHolder(ctx, userId)
+func (pc *Checker) UserHasScopePermission(ctx context.Context, userID int64, scope string) (bool, error) {
+	user, err := pc.loadGrantHolder(ctx, userID)
 	if err != nil {
 		return false, err
 	}
