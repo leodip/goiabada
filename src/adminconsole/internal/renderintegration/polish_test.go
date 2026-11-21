@@ -16,7 +16,9 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/palette"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -183,6 +185,75 @@ func TestPolish_ABrandsDeletionCountsItsClients(t *testing.T) {
 			require.Equal(t, http.StatusOK, w.Code)
 
 			assert.Contains(t, html.UnescapeString(w.Body.String()), `<p class="page-lead">Marka zostanie usunięta. `+tc.want+`</p>`)
+		})
+	}
+}
+
+// polishCustomBrand is the auth server holding brand count on a stored custom palette, failing count
+// contrast pairs and drawn for count clients, as a brand's editor reads it.
+type polishCustomBrand struct{}
+
+func (polishCustomBrand) GetBrandThemes(context.Context, string) ([]api.BrandThemeResponse, error) {
+	return nil, nil
+}
+
+func (polishCustomBrand) GetBrandByID(_ context.Context, _ string, brandID int64) (*api.BrandResponse, error) {
+	light, dark := map[string]string{}, map[string]string{}
+	for _, token := range palette.Tokens() {
+		light[token], dark[token] = "#f4f4f5", "#18181b"
+	}
+	warnings := make([]api.BrandContrastWarning, brandID)
+	for i := range warnings {
+		warnings[i] = api.BrandContrastWarning{Mode: "light", Foreground: "ink-muted", Background: "surface", Ratio: 3, Minimum: 4.5}
+	}
+	return &api.BrandResponse{ID: brandID, Name: "Marka " + strconv.FormatInt(brandID, 10), Appearance: "light", Theme: "custom",
+		Palette: &api.BrandPaletteResponse{Mode: "advanced", Light: light, Dark: dark},
+		Colors:  &api.BrandColors{Light: light, Dark: dark}, ClientCount: int(brandID), ContrastWarnings: warnings}, nil
+}
+
+// A custom brand's editor in Polish, drawn again after a save, says how many clients use the brand,
+// how many of its pairs are below their minimum, and in the saved notice how many pairs fail, each
+// in the form the count takes.
+func TestPolish_ABrandsEditorCountsItsClientsAndFailingPairs(t *testing.T) {
+	const wcag = " Tekst i krawędzie w tych kolorach nie spełniają wymogów kontrastu WCAG 2.2 na poziomie AA."
+	for _, tc := range []struct {
+		count                     int
+		clients, warnings, notice string
+	}{
+		{1, "1 client używa tej marki.", "1 para jest poniżej swojego minimum." + wcag,
+			"1 para jej kolorów jest poniżej minimalnego kontrastu."},
+		{2, "2 clienty używają tej marki.", "2 pary są poniżej swojego minimum." + wcag,
+			"2 pary jej kolorów są poniżej minimalnego kontrastu."},
+		{5, "5 clientów używa tej marki.", "5 par jest poniżej swojego minimum." + wcag,
+			"5 par jej kolorów jest poniżej minimalnego kontrastu."},
+		{22, "22 clienty używają tej marki.", "22 pary są poniżej swojego minimum." + wcag,
+			"22 pary jej kolorów są poniżej minimalnego kontrastu."},
+	} {
+		t.Run(strconv.Itoa(tc.count), func(t *testing.T) {
+			id := strconv.Itoa(tc.count)
+			path := "/admin/settings/branding/" + id + "/edit"
+			store := newRenderSessionStore(t)
+			// The save's redirect leaves the saved flash for the brand's page, as HandleBrandPost does.
+			saving := handlertest.Request(http.MethodPost, path)
+			sess, err := store.Get(saving, builtin.AdminConsoleSessionName)
+			require.NoError(t, err)
+			sess.SetFlash(path, "savedSuccessfully", "true")
+			saved := httptest.NewRecorder()
+			require.NoError(t, store.Save(saving, saved, sess))
+
+			req := handlertest.Request(http.MethodGet, path, handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", id),
+				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test"}), handlertest.WithLocale("pl-PL"))
+			for _, cookie := range saved.Result().Cookies() {
+				req.AddCookie(cookie)
+			}
+			w := httptest.NewRecorder()
+			adminsettingshandlers.HandleBrandGet(render.New(web.TemplateFS(), web.StaticFS()), store, polishCustomBrand{}).ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			out := html.UnescapeString(w.Body.String())
+			assert.Contains(t, out, `<p class="page-lead">Wybierz ją na karcie Ustawienia clienta, aby wyświetlać w niej jego strony. `+tc.clients+`</p>`)
+			assert.Contains(t, out, `id="paletteWarningsCount" role="status">`+tc.warnings+`</p>`)
+			assert.Contains(t, out, `<p>Zapisano markę. `+tc.notice+` <a class="text-link" href="#palette-warnings">Pokaż pary</a></p>`)
 		})
 	}
 }

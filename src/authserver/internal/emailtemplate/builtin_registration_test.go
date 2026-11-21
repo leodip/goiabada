@@ -247,31 +247,33 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 	}
 }
 
-// The test email: its subject, which names the app, and its two sentences.
+// The test email: its subject, which names the app, its two sentences, and the sign-off of a
+// language whose emails all close with one, as Polish's do with "Pozdrawiamy" and the app name.
 func TestTestEmail_InEachLanguage(t *testing.T) {
 	email := builtInByID(t, "test")
 	for _, tc := range []struct {
-		lang, subject, first, second string
+		lang, subject, first, second, signOff string
 	}{
 		{"en", "Acme Portal - test email", "This is a test email from Acme Portal.",
-			"It was sent from the email settings to check that email can be sent. If you can read it, there is nothing else to do."},
+			"It was sent from the email settings to check that email can be sent. If you can read it, there is nothing else to do.", ""},
 		{"de", "Acme Portal – Test-E-Mail", "Dies ist eine Test-E-Mail von Acme Portal.",
-			"Sie wurde aus den E-Mail-Einstellungen gesendet, um zu prüfen, ob E-Mails versendet werden können. Wenn Sie sie lesen können, ist nichts weiter zu tun."},
+			"Sie wurde aus den E-Mail-Einstellungen gesendet, um zu prüfen, ob E-Mails versendet werden können. Wenn Sie sie lesen können, ist nichts weiter zu tun.", ""},
 		{"es", "Acme Portal - correo de prueba", "Este es un correo de prueba enviado por Acme Portal.",
-			"Se envió desde la configuración de correo para comprobar que se pueden enviar correos. Si puedes leerlo, no tienes que hacer nada más."},
+			"Se envió desde la configuración de correo para comprobar que se pueden enviar correos. Si puedes leerlo, no tienes que hacer nada más.", ""},
 		{"fr", "Acme Portal - e-mail de test", "Ceci est un e-mail de test envoyé par Acme Portal.",
-			"Il a été envoyé depuis les paramètres des e-mails pour vérifier que l’envoi d’e-mails fonctionne. Si vous pouvez le lire, vous n’avez rien d’autre à faire."},
+			"Il a été envoyé depuis les paramètres des e-mails pour vérifier que l’envoi d’e-mails fonctionne. Si vous pouvez le lire, vous n’avez rien d’autre à faire.", ""},
 		{"it", "Acme Portal - email di prova", "Questa è un’email di prova inviata da Acme Portal.",
-			"È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro."},
+			"È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro.", ""},
 		{"pl", "Acme Portal – testowa wiadomość e-mail", "To jest testowa wiadomość e-mail z Acme Portal.",
-			"Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić."},
+			"Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.",
+			"<p>Pozdrawiamy<br>\nAcme Portal</p>\n"},
 		{"pt-BR", "Acme Portal - e-mail de teste", "Este é um e-mail de teste enviado por Acme Portal.",
-			"Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada."},
+			"Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada.", ""},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			subject, body := renderedIn(t, email, tc.lang, testValues)
 			assert.Equal(t, tc.subject, subject)
-			assert.Equal(t, "<p>"+tc.first+"</p>\n<p>"+tc.second+"</p>\n", body)
+			assert.Equal(t, "<p>"+tc.first+"</p>\n<p>"+tc.second+"</p>\n"+tc.signOff, body)
 		})
 	}
 }

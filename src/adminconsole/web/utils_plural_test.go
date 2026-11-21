@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
@@ -215,11 +216,20 @@ func comboboxStrings(lang string) map[string]string {
 
 // A searchable select's status counts the matches in the page's language as the person types, by the
 // count's CLDR category: no match reads the singular in French and Portuguese (Brazil), the form CLDR
-// gives zero there, and the plural in the other built-in languages: in Polish, many for zero and few
-// for 2 to 4.
+// gives zero there, and the plural in the other built-in languages: in Polish, many for zero and 5,
+// and few for 2 to 4 and again for 22.
 func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 	options := []string{"Choose a zone", "Europe/Lisbon", "Europe/Paris", "America/Sao_Paulo"}
-	queries := []string{"zzz", "lisb", "europe", "o"}
+	// Twenty-two areas, five of them isles, which no other query matches: "area" matches 22 options
+	// and "isle" 5.
+	for i := 1; i <= 22; i++ {
+		if i <= 5 {
+			options = append(options, fmt.Sprintf("Atlantic/Isle Area %02d", i))
+		} else {
+			options = append(options, fmt.Sprintf("Pacific/Area %02d", i))
+		}
+	}
+	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
 	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "pl"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
@@ -229,12 +239,12 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		return pluralCase{Kind: "status", CatalogLang: tag(lang), Strings: lang, Options: options, Queries: queries, want: want}
 	}
 	runPlural(t, strings, []pluralCase{
-		status("en", "0 matches", "1 match", "2 matches", "4 matches"),
-		status("fr", "0 résultat", "1 résultat", "2 résultats", "4 résultats"),
-		status("pt-BR", "0 resultado", "1 resultado", "2 resultados", "4 resultados"),
-		status("es", "0 resultados", "1 resultado", "2 resultados", "4 resultados"),
-		status("it", "0 risultati", "1 risultato", "2 risultati", "4 risultati"),
-		status("de", "0 Treffer", "1 Treffer", "2 Treffer", "4 Treffer"),
-		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki"),
+		status("en", "0 matches", "1 match", "2 matches", "4 matches", "5 matches", "22 matches"),
+		status("fr", "0 résultat", "1 résultat", "2 résultats", "4 résultats", "5 résultats", "22 résultats"),
+		status("pt-BR", "0 resultado", "1 resultado", "2 resultados", "4 resultados", "5 resultados", "22 resultados"),
+		status("es", "0 resultados", "1 resultado", "2 resultados", "4 resultados", "5 resultados", "22 resultados"),
+		status("it", "0 risultati", "1 risultato", "2 risultati", "4 risultati", "5 risultati", "22 risultati"),
+		status("de", "0 Treffer", "1 Treffer", "2 Treffer", "4 Treffer", "5 Treffer", "22 Treffer"),
+		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
 	})
 }

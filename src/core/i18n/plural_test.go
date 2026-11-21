@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"math"
 	"strconv"
 	"testing"
 
@@ -42,7 +43,16 @@ func TestPluralCategory_ARegionalTagReadsItsLanguage(t *testing.T) {
 func TestPluralCategory_NegativeCountsAndUnparseableTags(t *testing.T) {
 	assert.Equal(t, "one", PluralCategory("en", -1))
 	assert.Equal(t, "few", PluralCategory("pl", -22))
-	assert.NotPanics(t, func() { PluralCategory("pl", -int(^uint(0)>>1)-1) })
+	// A large count keeps its magnitude whatever its sign: CLDR's rules compare the whole value, so
+	// 10,000,001 is not 1 in Polish and 10,000,002 is not 2 in Arabic.
+	assert.Equal(t, "many", PluralCategory("pl", 10_000_001))
+	assert.Equal(t, "many", PluralCategory("pl", -10_000_001))
+	assert.Equal(t, "other", PluralCategory("ar", 10_000_002))
+	assert.Equal(t, "other", PluralCategory("ar", -10_000_002))
+	// The most negative int, whose absolute value 9,223,372,036,854,775,808 does not fit in an int,
+	// still reads its last digits: 8 in Polish is "many", and 08 in Arabic is "few".
+	assert.Equal(t, "many", PluralCategory("pl", math.MinInt))
+	assert.Equal(t, "few", PluralCategory("ar", math.MinInt))
 	assert.Equal(t, "one", PluralCategory("not a tag!", 1))
 	assert.Equal(t, "other", PluralCategory("not a tag!", 2))
 }

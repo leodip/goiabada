@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"context"
+	"math"
 
 	"golang.org/x/text/feature/plural"
 	"golang.org/x/text/language"
@@ -40,10 +41,13 @@ func PluralCategory(tag string, count int) string {
 }
 
 func pluralCategory(tag language.Tag, count int) string {
-	if count < 0 {
-		// x/text takes an operand too large for an int modulo 10,000,000, which also keeps the
-		// most negative int from staying negative when its sign is dropped.
+	switch {
+	case count == math.MinInt:
+		// The most negative int's absolute value does not fit in an int. x/text takes an operand
+		// too large for an int modulo 10,000,000, which keeps the last digits the rules read.
 		count = -(count % 10_000_000)
+	case count < 0:
+		count = -count
 	}
 	return pluralCategoryNames[plural.Cardinal.MatchPlural(tag, count, 0, 0, 0, 0)]
 }

@@ -41,7 +41,10 @@ Se envió desde la configuración de correo para comprobar que se pueden enviar 
 			Subject: "{{app_name}} – testowa wiadomość e-mail",
 			Body: `To jest testowa wiadomość e-mail z {{app_name}}.
 
-Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.`,
+Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.
+
+Pozdrawiamy
+{{app_name}}`,
 		},
 		"pt-BR": {
 			Subject: "{{app_name}} - e-mail de teste",

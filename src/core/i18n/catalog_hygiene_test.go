@@ -162,6 +162,7 @@ func TestCatalog_CountedKeysHaveTheirLanguagesCategories(t *testing.T) {
 				if placeholders, ok := families[family]; assert.Truef(t, ok, "%s has orphan counted key %q", name, key) {
 					assert.Equalf(t, placeholders, catalogPlaceholders(value), "%s: %q does not carry the placeholders of English's %s.other", name, key, family)
 				}
+				assert.Falsef(t, scriptFormLacksCount(key, value), "%s: %q, a form the console's script fills, does not spell its count {{count}}", name, key)
 			}
 			for family := range families {
 				slices.Sort(got[family])
@@ -169,6 +170,23 @@ func TestCatalog_CountedKeysHaveTheirLanguagesCategories(t *testing.T) {
 			}
 		})
 	}
+}
+
+// scriptFormLacksCount reports whether key is a counted form the console's script fills, a "js." key,
+// whose value lacks the exact {{count}} that tCount replaces. The script splits on that spelling
+// alone, so a form spelling "{{ count }}" would show the placeholder itself, though its name matches
+// English's.
+func scriptFormLacksCount(key, value string) bool {
+	return strings.HasPrefix(key, "js.") && !strings.Contains(value, "{{count}}")
+}
+
+func TestScriptFormLacksCount(t *testing.T) {
+	assert.False(t, scriptFormLacksCount("js.combobox.results.many", "{{count}} wyników"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.other", "{{ count }} wyniku"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.one", "{{.count}} match"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.one", "one match"))
+	// A form Go renders spells its count {{.count}}, which Go's templates read with or without spaces.
+	assert.False(t, scriptFormLacksCount("common.since.minute.few", "{{ .count }} minuty temu"))
 }
 
 // The roster names every built-in language, with the categories the chooser reaches for its whole
