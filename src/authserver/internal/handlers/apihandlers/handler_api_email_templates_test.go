@@ -32,7 +32,7 @@ var emailTemplateIDs = []string{
 }
 
 // The built-in languages, English first.
-var emailTemplateLanguages = []string{"en", "de", "es", "fr", "it", "pl", "pt-BR"}
+var emailTemplateLanguages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR"}
 
 // emailTemplateTx is the transaction a save and a reset run their write in: the write is enlisted
 // in RunInTransaction, which retries a deadlock victim, and never made outside it with nil.

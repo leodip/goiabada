@@ -20,6 +20,8 @@ func TestPluralCategory_CLDRCardinalRules(t *testing.T) {
 		"pl": {"many", "one", "few", "few", "few", "many", "many", "many", "many", "many", "few", "many", "many", "many", "few"},
 		"ru": {"many", "one", "few", "few", "few", "many", "many", "many", "many", "one", "few", "many", "many", "one", "few"},
 		"ar": {"zero", "one", "two", "few", "few", "few", "many", "many", "many", "many", "many", "many", "other", "other", "other"},
+		// Indonesian has one category, other, for every count.
+		"id": {"other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
 		"en": {"other", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
 		// Zero takes the one form in French and Portuguese (Brazil).
 		"fr":    {"one", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},

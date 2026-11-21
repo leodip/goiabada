@@ -74,6 +74,24 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject:     "{{app_name}} - buat kata sandi untuk akun baru Anda",
+			ButtonLabel: "Buat kata sandi",
+			Body: `Halo {{name}},
+
+Anda dapat membuat kata sandi Anda melalui tautan di bawah ini:
+
+{{button}}
+
+{{link}}
+
+Jika tautan tidak dapat dibuka, salin dan tempel tautan tersebut ke browser Anda.
+
+**Tautan ini berlaku selama {{expiry}}. Jika sudah kedaluwarsa, hubungi administrator Anda, yang dapat mengatur kata sandi Anda atau memungkinkan Anda meminta tautan baru dari halaman masuk.**
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject:     "{{app_name}} - crea una password per il tuo nuovo account",
 			ButtonLabel: "Crea la password",

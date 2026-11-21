@@ -232,25 +232,12 @@ export async function idFromListLink(page: Page, listUrl: string, text: string):
   return idInRowLink(page.getByRole("table").getByRole("link", { name: text, exact: true }), `${text} on ${listUrl}`);
 }
 
-async function idInRowLink(link: Locator, what: string): Promise<number> {
+// The database id in the link a list row is named by, on a list already loaded; what names the
+// link and the list in the error when the link has no id.
+export async function idInRowLink(link: Locator, what: string): Promise<number> {
   const match = (await link.getAttribute("href"))?.match(/\/admin\/\w+\/(\d+)\//);
   if (!match) throw new Error(`no link for ${what}`);
   return Number(match[1]);
-}
-
-// The id of the user the users list shows with exactly this email, or undefined when its search
-// shows none, as for an address a test submitted whose account was never created. A list that
-// does not load throws, so a failed lookup is never read as no user.
-export async function userIdIfListed(page: Page, email: string): Promise<number | undefined> {
-  const listUrl = `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`;
-  const response = await page.goto(listUrl);
-  if (!response?.ok()) throw new Error(`the users list answered ${response?.status()} for ${email}`);
-  await expect(page).toHaveURL(new RegExp(`^${env.adminUrl}/admin/users\\?`));
-  const table = page.locator("#usersTable");
-  await expect(table.or(page.locator(".empty-state"))).toBeVisible();
-  const link = table.getByRole("link", { name: email, exact: true });
-  if ((await link.count()) === 0) return undefined;
-  return idInRowLink(link, `${email} on ${listUrl}`);
 }
 
 export type ResourceTab = "settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";

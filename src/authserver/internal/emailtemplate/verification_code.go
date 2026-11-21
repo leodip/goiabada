@@ -63,6 +63,21 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject: "Verifikasi email - kode {{code}}",
+			Body: `Halo {{name}},
+
+Ini kode verifikasi email Anda:
+
+{{code}}
+
+Kode ini kedaluwarsa dalam {{expiry}}.
+
+Anda dapat memasukkan kode Anda di sini: {{link}}
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "Verifica email - codice {{code}}",
 			Body: `Ciao {{name}},

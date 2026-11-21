@@ -224,7 +224,7 @@ func TestRender_AdminSettingsEmailScriptTogglesTheEncryptionNotice(t *testing.T)
 
 // The notice and the hint are in every catalog: rendered in each, the page shows no raw key.
 func TestRender_AdminSettingsEmailEncryptionTextsAreInEveryCatalog(t *testing.T) {
-	for _, locale := range []string{"en", "pt-BR", "es", "fr", "de", "it"} {
+	for _, locale := range []string{"en", "pt-BR", "es", "fr", "de", "it", "id", "pl"} {
 		out := renderMenuPageIn(t, "/admin_settings_email.html", map[string]interface{}{
 			"settings": adminsettingshandlers.SettingsEmailGet{SMTPEnabled: true, SMTPEncryption: "none"},
 		}, locale, true)

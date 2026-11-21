@@ -9,7 +9,6 @@
 # Go date layout: day/month/year, 24-hour clock. Relative times are full phrases.
 # Terms checked against Keycloak’s French login catalog (themes/src/main/resources-community/
 # theme/base/login/messages/messages_fr.properties); wording here follows Goiabada’s context.
-# Native-speaker review is required before release (#659).
 
 "common.button.close" = "Fermer"
 "common.button.yes" = "Oui"

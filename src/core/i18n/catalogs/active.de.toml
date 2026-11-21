@@ -7,7 +7,6 @@
 # Go date layout: day.month.year, 24-hour clock. Relative times use the dative.
 # Terms checked against Keycloak's German login catalog:
 # https://github.com/keycloak/keycloak/blob/main/themes/src/main/resources-community/theme/base/login/messages/messages_de.properties
-# Native-speaker review is required before release (#661).
 
 # --- Common shared strings ---------------------------------------------------
 

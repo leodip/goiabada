@@ -168,6 +168,7 @@ func TestRender_AccountProfile_ThePageLanguageSelect(t *testing.T) {
 		"de||de – Deutsch (German)",
 		"es| selected|es – español (Spanish)",
 		"fr||fr – français (French)",
+		"id||id – Indonesia (Indonesian)",
 		"it||it – italiano (Italian)",
 		"pl||pl – polski (Polish)",
 		"pt-BR||pt-BR – português (Brasil) (Portuguese (Brazil))",

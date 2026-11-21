@@ -480,6 +480,7 @@ func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
 		{[]string{"es-MX"}, "es"}, {[]string{"es-419"}, "es"}, {[]string{"es-AR"}, "es"},
 		{[]string{"de-CH"}, "de"}, {[]string{"de-AT"}, "de"}, {[]string{"fr-CA"}, "fr"}, {[]string{"it-CH"}, "it"},
 		{[]string{"pt-PT"}, "pt-BR"},
+		{[]string{"in"}, "id"}, {[]string{"id-ID"}, "id"}, {[]string{"ms", "id"}, "id"}, {[]string{"ms,id;q=0.8"}, "id"},
 		{[]string{"uk", "de"}, "de"}, {[]string{"gl", "es"}, "es"},
 		{[]string{"uk,de;q=0.8"}, "de"}, {[]string{"gl,es-MX;q=0.8"}, "es"},
 		{[]string{"es;q=0,en;q=0.5"}, "en"},

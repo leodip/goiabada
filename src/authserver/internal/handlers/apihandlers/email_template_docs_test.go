@@ -54,8 +54,7 @@ func written(name string) string {
 // The section's steps name the editor where the console puts it, Admin, Email, its tab, by the
 // console's labels, and each field, the placeholder buttons, the preview, the test send, the save
 // and the reset by theirs (#818 decision 14). It says each built-in language is edited on its own,
-// counting none of them (#665 decision 9), that a field left alone follows later releases (decision
-// 7), and that edits are not per brand.
+// counting none of them (#668 decision 3), that a field left alone follows later releases (decision 7), and that edits are not per brand.
 func TestEmailTemplateDocs_TheGuideSaysWhereTheEditorIsAndWhatItDoes(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, emailTemplatesHead,
 		[]string{
@@ -259,7 +258,7 @@ func TestEmailTemplateDocs_TheAPISectionNamesEachOperationAndItsScopes(t *testin
 }
 
 // The guide's first steps link the section, and no section links the one it replaced; the glossary
-// defines the term, with no count of the built-in languages (#665 decision 9), and links it; the
+// defines the term, with no count of the built-in languages (#668 decision 3), and links it; the
 // personal data page does not say an email template can load an image, which the format refuses
 // (#818 decision 2).
 func TestEmailTemplateDocs_TheOtherSectionsAndTheGlossaryLinkIt(t *testing.T) {

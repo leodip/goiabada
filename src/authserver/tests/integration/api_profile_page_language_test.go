@@ -90,6 +90,20 @@ func TestAPIAccountProfilePut_PageLanguage(t *testing.T) {
 	var got api.GetUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 	assert.Equal(t, "de", got.User.PageLanguage)
+
+	// Indonesian is stored and answered as id (#668).
+	status, answered, _ := putPageLanguageProfile(t, profileURL, accessToken,
+		map[string]any{"givenName": "Ada", "familyName": "Lovelace", "pageLanguage": "id"})
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "id", answered)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "id", stored.PageLanguage)
+	idResp := makeAPIRequest(t, "GET", profileURL, accessToken, nil)
+	defer func() { _ = idResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, idResp.StatusCode)
+	require.NoError(t, json.NewDecoder(idResp.Body).Decode(&got))
+	assert.Equal(t, "id", got.User.PageLanguage)
 }
 
 func TestAPIUserProfilePut_PageLanguage(t *testing.T) {
@@ -130,4 +144,18 @@ func TestAPIUserProfilePut_PageLanguage(t *testing.T) {
 	require.NoError(t, json.NewDecoder(searchResp.Body).Decode(&found))
 	require.Len(t, found.Users, 1)
 	assert.Equal(t, "it", found.Users[0].PageLanguage, "the user search")
+
+	// An administrator stores Indonesian as id, and the read answers it (#668).
+	status, answered, _ := putPageLanguageProfile(t, userURL+"/profile", accessToken,
+		map[string]any{"givenName": "Ada", "familyName": "Lovelace", "pageLanguage": "id"})
+	require.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "id", answered)
+	stored, err := database.GetUserByID(context.Background(), nil, testUser.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "id", stored.PageLanguage)
+	idResp := makeAPIRequest(t, "GET", userURL, accessToken, nil)
+	defer func() { _ = idResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, idResp.StatusCode)
+	require.NoError(t, json.NewDecoder(idResp.Body).Decode(&got))
+	assert.Equal(t, "id", got.User.PageLanguage)
 }

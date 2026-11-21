@@ -67,6 +67,22 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject:     "Selamat datang!",
+			ButtonLabel: "Masuk",
+			Body: `Selamat! Akun Anda telah dibuat.
+
+Anda dapat masuk melalui tautan di bawah ini:
+
+{{button}}
+
+{{link}}
+
+Jika tautan tidak dapat dibuka, salin dan tempel tautan tersebut ke browser Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject:     "Benvenuto!",
 			ButtonLabel: "Accedi",

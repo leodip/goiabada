@@ -73,6 +73,7 @@ func TestHandleAccountRecoveryCodesPost_TellsTheUserANewSetWasMade(t *testing.T)
 		{"an English user", "en", "Your recovery codes were replaced"},
 		{"an Italian user", "it", "I tuoi codici di recupero sono stati sostituiti"},
 		{"a Spanish user", "es", "Se han sustituido tus códigos de recuperación"},
+		{"an Indonesian user", "id-ID", "Kode pemulihan Anda telah diganti"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)

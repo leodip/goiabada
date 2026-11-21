@@ -145,6 +145,7 @@ func TestAPIAccountRecoveryCodesPost_TellsTheUserANewSetWasMade(t *testing.T) {
 	}{
 		{"en", recoveryCodesReplacedSubjectEn, "Your previous recovery codes no longer work, used or not."},
 		{"it", "I tuoi codici di recupero sono stati sostituiti", "I codici di recupero precedenti non funzionano più, usati o no."},
+		{"id-ID", "Kode pemulihan Anda telah diganti", "Kode pemulihan Anda sebelumnya tidak lagi berlaku, baik yang sudah digunakan maupun belum."},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
 			accessToken, u := passwordNoticeUser(t, tc.locale, true)

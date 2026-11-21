@@ -60,6 +60,19 @@ Si vous l’aviez demandé, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Administrator telah mengubah kata sandi Anda",
+			Body: `Halo {{name}},
+
+Administrator telah mengubah kata sandi akun {{app_name}} Anda.
+
+Jika Anda yang memintanya, Anda tidak perlu melakukan apa pun.
+
+**Jika Anda tidak mengharapkannya, hubungi administrator Anda.** Anda juga dapat memilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan periksa pengaturan autentikasi dua faktor Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "Un amministratore ha cambiato la tua password",
 			Body: `Ciao {{name}},

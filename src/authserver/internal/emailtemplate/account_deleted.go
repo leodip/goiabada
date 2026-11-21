@@ -59,6 +59,19 @@ Si vous avez effectué cette modification, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Akun Anda telah dihapus",
+			Body: `Halo {{name}},
+
+Akun {{app_name}} Anda telah dihapus dari pengaturan akun Anda. Anda tidak dapat lagi masuk dengan akun tersebut, dan aplikasi tidak dapat lagi mengaksesnya.
+
+Jika Anda yang melakukan perubahan ini, Anda tidak perlu melakukan apa pun.
+
+**Jika bukan Anda, orang lain mengetahui kata sandi Anda.** Hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		//nolint:misspell // the it text: "eliminato" is Italian, not a misspelling of "elimination"
 		"it": {
 			Subject: "Il tuo account è stato eliminato",

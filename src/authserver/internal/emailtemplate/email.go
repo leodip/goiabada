@@ -98,7 +98,7 @@ type Message struct {
 
 // Languages are the built-in languages every email is written in, as the catalogs built into
 // Goiabada are tagged, English first.
-var Languages = []string{"en", "de", "es", "fr", "it", "pl", "pt-BR"}
+var Languages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR"}
 
 // languageTags are Languages parsed, in the same order, for the matcher.
 var languageTags = func() []language.Tag {
@@ -111,9 +111,9 @@ var languageTags = func() []language.Tag {
 
 // Language answers the built-in language an email to a recipient reading locale is written in, as an
 // email's copy was chosen before its text moved here (#531): locale is matched against the
-// built-in languages followed by English, so a regional variant reads its language's text (fr-CA
-// reads fr) and a language with none reads English. The answer is always one of Languages, by the
-// index the matcher answers rather than the tag it prints, which can come back region-extended.
+// built-in languages followed by English, so a regional variant reads its language's text (fr-CA reads fr)
+// and a language with none reads English. The answer is always one of Languages, by the index the
+// matcher answers rather than the tag it prints, which can come back region-extended.
 func Language(locale string) string {
 	parsed, _, err := language.ParseAcceptLanguage(locale)
 	if err != nil || len(parsed) == 0 {

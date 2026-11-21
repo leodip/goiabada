@@ -58,6 +58,19 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject: "Anda sudah memiliki akun",
+			Body: `Halo,
+
+Seseorang, mungkin Anda sendiri, mencoba membuat akun {{app_name}} baru dengan alamat email ini. Alamat ini sudah memiliki akun, jadi tidak ada akun baru yang dibuat.
+
+Jika itu Anda, masuklah dengan akun Anda yang sudah ada. Jika Anda lupa kata sandi, Anda dapat mengatur ulangnya di sini: {{link}}
+
+Jika itu bukan Anda, abaikan pesan ini. Akun Anda tidak diubah.
+
+Salam,
+{{app_name}}`,
+		},
 		//nolint:misspell // the it text: "modificato" is Italian, not a misspelling of "modification"
 		"it": {
 			Subject: "Hai già un account",

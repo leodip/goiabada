@@ -102,6 +102,7 @@ func TestProfilePuts_ApplyThePageLanguage(t *testing.T) {
 		{"empty sets Automatic", sent(""), ""},
 		{"a catalog's tag sets that language", sent("es"), "es"},
 		{"English is a choice, not Automatic", sent("en"), "en"},
+		{"Indonesian's tag sets Indonesian", sent("id"), "id"},
 	}
 
 	for _, route := range profilePageLanguageRoutes() {
@@ -135,7 +136,7 @@ func TestProfilePuts_ApplyThePageLanguage(t *testing.T) {
 
 func TestProfilePuts_RefuseAPageLanguageNotInTheList(t *testing.T) {
 	for _, route := range profilePageLanguageRoutes() {
-		for _, sent := range []string{"ja", "pt-br", "fr-CA", "pt"} {
+		for _, sent := range []string{"ja", "pt-br", "fr-CA", "pt", "id-ID", "in"} {
 			t.Run(route.name+", sent "+sent, func(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)

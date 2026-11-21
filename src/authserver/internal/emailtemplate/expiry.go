@@ -20,6 +20,7 @@ var expiryUnits = map[string]map[string]expiryUnit{
 	"de":    {"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}},
 	"es":    {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},
 	"fr":    {"one": {"minute", "heure"}, "other": {"minutes", "heures"}},
+	"id":    {"other": {"menit", "jam"}},
 	"it":    {"one": {"minuto", "ora"}, "other": {"minuti", "ore"}},
 	"pl":    {"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}},
 	"pt-BR": {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},

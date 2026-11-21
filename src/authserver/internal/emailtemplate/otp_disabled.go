@@ -60,6 +60,19 @@ Si vous avez effectué cette modification, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Autentikasi dua faktor telah dinonaktifkan",
+			Body: `Halo {{name}},
+
+Autentikasi dua faktor untuk akun {{app_name}} Anda telah dinonaktifkan dari pengaturan akun Anda. Aplikasi autentikator dan kode pemulihan Anda tidak lagi dapat digunakan untuk masuk.
+
+Jika Anda yang melakukan perubahan ini, Anda tidak perlu melakukan apa pun.
+
+**Jika bukan Anda, orang lain mungkin mengetahui kata sandi Anda.** Pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan siapkan kembali autentikasi dua faktor, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "L'autenticazione a due fattori è stata disattivata",
 			Body: `Ciao {{name}},

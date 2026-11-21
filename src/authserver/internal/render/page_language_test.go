@@ -26,6 +26,7 @@ func TestRender_LayoutsAreMarkedWithTheCatalogLanguage(t *testing.T) {
 		for acceptLanguage, want := range map[string]string{
 			"sv-SE":                      "en",
 			"de-AT":                      "de",
+			"id-ID":                      "id",
 			"nl-BE,nl;q=0.9,pt-BR;q=0.8": "pt-BR",
 			"en-GB":                      "en",
 		} {

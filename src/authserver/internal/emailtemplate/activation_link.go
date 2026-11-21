@@ -75,6 +75,24 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject:     "Aktifkan akun Anda",
+			ButtonLabel: "Aktifkan akun",
+			Body: `Halo,
+
+Untuk menyelesaikan pembuatan akun {{app_name}} Anda, buka tautan di bawah ini dan pilih kata sandi:
+
+{{button}}
+
+{{link}}
+
+Tautan ini kedaluwarsa dalam {{expiry}}. Jika tautan tidak dapat dibuka, salin dan tempel tautan tersebut ke browser Anda.
+
+Jika Anda tidak meminta pembuatan akun, abaikan pesan ini: akun tidak akan dibuat kecuali tautan tersebut digunakan.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject:     "Attiva il tuo account",
 			ButtonLabel: "Attiva l'account",

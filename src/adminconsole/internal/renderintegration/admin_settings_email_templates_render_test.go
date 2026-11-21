@@ -71,7 +71,7 @@ func emailTemplatesStore(t *testing.T) sessionstore.Store {
 // summary is one email as the list gives it, every language at the built-in text but those named.
 func summary(id string, statuses map[string]string) api.EmailTemplateSummaryResponse {
 	s := api.EmailTemplateSummaryResponse{ID: id}
-	for _, tag := range []string{"en", "de", "es", "fr", "it", "pl", "pt-BR"} {
+	for _, tag := range []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR"} {
 		status := "default"
 		if named, ok := statuses[tag]; ok {
 			status = named
@@ -111,7 +111,7 @@ func rowOf(t *testing.T, out, email string) string {
 }
 
 // The list is the third tab under Email: a sentence above it naming no count of the built-in
-// languages (#665 decision 9), the nineteen emails in their six groups, each named, with the sentence
+// languages (#668 decision 3), the nineteen emails in their six groups, each named, with the sentence
 // saying when it is sent, a tag for each edited language and "Needs attention" for an invalid one,
 // and the link to Branding for how they look.
 func TestRender_AdminSettingsEmailTemplates(t *testing.T) {
@@ -174,7 +174,7 @@ func emailTemplate() *api.EmailTemplateResponse {
 		},
 		Languages: []api.EmailTemplateLanguageResponse{
 			language("en", "default"), language("de", "default"), language("es", "default"),
-			language("fr", "edited"), language("it", "default"), ptBR,
+			language("fr", "edited"), language("id", "default"), language("it", "default"), language("pl", "default"), ptBR,
 		},
 	}
 }
@@ -203,8 +203,8 @@ func signedInWithSMTP() []handlertest.Option {
 }
 
 // The editor of one language: the email's name and when it is sent, the languages the API answers
-// with the edited ones marked, the editor's text in the fields, escaped, a button for each
-// placeholder, the required one marked, and the formatting the body takes.
+// with the edited ones marked, the editor's text in the fields, escaped, a button for each placeholder, the
+// required one marked, and the formatting the body takes.
 func TestRender_AdminSettingsEmailTemplate(t *testing.T) {
 	out := serveEditor(t, &emailTemplatesAPI{email: emailTemplate()}, "fr")
 
@@ -216,7 +216,9 @@ func TestRender_AdminSettingsEmailTemplate(t *testing.T) {
 	nav := regexp.MustCompile(`(?s)<nav class="tab-bar" id="emailTemplateLanguages".*?</nav>`).FindString(out)
 	require.NotEmpty(t, nav, "the language selector is drawn")
 	assert.Contains(t, nav, `aria-label="Idioma"`)
-	assert.Equal(t, 6, strings.Count(nav, `class="tab-item"`))
+	assert.Equal(t, 8, strings.Count(nav, `class="tab-item"`))
+	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/id">Indonesia (Indonesian)</a>`)
+	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/pl">polski (Polish)</a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/fr" aria-current="page">français (French) <span class="tag tag-note">Editado</span></a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/pt-BR">português (Brasil) (Portuguese (Brazil)) <span class="tag tag-caution">Requer atenção</span></a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/en">English</a>`)

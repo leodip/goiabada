@@ -81,6 +81,26 @@ Un saludo,
 				"Cordialement,\n" +
 				"{{app_name}}",
 		},
+		"id": {
+			Subject:     "Atur ulang kata sandi",
+			ButtonLabel: "Atur ulang kata sandi",
+			Body: `Halo {{name}},
+
+Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:
+
+{{button}}
+
+{{link}}
+
+Tautan ini kedaluwarsa dalam {{expiry}}.
+
+Jika tautan tidak dapat dibuka, salin dan tempel tautan tersebut ke browser Anda.
+
+**Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini.**
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject:     "Reimpostazione della password",
 			ButtonLabel: "Reimposta la password",

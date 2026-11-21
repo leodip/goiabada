@@ -230,7 +230,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		}
 	}
 	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "pl"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -245,6 +245,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("es", "0 resultados", "1 resultado", "2 resultados", "4 resultados", "5 resultados", "22 resultados"),
 		status("it", "0 risultati", "1 risultato", "2 risultati", "4 risultati", "5 risultati", "22 risultati"),
 		status("de", "0 Treffer", "1 Treffer", "2 Treffer", "4 Treffer", "5 Treffer", "22 Treffer"),
+		status("id", "0 hasil", "1 hasil", "2 hasil", "4 hasil", "5 hasil", "22 hasil"),
 		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
 	})
 }

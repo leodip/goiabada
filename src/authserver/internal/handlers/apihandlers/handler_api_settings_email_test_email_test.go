@@ -63,7 +63,9 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 		{"de-DE", "de", "Acme Portal – Test-E-Mail", "Dies ist eine Test-E-Mail von Acme Portal."},
 		{"es", "es", "Acme Portal - correo de prueba", "Este es un correo de prueba enviado por Acme Portal."},
 		{"fr-CA", "fr", "Acme Portal - e-mail de test", "Ceci est un e-mail de test envoyé par Acme Portal."},
+		{"id-ID", "id", "Acme Portal - email uji coba", "Ini adalah email uji coba dari Acme Portal."},
 		{"it", "it", "Acme Portal - email di prova", "Questa è un’email di prova inviata da Acme Portal."},
+		{"pl-PL", "pl", "Acme Portal – testowa wiadomość e-mail", "To jest testowa wiadomość e-mail z Acme Portal."},
 		{"pt-BR", "pt-BR", "Acme Portal - e-mail de teste", "Este é um e-mail de teste enviado por Acme Portal."},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {

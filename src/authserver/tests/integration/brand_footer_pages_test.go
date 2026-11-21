@@ -101,6 +101,10 @@ func TestPages_TheDefaultBrandsFooterIsDrawnUnderTheCard(t *testing.T) {
 			return loadPage(t, browser, base+"/no-such-page-footer")
 		}, []string{"Datenschutz", "Status", "Acme & Co"},
 			"Brauchen Sie Hilfe? help+desk%2@acme.example +442079460958 Supportseite", "(öffnet sich in einem neuen Tab)", "Supportseite"},
+		{"the not-found page, in Indonesian", "id-ID", func(t *testing.T, browser *http.Client) *http.Response {
+			return loadPage(t, browser, base+"/no-such-page-footer")
+		}, []string{"Privasi", "Status", "Acme & Co"},
+			"Perlu bantuan? help+desk%2@acme.example +442079460958 Halaman dukungan", "(terbuka di tab baru)", "Halaman dukungan"},
 		{"the form_post page", "en", func(t *testing.T, browser *http.Client) *http.Response {
 			params := formPostAuthorizeParams(client, "code", "form_post", formPostHTTPSURI, "none")
 			return loadPage(t, browser, base+"/auth/authorize?"+params.Encode())
@@ -151,7 +155,7 @@ func TestPages_TheDefaultBrandsFooterIsDrawnUnderTheCard(t *testing.T) {
 	assert.Equal(t, "https://acme.example/privacy", published.Brand.FooterLinks[0].URL)
 	assert.Equal(t, "Privacy", published.Brand.FooterLinks[0].Label)
 	assert.Equal(t, map[string]string{"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad",
-		"fr": "Confidentialité", "it": "Riservatezza", "pt-BR": "Privacidade"}, published.Brand.FooterLinks[0].Labels)
+		"fr": "Confidentialité", "id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade"}, published.Brand.FooterLinks[0].Labels)
 	assert.Equal(t, map[string]string{}, published.Brand.FooterLinks[1].Labels)
 	assert.Equal(t, "help+desk%2@acme.example", published.Brand.SupportEmail)
 	assert.Equal(t, "https://help.acme.example/contact", published.Brand.SupportURL)
