@@ -333,7 +333,7 @@ func TestLoad_AnImportOfAPackageTheWildcardSkipsIsAnError(t *testing.T) {
 }
 
 // A module nested in the module's directory is another module, which ./... leaves out rightly, so
-// importing it is no error.
+// importing it is no error, and so is a module elsewhere whose path only extends the module's.
 func TestLoad_AnImportOfANestedModuleIsNoError(t *testing.T) {
 	root := loadable(t, map[string]string{
 		"mod/go.mod":     "module example.test/mod\n",
@@ -343,6 +343,16 @@ func TestLoad_AnImportOfANestedModuleIsNoError(t *testing.T) {
 	})
 	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
 	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/mod/a"}, ids(pkgs))
+
+	root = loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/a/a.go": "package a\n\nimport \"example.test/mod/sub/s\"\n\nvar _ = s.S\n",
+		"dep/go.mod": "module example.test/mod/sub\n",
+		"dep/s/s.go": "package s\n\nconst S = 1\n",
+	})
+	pkgs, err = pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.NoError(t, err, "a module elsewhere that only extends the module's path")
 	assert.Equal(t, []string{"example.test/mod/a"}, ids(pkgs))
 }
 
