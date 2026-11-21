@@ -186,7 +186,7 @@ func declaringDirs(root string, dirs []string) ([]string, error) {
 			dir := filepath.Dir(path)
 			if !seen[dir] {
 				// ./... runs from the module's root, so only the names below it count.
-				modRoot, _, mErr := moduleFor(root, dir)
+				modRoot, mErr := moduleFor(root, dir)
 				if mErr != nil {
 					modRoot = root
 				}
@@ -215,7 +215,7 @@ func dirsByModule(root string, dirs []string) ([]string, map[string]map[string]b
 	byModule := map[string]map[string]bool{}
 	var order []string
 	for _, dir := range dirs {
-		modRoot, _, err := moduleFor(root, dir)
+		modRoot, err := moduleFor(root, dir)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -253,18 +253,16 @@ func skippedDir(name string) bool {
 
 // moduleFor finds the module that owns dir: the nearest ancestor holding a go.mod, at or below
 // root. That is the search space for references, per the ceiling on AssertNoDeadInterfaces.
-func moduleFor(root, dir string) (modRoot, modPath string, err error) {
+func moduleFor(root, dir string) (modRoot string, err error) {
 	for d := dir; ; {
 		goMod := filepath.Join(d, "go.mod")
 		if _, sErr := os.Stat(goMod); sErr == nil {
-			// ModulePath is what AssertArchitecture's graph reads, and sharing it is the point: a
-			// module renamed in go.mod has to move both guards at once rather than one of them
-			// silently.
-			path, pErr := refgraph.ModulePath(goMod)
-			if pErr != nil {
-				return "", "", pErr
+			// The module line is read as AssertArchitecture's graph reads it, so a go.mod that
+			// declares no module stops both guards alike.
+			if _, pErr := refgraph.ModulePath(goMod); pErr != nil {
+				return "", pErr
 			}
-			return d, path, nil
+			return d, nil
 		}
 		if d == root {
 			break
@@ -275,7 +273,7 @@ func moduleFor(root, dir string) (modRoot, modPath string, err error) {
 		}
 		d = parent
 	}
-	return "", "", errs.Errorf("no go.mod above %s (searched up to %s)", dir, root)
+	return "", errs.Errorf("no go.mod above %s (searched up to %s)", dir, root)
 }
 
 // declarationKey names a package-level type by where its name is declared, the file and the offset,
