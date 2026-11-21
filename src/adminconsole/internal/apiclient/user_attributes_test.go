@@ -11,11 +11,11 @@ import (
 
 // A user attribute takes the same path and has the same exposure: four of its five fields are what
 // the attributes page renders, and the fifth decides which token the value reaches.
-func TestAuthServerClient_GetUserAttributesByUserIdDecodesTheAttributeShape(t *testing.T) {
+func TestAuthServerClient_GetUserAttributesByUserIDDecodesTheAttributeShape(t *testing.T) {
 	client, recorded := serves(t, `{"attributes":[{"id":7,"createdAt":"2026-01-02T03:04:05Z","updatedAt":null,`+
 		`"key":"department","value":"engineering","includeInIdToken":true,"includeInAccessToken":false,"userId":42}]}`)
 
-	attributes, err := client.GetUserAttributesByUserId(context.Background(), "an-access-token", 42)
+	attributes, err := client.GetUserAttributesByUserID(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()

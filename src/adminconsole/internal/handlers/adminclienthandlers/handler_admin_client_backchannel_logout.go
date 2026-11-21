@@ -20,9 +20,9 @@ import (
 // clientBackchannelLogoutAPI is what the Back-channel logout tab needs: the client, the global
 // switches its gate reads against, and the write.
 type clientBackchannelLogoutAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
-	UpdateClientBackchannelLogout(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error)
+	UpdateClientBackchannelLogout(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error)
 }
 
 // manageScopeRequiredCode is the admin API's refusal of a write only authserver:manage may make,
@@ -50,7 +50,7 @@ var backchannelLogoutErrorFields = map[string]string{
 // auth server gates the save, and as the Sign-out redirect URIs tab beside it is gated: a client
 // with no flow that signs users in through a browser has no session to end (#784 decision 9).
 type ClientBackchannelLogout struct {
-	ClientId                         int64
+	ClientID                         int64
 	ClientIdentifier                 string
 	CanManageBackchannelLogout       bool
 	BackchannelLogoutURI             string
@@ -65,7 +65,7 @@ type ClientBackchannelLogout struct {
 // drawn when canManage says so.
 func clientBackchannelLogoutFrom(c *api.ClientResponse, canManage bool) ClientBackchannelLogout {
 	return ClientBackchannelLogout{
-		ClientId:                         c.ID,
+		ClientID:                         c.ID,
 		ClientIdentifier:                 c.ClientIdentifier,
 		CanManageBackchannelLogout:       canManage,
 		BackchannelLogoutURI:             c.BackchannelLogoutURI,
@@ -79,7 +79,7 @@ func clientBackchannelLogoutFrom(c *api.ClientResponse, canManage bool) ClientBa
 // identifier checkbox as stored, or, for a client with no flow that signs users in, the note saying
 // which flows the URI is for (#784 decision 9).
 func HandleBackchannelLogoutGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientBackchannelLogoutAPI,
 ) http.HandlerFunc {
@@ -92,13 +92,13 @@ func HandleBackchannelLogoutGet(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -154,7 +154,7 @@ func HandleBackchannelLogoutGet(
 // own sentence, which says what the administrator can still do; the API's own sentence is English
 // and speaks of administrators. Any other 403 is a server error, as on every tab.
 func HandleBackchannelLogoutPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientBackchannelLogoutAPI,
 	baseURL string,
@@ -168,13 +168,13 @@ func HandleBackchannelLogoutPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

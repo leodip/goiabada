@@ -32,7 +32,7 @@ const hostileScriptJSON = `"\u003c/script\u003e\u003csvg onload=alert(1)\u003e \
 func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	created := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	key := adminsettingshandlers.SettingsKey{
-		Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: hostileScriptValue,
+		ID: 1, CreatedAt: &created, State: "current", KeyIdentifier: hostileScriptValue,
 		Type: "RSA", Algorithm: "RS256",
 		PublicKeyASN1DER: "MIIBIjAN&<>", PublicKeyPEM: hostileScriptValue, PublicKeyJWK: `{"kid":"</script>"}`,
 	}
@@ -86,7 +86,7 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 			"selectedPhoneCountryUniqueId": "", "phoneNumber": "", "phoneCountries": nil, "savedSuccessfully": false,
 		}},
 		{"/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
-			"AuthServerBaseUrl": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
+			"AuthServerBaseURL": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 			"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false,
 		}},
 	}

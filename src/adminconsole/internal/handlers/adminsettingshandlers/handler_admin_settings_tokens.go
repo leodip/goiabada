@@ -22,7 +22,7 @@ type settingsTokensAPI interface {
 }
 
 func HandleTokensGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
 ) http.HandlerFunc {
@@ -30,9 +30,9 @@ func HandleTokensGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -48,7 +48,7 @@ func HandleTokensGet(
 			RefreshTokenOfflineIdleTimeoutInSeconds: apiResp.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: apiResp.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: apiResp.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     apiResp.IncludeOpenIDConnectClaimsInIDToken,
+			IncludeOpenIDConnectClaimsInIDToken:     apiResp.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
@@ -80,7 +80,7 @@ func HandleTokensGet(
 }
 
 func HandleTokensPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTokensAPI,
 	baseURL string,
@@ -89,9 +89,9 @@ func HandleTokensPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -100,7 +100,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: r.FormValue("refreshTokenOfflineIdleTimeoutInSeconds"),
 			RefreshTokenOfflineMaxLifetimeInSeconds: r.FormValue("refreshTokenOfflineMaxLifetimeInSeconds"),
 			IncludeOpenIDConnectClaimsInAccessToken: r.FormValue("includeOpenIDConnectClaimsInAccessToken") == "on",
-			IncludeOpenIDConnectClaimsInIdToken:     r.FormValue("includeOpenIDConnectClaimsInIdToken") == "on",
+			IncludeOpenIDConnectClaimsInIDToken:     r.FormValue("includeOpenIDConnectClaimsInIdToken") == "on",
 		}
 
 		renderError := func(message, errorField string) {
@@ -139,7 +139,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: idle,
 			RefreshTokenOfflineMaxLifetimeInSeconds: maxlife,
 			IncludeOpenIDConnectClaimsInAccessToken: settingsInfo.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		_, err = apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)

@@ -21,16 +21,16 @@ import (
 // broken API looked exactly like an empty profile. A user with no picture is a 200 from the API
 // with HasPicture false, so every error here is a real one, and it now goes through the classifier
 // like the user read above it (#425).
-type userPictureApiClient struct {
+type userPictureAPIClient struct {
 	picture *api.ProfilePictureInfoResponse
 	err     error
 }
 
-func (c *userPictureApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+func (c *userPictureAPIClient) GetUserByID(_ context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (c *userPictureApiClient) GetUserProfilePicture(_ context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {
+func (c *userPictureAPIClient) GetUserProfilePicture(_ context.Context, accessToken string, userID int64) (*api.ProfilePictureInfoResponse, error) {
 	return c.picture, c.err
 }
 
@@ -41,8 +41,8 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		err          error
 		wantNotFound bool
 		wantError    bool
-		// wantUrlPrefix is what profilePictureUrl must start with; empty means it must be empty.
-		wantUrlPrefix string
+		// wantURLPrefix is what profilePictureUrl must start with; empty means it must be empty.
+		wantURLPrefix string
 	}{
 		{
 			name:         "a 404 from the API renders the 404 page",
@@ -62,7 +62,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		{
 			name:          "a picture renders the page with its address",
 			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureURL: "https://auth.example/picture/42"},
-			wantUrlPrefix: "https://auth.example/picture/42?t=",
+			wantURLPrefix: "https://auth.example/picture/42?t=",
 		},
 		{
 			name:    "no picture renders the page without one",
@@ -72,7 +72,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			switch {
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
@@ -83,7 +83,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_picture.html").Once()
 			}
 
-			HandlePictureGet(httpHelper, &userPictureApiClient{picture: testCase.picture, err: testCase.err}).
+			HandlePictureGet(httpHelper, &userPictureAPIClient{picture: testCase.picture, err: testCase.err}).
 				ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodGet, "/admin/users/42/picture",
 					handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42")))
 
@@ -95,10 +95,10 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 			}
 
 			url, _ := handlertest.Bind(t, httpHelper)["profilePictureUrl"].(string)
-			if testCase.wantUrlPrefix == "" {
+			if testCase.wantURLPrefix == "" {
 				assert.Empty(t, url)
 			} else {
-				assert.True(t, strings.HasPrefix(url, testCase.wantUrlPrefix), "got %q", url)
+				assert.True(t, strings.HasPrefix(url, testCase.wantURLPrefix), "got %q", url)
 			}
 		})
 	}

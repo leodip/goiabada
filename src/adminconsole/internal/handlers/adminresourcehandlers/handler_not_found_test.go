@@ -24,28 +24,28 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundResourceApiClient answers the one call the handler makes before it decides. The rest of the
+// notFoundResourceAPIClient answers the one call the handler makes before it decides. The rest of the
 // ports it is passed to panic, rather than return a helpful zero value.
-type notFoundResourceApiClient struct {
+type notFoundResourceAPIClient struct {
 	entity *api.ResourceResponse
 	err    error
 }
 
-func (c *notFoundResourceApiClient) GetResourceById(_ context.Context, accessToken string, id int64) (*api.ResourceResponse, error) {
+func (c *notFoundResourceAPIClient) GetResourceByID(_ context.Context, accessToken string, id int64) (*api.ResourceResponse, error) {
 	return c.entity, c.err
 }
 
-// The rest of the ports notFoundResourceApiClient is passed to, which no test here reaches.
+// The rest of the ports notFoundResourceAPIClient is passed to, which no test here reaches.
 
-func (*notFoundResourceApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+func (*notFoundResourceAPIClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
 	panic("unexpected call to GetPermissionsByResource")
 }
 
-func (*notFoundResourceApiClient) UpdateResourcePermissions(context.Context, string, int64, *api.UpdateResourcePermissionsRequest) error {
+func (*notFoundResourceAPIClient) UpdateResourcePermissions(context.Context, string, int64, *api.UpdateResourcePermissionsRequest) error {
 	panic("unexpected call to UpdateResourcePermissions")
 }
 
-func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
+func TestResource_StaleOrMalformedURLAnswers404(t *testing.T) {
 	const pathValueName = "resourceId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
@@ -59,7 +59,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		// the router never bound, which is how an unbound parameter reads from r.PathValue.
 		target       string
 		id           string
-		withJwt      bool
+		withJWT      bool
 		entity       *api.ResourceResponse
 		apiErr       error
 		wantNotFound bool
@@ -68,14 +68,14 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an id that does not parse",
 			target:       "/admin/resources/not-a-number/permissions",
 			id:           "not-a-number",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
 		{
 			name:         "an id the router never bound",
 			target:       "/admin/resources/42/permissions",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
@@ -83,7 +83,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API says is gone",
 			target:       "/admin/resources/42/permissions",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			apiErr:       gone,
 			wantNotFound: true,
 		},
@@ -91,28 +91,28 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API returns as nil without an error",
 			target:       "/admin/resources/42/permissions",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			wantNotFound: true,
 		},
 		{
 			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
 			target:  "/admin/resources/42/permissions",
 			id:      "42",
-			withJwt: false,
+			withJWT: false,
 			entity:  present,
 		},
 		{
 			name:    "a 500 from the API, which is a server fault and stays a 500",
 			target:  "/admin/resources/42/permissions",
 			id:      "42",
-			withJwt: true,
+			withJWT: true,
 			apiErr:  broken,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -121,7 +121,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 
 			var opts []handlertest.Option
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			if testCase.id != "" {
@@ -129,7 +129,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
-			apiClient := &notFoundResourceApiClient{entity: testCase.entity, err: testCase.apiErr}
+			apiClient := &notFoundResourceAPIClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandlePermissionsGet(httpHelper, nil, apiClient)
 			w := httptest.NewRecorder()
 

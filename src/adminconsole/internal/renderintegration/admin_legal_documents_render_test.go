@@ -239,14 +239,14 @@ func TestRender_AdminLegalDocumentsAppliesTo(t *testing.T) {
 func TestRender_AdminLegalDocumentApps(t *testing.T) {
 	bind := func(doc api.LegalDocumentResponse, allApps bool, apps []map[string]any) map[string]interface{} {
 		type appChoice struct {
-			Id          int64
+			ID          int64
 			Identifier  string
 			Description string
 			Selected    bool
 		}
 		choices := []appChoice{}
 		for _, a := range apps {
-			choices = append(choices, appChoice{Id: a["id"].(int64), Identifier: a["identifier"].(string),
+			choices = append(choices, appChoice{ID: a["id"].(int64), Identifier: a["identifier"].(string),
 				Description: a["description"].(string), Selected: a["selected"].(bool)})
 		}
 		return map[string]interface{}{

@@ -13,7 +13,7 @@ import (
 // Section 15.5.4: with 403, "If authentication credentials were provided in the request, the server
 // considers them insufficient to grant access", which is this page's whole case.
 func HandleUnauthorizedGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

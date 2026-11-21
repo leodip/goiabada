@@ -73,7 +73,7 @@ func decoded(claims jwt.MapClaims) jwt.MapClaims {
 // keys, and answers how many times the JWKS was fetched.
 func parserOver(t *testing.T, keys ...oauth.JWK) (*oauthclient.JWKSTokenParser, *atomic.Int32) {
 	t.Helper()
-	server, hits := oauthclienttest.NewJwksServer(t, keys...)
+	server, hits := oauthclienttest.NewJWKSServer(t, keys...)
 	return oauthclient.NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer)), hits
 }
@@ -133,13 +133,13 @@ func TestIDToken_RefusesATokenOfInvalidStructure(t *testing.T) {
 
 	for _, method := range readerMethods() {
 		t.Run(method.name+"/the unaltered token", func(t *testing.T) {
-			parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+			parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 			require.NoError(t, method.run(parser, claims, valid))
 		})
 		for _, tc := range tokens {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 				err := method.run(parser, claims, tc.token)
 
@@ -160,7 +160,7 @@ func TestIDToken_AStructurallyRefusedTokenFetchesNoKey(t *testing.T) {
 
 	for _, method := range readerMethods() {
 		t.Run(method.name, func(t *testing.T) {
-			parser, hits := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+			parser, hits := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 			err := method.run(parser, claims, token)
 
@@ -199,7 +199,7 @@ func TestIDToken_SubAndIat(t *testing.T) {
 	for _, method := range readerMethods() {
 		for _, tc := range testCases {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 				claims := idClaims()
 				tc.mutate(claims)
 				token := oauthclienttest.SignRawRS256(t, key, `{"alg":"RS256","kid":"key-1","typ":"JWT"}`, claimsJSON(t, claims))
@@ -238,7 +238,7 @@ func exponentIn(n int) string {
 func TestIDToken_VerificationKeys(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	weak := weakKey(t)
-	published := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
+	published := oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey)
 	with := func(change func(*oauth.JWK)) oauth.JWK {
 		jwk := published
 		change(&jwk)
@@ -266,7 +266,7 @@ func TestIDToken_VerificationKeys(t *testing.T) {
 		want    outcome
 	}{
 		{"the key as the auth server publishes it", published, nil, key, "key-1", accepted},
-		{"a 1024-bit key", oauthclienttest.JwkFromPublicKey("key-1", &weak.PublicKey), nil, weak, "key-1", refusedNotForeign},
+		{"a 1024-bit key", oauthclienttest.JWKFromPublicKey("key-1", &weak.PublicKey), nil, weak, "key-1", refusedNotForeign},
 		{"e in four bytes", with(func(j *oauth.JWK) { j.E = exponentIn(4) }), nil, key, "key-1", accepted},
 		{"e in five bytes", with(func(j *oauth.JWK) { j.E = exponentIn(5) }), nil, key, "key-1", refusedNotForeign},
 		{"e in nine bytes", with(func(j *oauth.JWK) { j.E = exponentIn(9) }), nil, key, "key-1", refusedNotForeign},
@@ -289,7 +289,7 @@ func TestIDToken_VerificationKeys(t *testing.T) {
 		{"no kid, the one key marked alg RS512", with(func(j *oauth.JWK) { j.Alg = "RS512" }), nil, key, "", refusedNotForeign},
 		{"no kid, the one key with use empty", published, set("use", ""), key, "", refusedNotForeign},
 		{"no kid, the one key with alg null", published, set("alg", nil), key, "", refusedNotForeign},
-		{"no kid, the one key 1024 bits", oauthclienttest.JwkFromPublicKey("key-1", &weak.PublicKey), nil, weak, "", refusedNotForeign},
+		{"no kid, the one key 1024 bits", oauthclienttest.JWKFromPublicKey("key-1", &weak.PublicKey), nil, weak, "", refusedNotForeign},
 	}
 
 	for _, method := range readerMethods() {
@@ -329,11 +329,11 @@ func parserOverDocument(t *testing.T, jwk oauth.JWK, members func(map[string]any
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 }
 
-// authServerJwk writes a key as the auth server's /certs serves it (rsakey's JWK: alg, kid, kty,
+// authServerJWK writes a key as the auth server's /certs serves it (rsakey's JWK: alg, kid, kty,
 // use, n, e), with e written out as RFC 7518 section 6.3.1.2's example for 65537.
-func authServerJwk(kid string, pub *rsa.PublicKey) string {
+func authServerJWK(kid string, pub *rsa.PublicKey) string {
 	if pub.E != 65537 {
-		panic("authServerJwk writes e as AQAB")
+		panic("authServerJWK writes e as AQAB")
 	}
 	return fmt.Sprintf(`{"alg":"RS256","kid":%q,"kty":"RSA","use":"sig","n":%q,"e":"AQAB"}`,
 		kid, base64.RawURLEncoding.EncodeToString(pub.N.Bytes()))
@@ -346,9 +346,9 @@ func TestIDToken_AcceptsTheAuthServersJWKS(t *testing.T) {
 	current, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 	next, previous := oauthclienttest.Keys(t)
-	document := `{"keys":[` + authServerJwk("next-kid", &next.PublicKey) + "," +
-		authServerJwk("current-kid", &current.PublicKey) + "," +
-		authServerJwk("previous-kid", &previous.PublicKey) + `]}`
+	document := `{"keys":[` + authServerJWK("next-kid", &next.PublicKey) + "," +
+		authServerJWK("current-kid", &current.PublicKey) + "," +
+		authServerJWK("previous-kid", &previous.PublicKey) + `]}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(document))
@@ -422,7 +422,7 @@ func TestIDToken_RefusesTheAuthServersOtherTokens(t *testing.T) {
 	for _, method := range readerMethods() {
 		for _, tc := range tokens {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 				err := method.run(parser, tc.claims, oauthclienttest.SignRawRS256(t, key, tc.header, claimsJSON(t, tc.claims)))
 
 				assertOutcome(t, foreign, err)

@@ -104,7 +104,7 @@ type BrandPaletteRow struct {
 // the color its well holds, whether its column is shown, whether it holds a value that is not a color,
 // and whether the save was refused at it.
 type BrandPaletteField struct {
-	Id      string
+	ID      string
 	Mode    string
 	Value   string
 	Well    string
@@ -120,8 +120,8 @@ type BrandPaletteSwatch struct {
 	Dark  map[string]string
 }
 
-// paletteFieldId is the id and the name of the field of token in mode.
-func paletteFieldId(mode, token string) string {
+// paletteFieldID is the id and the name of the field of token in mode.
+func paletteFieldID(mode, token string) string {
 	return "palette-" + mode + "-" + token
 }
 
@@ -163,9 +163,9 @@ func NewBrandPaletteView(form BrandPaletteForm, appearance, refusedField string)
 				Basic: slices.Contains(basicTokens, token)}
 			for _, mode := range paletteModes {
 				value := form.valuesOf(mode)[token]
-				field := BrandPaletteField{Id: paletteFieldId(mode, token), Mode: mode, Value: value, Well: paletteWellBlack,
+				field := BrandPaletteField{ID: paletteFieldID(mode, token), Mode: mode, Value: value, Well: paletteWellBlack,
 					Invalid: !palette.IsColor(value)}
-				field.Refused = field.Id == refusedField
+				field.Refused = field.ID == refusedField
 				if !field.Invalid {
 					field.Well = strings.ToLower(value)
 				}
@@ -217,7 +217,7 @@ func brandPaletteFormFrom(r *http.Request, stored *api.BrandResponse) BrandPalet
 	}
 	for _, mode := range paletteModes {
 		for _, token := range palette.Tokens() {
-			form.valuesOf(mode)[token] = strings.TrimSpace(r.PostFormValue(paletteFieldId(mode, token)))
+			form.valuesOf(mode)[token] = strings.TrimSpace(r.PostFormValue(paletteFieldID(mode, token)))
 		}
 	}
 	return form
@@ -286,7 +286,7 @@ func paletteInput(tokens []string) string {
 		return "paletteMode"
 	}
 	if len(tokens) == 3 && slices.Contains(paletteModes, tokens[1]) && slices.Contains(palette.Tokens(), tokens[2]) {
-		return paletteFieldId(tokens[1], tokens[2])
+		return paletteFieldID(tokens[1], tokens[2])
 	}
 	return ""
 }

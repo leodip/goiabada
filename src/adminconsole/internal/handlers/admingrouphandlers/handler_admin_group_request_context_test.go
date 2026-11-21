@@ -32,107 +32,107 @@ import (
 
 type groupCtxMarkerKey struct{}
 
-// groupCtxRecordingApiClient records the context every stage-11 group method is called with and
+// groupCtxRecordingAPIClient records the context every stage-11 group method is called with and
 // then refuses, so the handler takes its error path in the same pass. The tables below are typed on
 // it, so a method a handler's port gains and this fake lacks fails to compile rather than passing
 // silently.
-type groupCtxRecordingApiClient struct {
+type groupCtxRecordingAPIClient struct {
 	seen []context.Context
 }
 
-func (s *groupCtxRecordingApiClient) record(ctx context.Context) error {
+func (s *groupCtxRecordingAPIClient) record(ctx context.Context) error {
 	s.seen = append(s.seen, ctx)
 	return errs.New("the auth server refused")
 }
 
 // GetAllResources is the permissions page's first call and is #386 stage 12's. It is here rather
 // than in the resource package because this is the handler that makes it.
-func (s *groupCtxRecordingApiClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) CreateGroup(ctx context.Context, _ string, _ *api.CreateGroupRequest) (*api.GroupResponse, error) {
+func (s *groupCtxRecordingAPIClient) CreateGroup(ctx context.Context, _ string, _ *api.CreateGroupRequest) (*api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetGroupById(ctx context.Context, _ string, _ int64) (*api.GroupResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetGroupByID(ctx context.Context, _ string, _ int64) (*api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) UpdateGroup(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+func (s *groupCtxRecordingAPIClient) UpdateGroup(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupRequest) (*api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) DeleteGroup(ctx context.Context, _ string, _ int64) error {
+func (s *groupCtxRecordingAPIClient) DeleteGroup(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetGroupMembers(ctx context.Context, _ string, _ int64, _, _ int) ([]api.UserResponse, int, error) {
+func (s *groupCtxRecordingAPIClient) GetGroupMembers(ctx context.Context, _ string, _ int64, _, _ int) ([]api.UserResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) AddUserToGroup(ctx context.Context, _ string, _ int64, _ int64) error {
+func (s *groupCtxRecordingAPIClient) AddUserToGroup(ctx context.Context, _ string, _ int64, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) RemoveUserFromGroup(ctx context.Context, _ string, _ int64, _ int64) error {
+func (s *groupCtxRecordingAPIClient) RemoveUserFromGroup(ctx context.Context, _ string, _ int64, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) SearchUsersWithGroupAnnotation(ctx context.Context, _, _ string, _ int64, _, _ int) ([]api.UserWithGroupMembershipResponse, int, error) {
+func (s *groupCtxRecordingAPIClient) SearchUsersWithGroupAnnotation(ctx context.Context, _, _ string, _ int64, _, _ int) ([]api.UserWithGroupMembershipResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetGroupPermissions(ctx context.Context, _ string, _ int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetGroupPermissions(ctx context.Context, _ string, _ int64) (*api.GroupResponse, []api.PermissionResponse, error) {
 	return nil, nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) UpdateGroupPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupPermissionsRequest) error {
+func (s *groupCtxRecordingAPIClient) UpdateGroupPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupPermissionsRequest) error {
 	return s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetGroupAttributesByGroupId(ctx context.Context, _ string, _ int64) ([]api.GroupAttributeResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetGroupAttributesByGroupID(ctx context.Context, _ string, _ int64) ([]api.GroupAttributeResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) GetGroupAttributeById(ctx context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
+func (s *groupCtxRecordingAPIClient) GetGroupAttributeByID(ctx context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) CreateGroupAttribute(ctx context.Context, _ string, _ *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+func (s *groupCtxRecordingAPIClient) CreateGroupAttribute(ctx context.Context, _ string, _ *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) UpdateGroupAttribute(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+func (s *groupCtxRecordingAPIClient) UpdateGroupAttribute(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *groupCtxRecordingApiClient) DeleteGroupAttribute(ctx context.Context, _ string, _ int64) error {
+func (s *groupCtxRecordingAPIClient) DeleteGroupAttribute(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
+func TestAdminGroupHandlers_EveryHandlerConsultsTheAPIClientWithTheRequestsContext(t *testing.T) {
 	// The handlers taking a session store reach it only after the API answered, and the client
 	// here always refuses, so nil is never dereferenced.
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *groupCtxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HTTPHelper, apiClient *groupCtxRecordingAPIClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleListGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleNewPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleNewPost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
@@ -141,7 +141,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -149,7 +149,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleSettingsGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleSettingsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/settings",
@@ -157,7 +157,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleSettingsPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleSettingsPost(h, nil, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/settings",
@@ -166,7 +166,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleDeleteGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/delete",
@@ -174,7 +174,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleDeletePost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/delete",
@@ -183,7 +183,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleMembersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members",
@@ -191,7 +191,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersAddGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleMembersAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/add",
@@ -199,7 +199,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersSearchGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleMembersSearchGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/members/search?query=jane",
@@ -207,7 +207,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersAddPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleMembersAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/add?userId=42",
@@ -215,7 +215,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleMembersRemoveUserPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleMembersRemoveUserPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
@@ -224,7 +224,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
@@ -232,7 +232,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandlePermissionsPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/permissions",
@@ -242,7 +242,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes",
@@ -250,7 +250,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesRemovePost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/remove",
@@ -259,7 +259,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesAddGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/add",
@@ -267,7 +267,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesAddPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/add",
@@ -276,7 +276,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesEditGet",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/groups/5/attributes/11/edit",
@@ -285,7 +285,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 		},
 		{
 			name: "HandleAttributesEditPost",
-			build: func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleAttributesEditPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/groups/5/attributes/11/edit",
@@ -297,7 +297,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			// Every writer is admitted: which one a handler picks is pattern 7's decision and is
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
@@ -308,7 +308,7 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			apiClient := &groupCtxRecordingApiClient{}
+			apiClient := &groupCtxRecordingAPIClient{}
 
 			marked := testCase.request.WithContext(
 				context.WithValue(testCase.request.Context(), groupCtxMarkerKey{}, testCase.name))

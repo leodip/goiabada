@@ -26,12 +26,12 @@ const permissionUserSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Us
 // permission, and one user the search found, already holding it.
 type permissionUserSearchAPI struct{}
 
-func (permissionUserSearchAPI) GetPermissionsByResource(_ context.Context, _ string, resourceId int64) ([]api.PermissionResponse, error) {
-	return []api.PermissionResponse{{ID: 11, ResourceID: resourceId}}, nil
+func (permissionUserSearchAPI) GetPermissionsByResource(_ context.Context, _ string, resourceID int64) ([]api.PermissionResponse, error) {
+	return []api.PermissionResponse{{ID: 11, ResourceID: resourceID}}, nil
 }
 
-func (permissionUserSearchAPI) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{ID: resourceId}, nil
+func (permissionUserSearchAPI) GetResourceByID(_ context.Context, _ string, resourceID int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{ID: resourceID}, nil
 }
 
 func (permissionUserSearchAPI) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {

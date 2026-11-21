@@ -80,10 +80,10 @@ func servesStatus(t *testing.T, status int, body string) (*AuthServerClient, fun
 	return NewAuthServerClient(server.URL, nil, nil), func() (string, string) { return gotPath, gotAuthorization }
 }
 
-func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetUserByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"user":{`+userBodyFields+`}}`)
 
-	user, err := client.GetUserById(context.Background(), "an-access-token", 42)
+	user, err := client.GetUserByID(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 

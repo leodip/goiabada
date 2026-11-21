@@ -35,15 +35,15 @@ type userProfileRecorder struct {
 	subject   string
 	updateErr error
 	updates   []*api.UpdateUserProfileRequest
-	updateIds []int64
+	updateIDs []int64
 	reads     []int64
 	tokens    []string
 }
 
-func storedUserProfile(userId int64) *api.UserResponse {
+func storedUserProfile(userID int64) *api.UserResponse {
 	birthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	return &api.UserResponse{
-		ID:                  userId,
+		ID:                  userID,
 		Email:               "stored@example.com",
 		Username:            "stored-username",
 		GivenName:           "Stored",
@@ -59,22 +59,22 @@ func storedUserProfile(userId int64) *api.UserResponse {
 	}
 }
 
-func (c *userProfileRecorder) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	c.reads = append(c.reads, userId)
-	user := storedUserProfile(userId)
+func (c *userProfileRecorder) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	c.reads = append(c.reads, userID)
+	user := storedUserProfile(userID)
 	user.PageLanguage = c.pageLanguage
 	return user, nil
 }
 
-func (c *userProfileRecorder) UpdateUserProfile(_ context.Context, accessToken string, userId int64,
+func (c *userProfileRecorder) UpdateUserProfile(_ context.Context, accessToken string, userID int64,
 	request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	c.tokens = append(c.tokens, accessToken)
-	c.updateIds = append(c.updateIds, userId)
+	c.updateIDs = append(c.updateIDs, userID)
 	c.updates = append(c.updates, request)
 	if c.updateErr != nil {
 		return nil, c.updateErr
 	}
-	saved := storedUserProfile(userId)
+	saved := storedUserProfile(userID)
 	saved.Subject = c.subject
 	saved.PageLanguage = c.pageLanguage
 	if request.PageLanguage != nil {
@@ -87,7 +87,7 @@ func (c *userProfileRecorder) UpdateUserProfile(_ context.Context, accessToken s
 // rather than what is stored, the API's sentence, and the list position the page was opened from
 // (#440 decision 7).
 func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_profile.html").Once()
 
@@ -115,7 +115,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 
 	require.Len(t, apiClient.updates, 1)
 	assert.Equal(t, []string{handlertest.AccessToken}, apiClient.tokens)
-	assert.Equal(t, []int64{7}, apiClient.updateIds)
+	assert.Equal(t, []int64{7}, apiClient.updateIDs)
 	assert.Equal(t, &api.UpdateUserProfileRequest{
 		Username:            "jane-doe",
 		GivenName:           "Jane",
@@ -167,7 +167,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
 	for _, zoneInfo := range []string{"America/Sao_Paulo", "Brazil___America___Sao_Paulo"} {
 		t.Run(zoneInfo, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			apiClient := &userProfileRecorder{}
@@ -201,7 +201,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndSelectsTheStoredPageLanguage
 		{"a catalog that has gone", "ja", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_profile.html").Once()
 			store := newFlashTestStore()
@@ -243,7 +243,7 @@ func TestHandleProfilePost_SendsThePageLanguageTheFormPosted(t *testing.T) {
 		{"the field in the query only", "/admin/users/7/profile?pageLanguage=de", url.Values{"username": {"jane-doe"}}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			store := newFlashTestStore()
 			apiClient := &userProfileRecorder{pageLanguage: "it"}
@@ -256,7 +256,7 @@ func TestHandleProfilePost_SendsThePageLanguageTheFormPosted(t *testing.T) {
 			require.Equal(t, http.StatusFound, rr.Code)
 			assert.Equal(t, consoleBaseURL+"/admin/users/7/profile?page=&query=", rr.Header().Get("Location"))
 			require.Len(t, apiClient.updates, 1)
-			assert.Equal(t, []int64{7}, apiClient.updateIds)
+			assert.Equal(t, []int64{7}, apiClient.updateIDs)
 			assert.Equal(t, tc.want, apiClient.updates[0].PageLanguage)
 		})
 	}
@@ -275,26 +275,26 @@ func TestHandleProfilePost_AnAdministratorsOwnSaveRefreshesTheConsoleLanguage(t 
 		form     url.Values
 		wantCopy string
 	}{
-		{"their own user, a language chosen", signedIn, adminIdToken(signedIn),
+		{"their own user, a language chosen", signedIn, adminIDToken(signedIn),
 			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "es"},
-		{"their own user, Automatic chosen", signedIn, adminIdToken(signedIn),
+		{"their own user, Automatic chosen", signedIn, adminIDToken(signedIn),
 			url.Values{"username": {"jane-doe"}, "pageLanguage": {""}}, ""},
-		{"another user", "other-subject", adminIdToken(signedIn),
+		{"another user", "other-subject", adminIDToken(signedIn),
 			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "pt-BR"},
 		{"no ID token", signedIn, nil,
 			url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, "pt-BR"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			store := newFlashTestStore()
 			cookie := pageLanguageInSession(t, store, "pt-BR")
 			apiClient := &userProfileRecorder{pageLanguage: "it", subject: tc.saved}
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/7/profile",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       tc.idToken,
+					IDToken:       tc.idToken,
 				}),
 				handlertest.WithPathValue("userId", "7"), handlertest.WithForm(tc.form))
 			req.AddCookie(cookie)
@@ -314,7 +314,7 @@ func TestHandleProfilePost_AnAdministratorsOwnSaveRefreshesTheConsoleLanguage(t 
 	}
 }
 
-func adminIdToken(subject string) *oauth.JWTToken {
+func adminIDToken(subject string) *oauth.JWTToken {
 	return &oauth.JWTToken{TokenBase64: "id", Claims: map[string]any{"sub": subject}}
 }
 

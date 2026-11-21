@@ -5,12 +5,12 @@
 {{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "web-origins" .client.ClientId .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+{{ template "client_header" (args "web-origins" .client.ClientID .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* The list is drawn as stored; client-uri-list.js edits it in the page, keeping of each entry
      only its origin, data-origins, and saves it whole, with the list as drawn, so the server
      refuses a save from an outdated page (#428). */}}
-<form class="panel" id="uriListForm" novalidate data-save-url="/admin/clients/{{ .client.ClientId }}/web-origins" data-client-id="{{ .client.ClientId }}" data-list-key="webOrigins" data-expected-key="expectedWebOrigins" data-origins
+<form class="panel" id="uriListForm" novalidate data-save-url="/admin/clients/{{ .client.ClientID }}/web-origins" data-client-id="{{ .client.ClientID }}" data-list-key="webOrigins" data-expected-key="expectedWebOrigins" data-origins
   data-invalid="{{ T $.ctx "adminconsole.admin_clients.web_origins.invalid_url" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_clients.web_origins.duplicate_error" }}"
   data-added="{{ T $.ctx "adminconsole.admin_clients.web_origins.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_clients.web_origins.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_clients.web_origins.remove_label" }}"
   data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}"{{ if .client.IsSystemLevelClient }} data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>

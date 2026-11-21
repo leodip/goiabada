@@ -13,12 +13,12 @@ import (
 
 // groupMembersAPI is what the group members page needs: the group, and its members.
 type groupMembersAPI interface {
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
-	GetGroupMembers(ctx context.Context, accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error)
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
+	GetGroupMembers(ctx context.Context, accessToken string, groupID int64, page, size int) ([]api.UserResponse, int, error)
 }
 
 func HandleMembersGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupMembersAPI,
 ) http.HandlerFunc {
 
@@ -37,14 +37,14 @@ func HandleMembersGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group details
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

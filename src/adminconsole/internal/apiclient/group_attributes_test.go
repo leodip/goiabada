@@ -27,11 +27,11 @@ const groupAttributeBodyFields = `
 	"includeInAccessToken": false,
 	"groupId": 4`
 
-func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t *testing.T) {
+func TestAuthServerClient_GetGroupAttributesByGroupIDDecodesTheAttributeShape(t *testing.T) {
 	client, recorded := serves(t, `{"attributes":[{`+groupAttributeBodyFields+`},`+
 		`{"id":8,"key":"region","value":"br","groupId":4}]}`)
 
-	attributes, err := client.GetGroupAttributesByGroupId(context.Background(), "an-access-token", 4)
+	attributes, err := client.GetGroupAttributesByGroupID(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 
 	gotPath, gotAuthorization := recorded()
@@ -54,10 +54,10 @@ func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t 
 	assert.Equal(t, "region", attributes[1].Key)
 }
 
-func TestAuthServerClient_GetGroupAttributeByIdDecodesTheSingleAttribute(t *testing.T) {
+func TestAuthServerClient_GetGroupAttributeByIDDecodesTheSingleAttribute(t *testing.T) {
 	client, recorded := serves(t, `{"attribute":{`+groupAttributeBodyFields+`}}`)
 
-	attribute, err := client.GetGroupAttributeById(context.Background(), "an-access-token", 7)
+	attribute, err := client.GetGroupAttributeByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, attribute)
 

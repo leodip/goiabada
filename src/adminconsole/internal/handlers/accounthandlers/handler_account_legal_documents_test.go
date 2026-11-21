@@ -14,14 +14,14 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// accountLegalDocumentsApiClient answers the one read My Account's Legal documents page performs,
+// accountLegalDocumentsAPIClient answers the one read My Account's Legal documents page performs,
 // with the signed-in user's token.
-type accountLegalDocumentsApiClient struct {
+type accountLegalDocumentsAPIClient struct {
 	acceptances []api.LegalDocumentAcceptanceResponse
 	tokens      []string
 }
 
-func (c *accountLegalDocumentsApiClient) GetAccountLegalDocumentAcceptances(_ context.Context,
+func (c *accountLegalDocumentsAPIClient) GetAccountLegalDocumentAcceptances(_ context.Context,
 	accessToken string) ([]api.LegalDocumentAcceptanceResponse, error) {
 	c.tokens = append(c.tokens, accessToken)
 	return c.acceptances, nil
@@ -29,7 +29,7 @@ func (c *accountLegalDocumentsApiClient) GetAccountLegalDocumentAcceptances(_ co
 
 // The page binds the user's acceptances as the API answers them, read with the user's own token.
 func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_legal_documents.html").Maybe()
 
@@ -37,7 +37,7 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 	acceptances := []api.LegalDocumentAcceptanceResponse{
 		{ID: 3, LegalDocumentID: 7, ShortName: "terms", Version: 2, Title: "Terms of use", URL: &url},
 	}
-	apiClient := &accountLegalDocumentsApiClient{acceptances: acceptances}
+	apiClient := &accountLegalDocumentsAPIClient{acceptances: acceptances}
 
 	req := handlertest.Request(http.MethodGet, "/account/legal-documents", handlertest.WithAccessToken())
 	HandleLegalDocumentsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)

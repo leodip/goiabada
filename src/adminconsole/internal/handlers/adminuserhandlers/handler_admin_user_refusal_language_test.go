@@ -15,27 +15,27 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// refusingUserApiClient answers the reads the user pages make before they refuse a form, and panics
+// refusingUserAPIClient answers the reads the user pages make before they refuse a form, and panics
 // on every write: each refusal below happens before the console asks the API to change anything.
-type refusingUserApiClient struct{}
+type refusingUserAPIClient struct{}
 
-func (*refusingUserApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+func (*refusingUserAPIClient) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (*refusingUserApiClient) GetUserAttributeById(_ context.Context, _ string, attributeId int64) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{ID: attributeId, Key: "department", UserID: 5}, nil
+func (*refusingUserAPIClient) GetUserAttributeByID(_ context.Context, _ string, attributeID int64) (*api.UserAttributeResponse, error) {
+	return &api.UserAttributeResponse{ID: attributeID, Key: "department", UserID: 5}, nil
 }
 
-func (*refusingUserApiClient) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
+func (*refusingUserAPIClient) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	panic("unexpected call to CreateUserAdmin")
 }
 
-func (*refusingUserApiClient) CreateUserAttribute(context.Context, string, *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error) {
+func (*refusingUserAPIClient) CreateUserAttribute(context.Context, string, *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	panic("unexpected call to CreateUserAttribute")
 }
 
-func (*refusingUserApiClient) UpdateUserAttribute(context.Context, string, int64, *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
+func (*refusingUserAPIClient) UpdateUserAttribute(context.Context, string, int64, *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	panic("unexpected call to UpdateUserAttribute")
 }
 
@@ -46,7 +46,7 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 	testCases := []struct {
 		name       string
 		template   string
-		handler    func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
+		handler    func(httpHelper *handlersmocks.HTTPHelper) http.HandlerFunc
 		target     string
 		options    []handlertest.Option
 		form       url.Values
@@ -56,8 +56,8 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a new user with no email",
 			template: "/admin_users_new.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleNewPost(h, nil, &refusingUserApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleNewPost(h, nil, &refusingUserAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/users/new",
 			options:    []handlertest.Option{handlertest.WithSettings(&api.PublicSettingsResponse{})},
@@ -68,8 +68,8 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a new attribute with no key",
 			template: "/admin_users_attributes_add.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleAttributesAddPost(h, &refusingUserApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleAttributesAddPost(h, &refusingUserAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/users/5/attributes/add",
 			options:    []handlertest.Option{handlertest.WithPathValue("userId", "5")},
@@ -80,8 +80,8 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an attribute edited to no key",
 			template: "/admin_users_attributes_edit.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleAttributesEditPost(h, &refusingUserApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleAttributesEditPost(h, &refusingUserAPIClient{}, consoleBaseURL)
 			},
 			target: "/admin/users/5/attributes/edit/9",
 			options: []handlertest.Option{handlertest.WithPathValue("userId", "5"),
@@ -98,7 +98,7 @@ func TestAdminUserPages_RefuseInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, testCase.template).Once()
 

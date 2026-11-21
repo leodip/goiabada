@@ -86,7 +86,7 @@ func dataPostRequest(opts ...handlertest.Option) *http.Request {
 	return handlertest.Request(http.MethodPost, accountDataPath, append([]handlertest.Option{handlertest.WithAccessToken()}, opts...)...)
 }
 
-func serveDataPost(httpHelper *handlersmocks.HttpHelper, client *accountExportAPI, signIn *signInRecorder,
+func serveDataPost(httpHelper *handlersmocks.HTTPHelper, client *accountExportAPI, signIn *signInRecorder,
 	req *http.Request) *httptest.ResponseRecorder {
 
 	rec := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func serveDataPost(httpHelper *handlersmocks.HttpHelper, client *accountExportAP
 // The page draws its form, with no notice and no refusal on an ordinary visit, the menu marking it
 // from the request's path.
 func TestHandleDataGet_DrawsThePage(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_data.html").Once()
 
@@ -112,7 +112,7 @@ func TestHandleDataGet_DrawsThePage(t *testing.T) {
 // Back from the sign-in the page sent the browser through, it says so above the button: press it
 // again (decision 6).
 func TestHandleDataGet_BackFromTheSignInShowsTheNotice(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_data.html").Once()
 
@@ -126,7 +126,7 @@ func TestHandleDataGet_BackFromTheSignInShowsTheNotice(t *testing.T) {
 // passes it (decision 3): the bytes still compressed, the encoding, the length and the file name
 // the auth server chose, never stored by a cache, on the user's own token.
 func TestHandleDataPost_PassesTheExportThroughUntouched(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	compressed := []byte{0x1f, 0x8b, 0x08, 0x00, 'c', 'o', 'm', 'p', 'r', 'e', 's', 's', 'e', 'd'}
@@ -168,7 +168,7 @@ func (d *dataDeadlineRecorder) SetWriteDeadline(deadline time.Time) error {
 
 // The file has five minutes to reach the browser, the administrator's download's bound.
 func TestHandleDataPost_LiftsTheWriteDeadlineToFiveMinutes(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	client := &accountExportAPI{export: &apiclient.UserExport{
 		ContentType: "application/json",
@@ -197,7 +197,7 @@ var stepUpRefusal = &apiclient.APIError{Code: "INSUFFICIENT_USER_AUTHENTICATION"
 // urn:goiabada:level2_optional, with no max_age, and comes back to the page with its notice
 // (decision 1). Nothing else is written, and the session-ended page is not where it goes.
 func TestHandleDataPost_TheStepUpRefusalSendsTheBrowserToSignInAgain(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	client := &accountExportAPI{err: stepUpRefusal}
 	signIn := &signInRecorder{}
@@ -207,7 +207,7 @@ func TestHandleDataPost_TheStepUpRefusalSendsTheBrowserToSignInAgain(t *testing.
 	require.Equal(t, 1, signIn.calls, "one sign-in")
 	assert.Equal(t, "admin-console-client", signIn.client)
 	assert.Equal(t, dataSignInScope, signIn.scope)
-	assert.Equal(t, oauthclient.SignInOptions{Prompt: "login", AcrValues: "urn:goiabada:level2_optional"}, signIn.options)
+	assert.Equal(t, oauthclient.SignInOptions{Prompt: "login", ACRValues: "urn:goiabada:level2_optional"}, signIn.options)
 	assert.Equal(t, consoleBaseURL+"/account/data?signed_in_again=1", signIn.redirectBack,
 		"back to the page, with its notice")
 
@@ -220,7 +220,7 @@ func TestHandleDataPost_TheStepUpRefusalSendsTheBrowserToSignInAgain(t *testing.
 // A sign-in redirect that cannot be made, as when the handshake cannot be sealed, is the error
 // page, and nothing else is written.
 func TestHandleDataPost_ASignInThatCannotStartIsAnError(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var answered error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { answered = args.Error(2) }).Return().Once()
@@ -236,7 +236,7 @@ func TestHandleDataPost_ASignInThatCannotStartIsAnError(t *testing.T) {
 // Five downloads an hour is the user's to wait out: the page is drawn again with the console's own
 // sentence in the page's language, as the other account pages draw it (decision 6).
 func TestHandleDataPost_ARateLimitIsShownOnThePage(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_data.html").Once()
 	client := &accountExportAPI{err: &apiclient.APIError{Code: "TOO_MANY_REQUESTS",
@@ -256,7 +256,7 @@ func TestHandleDataPost_ARateLimitIsShownOnThePage(t *testing.T) {
 // Any other 401 is a session that ended, as everywhere in the console: the browser goes to the
 // session-ended page, not through a sign-in that asks for more.
 func TestHandleDataPost_AnyOther401StillEndsTheSession(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	client := &accountExportAPI{err: &apiclient.APIError{Code: "invalid_token",
 		Message: "The access token is invalid.", StatusCode: http.StatusUnauthorized}}
@@ -272,7 +272,7 @@ func TestHandleDataPost_AnyOther401StillEndsTheSession(t *testing.T) {
 // The step-up code on another status is not the step-up challenge: RFC 9470 section 3 answers it
 // with 401 alone.
 func TestHandleDataPost_TheStepUpCodeCountsOnlyOnA401(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	client := &accountExportAPI{err: &apiclient.APIError{Code: "INSUFFICIENT_USER_AUTHENTICATION",
 		Message: "no", StatusCode: http.StatusForbidden}}
@@ -286,7 +286,7 @@ func TestHandleDataPost_TheStepUpCodeCountsOnlyOnA401(t *testing.T) {
 // A refusal the user can't act on, such as the auth server refusing the console's own client, is a
 // fault for the classifier, and no file is offered.
 func TestHandleDataPost_AnyOtherRefusalGoesThroughTheClassifier(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var answered error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { answered = args.Error(2) }).Return().Once()

@@ -15,35 +15,35 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// refusingSettingsApiClient panics on every call: each refusal below happens before the console
+// refusingSettingsAPIClient panics on every call: each refusal below happens before the console
 // calls the API at all.
-type refusingSettingsApiClient struct{}
+type refusingSettingsAPIClient struct{}
 
-func (*refusingSettingsApiClient) GetSettingsEmail(context.Context, string) (*api.SettingsEmailResponse, error) {
+func (*refusingSettingsAPIClient) GetSettingsEmail(context.Context, string) (*api.SettingsEmailResponse, error) {
 	panic("unexpected call to GetSettingsEmail")
 }
 
-func (*refusingSettingsApiClient) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+func (*refusingSettingsAPIClient) SendTestEmail(context.Context, string, *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
 	panic("unexpected call to SendTestEmail")
 }
 
-func (*refusingSettingsApiClient) UpdateSettingsEmail(context.Context, string, *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error) {
+func (*refusingSettingsAPIClient) UpdateSettingsEmail(context.Context, string, *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error) {
 	panic("unexpected call to UpdateSettingsEmail")
 }
 
-func (*refusingSettingsApiClient) GetAuditEventTypes(context.Context, string) (*api.GetAuditEventTypesResponse, error) {
+func (*refusingSettingsAPIClient) GetAuditEventTypes(context.Context, string) (*api.GetAuditEventTypesResponse, error) {
 	panic("unexpected call to GetAuditEventTypes")
 }
 
-func (*refusingSettingsApiClient) GetAuditLogsPaginated(context.Context, string, int, int, string, string, int64) (*api.GetAuditLogsResponse, error) {
+func (*refusingSettingsAPIClient) GetAuditLogsPaginated(context.Context, string, int, int, string, string, int64) (*api.GetAuditLogsResponse, error) {
 	panic("unexpected call to GetAuditLogsPaginated")
 }
 
-func (*refusingSettingsApiClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
+func (*refusingSettingsAPIClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
 	panic("unexpected call to GetSettingsAuditLogs")
 }
 
-func (*refusingSettingsApiClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+func (*refusingSettingsAPIClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
 	panic("unexpected call to UpdateSettingsAuditLogs")
 }
 
@@ -54,7 +54,7 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 	testCases := []struct {
 		name       string
 		template   string
-		handler    func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
+		handler    func(httpHelper *handlersmocks.HTTPHelper) http.HandlerFunc
 		target     string
 		form       url.Values
 		english    string
@@ -63,8 +63,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a test email with no destination",
 			template: "/admin_settings_email_sendtest.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailSendTestPost(h, nil, &refusingSettingsApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailSendTestPost(h, nil, &refusingSettingsAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/settings/email/send-test-email",
 			form:       url.Values{"destinationEmail": {""}},
@@ -74,8 +74,8 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a retention that is not a number",
 			template: "/admin_settings_audit_logs.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleAuditLogsPost(h, nil, &refusingSettingsApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleAuditLogsPost(h, nil, &refusingSettingsAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/settings/audit-logs",
 			form:       url.Values{"auditLogRetentionDays": {"ninety"}},
@@ -90,7 +90,7 @@ func TestAdminSettingsPages_RefuseInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, testCase.template).Once()
 

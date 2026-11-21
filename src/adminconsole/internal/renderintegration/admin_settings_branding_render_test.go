@@ -809,7 +809,7 @@ func TestRender_AdminSettingsBrandingSampleHasARoomForTheFooter(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew": false,
 		"brand": adminsettingshandlers.BrandForm{Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "system-ui", BackgroundFit: "cover",
-			FooterLinks:  [3]adminsettingshandlers.BrandFooterLinkRow{{Label: "Privacy", Url: "https://autumn.example/privacy"}},
+			FooterLinks:  [3]adminsettingshandlers.BrandFooterLinkRow{{Label: "Privacy", URL: "https://autumn.example/privacy"}},
 			SupportEmail: "help@autumn.example"},
 		"storedBrand":     api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
 		"brandThemes":     renderThemes,

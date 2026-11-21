@@ -28,16 +28,16 @@ import (
 // the other half: it kept a page past the end for the query, and rendered an
 // empty table under a bar highlighting the last page (#305).
 
-type auditPagingApiClient struct {
+type auditPagingAPIClient struct {
 	total int
 	asked []int
 	// events records the auditEvent filter each call carried, which the
 	// re-query must not drop.
 	events []string
-	// requestIds records the same for the request id filter (#328).
-	requestIds []string
-	// userIds records the same for the user filter, 0 for none (#780).
-	userIds []int64
+	// requestIDs records the same for the request id filter (#328).
+	requestIDs []string
+	// userIDs records the same for the user filter, 0 for none (#780).
+	userIDs []int64
 	// eventTypes is the catalog the auth server answers with, and eventTypesErr the
 	// refusal it answers with instead. The viewer fetches the dropdown's options over
 	// the API rather than compiling them in (#351).
@@ -45,13 +45,13 @@ type auditPagingApiClient struct {
 	eventTypesErr error
 }
 
-func (c *auditPagingApiClient) GetAuditLogsPaginated(_ context.Context, accessToken string, page, pageSize int,
-	auditEvent string, requestId string, userId int64) (*api.GetAuditLogsResponse, error) {
+func (c *auditPagingAPIClient) GetAuditLogsPaginated(_ context.Context, accessToken string, page, pageSize int,
+	auditEvent string, requestID string, userID int64) (*api.GetAuditLogsResponse, error) {
 
 	c.asked = append(c.asked, page)
 	c.events = append(c.events, auditEvent)
-	c.requestIds = append(c.requestIds, requestId)
-	c.userIds = append(c.userIds, userId)
+	c.requestIDs = append(c.requestIDs, requestID)
+	c.userIDs = append(c.userIDs, userID)
 
 	return &api.GetAuditLogsResponse{
 		AuditLogs: logsOnPage(c.total, page, pageSize),
@@ -61,7 +61,7 @@ func (c *auditPagingApiClient) GetAuditLogsPaginated(_ context.Context, accessTo
 	}, nil
 }
 
-func (c *auditPagingApiClient) GetAuditEventTypes(_ context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error) {
+func (c *auditPagingAPIClient) GetAuditEventTypes(_ context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error) {
 	if c.eventTypesErr != nil {
 		return nil, c.eventTypesErr
 	}
@@ -70,18 +70,18 @@ func (c *auditPagingApiClient) GetAuditEventTypes(_ context.Context, accessToken
 
 // GetSettingsAuditLogs answers that events are stored, which the viewer asks to say when they are
 // not.
-func (*auditPagingApiClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
+func (*auditPagingAPIClient) GetSettingsAuditLogs(context.Context, string) (*api.SettingsAuditLogsResponse, error) {
 	return &api.SettingsAuditLogsResponse{AuditLogsInDatabaseEnabled: true}, nil
 }
 
-// The rest of the ports auditPagingApiClient is passed to, which no test here reaches.
+// The rest of the ports auditPagingAPIClient is passed to, which no test here reaches.
 
-func (*auditPagingApiClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+func (*auditPagingAPIClient) UpdateSettingsAuditLogs(context.Context, string, *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
 	panic("unexpected call to UpdateSettingsAuditLogs")
 }
 
 // logsOnPage is the slice of a log of total entries that page holds, each
-// entry's Id being its 1-based position. The start < 0 arm stands for the
+// entry's ID being its 1-based position. The start < 0 arm stands for the
 // negative SQL offset a real API cannot serve.
 func logsOnPage(total, page, pageSize int) []api.AuditLogResponse {
 	start := (page - 1) * pageSize
@@ -99,10 +99,10 @@ func logsOnPage(total, page, pageSize int) []api.AuditLogResponse {
 	return logs
 }
 
-func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interface{}, *auditPagingApiClient) {
+func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interface{}, *auditPagingAPIClient) {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
@@ -113,7 +113,7 @@ func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interf
 	}
 	req := handlertest.Request(http.MethodGet, target, handlertest.WithAccessToken())
 
-	apiClient := &auditPagingApiClient{total: total}
+	apiClient := &auditPagingAPIClient{total: total}
 	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
@@ -199,11 +199,11 @@ func TestHandleAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 // whole call, and one that forgot the event filter would page through the
 // unfiltered log while the filter dropdown still named an event.
 func TestHandleAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
-	apiClient := &auditPagingApiClient{total: 50}
+	apiClient := &auditPagingAPIClient{total: 50}
 
 	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-logs?page=99&auditEvent=UserAuthSuccess",
 		handlertest.WithAccessToken(),
@@ -247,10 +247,10 @@ func TestHandleAuditLogViewerGet_EveryTotalLandsOnAPageWithRows(t *testing.T) {
 
 // renderAuditLogsWithQuery renders the viewer for a whole query string, which the
 // page-size cases above do not need and the filter cases do.
-func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[string]interface{}, *auditPagingApiClient) {
+func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[string]interface{}, *auditPagingAPIClient) {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
@@ -259,23 +259,23 @@ func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[str
 		handlertest.WithAccessToken(),
 	)
 
-	apiClient := &auditPagingApiClient{total: total}
+	apiClient := &auditPagingAPIClient{total: total}
 	HandleAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?%s", rawQuery)
 	return bind, apiClient
 }
 
-// TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage
+// TestHandleAuditLogViewerGet_TheRequestIDFilterReachesTheAPIAndThePage
 // is seam 8's handler half: the query parameter added in stage 3 has to be read here
 // and handed back to the page, or the input the operator typed into empties itself on
 // every render and the filter looks broken while the rows are right (#328).
-func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheRequestIDFilterReachesTheAPIAndThePage(t *testing.T) {
 	testCases := []struct {
 		name      string
 		rawQuery  string
 		wantEvent string
-		wantId    string
+		wantID    string
 		wantLink  string
 	}{
 		{
@@ -292,14 +292,14 @@ func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *te
 		{
 			name:     "the request id alone",
 			rawQuery: "requestId=host%2FPpg6bHPK5f-000012",
-			wantId:   "host/Ppg6bHPK5f-000012",
+			wantID:   "host/Ppg6bHPK5f-000012",
 			wantLink: "/admin/settings/audit-log-viewer?requestId=host%2FPpg6bHPK5f-000012",
 		},
 		{
 			name:      "both",
 			rawQuery:  "auditEvent=user_login&requestId=host%2FPpg6bHPK5f-000012",
 			wantEvent: "user_login",
-			wantId:    "host/Ppg6bHPK5f-000012",
+			wantID:    "host/Ppg6bHPK5f-000012",
 			wantLink:  "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=host%2FPpg6bHPK5f-000012",
 		},
 		{
@@ -308,7 +308,7 @@ func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *te
 			// parameter, and "page" would then be read from the attacker's half.
 			name:     "an id carrying a query separator",
 			rawQuery: "requestId=" + url.QueryEscape("x&page=9"),
-			wantId:   "x&page=9",
+			wantID:   "x&page=9",
 			wantLink: "/admin/settings/audit-log-viewer?requestId=x%26page%3D9",
 		},
 	}
@@ -317,32 +317,32 @@ func TestHandleAuditLogViewerGet_TheRequestIdFilterReachesTheApiAndThePage(t *te
 		t.Run(tc.name, func(t *testing.T) {
 			bind, apiClient := renderAuditLogsWithQuery(t, tc.rawQuery, 50)
 
-			assert.Equal(t, []string{tc.wantId}, apiClient.requestIds,
+			assert.Equal(t, []string{tc.wantID}, apiClient.requestIDs,
 				"the request id the API was asked for")
 			assert.Equal(t, []string{tc.wantEvent}, apiClient.events,
 				"the event the API was asked for")
 
-			assert.Equal(t, tc.wantId, bind["selectedRequestId"], "selectedRequestId")
+			assert.Equal(t, tc.wantID, bind["selectedRequestId"], "selectedRequestId")
 			assert.Equal(t, tc.wantEvent, bind["selectedEvent"], "selectedEvent")
 			assert.Equal(t, tc.wantLink, bind["paginatorLink"], "paginatorLink")
 
 			result, ok := bind["pageResult"].(AuditLogsPageResult)
 			require.True(t, ok, "pageResult")
-			assert.Equal(t, tc.wantId, result.RequestId, "pageResult.RequestId")
+			assert.Equal(t, tc.wantID, result.RequestID, "pageResult.RequestID")
 			assert.Equal(t, tc.wantEvent, result.AuditEvent, "pageResult.AuditEvent")
 		})
 	}
 }
 
-// TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery is
+// TestHandleAuditLogViewerGet_TheRequestIDFilterSurvivesTheSecondQuery is
 // the event filter's case from #305 for the second filter: the clamp repeats the whole
 // call, and one that forgot the id would page through the unfiltered log while the input
 // still showed an id.
-func TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheRequestIDFilterSurvivesTheSecondQuery(t *testing.T) {
 	_, apiClient := renderAuditLogsWithQuery(t, "page=99&auditEvent=user_login&requestId=an-id", 50)
 
 	require.Len(t, apiClient.asked, 2, "the clamp should have cost a second query")
-	assert.Equal(t, []string{"an-id", "an-id"}, apiClient.requestIds,
+	assert.Equal(t, []string{"an-id", "an-id"}, apiClient.requestIDs,
 		"the request id filter was dropped on the way")
 	assert.Equal(t, []string{"user_login", "user_login"}, apiClient.events,
 		"the event filter was dropped on the way")
@@ -350,13 +350,13 @@ func TestHandleAuditLogViewerGet_TheRequestIdFilterSurvivesTheSecondQuery(t *tes
 
 // TestAuditLogViewerLink owns the base URL the paginator appends "page" to. It is the
 // one string on the page built from a client-chosen value, so every byte a request id
-// can carry is escaped here: addUrlParam parses this string, and anything it reads as a
+// can carry is escaped here: addURLParam parses this string, and anything it reads as a
 // separator becomes a parameter the handler would believe over its own.
 func TestAuditLogViewerLink(t *testing.T) {
 	testCases := []struct {
 		name       string
 		auditEvent string
-		requestId  string
+		requestID  string
 		want       string
 	}{
 		{"neither", "", "", "/admin/settings/audit-log-viewer"},
@@ -371,7 +371,7 @@ func TestAuditLogViewerLink(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			link := auditLogViewerLink(tc.auditEvent, tc.requestId, 0)
+			link := auditLogViewerLink(tc.auditEvent, tc.requestID, 0)
 			assert.Equal(t, tc.want, link)
 
 			// What the paginator then does with it: the page number must be the
@@ -379,7 +379,7 @@ func TestAuditLogViewerLink(t *testing.T) {
 			// trip byte for byte.
 			parsed, err := url.Parse(link)
 			require.NoError(t, err)
-			assert.Equal(t, tc.requestId, parsed.Query().Get("requestId"), "the id did not round-trip")
+			assert.Equal(t, tc.requestID, parsed.Query().Get("requestId"), "the id did not round-trip")
 			assert.Equal(t, tc.auditEvent, parsed.Query().Get("auditEvent"), "the event did not round-trip")
 			assert.Empty(t, parsed.Query()["page"], "the link already carries a page")
 			assert.Empty(t, parsed.Fragment, "part of the link fell into a fragment")
@@ -406,14 +406,14 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // compiled into this binary; it is now whatever the auth server answered. The catalog below is
 // deliberately not a real one, so a handler that fell back on a compiled-in list would render
 // the wrong options rather than coincidentally the right ones.
-func TestHandleAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleAuditLogViewerGet_TheDropdownIsWhatTheAPIAnswered(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Once()
 
 	catalog := []string{"an_event_no_constant_declares", "another_one"}
-	apiClient := &auditPagingApiClient{total: 3, eventTypes: catalog}
+	apiClient := &auditPagingAPIClient{total: 3, eventTypes: catalog}
 
 	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer",
 		handlertest.WithAccessToken())
@@ -428,14 +428,14 @@ func TestHandleAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
 // anyway would show a filter with no options and nothing saying why, which reads as "this
 // deployment has no audit events" rather than as a failed call.
 func TestHandleAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	var answered error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { answered = args.Get(2).(error) }).Once()
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
-	apiClient := &auditPagingApiClient{
+	apiClient := &auditPagingAPIClient{
 		total: 3,
 		eventTypesErr: &apiclient.APIError{
 			Code:       "insufficient_scope",
@@ -489,14 +489,14 @@ func TestAuditLogDetails(t *testing.T) {
 	}
 }
 
-// TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage is the console half of
+// TestHandleAuditLogViewerGet_TheUserIDFilterReachesTheAPIAndThePage is the console half of
 // decision 8 (#780): the User id box is read here, handed to the API as a row id, put back in the
 // box, and carried in the paginator's link beside the other two filters.
-func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheUserIDFilterReachesTheAPIAndThePage(t *testing.T) {
 	testCases := []struct {
 		name       string
 		rawQuery   string
-		wantUserId int64
+		wantUserID int64
 		wantBox    string
 		wantLink   string
 	}{
@@ -507,7 +507,7 @@ func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testi
 		},
 		{
 			name:     "the user id alone",
-			rawQuery: "userId=42", wantUserId: 42, wantBox: "42",
+			rawQuery: "userId=42", wantUserID: 42, wantBox: "42",
 			wantLink: "/admin/settings/audit-log-viewer?userId=42",
 		},
 		{
@@ -518,17 +518,17 @@ func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testi
 		{
 			// A pasted id often brings a space with it, as a request id does.
 			name:     "spaces around the id",
-			rawQuery: "userId=%2042%20", wantUserId: 42, wantBox: "42",
+			rawQuery: "userId=%2042%20", wantUserID: 42, wantBox: "42",
 			wantLink: "/admin/settings/audit-log-viewer?userId=42",
 		},
 		{
 			name:     "all three filters",
-			rawQuery: "auditEvent=user_login&requestId=x%26page%3D9&userId=7", wantUserId: 7, wantBox: "7",
+			rawQuery: "auditEvent=user_login&requestId=x%26page%3D9&userId=7", wantUserID: 7, wantBox: "7",
 			wantLink: "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=x%26page%3D9&userId=7",
 		},
 		{
 			name:     "the largest row id",
-			rawQuery: "userId=9223372036854775807", wantUserId: 9223372036854775807, wantBox: "9223372036854775807",
+			rawQuery: "userId=9223372036854775807", wantUserID: 9223372036854775807, wantBox: "9223372036854775807",
 			wantLink: "/admin/settings/audit-log-viewer?userId=9223372036854775807",
 		},
 	}
@@ -537,7 +537,7 @@ func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			bind, apiClient := renderAuditLogsWithQuery(t, tc.rawQuery, 50)
 
-			assert.Equal(t, []int64{tc.wantUserId}, apiClient.userIds, "the user id the API was asked for")
+			assert.Equal(t, []int64{tc.wantUserID}, apiClient.userIDs, "the user id the API was asked for")
 			assert.Equal(t, tc.wantBox, bind["selectedUserId"], "selectedUserId")
 			assert.Equal(t, tc.wantLink, bind["paginatorLink"], "paginatorLink")
 			assert.Nil(t, bind["error"], "a usable id is no error")
@@ -547,17 +547,17 @@ func TestHandleAuditLogViewerGet_TheUserIdFilterReachesTheApiAndThePage(t *testi
 
 // The clamp repeats the whole call, as for the other two filters: one that forgot the user would
 // page through every user's events while the box still showed an id.
-func TestHandleAuditLogViewerGet_TheUserIdFilterSurvivesTheSecondQuery(t *testing.T) {
+func TestHandleAuditLogViewerGet_TheUserIDFilterSurvivesTheSecondQuery(t *testing.T) {
 	_, apiClient := renderAuditLogsWithQuery(t, "page=99&userId=42", 50)
 
 	require.Len(t, apiClient.asked, 2, "the clamp should have cost a second query")
-	assert.Equal(t, []int64{42, 42}, apiClient.userIds, "the user filter was dropped on the way")
+	assert.Equal(t, []int64{42, 42}, apiClient.userIDs, "the user filter was dropped on the way")
 }
 
 // A User id that is not a positive whole number is the box's error, on the page: never an error
 // page, and never the unfiltered log, which would list every user's events under a filter the
 // administrator believes is set (decision 3). The value stays in the box, so it can be corrected.
-func TestHandleAuditLogViewerGet_AUserIdThatIsNoPositiveNumberIsTheBoxsError(t *testing.T) {
+func TestHandleAuditLogViewerGet_AUserIDThatIsNoPositiveNumberIsTheBoxsError(t *testing.T) {
 	for _, raw := range []string{"abc", "0", "-3", "4.5", "1e3", "0x2A", "9223372036854775808", "42abc"} {
 		t.Run(raw, func(t *testing.T) {
 			bind, apiClient := renderAuditLogsWithQuery(t, "auditEvent=user_login&userId="+url.QueryEscape(raw), 50)
@@ -575,7 +575,7 @@ func TestHandleAuditLogViewerGet_AUserIdThatIsNoPositiveNumberIsTheBoxsError(t *
 	}
 }
 
-func TestAuditLogViewerLink_CarriesTheUserId(t *testing.T) {
+func TestAuditLogViewerLink_CarriesTheUserID(t *testing.T) {
 	assert.Equal(t, "/admin/settings/audit-log-viewer?userId=42", auditLogViewerLink("", "", 42))
 	assert.Equal(t, "/admin/settings/audit-log-viewer?auditEvent=user_login&requestId=an-id&userId=7",
 		auditLogViewerLink("user_login", "an-id", 7))

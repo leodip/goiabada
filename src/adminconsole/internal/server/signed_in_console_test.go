@@ -75,7 +75,7 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 			_, _ = w.Write([]byte(settings + `}`))
 		case "/certs":
 			assert.NoError(t, json.NewEncoder(w).Encode(oauth.JWKS{
-				Keys: []oauth.JWK{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+				Keys: []oauth.JWK{oauthclienttest.JWKFromPublicKey("key-1", &signing.PublicKey)}}))
 		default:
 			adminAPI(w, r)
 		}

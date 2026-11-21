@@ -60,9 +60,9 @@ type SignInOptions struct {
 	// Prompt is OpenID Connect Core 1.0 section 3.1.2.1's prompt, such as "login", which asks the
 	// auth server to authenticate the user again even while their session is live.
 	Prompt string
-	// AcrValues is section 3.1.2.1's acr_values, the authentication context classes requested,
+	// ACRValues is section 3.1.2.1's acr_values, the authentication context classes requested,
 	// space-separated in order of preference.
-	AcrValues string
+	ACRValues string
 }
 
 // RedirToAuthorize sends the browser to the auth server's authorize endpoint for an ordinary
@@ -127,16 +127,16 @@ func (s *AuthHelper) RedirToAuthorizeWith(
 	if options.Prompt != "" {
 		values.Add("prompt", options.Prompt)
 	}
-	if options.AcrValues != "" {
-		values.Add("acr_values", options.AcrValues)
+	if options.ACRValues != "" {
+		values.Add("acr_values", options.ACRValues)
 	}
 	if safeMode {
 		values.Add(SafeModeParameter, "true")
 	}
 
-	destUrl := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
+	destURL := fmt.Sprintf("%v/auth/authorize?%v", s.authServerBaseURL, values.Encode())
 
-	http.Redirect(w, r, destUrl, http.StatusFound)
+	http.Redirect(w, r, destURL, http.StatusFound)
 
 	return nil
 }
@@ -150,10 +150,10 @@ func nonceHash(nonce string) string {
 }
 
 // IsAuthorizedToAccessResource reports whether the grant the token response records includes any
-// of scopesAnyOf. It reads the response's scope through JwtInfo.HasScope, never the access token,
+// of scopesAnyOf. It reads the response's scope through JWTInfo.HasScope, never the access token,
 // which the console carries without decoding (#427). A visitor with no token response has an empty
 // grant and is authorized for nothing.
-func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo JwtInfo, scopesAnyOf []string) bool {
+func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo JWTInfo, scopesAnyOf []string) bool {
 	for _, scope := range scopesAnyOf {
 		if jwtInfo.HasScope(scope) {
 			return true
@@ -162,6 +162,6 @@ func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo JwtInfo, scopesAnyOf [
 	return false
 }
 
-func (s *AuthHelper) IsAuthenticated(jwtInfo JwtInfo) bool {
-	return jwtInfo.IdToken != nil
+func (s *AuthHelper) IsAuthenticated(jwtInfo JWTInfo) bool {
+	return jwtInfo.IDToken != nil
 }

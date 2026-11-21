@@ -17,24 +17,24 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// groupPermissionsSaveApiClient records the request the save hands the API and answers it with err.
-type groupPermissionsSaveApiClient struct {
+// groupPermissionsSaveAPIClient records the request the save hands the API and answers it with err.
+type groupPermissionsSaveAPIClient struct {
 	err  error
 	sent *api.UpdateGroupPermissionsRequest
 }
 
-func (s *groupPermissionsSaveApiClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
+func (s *groupPermissionsSaveAPIClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
 	s.sent = request
 	return s.err
 }
 
-// The rest of the ports groupPermissionsSaveApiClient is passed to, which no test here reaches.
+// The rest of the ports groupPermissionsSaveAPIClient is passed to, which no test here reaches.
 
-func (*groupPermissionsSaveApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+func (*groupPermissionsSaveAPIClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
 	panic("unexpected call to GetAllResources")
 }
 
-func (*groupPermissionsSaveApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+func (*groupPermissionsSaveAPIClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetGroupPermissions")
 }
 
@@ -81,7 +81,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 			)
 
 			// The API refuses, so the handler returns before the nil session is touched.
-			stub := &groupPermissionsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			stub := &groupPermissionsSaveAPIClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 			HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
@@ -105,7 +105,7 @@ func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	)
 	rec := httptest.NewRecorder()
 
-	stub := &groupPermissionsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
+	stub := &groupPermissionsSaveAPIClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
 	HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)

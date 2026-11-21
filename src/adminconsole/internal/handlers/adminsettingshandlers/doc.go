@@ -7,7 +7,7 @@
 // A handler answers a page or JSON, never both, and passes an admin API failure to render's
 // classifiers. A save that changes what the public settings report invalidates the console's
 // cached copy through SettingsInvalidator, so the next page renders with the new values rather
-// than waiting out the cache. HttpHelper is declared here rather than imported from the parent
+// than waiting out the cache. HTTPHelper is declared here rather than imported from the parent
 // handlers package, and each handler names the API methods it calls in an unexported port beside
 // it (#386, #440).
 package adminsettingshandlers

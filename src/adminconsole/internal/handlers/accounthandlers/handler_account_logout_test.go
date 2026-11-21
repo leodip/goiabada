@@ -23,9 +23,9 @@ import (
 // receive the form instruction and redirect anyway, or it could render a page built from something
 // other than the endpoint and parameters the API sent.
 
-// logoutApiClient answers CreateAccountLogoutRequest, the logout page's one-method port, from a
+// logoutAPIClient answers CreateAccountLogoutRequest, the logout page's one-method port, from a
 // script and records what it was asked for.
-type logoutApiClient struct {
+type logoutAPIClient struct {
 	form     *api.AccountLogoutFormPostResponse
 	redirect *api.AccountLogoutRedirectResponse
 
@@ -34,7 +34,7 @@ type logoutApiClient struct {
 	gotBearer string
 }
 
-func (c *logoutApiClient) CreateAccountLogoutRequest(_ context.Context, accessToken string, request *api.AccountLogoutRequest) (
+func (c *logoutAPIClient) CreateAccountLogoutRequest(_ context.Context, accessToken string, request *api.AccountLogoutRequest) (
 	*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	c.got = request
 	c.gotBearer = accessToken
@@ -42,23 +42,23 @@ func (c *logoutApiClient) CreateAccountLogoutRequest(_ context.Context, accessTo
 }
 
 // logoutRequest is a visitor holding what this page reads: a verified ID token and the access
-// token string. WithAccessToken alone leaves IdToken nil, which is the handler's unauthenticated
+// token string. WithAccessToken alone leaves IDToken nil, which is the handler's unauthenticated
 // arm.
 func logoutRequest() *http.Request {
 	return handlertest.Request(http.MethodPost, "/account/logout",
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-			IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
+			IDToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 		}))
 }
 
 func TestHandleLogoutPost_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/no_menu_layout.html", "/account_logout_form_post.html").Once()
 
-	apiClient := &logoutApiClient{form: &api.AccountLogoutFormPostResponse{
+	apiClient := &logoutAPIClient{form: &api.AccountLogoutFormPostResponse{
 		Method:   "POST",
 		Endpoint: "https://auth.example.com/auth/logout",
 		Params: map[string]string{
@@ -101,10 +101,10 @@ func TestHandleLogoutPost_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) 
 // shape whatever the request asked for. Before decision 2 the handler dereferenced the redirect
 // return unconditionally, so this is also the case that pins the nil check the form arm needed.
 func TestHandleLogoutPost_StillFollowsARedirectResponse(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
-	apiClient := &logoutApiClient{redirect: &api.AccountLogoutRedirectResponse{
+	apiClient := &logoutAPIClient{redirect: &api.AccountLogoutRedirectResponse{
 		LogoutURL: "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
 	}}
 
@@ -127,15 +127,15 @@ func TestHandleLogoutPost_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T
 			handlertest.Request(http.MethodPost, "/account/logout", handlertest.WithAccessToken())},
 		{"an ID token and no access token",
 			handlertest.Request(http.MethodPost, "/account/logout",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
+				handlertest.WithJWTInfo(oauthclient.JWTInfo{IDToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
-			apiClient := &logoutApiClient{}
+			apiClient := &logoutAPIClient{}
 			rec := httptest.NewRecorder()
 
 			HandleLogoutPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rec, tc.req)
@@ -151,16 +151,16 @@ func TestHandleLogoutPost_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T
 // #411: the GET renders the confirmation and writes nothing — this handler is not handed a
 // session store, so the page cannot sign anybody out — and the POST beside it is what does.
 func TestHandleLogoutConfirmGet_RendersTheConfirmationAndSignsNobodyOut(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/account_logout_confirm.html").Once()
 
 	rec := httptest.NewRecorder()
 	HandleLogoutConfirmGet(httpHelper, consoleBaseURL).ServeHTTP(rec,
 		handlertest.Request(http.MethodGet, "/auth/logout",
-			handlertest.WithJwtInfo(oauthclient.JwtInfo{
+			handlertest.WithJWTInfo(oauthclient.JWTInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-				IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
+				IDToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 			})))
 
 	assert.Equal(t, http.StatusOK, rec.Code, "the confirmation page is rendered, not redirected to")
@@ -180,12 +180,12 @@ func TestHandleLogoutConfirmGet_SendsAVisitorWithoutTokensHome(t *testing.T) {
 			handlertest.Request(http.MethodGet, "/auth/logout", handlertest.WithAccessToken())},
 		{"an ID token and no access token",
 			handlertest.Request(http.MethodGet, "/auth/logout",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
+				handlertest.WithJWTInfo(oauthclient.JWTInfo{IDToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			rec := httptest.NewRecorder()

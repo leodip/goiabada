@@ -30,8 +30,8 @@ func (memberSearchAPI) AddUserToGroup(context.Context, string, int64, int64) err
 	panic("the member search adds no one")
 }
 
-func (memberSearchAPI) GetGroupById(_ context.Context, _ string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{ID: groupId}, nil
+func (memberSearchAPI) GetGroupByID(_ context.Context, _ string, groupID int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{ID: groupID}, nil
 }
 
 func (memberSearchAPI) SearchUsersWithGroupAnnotation(context.Context, string, string, int64, int, int) ([]api.UserWithGroupMembershipResponse, int, error) {

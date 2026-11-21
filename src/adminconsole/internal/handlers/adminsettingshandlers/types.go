@@ -176,7 +176,7 @@ type SettingsGeneral struct {
 // field declares the key it is written under, and a field is respelled without moving its key (#482
 // decision 7).
 type SettingsKey struct {
-	Id int64 `json:"Id"`
+	ID int64 `json:"Id"`
 	// CreatedAt is the instant rather than pre-rendered text: the page formats it with the
 	// DateTime template function, which reads the layout from the viewer's catalog. Formatting
 	// it here produced "02 Jan 2006 15:04:05 MST" under every locale, month name included,
@@ -210,7 +210,7 @@ type SettingsTokenGet struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int
 	RefreshTokenOfflineMaxLifetimeInSeconds int
 	IncludeOpenIDConnectClaimsInAccessToken bool
-	IncludeOpenIDConnectClaimsInIdToken     bool
+	IncludeOpenIDConnectClaimsInIDToken     bool
 }
 
 type SettingsTokenPost struct {
@@ -218,7 +218,7 @@ type SettingsTokenPost struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds string
 	RefreshTokenOfflineMaxLifetimeInSeconds string
 	IncludeOpenIDConnectClaimsInAccessToken bool
-	IncludeOpenIDConnectClaimsInIdToken     bool
+	IncludeOpenIDConnectClaimsInIDToken     bool
 }
 
 type SettingsAuditLogsGet struct {
@@ -260,6 +260,6 @@ type AuditLogsPageResult struct {
 	Page       int
 	PageSize   int
 	AuditEvent string
-	RequestId  string
-	UserId     string
+	RequestID  string
+	UserID     string
 }

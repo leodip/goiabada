@@ -210,8 +210,8 @@ func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
 
 	// Both ports are set, so it is the empty hosts that disable the two listeners.
 	s := &Server{cfg: &config.Config{AdminConsole: config.AdminConsoleConfig{
-		ListenPortHttps: 9444,
-		ListenPortHttp:  9091,
+		ListenPortHTTPS: 9444,
+		ListenPortHTTP:  9091,
 	}}}
 	err := s.Start(context.Background())
 

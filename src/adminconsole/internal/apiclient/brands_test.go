@@ -19,10 +19,10 @@ import (
 const brandBodyFields = `"id":7,"name":"Spring","appearance":"dark","theme":"plum","isDefault":true,"clientCount":3,` +
 	`"createdAt":"2026-11-09T10:00:00Z","updatedAt":"2026-11-09T11:30:00Z"`
 
-func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetBrandByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"brand":{`+brandBodyFields+`}}`)
 
-	brand, err := client.GetBrandById(context.Background(), "an-access-token", 7)
+	brand, err := client.GetBrandByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, brand)
 

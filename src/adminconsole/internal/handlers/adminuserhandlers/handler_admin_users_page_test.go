@@ -29,16 +29,16 @@ import (
 // what the handler asks the API for, what it settles on, and that the rows and
 // the bar name the same page.
 
-// usersPagingApiClient answers the search from a list of a fixed size and
+// usersPagingAPIClient answers the search from a list of a fixed size and
 // records every page it was asked for, in order, which is what makes the second
 // query after a clamp visible -- and its absence, when the page was already
 // good, equally visible.
-type usersPagingApiClient struct {
+type usersPagingAPIClient struct {
 	total int
 	asked []int
 }
 
-func (c *usersPagingApiClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
+func (c *usersPagingAPIClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
 	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
@@ -46,7 +46,7 @@ func (c *usersPagingApiClient) SearchUsersPaginated(_ context.Context, accessTok
 }
 
 // usersOnPage is the slice of a list of total users that page holds, each
-// user's Id being its 1-based position in the whole list, so the rows a handler
+// user's ID being its 1-based position in the whole list, so the rows a handler
 // binds say which page they came from.
 //
 // The start < 0 arm is what a real API cannot have: it stands for the SQL
@@ -79,7 +79,7 @@ func usersOnPage(total, page, pageSize int) []api.UserResponse {
 func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{}, []int) {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users.html").Maybe()
 
@@ -89,7 +89,7 @@ func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{
 	}
 	req := handlertest.Request(http.MethodGet, target, handlertest.WithAccessToken())
 
-	apiClient := &usersPagingApiClient{total: total}
+	apiClient := &usersPagingAPIClient{total: total}
 
 	// A panic here is a failure, not a crash to explain: the sibling
 	// groups-with-permission page panicked on a page number this test also
@@ -225,11 +225,11 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // second query that forgot the search box would page through every user while
 // the bar and the search field still said otherwise.
 func TestHandleListGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
-	apiClient := &queryRecordingApiClient{total: 25}
+	apiClient := &queryRecordingAPIClient{total: 25}
 
 	req := handlertest.Request(http.MethodGet, "/admin/users?page=99&query=ana", handlertest.WithAccessToken())
 
@@ -241,13 +241,13 @@ func TestHandleListGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 		"the access token was dropped on the way")
 }
 
-type queryRecordingApiClient struct {
+type queryRecordingAPIClient struct {
 	total   int
 	queries []string
 	tokens  []string
 }
 
-func (c *queryRecordingApiClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
+func (c *queryRecordingAPIClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
 	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.queries = append(c.queries, query)

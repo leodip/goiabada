@@ -33,40 +33,40 @@ func lastAdministratorRefusal() error {
 	return &apiclient.APIError{Code: "LAST_ADMINISTRATOR", Message: lastAdministratorSentence, StatusCode: http.StatusConflict}
 }
 
-// lastAdministratorUserApiClient answers the reads a re-rendered page makes and refuses every
+// lastAdministratorUserAPIClient answers the reads a re-rendered page makes and refuses every
 // write as the last administrator's.
-type lastAdministratorUserApiClient struct {
+type lastAdministratorUserAPIClient struct {
 	user   *api.UserResponse
 	groups []api.GroupResponse
 }
 
-func (c *lastAdministratorUserApiClient) GetUserById(context.Context, string, int64) (*api.UserResponse, error) {
+func (c *lastAdministratorUserAPIClient) GetUserByID(context.Context, string, int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *lastAdministratorUserApiClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
+func (c *lastAdministratorUserAPIClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
 	return c.user, c.groups, nil
 }
 
-func (*lastAdministratorUserApiClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
+func (*lastAdministratorUserAPIClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
 	return nil, lastAdministratorRefusal()
 }
 
-func (*lastAdministratorUserApiClient) DeleteUser(context.Context, string, int64) error {
+func (*lastAdministratorUserAPIClient) DeleteUser(context.Context, string, int64) error {
 	return lastAdministratorRefusal()
 }
 
-func (*lastAdministratorUserApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+func (*lastAdministratorUserAPIClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
 	return lastAdministratorRefusal()
 }
 
-// The rest of the ports lastAdministratorUserApiClient is passed to, which no test here reaches.
+// The rest of the ports lastAdministratorUserAPIClient is passed to, which no test here reaches.
 
-func (*lastAdministratorUserApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+func (*lastAdministratorUserAPIClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
 	panic("unexpected call to GetAllResources")
 }
 
-func (*lastAdministratorUserApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (*lastAdministratorUserAPIClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetUserPermissions")
 }
 
@@ -74,7 +74,7 @@ func (*lastAdministratorUserApiClient) GetUserPermissions(context.Context, strin
 // sentence where the page shows an error, and no saved notice.
 func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
 	user := &api.UserResponse{ID: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
 
@@ -84,7 +84,7 @@ func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testin
 		handlertest.WithForm(url.Values{}),
 	)
 
-	HandleDetailsPost(httpHelper, nil, &lastAdministratorUserApiClient{user: user}, "https://console.example.com").
+	HandleDetailsPost(httpHelper, nil, &lastAdministratorUserAPIClient{user: user}, "https://console.example.com").
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -99,7 +99,7 @@ func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testin
 func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
 	user := &api.UserResponse{ID: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
 	groups := []api.GroupResponse{{ID: 2, GroupIdentifier: "admins"}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Once()
 
@@ -110,7 +110,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 	)
 	rec := httptest.NewRecorder()
 
-	HandleDeletePost(httpHelper, &lastAdministratorUserApiClient{user: user, groups: groups}, "https://console.example.com").
+	HandleDeletePost(httpHelper, &lastAdministratorUserAPIClient{user: user, groups: groups}, "https://console.example.com").
 		ServeHTTP(rec, req)
 
 	assert.Empty(t, rec.Header().Get("Location"), "no redirect to the list: the user was not deleted")
@@ -131,7 +131,7 @@ func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *t
 	)
 	rec := httptest.NewRecorder()
 
-	HandlePermissionsPost(render.New(nil, nil), nil, &lastAdministratorUserApiClient{}).ServeHTTP(rec, req)
+	HandlePermissionsPost(render.New(nil, nil), nil, &lastAdministratorUserAPIClient{}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }
@@ -145,7 +145,7 @@ func TestHandleGroupsPost_TheLastAdministratorRefusalReachesTheBrowser(t *testin
 	)
 	rec := httptest.NewRecorder()
 
-	HandleGroupsPost(render.New(nil, nil), nil, &userGroupsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
+	HandleGroupsPost(render.New(nil, nil), nil, &userGroupsSaveAPIClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }

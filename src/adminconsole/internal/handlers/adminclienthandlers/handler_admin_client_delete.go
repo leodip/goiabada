@@ -15,13 +15,13 @@ import (
 // clientDeleteAPI is what the client delete page needs: the permissions it warns about, and the
 // delete.
 type clientDeleteAPI interface {
-	DeleteClient(ctx context.Context, accessToken string, clientId int64) error
-	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
+	DeleteClient(ctx context.Context, accessToken string, clientID int64) error
+	GetClientPermissions(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, []api.PermissionResponse, error)
 }
 
 // clientDeleteView is what the delete page draws: the client, and the permissions it warns about.
 type clientDeleteView struct {
-	Id                       int64
+	ID                       int64
 	ClientIdentifier         string
 	Description              string
 	Enabled                  bool
@@ -35,7 +35,7 @@ type clientDeleteView struct {
 
 func newClientDeleteView(client *api.ClientResponse, perms []api.PermissionResponse) clientDeleteView {
 	return clientDeleteView{
-		Id:                       client.ID,
+		ID:                       client.ID,
 		ClientIdentifier:         client.ClientIdentifier,
 		Description:              client.Description,
 		Enabled:                  client.Enabled,
@@ -49,7 +49,7 @@ func newClientDeleteView(client *api.ClientResponse, perms []api.PermissionRespo
 }
 
 func HandleDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientDeleteAPI,
 ) http.HandlerFunc {
 
@@ -68,9 +68,9 @@ func HandleDeleteGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -97,7 +97,7 @@ func HandleDeleteGet(
 }
 
 func HandleDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientDeleteAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -117,9 +117,9 @@ func HandleDeletePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

@@ -195,13 +195,13 @@
             <div class="palette-cell" data-palette-column="{{ .Mode }}"{{ if not .Shown }} hidden{{ end }}>
               <div class="palette-control">
                 {{- $name := T $.ctx "adminconsole.admin_branding.palette.field_name" "color" (T $.ctx $row.LabelID) "mode" (T $.ctx (printf "adminconsole.admin_branding.appearance.%s" .Mode)) }}
-                <label class="sr-only" for="{{ .Id }}-well">{{ T $.ctx "adminconsole.admin_branding.palette.well_name" "field" $name }}</label>
-                <input type="color" class="palette-well" id="{{ .Id }}-well" value="{{ .Well }}" data-palette-well hidden>
-                <label class="sr-only" for="{{ .Id }}">{{ $name }}</label>
-                <input class="control palette-value" type="text" id="{{ .Id }}" name="{{ .Id }}" value="{{ .Value }}" autocomplete="off" spellcheck="false" autocapitalize="none" data-palette-value
-                  {{- if $.error }}{{ if .Refused }} aria-describedby="brand-error{{ if .Invalid }} {{ .Id }}-error{{ end }}" aria-invalid="true" autofocus{{ else if .Invalid }} aria-describedby="{{ .Id }}-error" aria-invalid="true"{{ end }}{{ else if .Invalid }} aria-describedby="{{ .Id }}-error" aria-invalid="true"{{ end }}>
+                <label class="sr-only" for="{{ .ID }}-well">{{ T $.ctx "adminconsole.admin_branding.palette.well_name" "field" $name }}</label>
+                <input type="color" class="palette-well" id="{{ .ID }}-well" value="{{ .Well }}" data-palette-well hidden>
+                <label class="sr-only" for="{{ .ID }}">{{ $name }}</label>
+                <input class="control palette-value" type="text" id="{{ .ID }}" name="{{ .ID }}" value="{{ .Value }}" autocomplete="off" spellcheck="false" autocapitalize="none" data-palette-value
+                  {{- if $.error }}{{ if .Refused }} aria-describedby="brand-error{{ if .Invalid }} {{ .ID }}-error{{ end }}" aria-invalid="true" autofocus{{ else if .Invalid }} aria-describedby="{{ .ID }}-error" aria-invalid="true"{{ end }}{{ else if .Invalid }} aria-describedby="{{ .ID }}-error" aria-invalid="true"{{ end }}>
               </div>
-              <p class="field-error" id="{{ .Id }}-error"{{ if not .Invalid }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.palette.value_invalid" }}</p>
+              <p class="field-error" id="{{ .ID }}-error"{{ if not .Invalid }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_branding.palette.value_invalid" }}</p>
             </div>
             {{- end }}
           </div>
@@ -345,7 +345,7 @@
         </div>
         <div class="field">
           <label class="field-label" for="footerLinks-{{ $i }}-url">{{ T $.ctx "adminconsole.admin_branding.brand.footer_links.url" }}</label>
-          <input class="control" id="footerLinks-{{ $i }}-url" type="url" name="footerLinks-{{ $i }}-url" value="{{ $link.Url }}" autocomplete="off"
+          <input class="control" id="footerLinks-{{ $i }}-url" type="url" name="footerLinks-{{ $i }}-url" value="{{ $link.URL }}" autocomplete="off"
             {{- if $.error }}{{ if eq $.errorField (printf "%surl" $prefix) }} aria-describedby="brand-error" aria-invalid="true" autofocus{{ end }}{{ end }}>
         </div>
       </div>
@@ -379,7 +379,7 @@
       </div>
       <div class="field">
         <label class="field-label" for="supportUrl">{{ T $.ctx "adminconsole.admin_branding.brand.support.url" }}</label>
-        <input class="control" id="supportUrl" type="url" name="supportUrl" value="{{ .brand.SupportUrl }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "supportUrl" }}brand-error {{ end }}{{ end }}supportUrlHint"
+        <input class="control" id="supportUrl" type="url" name="supportUrl" value="{{ .brand.SupportURL }}" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "supportUrl" }}brand-error {{ end }}{{ end }}supportUrlHint"
           {{- if .error }}{{ if eq .errorField "supportUrl" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
         <p class="field-hint" id="supportUrlHint">{{ T $.ctx "adminconsole.admin_branding.brand.support.url_hint" }}</p>
       </div>
@@ -405,7 +405,7 @@
       <p class="field-hint" id="customCssPreviewNote">{{ T $.ctx "adminconsole.admin_branding.brand.custom_css.preview_note" }}</p>
       <textarea class="control control-mono" id="customCss" name="customCss" rows="12" spellcheck="false" autocomplete="off" aria-describedby="{{ if .error }}{{ if eq .errorField "customCss" }}brand-error {{ end }}{{ end }}customCssHint customCssPreviewNote"
         {{- if .error }}{{ if eq .errorField "customCss" }} aria-invalid="true" autofocus{{ end }}{{ end }}>
-{{ .brand.CustomCss }}</textarea>
+{{ .brand.CustomCSS }}</textarea>
     </div>
   </div>
   <div class="panel-footer">

@@ -15,15 +15,15 @@ import (
 // its permissions, the groups to choose from, and each group's own set.
 type resourceGroupsWithPermissionAPI interface {
 	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
-	GetGroupPermissions(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
-	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
+	GetGroupPermissions(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, []api.PermissionResponse, error)
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
+	SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionID int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
+	UpdateGroupPermissions(ctx context.Context, accessToken string, groupID int64, request *api.UpdateGroupPermissionsRequest) error
 }
 
 func HandleGroupsWithPermissionGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
@@ -115,7 +115,7 @@ func HandleGroupsWithPermissionGet(
 			pageGroups := allGroups[start:end]
 			groupInfoArr = make([]GroupInfo, len(pageGroups))
 			for i, g := range pageGroups {
-				groupInfoArr[i] = GroupInfo{Id: g.ID, GroupIdentifier: g.GroupIdentifier, Description: g.Description, HasPermission: false}
+				groupInfoArr[i] = GroupInfo{ID: g.ID, GroupIdentifier: g.GroupIdentifier, Description: g.Description, HasPermission: false}
 			}
 		} else {
 			annotatedGroups, total2, searchErr := apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
@@ -141,7 +141,7 @@ func HandleGroupsWithPermissionGet(
 			groupInfoArr = make([]GroupInfo, len(annotatedGroups))
 			for i, grp := range annotatedGroups {
 				groupInfoArr[i] = GroupInfo{
-					Id:              grp.ID,
+					ID:              grp.ID,
 					GroupIdentifier: grp.GroupIdentifier,
 					Description:     grp.Description,
 					HasPermission:   grp.HasPermission,
@@ -174,7 +174,7 @@ func HandleGroupsWithPermissionGet(
 }
 
 func HandleGroupsWithPermissionAddPermissionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
@@ -191,19 +191,19 @@ func HandleGroupsWithPermissionAddPermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		groupIdStr := r.PathValue("groupId")
-		if len(groupIdStr) == 0 {
+		groupIDStr := r.PathValue("groupId")
+		if len(groupIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
+		groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupId)
+		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -213,13 +213,13 @@ func HandleGroupsWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissionIdStr := r.PathValue("permissionId")
-		if len(permissionIdStr) == 0 {
+		permissionIDStr := r.PathValue("permissionId")
+		if len(permissionIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		permissionID, err := strconv.ParseInt(permissionIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -227,7 +227,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -240,7 +240,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -251,13 +251,13 @@ func HandleGroupsWithPermissionAddPermissionPost(
 			return
 		}
 		// Build the new set and update via API
-		newIds := make([]int64, 0, len(currentPerms)+1)
+		newIDs := make([]int64, 0, len(currentPerms)+1)
 		for _, p := range currentPerms {
-			newIds = append(newIds, p.ID)
+			newIDs = append(newIDs, p.ID)
 		}
-		newIds = append(newIds, permissionId)
+		newIDs = append(newIDs, permissionID)
 
-		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIDs, ExpectedPermissionIDs: permissionIDsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.ID, req); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -273,7 +273,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 }
 
 func HandleGroupsWithPermissionRemovePermissionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
@@ -290,19 +290,19 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		groupIdStr := r.PathValue("groupId")
-		if len(groupIdStr) == 0 {
+		groupIDStr := r.PathValue("groupId")
+		if len(groupIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		groupId, err := strconv.ParseInt(groupIdStr, 10, 64)
+		groupID, err := strconv.ParseInt(groupIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupId)
+		group, currentPerms, err := apiClient.GetGroupPermissions(r.Context(), accessToken, groupID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -312,13 +312,13 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissionIdStr := r.PathValue("permissionId")
-		if len(permissionIdStr) == 0 {
+		permissionIDStr := r.PathValue("permissionId")
+		if len(permissionIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		permissionID, err := strconv.ParseInt(permissionIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -326,7 +326,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -339,7 +339,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -350,13 +350,13 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 		// Build reduced set and update via API
-		newIds := make([]int64, 0, len(currentPerms))
+		newIDs := make([]int64, 0, len(currentPerms))
 		for _, p := range currentPerms {
-			if p.ID != permissionId {
-				newIds = append(newIds, p.ID)
+			if p.ID != permissionID {
+				newIDs = append(newIDs, p.ID)
 			}
 		}
-		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIDs, ExpectedPermissionIDs: permissionIDsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.ID, req); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

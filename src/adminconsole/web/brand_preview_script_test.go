@@ -1191,7 +1191,7 @@ func TestBrandPreviewJS_PageshowDrawsTheRestoredFiles(t *testing.T) {
 }
 
 // A slot whose id field is empty holds nothing, whatever its URL field holds.
-func TestBrandPreviewJS_ASlotWithoutAnIdHoldsNothing(t *testing.T) {
+func TestBrandPreviewJS_ASlotWithoutAnIDHoldsNothing(t *testing.T) {
 	looks := runBrandPreview(t, previewPage{themeCards: bothCards, theme: "plum", appearance: "light", font: "uploaded",
 		slots: map[string]previewSlot{"logo": {URL: testLogoURL}, "background": {URL: testBackgroundURL}, "regularFont": {URL: testRegularURL}}},
 		load(), lookAt())

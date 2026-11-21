@@ -70,9 +70,9 @@ func newStartableTestServer(t *testing.T, configure func(*config.AdminConsoleCon
 
 	cfg := &config.Config{
 		AdminConsole: config.AdminConsoleConfig{
-			LogHttpRequests: true,
-			ListenHostHttp:  "127.0.0.1",
-			ListenPortHttp:  9091,
+			LogHTTPRequests: true,
+			ListenHostHTTP:  "127.0.0.1",
+			ListenPortHTTP:  9091,
 		},
 		// The browser's address of the auth server, which the policy admits, and the address this
 		// process calls it at.
@@ -387,11 +387,11 @@ func TestStart_TheHTTPListenerAndItsRecords(t *testing.T) {
 				c.BaseURL = tt.baseURL
 				c.TrustProxyHeaders = tt.trusted
 				if tt.httpsEnabled {
-					c.ListenHostHttps, c.ListenPortHttps = "127.0.0.1", 9444
+					c.ListenHostHTTPS, c.ListenPortHTTPS = "127.0.0.1", 9444
 					c.CertFile, c.KeyFile = "/certs/cert.pem", "/certs/key.pem"
 				}
 				if !tt.httpEnabled {
-					c.ListenHostHttp = ""
+					c.ListenHostHTTP = ""
 				}
 			})
 			logs := logtest.CaptureSlog(t)
@@ -454,7 +454,7 @@ func TestStart_AnHTTPSBaseURLsHTTPListenerOnlyRedirects(t *testing.T) {
 
 	s := newStartableTestServer(t, func(c *config.AdminConsoleConfig) {
 		c.BaseURL = "https://console.example.com"
-		c.ListenPortHttp = port
+		c.ListenPortHTTP = port
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

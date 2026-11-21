@@ -65,7 +65,7 @@
         </span>
       </label>
       <label class="check-row" for="includeOpenIDConnectClaimsInIdToken">
-        <input type="checkbox" id="includeOpenIDConnectClaimsInIdToken" name="includeOpenIDConnectClaimsInIdToken" aria-describedby="includeClaimsInIdHint"{{ if .settings.IncludeOpenIDConnectClaimsInIdToken }} checked{{ end }}>
+        <input type="checkbox" id="includeOpenIDConnectClaimsInIdToken" name="includeOpenIDConnectClaimsInIdToken" aria-describedby="includeClaimsInIdHint"{{ if .settings.IncludeOpenIDConnectClaimsInIDToken }} checked{{ end }}>
         <span class="grid min-w-0 flex-1 gap-0.5">
           <span class="choice-label">{{ T $.ctx "adminconsole.admin_settings.tokens.field.include_oidc_in_id_token" }}</span>
           <span class="field-hint" id="includeClaimsInIdHint">{{ T $.ctx "adminconsole.admin_settings.tokens.include_oidc_in_id_token_tooltip" }}</span>

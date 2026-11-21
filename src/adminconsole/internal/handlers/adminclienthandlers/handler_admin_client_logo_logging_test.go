@@ -17,28 +17,28 @@ import (
 	"github.com/leodip/goiabada/core/requestid"
 )
 
-// logoApiClient answers the two calls this page makes: the client it renders, and the logo
-// lookup that is allowed to fail. Separate from stubApiClient so that adding a failing method
+// logoAPIClient answers the two calls this page makes: the client it renders, and the logo
+// lookup that is allowed to fail. Separate from stubAPIClient so that adding a failing method
 // here cannot change what the redirect-URI cases see.
-type logoApiClient struct {
+type logoAPIClient struct {
 	logoErr error
 }
 
-func (c *logoApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
-	return &api.ClientResponse{ID: clientId, ClientIdentifier: "an-client"}, nil
+func (c *logoAPIClient) GetClientByID(_ context.Context, accessToken string, clientID int64) (*api.ClientResponse, error) {
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "an-client"}, nil
 }
 
-func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error) {
+func (c *logoAPIClient) GetClientLogo(_ context.Context, accessToken string, clientID int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, c.logoErr
 }
 
-// The rest of the ports logoApiClient is passed to, which no test here reaches.
+// The rest of the ports logoAPIClient is passed to, which no test here reaches.
 
-func (*logoApiClient) DeleteClientLogo(context.Context, string, int64) error {
+func (*logoAPIClient) DeleteClientLogo(context.Context, string, int64) error {
 	panic("unexpected call to DeleteClientLogo")
 }
 
-func (*logoApiClient) UploadClientLogo(context.Context, string, int64, []byte, string) (*api.ClientLogoUploadResponse, error) {
+func (*logoAPIClient) UploadClientLogo(context.Context, string, int64, []byte, string) (*api.ClientLogoUploadResponse, error) {
 	panic("unexpected call to UploadClientLogo")
 }
 
@@ -49,11 +49,11 @@ func (*logoApiClient) UploadClientLogo(context.Context, string, int64, []byte, s
 // the administrator is served, and nobody has to act, which is the definition decision 5 gives
 // Warn rather than the Error a failed call reads like. It also carries the request id from the
 // context, with neither the key nor the value named at the call site.
-func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *testing.T) {
+func TestHandleLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestID(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
-	httpHelper := &stubHttpHelper{}
-	apiClient := &logoApiClient{logoErr: errs.New("the auth server is unreachable")}
+	httpHelper := &stubHTTPHelper{}
+	apiClient := &logoAPIClient{logoErr: errs.New("the auth server is unreachable")}
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/42/logo",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42"))

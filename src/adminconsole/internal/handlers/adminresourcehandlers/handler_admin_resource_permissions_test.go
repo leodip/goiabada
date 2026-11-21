@@ -26,7 +26,7 @@ import (
 // refused on save.
 //
 // Both dependencies are the real implementations rather than mocks. Neither reaches a database or
-// a template: HttpHelper only encodes JSON on these paths, and IdentifierValidator is a regex. A
+// a template: HTTPHelper only encodes JSON on these paths, and IdentifierValidator is a regex. A
 // mocked IdentifierValidator in particular would prove nothing about the identifier case below,
 // which is entirely about what the handler hands it.
 func validatePermissionResponse(t *testing.T, identifier string, description string) ValidatePermissionResult {

@@ -12,21 +12,21 @@ import (
 
 // accountSessionsAPI is what the account sessions page needs: the list, and the revoke of one.
 type accountSessionsAPI interface {
-	DeleteAccountSession(ctx context.Context, accessToken string, sessionId int64) error
+	DeleteAccountSession(ctx context.Context, accessToken string, sessionID int64) error
 	GetAccountSessions(ctx context.Context, accessToken string) ([]api.UserSessionDetailResponse, error)
 }
 
 func HandleSessionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -52,16 +52,16 @@ func HandleSessionsGet(
 }
 
 func HandleSessionsEndSessionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -72,8 +72,8 @@ func HandleSessionsEndSessionPost(
 			return
 		}
 
-		userSessionId, ok := data["userSessionId"].(float64)
-		if !ok || userSessionId == 0 {
+		userSessionID, ok := data["userSessionId"].(float64)
+		if !ok || userSessionID == 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
@@ -90,7 +90,7 @@ func HandleSessionsEndSessionPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range sessions {
-			if es.ID == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionID) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}
@@ -109,7 +109,7 @@ func HandleSessionsEndSessionPost(
 		}
 
 		// Delete session via API (server validates ownership and audits)
-		if err = apiClient.DeleteAccountSession(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
+		if err = apiClient.DeleteAccountSession(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionID)); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

@@ -22,7 +22,7 @@ const storedCustomCSS = "body[data-page=\"sign-in\"] .auth-card {\n  border: 2px
 
 // A stored brand's page holds its custom CSS as the admin API answered it.
 func TestHandleBrandGet_DrawsTheStoredCustomCSS(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 	apiClient := newBrandingAPI()
@@ -32,7 +32,7 @@ func TestHandleBrandGet_DrawsTheStoredCustomCSS(t *testing.T) {
 		handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("brandId", "4")))
 
-	assert.Equal(t, storedCustomCSS, handlertest.Bind(t, httpHelper)["brand"].(BrandForm).CustomCss)
+	assert.Equal(t, storedCustomCSS, handlertest.Bind(t, httpHelper)["brand"].(BrandForm).CustomCSS)
 }
 
 // A new brand's CSS is sent exactly as the browser sent it, its spaces and CRLF line endings included:
@@ -40,7 +40,7 @@ func TestHandleBrandGet_DrawsTheStoredCustomCSS(t *testing.T) {
 // console rewrites nothing.
 func TestHandleBrandNewPost_SendsTheCustomCSSAsTyped(t *testing.T) {
 	const typed = "  .auth-card {\r\n  color: red;\r\n}\r\n\r\n"
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -63,7 +63,7 @@ func TestHandleBrandPost_SendsTheCustomCSSTheFormHolds(t *testing.T) {
 		{"emptied", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := newBrandingAPI()
 			apiClient.brands[0].CustomCSS = storedCustomCSS
@@ -95,13 +95,13 @@ func TestHandleBrandWrite_EachCustomCSSRefusalIsShownAtTheField(t *testing.T) {
 		var apiErr *apiclient.APIError
 		require.ErrorAs(t, err, &apiErr)
 		t.Run(apiErr.Code, func(t *testing.T) {
-			for name, post := range map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
-				"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+			for name, post := range map[string]func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI){
+				"new form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 					HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 						handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 							handlertest.WithForm(footerForm(url.Values{"customCss": {typed}}))))
 				},
-				"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+				"brand's form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 					HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
 						httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
 							handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"),
@@ -109,7 +109,7 @@ func TestHandleBrandWrite_EachCustomCSSRefusalIsShownAtTheField(t *testing.T) {
 				},
 			} {
 				t.Run(name, func(t *testing.T) {
-					httpHelper := handlersmocks.NewHttpHelper(t)
+					httpHelper := handlersmocks.NewHTTPHelper(t)
 					handlertest.RefuseInternalServerError(t, httpHelper)
 					handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 					apiClient := newBrandingAPI()
@@ -121,7 +121,7 @@ func TestHandleBrandWrite_EachCustomCSSRefusalIsShownAtTheField(t *testing.T) {
 					bind := handlertest.Bind(t, httpHelper)
 					assert.Equal(t, "customCss", bind["errorField"])
 					assert.Equal(t, apiErr.Message, bind["error"])
-					assert.Equal(t, typed, bind["brand"].(BrandForm).CustomCss, "the CSS as typed, not the stored one")
+					assert.Equal(t, typed, bind["brand"].(BrandForm).CustomCSS, "the CSS as typed, not the stored one")
 				})
 			}
 		})

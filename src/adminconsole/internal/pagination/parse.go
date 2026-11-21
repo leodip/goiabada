@@ -5,11 +5,11 @@ import (
 	"strconv"
 )
 
-// maxApiPageSize is the largest page size the auth server API accepts, from the
+// maxAPIPageSize is the largest page size the auth server API accepts, from the
 // "s > 0 && s <= 200" its list endpoints validate with. The admin console never
 // asks for more than 20, but the bound below is only honest if it holds for the
 // largest page size that could reach the database.
-const maxApiPageSize = 200
+const maxAPIPageSize = 200
 
 // maxPage is the largest page number ParsePage will return.
 //
@@ -40,7 +40,7 @@ const maxApiPageSize = 200
 // platform's int rather than only on a 64-bit one. Either way it is a page
 // number no list will ever reach: at the console's page size of 10 it is a list
 // of 4.6e17 rows.
-var maxPage = math.MaxInt/maxApiPageSize + 1
+var maxPage = math.MaxInt/maxAPIPageSize + 1
 
 // ParsePage turns the raw value of a "?page=" query parameter into a page
 // number. Anything a browser can put there and this package cannot use -- an

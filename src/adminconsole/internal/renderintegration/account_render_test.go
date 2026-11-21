@@ -192,7 +192,7 @@ func TestRender_ProfilePagesSelectTheStoredZoneRow(t *testing.T) {
 // The hidden inputs are what #247 removed. They put the TOTP shared secret and an image encoding it
 // into the submitted body of every enrolment attempt, on a page that then let the server enrol
 // whatever came back. The visible <img> and <pre> stay: those are what the user scans and types.
-func TestRender_AccountOtp_Enrollment(t *testing.T) {
+func TestRender_AccountOTP_Enrollment(t *testing.T) {
 	const secretKey = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 
 	out := renderMenuPage(t, "/account_otp.html", map[string]interface{}{
@@ -218,7 +218,7 @@ func TestRender_AccountOtp_Enrollment(t *testing.T) {
 
 // The enabled state carries neither, whatever the bind map happens to hold: a user with an
 // authenticator is not enrolling, and the page is a disable form.
-func TestRender_AccountOtp_Enabled(t *testing.T) {
+func TestRender_AccountOTP_Enabled(t *testing.T) {
 	out := renderMenuPage(t, "/account_otp.html", map[string]interface{}{
 		"otpEnabled": true,
 		"error":      "Authentication failed. Check your password and try again.",
@@ -235,7 +235,7 @@ func TestRender_AccountOtp_Enabled(t *testing.T) {
 // Right after two-factor authentication is turned on, the page shows the set of recovery codes,
 // each on its own line, with the instruction to save them and the Copy button that copies the list
 // (#257 decision 8). The codes are text only: none of them is in a form, so nothing posts them back.
-func TestRender_AccountOtp_TheNewSetOfRecoveryCodes(t *testing.T) {
+func TestRender_AccountOTP_TheNewSetOfRecoveryCodes(t *testing.T) {
 	codes := []string{"7kq2-m9xh-4trw-b3np-j6vd-egac", "0123-4567-89ab-cdef-ghjk-mnpq"}
 
 	out := renderMenuPageIn(t, "/account_otp.html", map[string]interface{}{
@@ -261,7 +261,7 @@ func TestRender_AccountOtp_TheNewSetOfRecoveryCodes(t *testing.T) {
 // the set's ten codes are unused, or that none are and a new set is needed, and a form taking the
 // password that asks, before it is sent, to confirm that the old codes stop working (#257 decisions
 // 8 and 9).
-func TestRender_AccountOtp_TheRecoveryCodesSection(t *testing.T) {
+func TestRender_AccountOTP_TheRecoveryCodesSection(t *testing.T) {
 	counts := []struct {
 		remaining int
 		want      string
@@ -329,7 +329,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
 				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					UserSessionID: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
 			},
@@ -340,7 +340,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
+					UserSessionID: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
 				"page":  "1",
@@ -353,7 +353,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			bind: map[string]interface{}{
 				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
-					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					UserSessionID: 1, UserID: 7, UserEmail: "someone@example.com",
 					DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
 				}},
@@ -410,7 +410,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
 				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
+					UserSessionID: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 			},
 		},
@@ -420,7 +420,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"sessions": []render.SessionInfo{{
-					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
+					UserSessionID: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
 				"page":  "1",
 				"query": "",
@@ -432,7 +432,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			bind: map[string]interface{}{
 				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
-					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					UserSessionID: 1, UserID: 7, UserEmail: "someone@example.com",
 					Started: &started, LastAccessed: &lastAccessed,
 				}},
 			},
@@ -461,7 +461,7 @@ func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 	out := renderMenuPage(t, "/admin_clients_usersessions.html", map[string]interface{}{
 		"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 		"sessions": []adminclienthandlers.SessionInfo{{
-			UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+			UserSessionID: 1, UserID: 7, UserEmail: "someone@example.com",
 		}},
 	})
 
@@ -489,8 +489,8 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 			page: "/account_user_sessions.html",
 			bind: map[string]interface{}{
 				"sessions": []render.SessionInfo{
-					{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
-					{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+					{UserSessionID: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionID: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
 				},
 			},
 			endURL: "/account/sessions",
@@ -501,8 +501,8 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{ID: 7, Email: "admin@example.com"},
 				"sessions": []render.SessionInfo{
-					{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
-					{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+					{UserSessionID: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionID: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
 				},
 				"page":  "1",
 				"query": "",
@@ -515,8 +515,8 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 			bind: map[string]interface{}{
 				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{
-					{UserSessionId: 1, UserId: 7, UserEmail: "admin@example.com", DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
-					{UserSessionId: 2, UserId: 8, UserEmail: "someone@example.com", DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
+					{UserSessionID: 1, UserID: 7, UserEmail: "admin@example.com", DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
+					{UserSessionID: 2, UserID: 8, UserEmail: "someone@example.com", DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
 				},
 			},
 			endURL: "/admin/clients/3/user-sessions/delete",
@@ -563,7 +563,7 @@ func TestRender_ConnectedClientPagesAskWithTheirOwnSentence(t *testing.T) {
 			name: "account",
 			page: "/account_applications.html",
 			bind: map[string]interface{}{
-				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: "web-app", ClientName: markup, GrantScope: "openid"}},
+				"clients": []render.ConnectedClientInfo{{ClientID: 4, Client: "web-app", ClientName: markup, GrantScope: "openid"}},
 			},
 			action: `data-action-url="/account/applications" data-action-body="{&#34;clientId&#34;:4}"`,
 			dialog: "disconnectClient",
@@ -573,7 +573,7 @@ func TestRender_ConnectedClientPagesAskWithTheirOwnSentence(t *testing.T) {
 			page: "/admin_users_connected_clients.html",
 			bind: map[string]interface{}{
 				"user":    &api.UserResponse{ID: 7, Email: "someone@example.com"},
-				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: markup, GrantScope: "openid"}},
+				"clients": []render.ConnectedClientInfo{{ClientID: 4, Client: markup, GrantScope: "openid"}},
 				"page":    "1",
 				"query":   "",
 			},
@@ -620,7 +620,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			cell: `<td class="sm:whitespace-nowrap" data-label="Consentimento">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"clients": []render.ConnectedClientInfo{{
-					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
+					ClientID: 1, Client: "web-app", ClientDescription: "The web app",
 					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
 				}},
 			},
@@ -632,7 +632,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"clients": []render.ConnectedClientInfo{{
-					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
+					ClientID: 1, Client: "web-app", ClientDescription: "The web app",
 					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
 				}},
 				"page":              "1",
@@ -657,9 +657,9 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) {
 	consents := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
-			{ClientId: 1, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders and invoices",
+			{ClientID: 1, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders and invoices",
 				HasConsent: true, ConsentScope: "openid"},
-			{ClientId: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, GrantScope: "openid"},
+			{ClientID: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, GrantScope: "openid"},
 		},
 	})
 	assert.Contains(t, consents, `<span class="font-semibold">Customer portal</span>`)
@@ -672,7 +672,7 @@ func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) 
 
 	sessions := renderMenuPage(t, "/account_user_sessions.html", map[string]interface{}{
 		"sessions": []render.SessionInfo{{
-			UserSessionId: 1, DeviceName: "Firefox", DeviceType: "Desktop", DeviceOS: "Linux",
+			UserSessionID: 1, DeviceName: "Firefox", DeviceType: "Desktop", DeviceOS: "Linux",
 			Clients:     []string{"portal", "dcr_a3f9"},
 			ClientNames: []render.ClientName{{Name: "Customer portal"}, {Name: "Payroll Portal", Unverified: true}},
 		}},
@@ -689,7 +689,7 @@ func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) 
 func TestRender_ApplicationsPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
 	out := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{{
-			ClientId: 1, Client: "web-app", HasConsent: true, ConsentScope: "openid",
+			ClientID: 1, Client: "web-app", HasConsent: true, ConsentScope: "openid",
 		}},
 	})
 

@@ -81,12 +81,12 @@ func brandAssetUploads(ctx context.Context) map[string]BrandAssetUpload {
 // A file the request-body table cuts off never reaches the admin API: it is refused as the API refuses
 // a file over the kind's limit, naming the limit, so a person sees the same sentence whichever side
 // measured it.
-func HandleBrandAssetPost(httpHelper HttpHelper, apiClient brandAssetUploadAPI, kind string) http.HandlerFunc {
+func HandleBrandAssetPost(httpHelper HTTPHelper, apiClient brandAssetUploadAPI, kind string) http.HandlerFunc {
 	limit := brandAssetKinds[kind]
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

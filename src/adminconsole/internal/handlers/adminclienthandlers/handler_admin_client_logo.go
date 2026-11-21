@@ -20,10 +20,10 @@ import (
 // clientLogoAPI is what the client logo page needs: the client, and the logo it reads, uploads
 // and deletes.
 type clientLogoAPI interface {
-	DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
-	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error)
-	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*api.ClientLogoUploadResponse, error)
+	DeleteClientLogo(ctx context.Context, accessToken string, clientID int64) error
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
+	GetClientLogo(ctx context.Context, accessToken string, clientID int64) (*api.ClientLogoInfoResponse, error)
+	UploadClientLogo(ctx context.Context, accessToken string, clientID int64, logoData []byte, filename string) (*api.ClientLogoUploadResponse, error)
 }
 
 // The error surface here answers through the console's shared JSON writers rather than the
@@ -32,7 +32,7 @@ type clientLogoAPI interface {
 // invariant the other 100 sites answer 500 for, and rendered the HTML 500 page into a fetch() that
 // was about to call response.json(). The success bodies are unchanged.
 func HandleLogoGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 
@@ -50,13 +50,13 @@ func HandleLogoGet(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -66,7 +66,7 @@ func HandleLogoGet(
 			return
 		}
 
-		var logoUrl string
+		var logoURL string
 		logoInfo, err := apiClient.GetClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			// The page renders without the logo, but not past a 401 that ends the session: the
@@ -78,12 +78,12 @@ func HandleLogoGet(
 			}
 			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
 		} else if logoInfo != nil && logoInfo.HasLogo {
-			logoUrl = fmt.Sprintf("%s?t=%d", logoInfo.LogoURL, time.Now().UnixNano())
+			logoURL = fmt.Sprintf("%s?t=%d", logoInfo.LogoURL, time.Now().UnixNano())
 		}
 
 		bind := map[string]interface{}{
 			"client":  clientResp,
-			"logoUrl": logoUrl,
+			"logoUrl": logoURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_logo.html", bind)
@@ -95,18 +95,18 @@ func HandleLogoGet(
 }
 
 func HandleLogoPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientIdStr := r.PathValue("clientId")
-		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
+		clientIDStr := r.PathValue("clientId")
+		clientID, err := strconv.ParseInt(clientIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -134,7 +134,7 @@ func HandleLogoPost(
 			return
 		}
 
-		response, err := apiClient.UploadClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
+		response, err := apiClient.UploadClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientID, logoData, header.Filename)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -149,24 +149,24 @@ func HandleLogoPost(
 }
 
 func HandleLogoDelete(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientIdStr := r.PathValue("clientId")
-		clientId, err := strconv.ParseInt(clientIdStr, 10, 64)
+		clientIDStr := r.PathValue("clientId")
+		clientID, err := strconv.ParseInt(clientIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		err = apiClient.DeleteClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId)
+		err = apiClient.DeleteClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

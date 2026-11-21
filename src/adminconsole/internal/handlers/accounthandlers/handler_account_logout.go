@@ -39,16 +39,16 @@ type accountLogoutAPI interface {
 // A visitor with no token set is not asked to confirm what they cannot do, and is sent home
 // exactly as the sign-out below sends them.
 func HandleLogoutConfirmGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// An absent token set is this page's unauthenticated arm, not a fault: the zero value has
 		// no ID token, and the visitor is sent home below.
-		jwtInfo, _ := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, _ := reqctx.JWTInfoFrom(r.Context())
 
-		if jwtInfo.IdToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
+		if jwtInfo.IDToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
 			http.Redirect(w, r, baseURL, http.StatusFound)
 			return
 		}
@@ -75,7 +75,7 @@ func HandleLogoutConfirmGet(
 // and the auth server; a self-submitting form carries it in a request body instead (#350
 // decision 2).
 func HandleLogoutPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountLogoutAPI,
 	baseURL string,
@@ -84,7 +84,7 @@ func HandleLogoutPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		// An absent token set is this page's unauthenticated arm, not a fault: the zero value has
 		// no ID token, and the visitor is sent home below.
-		jwtInfo, _ := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, _ := reqctx.JWTInfoFrom(r.Context())
 
 		session, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 		if err != nil {
@@ -100,7 +100,7 @@ func HandleLogoutPost(
 		}
 
 		// If we don't have a valid ID token, just go back to the console home
-		if jwtInfo.IdToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
+		if jwtInfo.IDToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
 			http.Redirect(w, r, baseURL, http.StatusFound)
 			return
 		}

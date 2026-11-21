@@ -61,7 +61,7 @@ func TestHandleGeneralPost_AnIssuerChangeDeletesTheTokenResponseAndItsExpiry(t *
 		req.AddCookie(c)
 	}
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
 	HandleGeneralPost(httpHelper, store,

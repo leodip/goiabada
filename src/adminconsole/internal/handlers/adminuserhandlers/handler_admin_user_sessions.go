@@ -14,21 +14,21 @@ import (
 // userSessionsAPI is what the user sessions page needs: the user, its sessions, and the revoke of
 // one.
 type userSessionsAPI interface {
-	DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserSessionsByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserSessionDetailResponse, error)
+	DeleteUserSessionByID(ctx context.Context, accessToken string, sessionID int64) error
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	GetUserSessionsByUserID(ctx context.Context, accessToken string, userID int64) ([]api.UserSessionDetailResponse, error)
 }
 
 func HandleSessionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -45,7 +45,7 @@ func HandleSessionsGet(
 		}
 
 		// Get user details via API
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -56,7 +56,7 @@ func HandleSessionsGet(
 		}
 
 		// Get the user's sessions via API
-		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
+		sessions, err := apiClient.GetUserSessionsByUserID(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -80,15 +80,15 @@ func HandleSessionsGet(
 }
 
 func HandleSessionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -105,7 +105,7 @@ func HandleSessionsPost(
 		}
 
 		// Verify user exists via API
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -122,8 +122,8 @@ func HandleSessionsPost(
 			return
 		}
 
-		userSessionId, ok := data["userSessionId"].(float64)
-		if !ok || userSessionId == 0 {
+		userSessionID, ok := data["userSessionId"].(float64)
+		if !ok || userSessionID == 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
@@ -132,7 +132,7 @@ func HandleSessionsPost(
 		// server computes isCurrent from the sid claim of the very token this request forwards,
 		// so this is the same comparison the console used to make for itself, now made once and
 		// in one place (#373).
-		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
+		sessions, err := apiClient.GetUserSessionsByUserID(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleSessionsPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range sessions {
-			if es.ID == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionID) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}
@@ -162,7 +162,7 @@ func HandleSessionsPost(
 		}
 
 		// Delete the user session via API
-		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
+		err = apiClient.DeleteUserSessionByID(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionID))
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

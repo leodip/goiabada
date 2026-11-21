@@ -39,14 +39,14 @@
             {{ range .Clients }}<li>{{ . }}</li>{{ end }}
           </ul>
         </td>
-        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_ip" }}">{{ .IpAddress }}</td>
+        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_ip" }}">{{ .IPAddress }}</td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_started_at" }}">{{ DateTime $.ctx .Started }}<span class="cell-secondary">{{ Since $.ctx .Started }}</span></td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_last_accessed_at" }}">{{ DateTime $.ctx .LastAccessed }}<span class="cell-secondary">{{ Since $.ctx .LastAccessed }}</span></td>
         <td class="cell-actions">
           {{ if .IsCurrent }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
           {{ else }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
           {{ end }}
         </td>
       </tr>

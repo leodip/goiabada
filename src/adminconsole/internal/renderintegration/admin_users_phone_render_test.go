@@ -35,7 +35,7 @@ func (s *phoneTabAPI) GetPhoneCountries(_ context.Context, _ string) ([]api.Phon
 	}, nil
 }
 
-func (s *phoneTabAPI) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (s *phoneTabAPI) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	return s.stored, nil
 }
 

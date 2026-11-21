@@ -293,7 +293,7 @@ var searchPages = []string{
 var (
 	formOpenRe       = regexp.MustCompile(`(?is)<form\b[^>]*>`)
 	searchInputRe    = regexp.MustCompile(`(?is)<input\b[^>]*\bid="search"[^>]*>`)
-	searchFormIdRe   = regexp.MustCompile(`(?is)\bid="userSearchForm"`)
+	searchFormIDRe   = regexp.MustCompile(`(?is)\bid="userSearchForm"`)
 	searchScriptRe   = regexp.MustCompile(`/static/pages/user-search\.js`)
 	preventsSubmitRe = regexp.MustCompile(`(?s)searchForm\.addEventListener\("submit", function \(event\) \{\s*event\.preventDefault\(\);`)
 )
@@ -314,7 +314,7 @@ func searchFormFault(page string) (string, bool) {
 	if open == nil || strings.Contains(strings.ToLower(page[open[1]:input[0]]), "</form") {
 		return "", false
 	}
-	if !searchFormIdRe.MatchString(page[open[0]:open[1]]) {
+	if !searchFormIDRe.MatchString(page[open[0]:open[1]]) {
 		return "the form holding the search box is not #userSearchForm, whose submit user-search.js stops; " +
 			"Enter in the box then submits it (#562)", true
 	}

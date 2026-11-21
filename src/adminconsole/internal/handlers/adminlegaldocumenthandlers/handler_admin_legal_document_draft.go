@@ -13,7 +13,7 @@ import (
 )
 
 func HandleDraftGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentTextReader,
 ) http.HandlerFunc {
@@ -42,14 +42,14 @@ func HandleDraftGet(
 // with, and the write.
 type legalDocumentDraftAPI interface {
 	legalDocumentReader
-	SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentId int64, request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error)
+	SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentID int64, request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error)
 }
 
 // HandleDraftPost saves the editor's fields as the document's one draft, which replaces the draft
 // it held or starts one. The short name goes with it only until the document is first published:
 // from then on it is fixed, so links to its public page keep working.
 func HandleDraftPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentDraftAPI,
 	baseURL string,
@@ -101,13 +101,13 @@ func HandleDraftPost(
 // drawn with, and the write.
 type legalDocumentPublishAPI interface {
 	legalDocumentTextReader
-	PublishLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error)
+	PublishLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error)
 }
 
 // HandlePublishPost publishes the document's saved draft as its next version and opens the
 // versions, which name the one published. A refusal is said on the editor.
 func HandlePublishPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentPublishAPI,
 	baseURL string,

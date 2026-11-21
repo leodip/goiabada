@@ -41,7 +41,7 @@ func TestTokenClientAndJWKSFetch_SharingAClientRecordUnderTheirOwnTargets(t *tes
 	require.NoError(t, err)
 	_, err = tokenClient.ClientCredentials(context.Background(), "authserver:manage")
 	require.NoError(t, err)
-	require.NoError(t, parser.refreshJwks(context.Background()))
+	require.NoError(t, parser.refreshJWKS(context.Background()))
 
 	rec := httptest.NewRecorder()
 	reg.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))

@@ -137,7 +137,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 			name:      "the redirect to the authorize endpoint fails",
 			wantCause: "unable to redirect to authorize",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				jwtInfo := oauthclient.JwtInfo{}
+				jwtInfo := oauthclient.JWTInfo{}
 
 				helper := new(middlewaremocks.AuthHelper)
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -149,7 +149,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				m := NewJWT(new(sessionstoremocks.Store), nil, sessionName, new(middlewaremocks.TokenParser), nil, helper, rec, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+				req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},

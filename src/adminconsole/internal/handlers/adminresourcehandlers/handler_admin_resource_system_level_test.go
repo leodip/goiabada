@@ -26,31 +26,31 @@ import (
 // case the two implementations answer differently: the console would offer a rename the API then
 // refuses. Both rows are here, so a return to the local rule fails the first and a hard-coded true
 // fails the second.
-type systemLevelApiClient struct {
+type systemLevelAPIClient struct {
 	resource api.ResourceResponse
 }
 
-func (c *systemLevelApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *systemLevelAPIClient) GetResourceByID(_ context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
 	resource := c.resource
-	resource.ID = resourceId
+	resource.ID = resourceID
 	return &resource, nil
 }
 
-func (c *systemLevelApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *systemLevelAPIClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error) {
 	return nil, nil
 }
 
-// The rest of the ports systemLevelApiClient is passed to, which no test here reaches.
+// The rest of the ports systemLevelAPIClient is passed to, which no test here reaches.
 
-func (*systemLevelApiClient) DeleteResource(context.Context, string, int64) error {
+func (*systemLevelAPIClient) DeleteResource(context.Context, string, int64) error {
 	panic("unexpected call to DeleteResource")
 }
 
-func (*systemLevelApiClient) UpdateResource(context.Context, string, int64, *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+func (*systemLevelAPIClient) UpdateResource(context.Context, string, int64, *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
 	panic("unexpected call to UpdateResource")
 }
 
-func (*systemLevelApiClient) UpdateResourcePermissions(context.Context, string, int64, *api.UpdateResourcePermissionsRequest) error {
+func (*systemLevelAPIClient) UpdateResourcePermissions(context.Context, string, int64, *api.UpdateResourcePermissionsRequest) error {
 	panic("unexpected call to UpdateResourcePermissions")
 }
 
@@ -58,11 +58,11 @@ func (*systemLevelApiClient) UpdateResourcePermissions(context.Context, string, 
 func bindOfSystemLevelPage(t *testing.T, page string, resource api.ResourceResponse) map[string]interface{} {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 
-	apiClient := &systemLevelApiClient{resource: resource}
+	apiClient := &systemLevelAPIClient{resource: resource}
 
 	var handler http.HandlerFunc
 	switch page {
@@ -115,11 +115,11 @@ func TestAdminResourcePages_TheSystemLevelFlagIsTheServersAnswer(t *testing.T) {
 // re-renders with the refusal and DeleteResource is never reached, which the stub proves by
 // panicking if it is.
 func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 
-	apiClient := &systemLevelApiClient{resource: api.ResourceResponse{
+	apiClient := &systemLevelAPIClient{resource: api.ResourceResponse{
 		ResourceIdentifier:    "some-other-resource",
 		IsSystemLevelResource: true,
 	}}

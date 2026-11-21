@@ -13,13 +13,13 @@ import (
 // userAttributesAPI is what the user attributes page needs: the user, its attributes, and the
 // delete of one.
 type userAttributesAPI interface {
-	DeleteUserAttribute(ctx context.Context, accessToken string, attributeId int64) error
-	GetUserAttributesByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserAttributeResponse, error)
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	DeleteUserAttribute(ctx context.Context, accessToken string, attributeID int64) error
+	GetUserAttributesByUserID(ctx context.Context, accessToken string, userID int64) ([]api.UserAttributeResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
 }
 
 func HandleAttributesGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesAPI,
 ) http.HandlerFunc {
 
@@ -38,13 +38,13 @@ func HandleAttributesGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -54,7 +54,7 @@ func HandleAttributesGet(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
+		attributes, err := apiClient.GetUserAttributesByUserID(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -76,7 +76,7 @@ func HandleAttributesGet(
 }
 
 func HandleAttributesRemovePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesAPI,
 ) http.HandlerFunc {
 
@@ -95,13 +95,13 @@ func HandleAttributesRemovePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -111,19 +111,19 @@ func HandleAttributesRemovePost(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
+		attributes, err := apiClient.GetUserAttributesByUserID(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
 
-		attributeIdStr := r.PathValue("attributeId")
-		if len(attributeIdStr) == 0 {
+		attributeIDStr := r.PathValue("attributeId")
+		if len(attributeIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -131,7 +131,7 @@ func HandleAttributesRemovePost(
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.ID == attributeId {
+			if attribute.ID == attributeID {
 				found = true
 				break
 			}
@@ -142,7 +142,7 @@ func HandleAttributesRemovePost(
 			return
 		}
 
-		err = apiClient.DeleteUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
+		err = apiClient.DeleteUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

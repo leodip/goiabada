@@ -27,25 +27,25 @@ import (
 // at JSONError as a bare error and came back as "An unexpected server error has occurred" with the
 // explanation in the log. Eight handlers carried that block. The 500 row is what stops a fix from
 // forwarding everything: a server fault still belongs in the log.
-type permissionsApiClient struct {
+type permissionsAPIClient struct {
 	err error
 }
 
-func (c *permissionsApiClient) UpdateClientPermissions(_ context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
+func (c *permissionsAPIClient) UpdateClientPermissions(_ context.Context, accessToken string, clientID int64, request *api.UpdateClientPermissionsRequest) error {
 	return c.err
 }
 
-// The rest of the ports permissionsApiClient is passed to, which no test here reaches.
+// The rest of the ports permissionsAPIClient is passed to, which no test here reaches.
 
-func (*permissionsApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+func (*permissionsAPIClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
 	panic("unexpected call to GetAllResources")
 }
 
-func (*permissionsApiClient) GetClientPermissions(context.Context, string, int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+func (*permissionsAPIClient) GetClientPermissions(context.Context, string, int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetClientPermissions")
 }
 
-func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
+func TestClientPermissionsPost_ForwardsTheAPIsAnswer(t *testing.T) {
 	testCases := []struct {
 		name   string
 		apiErr error
@@ -99,7 +99,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -112,7 +112,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 			)
 
 			handler := HandlePermissionsPost(httpHelper, nil,
-				&permissionsApiClient{err: testCase.apiErr})
+				&permissionsAPIClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
@@ -141,7 +141,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 // handler reads the body with io.ReadAll and unmarshals it, which is the same condition by another
 // route and answered the same 500 before #279.
 func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -153,7 +153,7 @@ func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 		handlertest.WithBody(strings.NewReader("{this is not json")),
 	)
 
-	handler := HandlePermissionsPost(httpHelper, nil, &permissionsApiClient{})
+	handler := HandlePermissionsPost(httpHelper, nil, &permissionsAPIClient{})
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)

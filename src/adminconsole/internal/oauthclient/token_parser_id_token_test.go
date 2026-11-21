@@ -49,7 +49,7 @@ type idTokenFixture struct {
 func newIDTokenFixture(t *testing.T, issuer string) *idTokenFixture {
 	t.Helper()
 	key, attacker := oauthclienttest.Keys(t)
-	server, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	server, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 	return &idTokenFixture{
 		key:      key,
 		attacker: attacker,
@@ -407,10 +407,10 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, *response, result.TokenResponse)
-		require.NotNil(t, result.IdToken)
-		assert.Equal(t, idToken, result.IdToken.TokenBase64)
-		assert.Equal(t, "1234567890", result.IdToken.StringClaim("sub"))
-		// The access and refresh tokens are carried, never decoded: JwtInfo has no field to
+		require.NotNil(t, result.IDToken)
+		assert.Equal(t, idToken, result.IDToken.TokenBase64)
+		assert.Equal(t, "1234567890", result.IDToken.StringClaim("sub"))
+		// The access and refresh tokens are carried, never decoded: JWTInfo has no field to
 		// decode them into since #427, so the equality with the response above is the whole of it.
 	})
 }
@@ -426,7 +426,7 @@ func TestDecodeAndValidateRefreshResponse(t *testing.T) {
 		result, err := f.parser.DecodeAndValidateRefreshResponse(context.Background(), response, previous)
 
 		require.NoError(t, err)
-		assert.Same(t, previous, result.IdToken)
+		assert.Same(t, previous, result.IDToken)
 		assert.Equal(t, previous.TokenBase64, result.TokenResponse.IDToken)
 		assert.Equal(t, "new-access-token", result.TokenResponse.AccessToken)
 		assert.Equal(t, "new-refresh-token", result.TokenResponse.RefreshToken)
@@ -596,7 +596,7 @@ func TestDecodeAndValidateRefreshResponse(t *testing.T) {
 			assertOutcome(t, tc.want, err)
 			if tc.want == accepted {
 				require.NotNil(t, result)
-				assert.Equal(t, refreshed, result.IdToken.TokenBase64, "the refreshed ID token replaces the previous one")
+				assert.Equal(t, refreshed, result.IDToken.TokenBase64, "the refreshed ID token replaces the previous one")
 				assert.Equal(t, refreshed, result.TokenResponse.IDToken)
 			} else {
 				assert.Nil(t, result)

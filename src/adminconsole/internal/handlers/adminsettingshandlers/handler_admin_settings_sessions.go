@@ -22,7 +22,7 @@ type settingsSessionsAPI interface {
 }
 
 func HandleSessionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsSessionsAPI,
 ) http.HandlerFunc {
@@ -30,9 +30,9 @@ func HandleSessionsGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -79,7 +79,7 @@ func HandleSessionsGet(
 }
 
 func HandleSessionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsSessionsAPI,
 	baseURL string,
@@ -88,9 +88,9 @@ func HandleSessionsPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

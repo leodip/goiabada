@@ -18,12 +18,12 @@ import (
 const accountPasswordFormCurrent = "My-Current-P4ss"
 const accountPasswordFormNew = "N3w-Pass-word!"
 
-// passwordRecordingApiClient records the password change the handler sent.
-type passwordRecordingApiClient struct {
+// passwordRecordingAPIClient records the password change the handler sent.
+type passwordRecordingAPIClient struct {
 	sent []*api.UpdateAccountPasswordRequest
 }
 
-func (c *passwordRecordingApiClient) UpdateAccountPassword(_ context.Context, _ string,
+func (c *passwordRecordingAPIClient) UpdateAccountPassword(_ context.Context, _ string,
 	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	c.sent = append(c.sent, request)
 	return &api.UserResponse{ID: 7}, nil
@@ -35,7 +35,7 @@ func (c *passwordRecordingApiClient) UpdateAccountPassword(_ context.Context, _ 
 func TestHandleChangePasswordPost_SendsPasswordsAsTyped(t *testing.T) {
 	const current = "  " + accountPasswordFormCurrent + "  "
 	const next = "  " + accountPasswordFormNew + "  "
-	apiClient := &passwordRecordingApiClient{}
+	apiClient := &passwordRecordingAPIClient{}
 	form := url.Values{
 		"currentPassword":         {current},
 		"newPassword":             {next},
@@ -45,7 +45,7 @@ func TestHandleChangePasswordPost_SendsPasswordsAsTyped(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleChangePasswordPost(handlersmocks.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).
+	HandleChangePasswordPost(handlersmocks.NewHTTPHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).
 		ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")

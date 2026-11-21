@@ -18,33 +18,33 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
-// stalePageApiClient is grantOneApiClient, whose resource holds permission 7 alone, with the
+// stalePageAPIClient is grantOneAPIClient, whose resource holds permission 7 alone, with the
 // permissions save recorded too, so every case below can say nothing was written.
-type stalePageApiClient struct {
-	grantOneApiClient
+type stalePageAPIClient struct {
+	grantOneAPIClient
 	sentPermissions *api.UpdateResourcePermissionsRequest
 }
 
-func (c *stalePageApiClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
+func (c *stalePageAPIClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
 	c.sentPermissions = request
 	return nil
 }
 
-// The rest of the ports stalePageApiClient is passed to, which no test here reaches.
+// The rest of the ports stalePageAPIClient is passed to, which no test here reaches.
 
-func (*stalePageApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+func (*stalePageAPIClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
 	panic("unexpected call to GetAllGroups")
 }
 
-func (*stalePageApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+func (*stalePageAPIClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
 	panic("unexpected call to GetUsersByPermission")
 }
 
-func (*stalePageApiClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
+func (*stalePageAPIClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchGroupsWithPermissionAnnotation")
 }
 
-func (*stalePageApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+func (*stalePageAPIClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
@@ -61,26 +61,26 @@ func (*stalePageApiClient) SearchUsersWithPermissionAnnotation(context.Context, 
 //
 // The real writer, because the claim is the answer on the wire and the log it does not leave.
 func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testing.T) {
-	grantRoute := func(subject, permissionId string) []handlertest.Option {
+	grantRoute := func(subject, permissionID string) []handlertest.Option {
 		return []handlertest.Option{
 			handlertest.WithAccessToken(),
 			handlertest.WithPathValue("resourceId", "2"),
 			handlertest.WithPathValue(subject, "5"),
-			handlertest.WithPathValue("permissionId", permissionId),
+			handlertest.WithPathValue("permissionId", permissionID),
 		}
 	}
 
-	type build func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc
-	usersAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
+	type build func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc
+	usersAdd := func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc {
 		return HandleUsersWithPermissionAddPermissionPost(h, c)
 	}
-	usersRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
+	usersRemove := func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc {
 		return HandleUsersWithPermissionRemovePermissionPost(h, c)
 	}
-	groupsAdd := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
+	groupsAdd := func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc {
 		return HandleGroupsWithPermissionAddPermissionPost(h, c)
 	}
-	groupsRemove := func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
+	groupsRemove := func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc {
 		return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 	}
 
@@ -140,7 +140,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		},
 		{
 			name: "saving permissions with a body naming another resource",
-			build: func(h *render.Renderer, c *stalePageApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *stalePageAPIClient) http.HandlerFunc {
 				return HandlePermissionsPost(h, testStore(), c)
 			},
 			options: []handlertest.Option{
@@ -157,7 +157,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
-			apiClient := &stalePageApiClient{grantOneApiClient: grantOneApiClient{current: tc.current}}
+			apiClient := &stalePageAPIClient{grantOneAPIClient: grantOneAPIClient{current: tc.current}}
 
 			recorder := httptest.NewRecorder()
 			tc.build(render.New(fstest.MapFS{}, nil), apiClient).ServeHTTP(recorder,

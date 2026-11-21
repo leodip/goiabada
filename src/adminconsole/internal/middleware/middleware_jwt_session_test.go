@@ -273,7 +273,7 @@ func (h *sessionHarness) readBack(cookies []*http.Cookie) *sessionstore.Session 
 type served struct {
 	recorder *httptest.ResponseRecorder
 	reached  bool
-	jwtInfo  *oauthclient.JwtInfo
+	jwtInfo  *oauthclient.JWTInfo
 }
 
 // serve sends one request carrying cookies through SessionHandler over parser.
@@ -318,7 +318,7 @@ func (h *sessionHarness) serveChain(ctx context.Context, m *JWT, cookies []*http
 	out.recorder = httptest.NewRecorder()
 	page := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		out.reached = true
-		if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok {
+		if jwtInfo, ok := reqctx.JWTInfoFrom(r.Context()); ok {
 			out.jwtInfo = &jwtInfo
 		}
 		if then != nil {
@@ -504,7 +504,7 @@ func TestSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSigne
 	h := newSessionHarness(t)
 
 	signing, retired := oauthclienttest.Keys(t)
-	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("current", &signing.PublicKey))
+	jwks, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey("current", &signing.PublicKey))
 	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
@@ -537,9 +537,9 @@ func TestSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 
 	// warm returns a parser that verified stored while its key was published, over a JWKS that
 	// has since removed it, and the clock the parser measures its cache's age by.
-	warm := func(t *testing.T) (*oauthclient.JWKSTokenParser, *oauthclienttest.JwksServer, *oauthclienttest.Clock) {
+	warm := func(t *testing.T) (*oauthclient.JWKSTokenParser, *oauthclienttest.JWKSServer, *oauthclienttest.Clock) {
 		t.Helper()
-		jwks := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("removed", &signing.PublicKey))
+		jwks := oauthclienttest.NewMutableJWKSServer(t, oauthclienttest.JWKFromPublicKey("removed", &signing.PublicKey))
 		clock := oauthclienttest.NewClock()
 		parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 			oauthclienttest.StaticIssuer(oauthclienttest.Issuer), oauthclient.WithClock(clock.Now))
@@ -568,8 +568,8 @@ func TestSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
 
 		assert.True(t, out.reached)
 		require.NotNil(t, out.jwtInfo, "the administrator is still signed in")
-		require.NotNil(t, out.jwtInfo.IdToken)
-		assert.Equal(t, stored, out.jwtInfo.IdToken.TokenBase64)
+		require.NotNil(t, out.jwtInfo.IDToken)
+		assert.Equal(t, stored, out.jwtInfo.IDToken.TokenBase64)
 		assert.Equal(t, int32(1), jwks.Hits.Load(), "the cache answered")
 		h.assertNoRefreshSent()
 		assert.Empty(t, h.logs.Records())
@@ -615,7 +615,7 @@ func TestSessionHandler_UsesTheStoredTokensUntilTheyAreDue(t *testing.T) {
 			assert.True(t, out.reached)
 			require.NotNil(t, out.jwtInfo, "the administrator is signed in")
 			assert.Equal(t, storedResponse(), out.jwtInfo.TokenResponse)
-			assert.Same(t, verifiedStored, out.jwtInfo.IdToken, "the ID token the parser verified")
+			assert.Same(t, verifiedStored, out.jwtInfo.IDToken, "the ID token the parser verified")
 			h.assertNoRefreshSent()
 			assert.Empty(t, out.recorder.Result().Cookies(), "the session is not written")
 			assert.Empty(t, h.logs.Records())
@@ -650,7 +650,7 @@ func TestSessionHandler_AShortLivedSetIsNotDueBeforeHalfItsLifetime(t *testing.T
 	assert.True(t, out.reached)
 	require.NotNil(t, out.jwtInfo, "the administrator is signed in")
 	assert.Equal(t, shortLived, out.jwtInfo.TokenResponse)
-	assert.Same(t, verifiedStored, out.jwtInfo.IdToken, "the ID token the parser verified")
+	assert.Same(t, verifiedStored, out.jwtInfo.IDToken, "the ID token the parser verified")
 	h.assertNoRefreshSent()
 	assert.Empty(t, h.backend.recordedWrites()[writesBefore:], "the session is not written")
 	assert.Empty(t, out.recorder.Result().Cookies(), "nor its cookie")
@@ -665,7 +665,7 @@ func TestSessionHandler_AShortLivedSetIsNotDueBeforeHalfItsLifetime(t *testing.T
 // expectRefreshValidation answers the refresh response's validation with accepted or refused and
 // records, at the moment the parser is asked, what the session held: anything the middleware
 // stored before validating would show there.
-func (h *sessionHarness) expectRefreshValidation(cookies []*http.Cookie, accepted *oauthclient.JwtInfo,
+func (h *sessionHarness) expectRefreshValidation(cookies []*http.Cookie, accepted *oauthclient.JWTInfo,
 	refused error, heldAtValidation *any) {
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
 		Run(func(mock.Arguments) {
@@ -853,7 +853,7 @@ func TestSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 			h.refresher.answer = &tc.answer
 			var held any
 			h.expectRefreshValidation(cookies,
-				&oauthclient.JwtInfo{TokenResponse: tc.accepted, IdToken: tc.acceptedID}, nil, &held)
+				&oauthclient.JWTInfo{TokenResponse: tc.accepted, IDToken: tc.acceptedID}, nil, &held)
 
 			before := time.Now().Unix()
 			out := h.serve(h.parser, cookies)
@@ -886,7 +886,7 @@ func TestSessionHandler_ARefreshIsValidatedThenStored(t *testing.T) {
 			assert.True(t, out.reached)
 			require.NotNil(t, out.jwtInfo)
 			assert.Equal(t, stored, out.jwtInfo.TokenResponse, "the refreshed response reaches the request")
-			assert.Same(t, tc.acceptedID, out.jwtInfo.IdToken)
+			assert.Same(t, tc.acceptedID, out.jwtInfo.IDToken)
 			assert.Empty(t, h.logs.Records())
 		})
 	}
@@ -925,8 +925,8 @@ func TestSessionHandler_TheCheckAndTheWriteOutliveTheBrowser(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			checked = observe(args.Get(0).(context.Context))
 		}).
-		Return(func(_ context.Context, tr *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JwtInfo, error) {
-			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: &oauth.JWTToken{TokenBase64: refreshedIDTokenRaw}}, nil
+		Return(func(_ context.Context, tr *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JWTInfo, error) {
+			return &oauthclient.JWTInfo{TokenResponse: *tr, IDToken: &oauth.JWTToken{TokenBase64: refreshedIDTokenRaw}}, nil
 		})
 	h.backend.mu.Lock()
 	h.backend.writes = nil

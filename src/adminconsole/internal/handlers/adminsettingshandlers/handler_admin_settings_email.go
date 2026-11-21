@@ -23,7 +23,7 @@ type settingsEmailAPI interface {
 }
 
 func HandleEmailGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
 ) http.HandlerFunc {
@@ -31,9 +31,9 @@ func HandleEmailGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -102,7 +102,7 @@ func HandleEmailGet(
 }
 
 func HandleEmailPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
 	settingsCache SettingsInvalidator,
@@ -111,9 +111,9 @@ func HandleEmailPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -211,16 +211,16 @@ func HandleEmailPost(
 }
 
 func HandleEmailSendTestGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -264,7 +264,7 @@ func HandleEmailSendTestGet(
 }
 
 func HandleEmailSendTestPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsEmailAPI,
 	baseURL string,
@@ -273,9 +273,9 @@ func HandleEmailSendTestPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

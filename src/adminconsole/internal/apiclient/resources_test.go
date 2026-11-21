@@ -25,10 +25,10 @@ import (
 const resourceBodyFields = `"id":2,"resourceIdentifier":"api","description":"The API",` +
 	`"isSystemLevelResource":true`
 
-func TestAuthServerClient_GetResourceByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetResourceByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"resource":{`+resourceBodyFields+`}}`)
 
-	resource, err := client.GetResourceById(context.Background(), "an-access-token", 2)
+	resource, err := client.GetResourceByID(context.Background(), "an-access-token", 2)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 

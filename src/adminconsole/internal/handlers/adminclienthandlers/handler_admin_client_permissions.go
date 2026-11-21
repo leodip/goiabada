@@ -19,12 +19,12 @@ import (
 // and the client's own set.
 type clientPermissionsAPI interface {
 	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
-	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
-	UpdateClientPermissions(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
+	GetClientPermissions(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, []api.PermissionResponse, error)
+	UpdateClientPermissions(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientPermissionsRequest) error
 }
 
 func HandlePermissionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientPermissionsAPI,
 ) http.HandlerFunc {
@@ -43,9 +43,9 @@ func HandlePermissionsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -60,14 +60,14 @@ func HandlePermissionsGet(
 		}
 
 		adminClientPermissions := struct {
-			ClientId                 int64
+			ClientID                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
 			Permissions              []grantedPermission
 			IsSystemLevelClient      bool
 			IsPublic                 bool
 		}{
-			ClientId:                 clientResp.ID,
+			ClientID:                 clientResp.ID,
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			ClientCredentialsEnabled: clientResp.ClientCredentialsEnabled,
 			Permissions:              make([]grantedPermission, 0, len(perms)),
@@ -76,7 +76,7 @@ func HandlePermissionsGet(
 		}
 		for _, permission := range perms {
 			adminClientPermissions.Permissions = append(adminClientPermissions.Permissions, grantedPermission{
-				Id:    permission.ID,
+				ID:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -124,7 +124,7 @@ func HandlePermissionsGet(
 }
 
 func HandlePermissionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientPermissionsAPI,
 ) http.HandlerFunc {
@@ -145,18 +145,18 @@ func HandlePermissionsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Call Auth Server API to update client permissions
 		req := &api.UpdateClientPermissionsRequest{
-			PermissionIDs:         data.AssignedPermissionsIds,
-			ExpectedPermissionIDs: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIDs,
+			ExpectedPermissionIDs: data.ExpectedPermissionIDs,
 		}
-		if updateClientPermissionsErr := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req); updateClientPermissionsErr != nil {
+		if updateClientPermissionsErr := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientID, req); updateClientPermissionsErr != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, updateClientPermissionsErr)
 			return
 		}

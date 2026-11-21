@@ -28,17 +28,17 @@ import (
 // Two keys also make the argument order of SetFlash observable in a second way: a handler
 // that reads the wrong key of the two binds a notice the user did not earn.
 
-// flashStubApiClient answers the one call the details GET makes.
-type flashStubApiClient struct {
+// flashStubAPIClient answers the one call the details GET makes.
+type flashStubAPIClient struct {
 }
 
-func (flashStubApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
+func (flashStubAPIClient) GetUserByID(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return &api.UserResponse{ID: id, Email: "someone@example.com"}, nil
 }
 
-// The rest of the ports flashStubApiClient is passed to, which no test here reaches.
+// The rest of the ports flashStubAPIClient is passed to, which no test here reaches.
 
-func (flashStubApiClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
+func (flashStubAPIClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
 	panic("unexpected call to UpdateUserEnabled")
 }
 
@@ -101,7 +101,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
 
 	req := detailsRequest()
@@ -110,7 +110,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 	}
 	rec := httptest.NewRecorder()
 
-	HandleDetailsGet(httpHelper, store, flashStubApiClient{}).ServeHTTP(rec, req)
+	HandleDetailsGet(httpHelper, store, flashStubAPIClient{}).ServeHTTP(rec, req)
 
 	bind := handlertest.Bind(t, httpHelper)
 	return bind, rec

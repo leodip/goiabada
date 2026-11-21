@@ -17,34 +17,34 @@ import (
 // administrator creates with that identifier is an ordinary one, and is listed first here because
 // it is also the one each page selects when none is asked for.
 
-// systemResourceApiClient is resourcePagingApiClient answering for the authserver resource.
-type systemResourceApiClient struct {
-	resourcePagingApiClient
+// systemResourceAPIClient is resourcePagingAPIClient answering for the authserver resource.
+type systemResourceAPIClient struct {
+	resourcePagingAPIClient
 }
 
-func (c *systemResourceApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil
+func (c *systemResourceAPIClient) GetResourceByID(_ context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{ID: resourceID, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil
 }
 
-// The rest of the ports systemResourceApiClient is passed to, which no test here reaches.
+// The rest of the ports systemResourceAPIClient is passed to, which no test here reaches.
 
-func (*systemResourceApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+func (*systemResourceAPIClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetGroupPermissions")
 }
 
-func (*systemResourceApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (*systemResourceAPIClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetUserPermissions")
 }
 
-func (*systemResourceApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+func (*systemResourceAPIClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
-func (*systemResourceApiClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
+func (*systemResourceAPIClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
 	panic("unexpected call to UpdateGroupPermissions")
 }
 
-func (*systemResourceApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+func (*systemResourceAPIClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
 	panic("unexpected call to UpdateUserPermissions")
 }
 
@@ -56,8 +56,8 @@ func systemResourcePermissions() []api.PermissionResponse {
 	}
 }
 
-func TestHandleUsersWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
-	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
+func TestHandleUsersWithPermissionGet_TheSystemResourceListsWhatTheAPIReturned(t *testing.T) {
+	apiClient := &systemResourceAPIClient{resourcePagingAPIClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
 	bind := renderPermissionPage(t, HandleUsersWithPermissionGet(httpHelper, apiClient), "users-with-permission", "", httpHelper)
@@ -66,8 +66,8 @@ func TestHandleUsersWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t
 	assert.Equal(t, int64(41), bind["selectedPermission"])
 }
 
-func TestHandleGroupsWithPermissionGet_TheSystemResourceListsWhatTheApiReturned(t *testing.T) {
-	apiClient := &systemResourceApiClient{resourcePagingApiClient{permissions: systemResourcePermissions()}}
+func TestHandleGroupsWithPermissionGet_TheSystemResourceListsWhatTheAPIReturned(t *testing.T) {
+	apiClient := &systemResourceAPIClient{resourcePagingAPIClient{permissions: systemResourcePermissions()}}
 
 	httpHelper := newHelper(t)
 	bind := renderPermissionPage(t, HandleGroupsWithPermissionGet(httpHelper, apiClient), "groups-with-permission", "", httpHelper)

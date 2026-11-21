@@ -307,7 +307,7 @@ func TestMain_HandsTheInternalRootsToTheServer(t *testing.T) {
 			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"` + oauthclienttest.Issuer + `"}`))
 		case "/certs":
 			assert.NoError(t, json.NewEncoder(w).Encode(oauth.JWKS{
-				Keys: []oauth.JWK{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+				Keys: []oauth.JWK{oauthclienttest.JWKFromPublicKey("key-1", &signing.PublicKey)}}))
 		case "/api/v1/account/sessions":
 			_, _ = w.Write([]byte(`{}`))
 		default:

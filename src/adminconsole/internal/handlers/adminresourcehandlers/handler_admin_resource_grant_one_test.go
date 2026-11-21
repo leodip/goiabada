@@ -15,55 +15,55 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// grantOneApiClient answers the reads the four grant-one handlers make, holding the user's or
+// grantOneAPIClient answers the reads the four grant-one handlers make, holding the user's or
 // group's current grants, and records the save each hands the API.
-type grantOneApiClient struct {
+type grantOneAPIClient struct {
 	current   []api.PermissionResponse
 	sentUser  *api.UpdateUserPermissionsRequest
 	sentGroup *api.UpdateGroupPermissionsRequest
 }
 
-func (c *grantOneApiClient) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "some-resource"}, nil
+func (c *grantOneAPIClient) GetResourceByID(_ context.Context, _ string, resourceID int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{ID: resourceID, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (c *grantOneApiClient) GetPermissionsByResource(_ context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
+func (c *grantOneAPIClient) GetPermissionsByResource(_ context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
 	return []api.PermissionResponse{{ID: 7, PermissionIdentifier: "read"}}, nil
 }
 
-func (c *grantOneApiClient) GetUserPermissions(_ context.Context, _ string, userId int64) (*api.UserResponse, []api.PermissionResponse, error) {
-	return &api.UserResponse{ID: userId}, c.current, nil
+func (c *grantOneAPIClient) GetUserPermissions(_ context.Context, _ string, userID int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	return &api.UserResponse{ID: userID}, c.current, nil
 }
 
-func (c *grantOneApiClient) GetGroupPermissions(_ context.Context, _ string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error) {
-	return &api.GroupResponse{ID: groupId}, c.current, nil
+func (c *grantOneAPIClient) GetGroupPermissions(_ context.Context, _ string, groupID int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+	return &api.GroupResponse{ID: groupID}, c.current, nil
 }
 
-func (c *grantOneApiClient) UpdateUserPermissions(_ context.Context, _ string, _ int64, request *api.UpdateUserPermissionsRequest) error {
+func (c *grantOneAPIClient) UpdateUserPermissions(_ context.Context, _ string, _ int64, request *api.UpdateUserPermissionsRequest) error {
 	c.sentUser = request
 	return nil
 }
 
-func (c *grantOneApiClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
+func (c *grantOneAPIClient) UpdateGroupPermissions(_ context.Context, _ string, _ int64, request *api.UpdateGroupPermissionsRequest) error {
 	c.sentGroup = request
 	return nil
 }
 
-// The rest of the ports grantOneApiClient is passed to, which no test here reaches.
+// The rest of the ports grantOneAPIClient is passed to, which no test here reaches.
 
-func (*grantOneApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+func (*grantOneAPIClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
 	panic("unexpected call to GetAllGroups")
 }
 
-func (*grantOneApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+func (*grantOneAPIClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
 	panic("unexpected call to GetUsersByPermission")
 }
 
-func (*grantOneApiClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
+func (*grantOneAPIClient) SearchGroupsWithPermissionAnnotation(context.Context, string, int64, int, int) ([]api.GroupWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchGroupsWithPermissionAnnotation")
 }
 
-func (*grantOneApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+func (*grantOneAPIClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
@@ -76,7 +76,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 	testCases := []struct {
 		name         string
 		target       string
-		build        func(httpHelper *render.Renderer, apiClient *grantOneApiClient) http.HandlerFunc
+		build        func(httpHelper *render.Renderer, apiClient *grantOneAPIClient) http.HandlerFunc
 		current      []api.PermissionResponse
 		group        bool
 		wantWanted   []int64
@@ -85,7 +85,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 		{
 			name:   "revoking from a user",
 			target: "/admin/resources/2/users-with-permission/remove/5/7",
-			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneAPIClient) http.HandlerFunc {
 				return HandleUsersWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{ID: 3}, {ID: 7}},
@@ -95,7 +95,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 		{
 			name:   "granting to a user with no grants",
 			target: "/admin/resources/2/users-with-permission/add/5/7",
-			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneAPIClient) http.HandlerFunc {
 				return HandleUsersWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
@@ -105,7 +105,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 		{
 			name:   "revoking from a group",
 			target: "/admin/resources/2/groups-with-permission/remove/5/7",
-			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			current:      []api.PermissionResponse{{ID: 7}, {ID: 3}},
@@ -116,7 +116,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 		{
 			name:   "granting to a group with no grants",
 			target: "/admin/resources/2/groups-with-permission/add/5/7",
-			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
+			build: func(h *render.Renderer, c *grantOneAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			current:      nil,
@@ -129,7 +129,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := render.New(nil, nil)
-			apiClient := &grantOneApiClient{current: tc.current}
+			apiClient := &grantOneAPIClient{current: tc.current}
 			// Every target names resource 2, subject 5 and permission 7, which are the path values
 			// the route binds from it.
 			subject := "userId"

@@ -307,8 +307,8 @@ var healthcheckListeners = healthcheck.Listeners{
 	CertFile:         "GOIABADA_ADMINCONSOLE_CERTFILE",
 	KeyFile:          "GOIABADA_ADMINCONSOLE_KEYFILE",
 	DefaultHost:      config.DefaultListenHost,
-	DefaultHTTPPort:  config.DefaultListenPortHttp,
-	DefaultHTTPSPort: config.DefaultListenPortHttps,
+	DefaultHTTPPort:  config.DefaultListenPortHTTP,
+	DefaultHTTPSPort: config.DefaultListenPortHTTPS,
 }
 
 // dispatch refuses the positional arguments the flag parse leaves, since the console's flags take no

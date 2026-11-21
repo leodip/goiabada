@@ -25,13 +25,13 @@ import (
 // no issuer of its own (#427).
 type tokenParser interface {
 	DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JWTToken, error)
-	DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JwtInfo, error)
+	DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JWTInfo, error)
 }
 
 type AuthHelper interface {
 	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
-	IsAuthorizedToAccessResource(jwtInfo oauthclient.JwtInfo, scopesAnyOf []string) bool
-	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
+	IsAuthorizedToAccessResource(jwtInfo oauthclient.JWTInfo, scopesAnyOf []string) bool
+	IsAuthenticated(jwtInfo oauthclient.JWTInfo) bool
 }
 
 // tokenRefresher is the part of oauthclient.TokenClient this middleware calls: the refresh grant,
@@ -215,11 +215,11 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 					return
 				}
 				tokenResponse = refreshed.TokenResponse
-				idToken = refreshed.IdToken
+				idToken = refreshed.IDToken
 			}
 
 			// Step 6.
-			ctx = reqctx.WithJwtInfo(ctx, oauthclient.JwtInfo{TokenResponse: tokenResponse, IdToken: idToken})
+			ctx = reqctx.WithJWTInfo(ctx, oauthclient.JWTInfo{TokenResponse: tokenResponse, IDToken: idToken})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -293,7 +293,7 @@ func (m *JWT) refreshUnderLock(
 	w http.ResponseWriter,
 	r *http.Request,
 	sess *sessionstore.Session,
-) (refreshed *oauthclient.JwtInfo, answered bool) {
+) (refreshed *oauthclient.JWTInfo, answered bool) {
 	ctx := r.Context()
 
 	waitCtx, cancel := context.WithTimeout(ctx, m.refreshWait)
@@ -350,7 +350,7 @@ func (m *JWT) refreshUnderLock(
 
 // refreshToken sends the refresh grant for the session's current token set and, when the auth
 // server answers, accepts its answer through the parser against the ID token it re-read and
-// verified, before anything reaches the session. It returns the refreshed JwtInfo once it is
+// verified, before anything reaches the session. It returns the refreshed JWTInfo once it is
 // stored; refused is a token set the parser will not trust, which ends the session; lookupErr
 // is a re-read of the session that could not be performed, which refuses the request and
 // clears nothing; err is a grant that could not be completed, which signs it out, or
@@ -375,7 +375,7 @@ func (m *JWT) refreshToken(
 	w http.ResponseWriter,
 	r *http.Request,
 	sess *sessionstore.Session,
-) (refreshed *oauthclient.JwtInfo, refused error, lookupErr error, err error) {
+) (refreshed *oauthclient.JWTInfo, refused error, lookupErr error, err error) {
 	// The lock makes this request the only refresher of this session in this console, but not
 	// the first: another request may have refreshed while this one waited for it. The session
 	// is re-read before anything is sent, so a token set another request stored is carried as
@@ -402,7 +402,7 @@ func (m *JWT) refreshToken(
 	}
 	if !oauthclient.RefreshDue(&stored, expiresAt, time.Now()) {
 		carry(sess, stored, expiresAt)
-		return &oauthclient.JwtInfo{TokenResponse: stored, IdToken: previous}, nil, nil, nil
+		return &oauthclient.JWTInfo{TokenResponse: stored, IDToken: previous}, nil, nil, nil
 	}
 
 	if stored.RefreshToken == "" {
@@ -514,7 +514,7 @@ func (m *JWT) reReadSession(r *http.Request) (*sessionstore.Session, error) {
 // stands — and when nothing newer verifies, which is the sign-out's answer too. lookupErr is a
 // re-read that could not be performed, which is neither: nothing is known of what the session
 // holds, so nothing may be cleared on its strength.
-func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, refusedGrant error) (newer *oauthclient.JwtInfo, expiresAt int64, lookupErr error) {
+func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, refusedGrant error) (newer *oauthclient.JWTInfo, expiresAt int64, lookupErr error) {
 	current, err := m.reReadSession(r)
 	if err != nil {
 		return nil, 0, err
@@ -532,7 +532,7 @@ func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, 
 	slog.WarnContext(r.Context(),
 		"the refresh grant was refused, but a token set newer than the one it presented had been stored meanwhile, so the session keeps it",
 		"error", refusedGrant)
-	return &oauthclient.JwtInfo{TokenResponse: stored, IdToken: idToken}, storedExpiresAt, nil
+	return &oauthclient.JWTInfo{TokenResponse: stored, IDToken: idToken}, storedExpiresAt, nil
 }
 
 // RequiresScope is a middleware that checks if the user has the required scope to access the resource.
@@ -549,7 +549,7 @@ func (m *JWT) RequiresScope(
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// An absent token set is the anonymous request, and the zero value the accessor answers
 			// with authorizes nothing and authenticates no one, so it takes the sign-in arm below.
-			jwtInfo, _ := reqctx.JwtInfoFrom(r.Context())
+			jwtInfo, _ := reqctx.JWTInfoFrom(r.Context())
 
 			isAuthorized := m.authHelper.IsAuthorizedToAccessResource(jwtInfo, scopesAnyOf)
 			if !isAuthorized {

@@ -60,7 +60,7 @@ func TestHandleEmailGet_ANewConfigurationStartsFromSSLTLSOnPort465(t *testing.T)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email.html").Once()
 
@@ -102,7 +102,7 @@ func TestHandleEmailSendTest_TheRedirectedPageSaysWhetherTheTestEmailWentUnencry
 			store := newSettingsTestStore()
 			apiClient := &sendTestAnsweringAPI{encrypted: encrypted}
 
-			postHelper := handlersmocks.NewHttpHelper(t)
+			postHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, postHelper)
 			sent := httptest.NewRecorder()
 			HandleEmailSendTestPost(postHelper, store, apiClient, consoleBaseURL).ServeHTTP(sent,
@@ -122,7 +122,7 @@ func TestHandleEmailSendTest_TheRedirectedPageSaysWhetherTheTestEmailWentUnencry
 
 			// load draws the page as the browser next asks for it, and returns its bind.
 			load := func() map[string]interface{} {
-				helper := handlersmocks.NewHttpHelper(t)
+				helper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, helper)
 				handlertest.ExpectRender(helper, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html").Once()
 				req := handlertest.Request(http.MethodGet, "/admin/settings/email/send-test-email", handlertest.WithAccessToken())
@@ -152,7 +152,7 @@ func TestHandleEmailSendTest_AnEarlierUnshownSendIsNotSaidOfALaterOne(t *testing
 	store := newSettingsTestStore()
 	jar := map[string]*http.Cookie{}
 	send := func(encrypted bool) {
-		helper := handlersmocks.NewHttpHelper(t)
+		helper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, helper)
 		req := handlertest.Request(http.MethodPost, "/admin/settings/email/send-test-email", handlertest.WithAccessToken(),
 			handlertest.WithForm(url.Values{"destinationEmail": {"ana@example.com"}}))
@@ -170,7 +170,7 @@ func TestHandleEmailSendTest_AnEarlierUnshownSendIsNotSaidOfALaterOne(t *testing
 	send(false)
 	send(true)
 
-	helper := handlersmocks.NewHttpHelper(t)
+	helper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, helper)
 	handlertest.ExpectRender(helper, "/layouts/menu_layout.html", "/admin_settings_email_sendtest.html").Once()
 	req := handlertest.Request(http.MethodGet, "/admin/settings/email/send-test-email", handlertest.WithAccessToken())

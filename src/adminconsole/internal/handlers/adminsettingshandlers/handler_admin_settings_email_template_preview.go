@@ -31,7 +31,7 @@ import (
 
 // BrandOption is one brand the preview can be drawn in.
 type BrandOption struct {
-	Id   int64
+	ID   int64
 	Name string
 }
 
@@ -55,12 +55,12 @@ type emailTemplateTestSender interface {
 }
 
 // emailTemplateSample is the text in the editor's form and the brand chosen for its preview, as the
-// preview and the test send take them; BrandId is nil for the default brand.
+// preview and the test send take them; BrandID is nil for the default brand.
 type emailTemplateSample struct {
 	Subject     string `json:"subject"`
 	ButtonLabel string `json:"buttonLabel"`
 	Body        string `json:"body"`
-	BrandId     *int64 `json:"brandId"`
+	BrandID     *int64 `json:"brandId"`
 }
 
 // trimmed is the sample as a save sends its text: the subject and the button label are one line
@@ -74,7 +74,7 @@ func (s emailTemplateSample) trimmed() emailTemplateSample {
 
 func (s emailTemplateSample) previewRequest() *api.PreviewEmailTemplateRequest {
 	s = s.trimmed()
-	return &api.PreviewEmailTemplateRequest{Subject: s.Subject, ButtonLabel: s.ButtonLabel, Body: s.Body, BrandID: s.BrandId}
+	return &api.PreviewEmailTemplateRequest{Subject: s.Subject, ButtonLabel: s.ButtonLabel, Body: s.Body, BrandID: s.BrandID}
 }
 
 // emailTemplatePreviewAnswer is what the editor shows beside the frame.
@@ -85,10 +85,10 @@ type emailTemplatePreviewAnswer struct {
 
 // emailTemplateJSONAccessToken answers the bearer the request carries, answering the request as
 // JSON when it carries none, which is a wiring defect: these routes are mounted under RequiresScope.
-func emailTemplateJSONAccessToken(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
-	jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+func emailTemplateJSONAccessToken(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
+	jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 	if !ok {
-		httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+		httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 		return "", false
 	}
 	return jwtInfo.TokenResponse.AccessToken, true
@@ -96,7 +96,7 @@ func emailTemplateJSONAccessToken(httpHelper HttpHelper, w http.ResponseWriter, 
 
 // decodeEmailTemplateJSON reads the request's JSON body into into, answering a body that does not
 // decode.
-func decodeEmailTemplateJSON(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, into any) bool {
+func decodeEmailTemplateJSON(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, into any) bool {
 	body, err := io.ReadAll(r.Body)
 	if err != nil || json.Unmarshal(body, into) != nil {
 		render.JSONBadRequestBody(httpHelper, w, r)
@@ -108,7 +108,7 @@ func decodeEmailTemplateJSON(httpHelper HttpHelper, w http.ResponseWriter, r *ht
 // HandleEmailTemplatePreviewPost answers the subject and the plain-text part of the email the text
 // in the request draws, in the language the address names and the brand chosen, or, as JSON, the
 // refusal a save would give it.
-func HandleEmailTemplatePreviewPost(httpHelper HttpHelper, apiClient emailTemplatePreviewer) http.HandlerFunc {
+func HandleEmailTemplatePreviewPost(httpHelper HTTPHelper, apiClient emailTemplatePreviewer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var sample emailTemplateSample
 		if !decodeEmailTemplateJSON(httpHelper, w, r, &sample) {
@@ -173,7 +173,7 @@ func setEmailFrameHeaders(h http.Header, assetOrigins []string) {
 // the address names and the brand chosen, as an HTML document of its own, which the editor's
 // sandboxed frame shows. A text the API refuses, which the JSON preview has already said beside
 // the frame, answers its status with nothing to draw.
-func HandleEmailTemplatePreviewFramePost(httpHelper HttpHelper, apiClient emailTemplatePreviewer, assetOrigins []string) http.HandlerFunc {
+func HandleEmailTemplatePreviewFramePost(httpHelper HTTPHelper, apiClient emailTemplatePreviewer, assetOrigins []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		setEmailFrameHeaders(w.Header(), assetOrigins)
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
@@ -186,7 +186,7 @@ func HandleEmailTemplatePreviewFramePost(httpHelper HttpHelper, apiClient emailT
 			Body:        r.PostFormValue("body"),
 		}
 		if id, err := strconv.ParseInt(r.PostFormValue("brandId"), 10, 64); err == nil {
-			sample.BrandId = &id
+			sample.BrandID = &id
 		}
 
 		preview, err := apiClient.PreviewEmailTemplate(r.Context(), token, r.PathValue("email"), r.PathValue("language"),
@@ -228,7 +228,7 @@ type emailTemplateTestAnswer struct {
 // recipient would get it, in the language the address names and the brand chosen for the preview,
 // and answers the sentence saying where it went, and that it went unencrypted when it did, as the
 // SMTP test says; a refusal is answered as JSON with the API's sentence.
-func HandleEmailTemplateSendTestPost(httpHelper HttpHelper, apiClient emailTemplateTestSender) http.HandlerFunc {
+func HandleEmailTemplateSendTestPost(httpHelper HTTPHelper, apiClient emailTemplateTestSender) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var input emailTemplateTestInput
 		if !decodeEmailTemplateJSON(httpHelper, w, r, &input) {
@@ -242,7 +242,7 @@ func HandleEmailTemplateSendTestPost(httpHelper HttpHelper, apiClient emailTempl
 		sample := input.trimmed()
 		answer, err := apiClient.SendTestEmailTemplate(r.Context(), token, r.PathValue("email"), r.PathValue("language"),
 			&api.SendTestEmailTemplateRequest{To: to, Subject: sample.Subject, ButtonLabel: sample.ButtonLabel,
-				Body: sample.Body, BrandID: sample.BrandId})
+				Body: sample.Body, BrandID: sample.BrandID})
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -261,7 +261,7 @@ func HandleEmailTemplateSendTestPost(httpHelper HttpHelper, apiClient emailTempl
 // choice names; whether SMTP is on, without which the test send is disabled; and the signed-in
 // administrator's own address, which the test send's address starts at. It answers false, having
 // answered the page that says why, when the brands cannot be read.
-func bindEmailTemplatePreview(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateEditorReader,
+func bindEmailTemplatePreview(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateEditorReader,
 	token string, bind map[string]interface{}) bool {
 	brands, err := apiClient.GetAllBrands(r.Context(), token)
 	if err != nil {
@@ -271,7 +271,7 @@ func bindEmailTemplatePreview(httpHelper HttpHelper, w http.ResponseWriter, r *h
 	options := make([]BrandOption, 0, len(brands))
 	defaultName := ""
 	for _, brand := range brands {
-		options = append(options, BrandOption{Id: brand.ID, Name: brand.Name})
+		options = append(options, BrandOption{ID: brand.ID, Name: brand.Name})
 		if brand.IsDefault {
 			defaultName = brand.Name
 		}
@@ -286,8 +286,8 @@ func bindEmailTemplatePreview(httpHelper HttpHelper, w http.ResponseWriter, r *h
 	bind["smtpEnabled"] = smtpEnabled
 
 	testAddress := ""
-	if jwtInfo, ok := reqctx.JwtInfoFrom(r.Context()); ok && jwtInfo.IdToken != nil {
-		testAddress = jwtInfo.IdToken.StringClaim("email")
+	if jwtInfo, ok := reqctx.JWTInfoFrom(r.Context()); ok && jwtInfo.IDToken != nil {
+		testAddress = jwtInfo.IDToken.StringClaim("email")
 	}
 	bind["testAddress"] = testAddress
 	return true

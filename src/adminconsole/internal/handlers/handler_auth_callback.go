@@ -105,7 +105,7 @@ type accountProfileReader interface {
 // not answered with a removal either, because this route is CSRF-exempt and a cross-site post never
 // carries the Lax cookie, so a removal there would let any other site end a sign-in in flight.
 func HandleAuthCallbackPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession callbackSessionStore,
 	tokenParser TokenParser,
 	exchanger codeExchanger,
@@ -290,7 +290,7 @@ func signedInPageLanguage(ctx context.Context, profiles accountProfileReader, ac
 // the router's own 405 would name every method registered on the path in Allow, GET among them,
 // though GET is refused too (RFC 9110 section 15.5.6). No session is read and nothing is logged beyond the
 // refusal itself, because there is no sign-in here to say anything about.
-func HandleAuthCallbackWrongMethod(httpHelper HttpHelper) http.HandlerFunc {
+func HandleAuthCallbackWrongMethod(httpHelper HTTPHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", http.MethodPost)
 		refuseSignIn(httpHelper, w, r, refusalWrongMethod,
@@ -301,7 +301,7 @@ func HandleAuthCallbackWrongMethod(httpHelper HttpHelper) http.HandlerFunc {
 // refuseSignInByAuthServer answers the error the auth server posted back instead of a code: a
 // 400, since it is the answer to the browser's own request, showing the auth server's
 // description, or its error code when it sent none. Both arrive conformed.
-func refuseSignInByAuthServer(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
+func refuseSignInByAuthServer(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request,
 	errorCode, errorDescription string) {
 
 	refusal := signInRefusal{http.StatusBadRequest,
@@ -314,7 +314,7 @@ func refuseSignInByAuthServer(httpHelper HttpHelper, w http.ResponseWriter, r *h
 }
 
 // refuseSignIn logs a refused sign-in and renders its page.
-func refuseSignIn(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, refusal signInRefusal, cause error) {
+func refuseSignIn(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, refusal signInRefusal, cause error) {
 	renderSignInRefusal(httpHelper, w, r, refusal, "", "", cause)
 }
 
@@ -324,7 +324,7 @@ func refuseSignIn(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
 // accept, which someone must fix, logged at Error with a stack. The log names the exact cause
 // every time; the page never shows a token, the code, a claim or an internal address (#427
 // decisions 6 and 10).
-func renderSignInRefusal(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
+func renderSignInRefusal(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request,
 	refusal signInRefusal, errorCode, errorDescription string, cause error) {
 
 	serverFault := refusal.status == http.StatusInternalServerError

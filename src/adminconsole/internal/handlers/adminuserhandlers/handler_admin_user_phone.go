@@ -18,12 +18,12 @@ import (
 // userPhoneAPI is what the user phone page needs: the user and the phone write. The country list
 // it renders the form from is core's, as the account phone page's is (#563).
 type userPhoneAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserPhone(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
 }
 
 func HandlePhoneGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
 ) http.HandlerFunc {
@@ -44,14 +44,14 @@ func HandlePhoneGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get user via API
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -97,7 +97,7 @@ func HandlePhoneGet(
 }
 
 func HandlePhonePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userPhoneAPI,
 	baseURL string,
@@ -119,14 +119,14 @@ func HandlePhonePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// The user a refused save draws the page with: its title and its tabs name the stored user.
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -137,13 +137,13 @@ func HandlePhonePost(
 		}
 
 		// Parse form input
-		phoneCountryUniqueId := r.FormValue("phoneCountryUniqueId")
+		phoneCountryUniqueID := r.FormValue("phoneCountryUniqueId")
 		phoneNumber := strings.TrimSpace(r.FormValue("phoneNumber"))
 		phoneNumberVerified := r.FormValue("phoneNumberVerified") == "on"
 
 		// Create request
 		updateReq := &api.UpdateUserPhoneRequest{
-			PhoneCountryUniqueID: phoneCountryUniqueId,
+			PhoneCountryUniqueID: phoneCountryUniqueID,
 			PhoneNumber:          phoneNumber,
 			PhoneNumberVerified:  phoneNumberVerified,
 		}
@@ -152,7 +152,7 @@ func HandlePhonePost(
 		renderError := func(errorMessage, errorField string) {
 			bind := map[string]interface{}{
 				"user":                         user,
-				"selectedPhoneCountryUniqueId": phoneCountryUniqueId,
+				"selectedPhoneCountryUniqueId": phoneCountryUniqueID,
 				"phoneNumber":                  phoneNumber,
 				"phoneNumberVerified":          phoneNumberVerified,
 				"phoneCountries":               phoneCountries,

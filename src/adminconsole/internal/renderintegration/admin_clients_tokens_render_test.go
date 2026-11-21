@@ -37,7 +37,7 @@ type tokensTabAPI struct {
 	dpopRefusal string
 }
 
-func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *tokensTabAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
 }
 

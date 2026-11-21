@@ -24,16 +24,16 @@ import (
 // Both halves are asserted here: nothing below answers 500, and the rows and the
 // bar always name the same page.
 
-type membersPagingApiClient struct {
+type membersPagingAPIClient struct {
 	total int
 	asked []int
 }
 
-func (c *membersPagingApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{ID: groupId, GroupIdentifier: "some-group"}, nil
+func (c *membersPagingAPIClient) GetGroupByID(_ context.Context, accessToken string, groupID int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{ID: groupID, GroupIdentifier: "some-group"}, nil
 }
 
-func (c *membersPagingApiClient) GetGroupMembers(_ context.Context, accessToken string, groupId int64,
+func (c *membersPagingAPIClient) GetGroupMembers(_ context.Context, accessToken string, groupID int64,
 	page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
@@ -41,7 +41,7 @@ func (c *membersPagingApiClient) GetGroupMembers(_ context.Context, accessToken 
 }
 
 // membersOnPage is the slice of a list of total members that page holds, each
-// member's Id being its 1-based position in the whole list. The start < 0 arm
+// member's ID being its 1-based position in the whole list. The start < 0 arm
 // stands for the negative SQL offset a real API cannot serve.
 func membersOnPage(total, page, pageSize int) []api.UserResponse {
 	start := (page - 1) * pageSize
@@ -62,7 +62,7 @@ func membersOnPage(total, page, pageSize int) []api.UserResponse {
 func renderMembers(t *testing.T, rawPage string, total int) (map[string]interface{}, []int) {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_groups_members.html").Maybe()
 
@@ -73,7 +73,7 @@ func renderMembers(t *testing.T, rawPage string, total int) (map[string]interfac
 	req := handlertest.Request(http.MethodGet, target,
 		handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "3"))
 
-	apiClient := &membersPagingApiClient{total: total}
+	apiClient := &membersPagingAPIClient{total: total}
 	HandleMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)

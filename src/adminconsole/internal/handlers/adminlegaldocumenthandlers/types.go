@@ -41,7 +41,7 @@ const (
 )
 
 // legalDocumentId reads the {legalDocumentId} path value; false when it is not an id.
-func legalDocumentId(r *http.Request) (int64, bool) {
+func legalDocumentID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("legalDocumentId"), 10, 64)
 	return id, err == nil && id > 0
 }
@@ -54,7 +54,7 @@ func postedMarkdown(r *http.Request) string {
 
 // appChoice is one app the Applies to tab offers, ticked when the document lists it.
 type appChoice struct {
-	Id          int64
+	ID          int64
 	Identifier  string
 	Description string
 	Selected    bool

@@ -15,10 +15,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubAuthenticationApiClient answers the Authentication tab's reads: the client from GET
+// stubAuthenticationAPIClient answers the Authentication tab's reads: the client from GET
 // /clients/{id}, which carries no secret, and the secret from GET /clients/{id}/secret, the one
 // route that does (#402 decision 8).
-type stubAuthenticationApiClient struct {
+type stubAuthenticationAPIClient struct {
 	client *api.ClientResponse
 	secret string
 	// secretReadFor is every client id the secret was read for.
@@ -27,24 +27,24 @@ type stubAuthenticationApiClient struct {
 	updates []*api.UpdateClientAuthenticationRequest
 }
 
-func (s *stubAuthenticationApiClient) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *stubAuthenticationAPIClient) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
-func (s *stubAuthenticationApiClient) GetClientSecret(_ context.Context, _ string, clientId int64) (string, error) {
-	s.secretReadFor = append(s.secretReadFor, clientId)
+func (s *stubAuthenticationAPIClient) GetClientSecret(_ context.Context, _ string, clientID int64) (string, error) {
+	s.secretReadFor = append(s.secretReadFor, clientID)
 	return s.secret, nil
 }
 
-func (s *stubAuthenticationApiClient) UpdateClientAuthentication(_ context.Context, _ string, _ int64,
+func (s *stubAuthenticationAPIClient) UpdateClientAuthentication(_ context.Context, _ string, _ int64,
 	request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
 	s.updates = append(s.updates, request)
 	return nil, nil
 }
 
-func authenticationTabBind(t *testing.T, apiClient *stubAuthenticationApiClient) reflect.Value {
+func authenticationTabBind(t *testing.T, apiClient *stubAuthenticationAPIClient) reflect.Value {
 	t.Helper()
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/authentication",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
@@ -57,7 +57,7 @@ func authenticationTabBind(t *testing.T, apiClient *stubAuthenticationApiClient)
 
 // A confidential client's secret is shown from the secret route, the client detail having none.
 func TestHandleAuthenticationGet_ShowsTheSecretReadFromTheSecretRoute(t *testing.T) {
-	apiClient := &stubAuthenticationApiClient{
+	apiClient := &stubAuthenticationAPIClient{
 		client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", IsPublic: false},
 		secret: "the-secret-from-its-route",
 	}
@@ -70,7 +70,7 @@ func TestHandleAuthenticationGet_ShowsTheSecretReadFromTheSecretRoute(t *testing
 
 // A public client has no secret, so none is read and none is recorded as viewed.
 func TestHandleAuthenticationGet_APublicClientReadsNoSecret(t *testing.T) {
-	apiClient := &stubAuthenticationApiClient{
+	apiClient := &stubAuthenticationAPIClient{
 		client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		secret: "never-read",
 	}
@@ -86,7 +86,7 @@ func TestHandleAuthenticationGet_APublicClientReadsNoSecret(t *testing.T) {
 func TestHandleAuthenticationGet_DrawsTheMethodTheClientIsHeldTo(t *testing.T) {
 	for _, held := range []string{"client_secret_basic", "client_secret_post", ""} {
 		t.Run("held to "+held, func(t *testing.T) {
-			apiClient := &stubAuthenticationApiClient{
+			apiClient := &stubAuthenticationAPIClient{
 				client: &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
 					TokenEndpointAuthMethod: held},
 				secret: "the-secret",
@@ -111,11 +111,11 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 		{"publicConfidential": {"both"}, "clientSecret": {"a-secret-typed-by-hand"}},
 	} {
 		t.Run("publicConfidential="+form.Get("publicConfidential"), func(t *testing.T) {
-			apiClient := &stubAuthenticationApiClient{
+			apiClient := &stubAuthenticationAPIClient{
 				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", IsPublic: false},
 				secret: "the-stored-secret",
 			}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 				handlertest.WithForm(form))
@@ -131,7 +131,7 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 			assert.Empty(t, httpHelper.bind["errorField"], "the refusal is about the request, not a field")
 
 			stored := ClientAuthentication{
-				ClientId:         7,
+				ClientID:         7,
 				ClientIdentifier: "portal",
 				IsPublic:         false,
 				ClientSecret:     "the-stored-secret",
@@ -146,12 +146,12 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 // A refused save draws the tab again with the method the stored client is held to, which the tab
 // names from the client as stored (#708 decision 5).
 func TestHandleAuthenticationPost_ARefusedSaveStillDrawsTheMethodTheClientIsHeldTo(t *testing.T) {
-	apiClient := &stubAuthenticationApiClient{
+	apiClient := &stubAuthenticationAPIClient{
 		client: &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
 			TokenEndpointAuthMethod: "client_secret_post"},
 		secret: "the-stored-secret",
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithForm(url.Values{"publicConfidential": {"neither"}}))
@@ -167,11 +167,11 @@ func TestHandleAuthenticationPost_ARefusedSaveStillDrawsTheMethodTheClientIsHeld
 
 // A public client holds no secret, so its refused tab reads none, as its first draw reads none.
 func TestHandleAuthenticationPost_ARefusedPublicClientReadsNoSecret(t *testing.T) {
-	apiClient := &stubAuthenticationApiClient{
+	apiClient := &stubAuthenticationAPIClient{
 		client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		secret: "never-read",
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
 		handlertest.WithForm(url.Values{"publicConfidential": {"neither"}}))
@@ -181,7 +181,7 @@ func TestHandleAuthenticationPost_ARefusedPublicClientReadsNoSecret(t *testing.T
 
 	require.NoError(t, httpHelper.err)
 	require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
-	assert.Equal(t, ClientAuthentication{ClientId: 7, ClientIdentifier: "spa", IsPublic: true}, httpHelper.bind["client"])
+	assert.Equal(t, ClientAuthentication{ClientID: 7, ClientIdentifier: "spa", IsPublic: true}, httpHelper.bind["client"])
 	assert.Empty(t, apiClient.secretReadFor)
 	assert.Empty(t, apiClient.updates)
 }

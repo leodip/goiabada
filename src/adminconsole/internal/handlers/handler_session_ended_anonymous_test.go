@@ -63,7 +63,7 @@ func newCountingStore(t *testing.T) (*sessionstore.ServerSideStore, *createCount
 
 func TestHandleSessionEndedGet_ACookielessRequestWritesNoRow(t *testing.T) {
 	store, backend := newCountingStore(t)
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	w := httptest.NewRecorder()
 	HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,

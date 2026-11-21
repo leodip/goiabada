@@ -15,16 +15,16 @@ import (
 // resourceUsersWithPermissionAPI is what the users-with-permission page needs: the resource and
 // its permissions, the users holding one, and each user's own set.
 type resourceUsersWithPermissionAPI interface {
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
-	GetUsersByPermission(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error)
-	SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
-	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
+	GetUserPermissions(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.PermissionResponse, error)
+	GetUsersByPermission(ctx context.Context, accessToken string, permissionID int64, page, size int) ([]api.UserResponse, int, error)
+	SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionID int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
+	UpdateUserPermissions(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPermissionsRequest) error
 }
 
 func HandleUsersWithPermissionGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +129,7 @@ func HandleUsersWithPermissionGet(
 }
 
 func HandleUsersWithPermissionRemovePermissionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -144,18 +144,18 @@ func HandleUsersWithPermissionRemovePermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		userIdStr := r.PathValue("userId")
-		if len(userIdStr) == 0 {
+		userIDStr := r.PathValue("userId")
+		if len(userIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
+		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -165,19 +165,19 @@ func HandleUsersWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissionIdStr := r.PathValue("permissionId")
-		if len(permissionIdStr) == 0 {
+		permissionIDStr := r.PathValue("permissionId")
+		if len(permissionIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
-		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		permissionID, err := strconv.ParseInt(permissionIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 		found := false
 		for _, permission := range permissions {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -189,7 +189,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -200,13 +200,13 @@ func HandleUsersWithPermissionRemovePermissionPost(
 		}
 
 		// Build reduced set and update via API
-		newIds := make([]int64, 0, len(currentPerms))
+		newIDs := make([]int64, 0, len(currentPerms))
 		for _, p := range currentPerms {
-			if p.ID != permissionId {
-				newIds = append(newIds, p.ID)
+			if p.ID != permissionID {
+				newIDs = append(newIDs, p.ID)
 			}
 		}
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIDs, ExpectedPermissionIDs: permissionIDsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.ID, apiReq); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -218,7 +218,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 }
 
 func HandleUsersWithPermissionAddGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +287,7 @@ func HandleUsersWithPermissionAddGet(
 }
 
 func HandleUsersWithPermissionSearchGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +343,7 @@ func HandleUsersWithPermissionSearchGet(
 		usersResult := make([]UserResult, 0, len(annotatedUsers))
 		for _, u := range annotatedUsers {
 			usersResult = append(usersResult, UserResult{
-				Id:            u.ID,
+				ID:            u.ID,
 				Subject:       u.Subject,
 				Username:      u.Username,
 				Email:         u.Email,
@@ -359,7 +359,7 @@ func HandleUsersWithPermissionSearchGet(
 }
 
 func HandleUsersWithPermissionAddPermissionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -374,18 +374,18 @@ func HandleUsersWithPermissionAddPermissionPost(
 		}
 		permissions, accessToken := loaded.permissions, loaded.accessToken
 
-		userIdStr := r.PathValue("userId")
-		if len(userIdStr) == 0 {
+		userIDStr := r.PathValue("userId")
+		if len(userIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
+		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -395,12 +395,12 @@ func HandleUsersWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissionIdStr := r.PathValue("permissionId")
-		if len(permissionIdStr) == 0 {
+		permissionIDStr := r.PathValue("permissionId")
+		if len(permissionIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
-		permissionId, err := strconv.ParseInt(permissionIdStr, 10, 64)
+		permissionID, err := strconv.ParseInt(permissionIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -408,7 +408,7 @@ func HandleUsersWithPermissionAddPermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				found = true
 				break
 			}
@@ -419,18 +419,18 @@ func HandleUsersWithPermissionAddPermissionPost(
 		}
 
 		for _, permission := range currentPerms {
-			if permission.ID == permissionId {
+			if permission.ID == permissionID {
 				render.JSONConflict(httpHelper, w, r)
 				return
 			}
 		}
 
-		newIds := make([]int64, 0, len(currentPerms)+1)
+		newIDs := make([]int64, 0, len(currentPerms)+1)
 		for _, p := range currentPerms {
-			newIds = append(newIds, p.ID)
+			newIDs = append(newIDs, p.ID)
 		}
-		newIds = append(newIds, permissionId)
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		newIDs = append(newIDs, permissionID)
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIDs, ExpectedPermissionIDs: permissionIDsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.ID, apiReq); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

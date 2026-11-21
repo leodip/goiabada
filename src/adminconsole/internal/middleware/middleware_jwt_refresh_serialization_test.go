@@ -201,7 +201,7 @@ func TestSessionHandler_ARefusedGrantDoesNotClearATokenSetNewerThanTheOnePresent
 	assert.True(t, out.reached, "the chain continues")
 	require.NotNil(t, out.jwtInfo, "the administrator is still signed in")
 	assert.Equal(t, winner, out.jwtInfo.TokenResponse, "carrying the token set the other replica stored")
-	assert.Same(t, verifiedRefreshed, out.jwtInfo.IdToken, "whose ID token verified")
+	assert.Same(t, verifiedRefreshed, out.jwtInfo.IDToken, "whose ID token verified")
 
 	h.assertHolds(cookies, winner, winnerExpiresAt)
 	_, flashed := h.readBack(cookies).TakeFlash(flashPage, flashKey)
@@ -251,7 +251,7 @@ func TestSessionHandler_ConcurrentRequestsShareOneRefreshGrant(t *testing.T) {
 	claims := oauthclienttest.ValidClaims()
 	stored := oauthclienttest.SignRS256(t, signing, "current", claims)
 	refreshed := oauthclienttest.SignRS256(t, signing, "current", claims)
-	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("current", &signing.PublicKey))
+	jwks, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey("current", &signing.PublicKey))
 	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil,
 		oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
@@ -342,7 +342,7 @@ func TestSessionHandler_AWaiterCarriesTheStoredSetIntoItsOwnSession(t *testing.T
 	assert.True(t, out.reached, "the chain continues")
 	require.NotNil(t, out.jwtInfo, "the administrator is still signed in")
 	assert.Equal(t, winner, out.jwtInfo.TokenResponse, "carrying the winner's set")
-	assert.Same(t, verifiedRefreshed, out.jwtInfo.IdToken)
+	assert.Same(t, verifiedRefreshed, out.jwtInfo.IDToken)
 	h.assertNoRefreshSent()
 
 	h.assertHolds(cookies, winner, winnerExpiresAt)
@@ -599,7 +599,7 @@ func TestSessionHandler_AWaitForTheRefreshLockEndsAtItsBound(t *testing.T) {
 	winner := winnerSet()
 	h.refresher.answer = &winner
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
-		Return(&oauthclient.JwtInfo{TokenResponse: winner, IdToken: verifiedRefreshed}, nil)
+		Return(&oauthclient.JWTInfo{TokenResponse: winner, IDToken: verifiedRefreshed}, nil)
 
 	inGrant, finishGrant := make(chan struct{}), make(chan struct{})
 	var first sync.Once
@@ -659,8 +659,8 @@ func TestSessionHandler_AShortLivedAnswerIsCarriedNotRotatedAgain(t *testing.T) 
 	h.refresher.inOrder = []scriptedGrant{{answer: &answer}, {answer: &again}}
 	h.refresher.err = invalidGrant()
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JwtInfo, error) {
-			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: verifiedRefreshed}, nil
+		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JWTInfo, error) {
+			return &oauthclient.JWTInfo{TokenResponse: *tr, IDToken: verifiedRefreshed}, nil
 		})
 
 	m := h.middleware(h.parser)
@@ -720,8 +720,8 @@ func TestSessionHandler_TheReReadKeepsTheRequestAndOutlivesTheBrowser(t *testing
 	h.refresher.answer = &oauth.TokenResponse{AccessToken: "the-new-access-token", IDToken: refreshedIDTokenRaw,
 		RefreshToken: "the-new-refresh-token", ExpiresIn: 600}
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
-		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JwtInfo, error) {
-			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: verifiedRefreshed}, nil
+		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JWTInfo, error) {
+			return &oauthclient.JWTInfo{TokenResponse: *tr, IDToken: verifiedRefreshed}, nil
 		})
 	loadsBefore := len(h.backend.recordedLoads())
 

@@ -13,7 +13,7 @@
     <label class="field-label" for="permissionSelect">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.field.permission" }}</label>
     <select class="control" id="permissionSelect" name="permission">
       {{ range .permissionChoices }}
-      <option value="{{ .Id }}"{{ if eq $.selectedPermission .Id }} selected{{ end }}>{{ .Label }}</option>
+      <option value="{{ .ID }}"{{ if eq $.selectedPermission .ID }} selected{{ end }}>{{ .Label }}</option>
       {{ end }}
     </select>
   </div>

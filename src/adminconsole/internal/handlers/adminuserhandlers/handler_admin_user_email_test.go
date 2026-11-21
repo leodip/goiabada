@@ -21,15 +21,15 @@ import (
 // and its write (#414, #425) reached the 500 page and the administrator lost the form. It now goes
 // through HandleAPIErrorWithCallback, which sends a 400 and a 409 back to the form and the rest
 // where they always went.
-type userEmailApiClient struct {
+type userEmailAPIClient struct {
 	updateErr error
 }
 
-func (c *userEmailApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId, Email: "before@example.com"}, nil
+func (c *userEmailAPIClient) GetUserByID(_ context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Email: "before@example.com"}, nil
 }
 
-func (c *userEmailApiClient) UpdateUserEmail(_ context.Context, accessToken string, userId int64,
+func (c *userEmailAPIClient) UpdateUserEmail(_ context.Context, accessToken string, userID int64,
 	request *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
 	return nil, c.updateErr
 }
@@ -70,7 +70,7 @@ func TestHandleEmailPost_AnswersAFailedWrite(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			switch {
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
@@ -82,7 +82,7 @@ func TestHandleEmailPost_AnswersAFailedWrite(t *testing.T) {
 			}
 
 			// The session store is nil: every row fails before the success path reaches it.
-			HandleEmailPost(httpHelper, nil, &userEmailApiClient{updateErr: testCase.err}, consoleBaseURL).
+			HandleEmailPost(httpHelper, nil, &userEmailAPIClient{updateErr: testCase.err}, consoleBaseURL).
 				ServeHTTP(httptest.NewRecorder(), handlertest.Request(http.MethodPost,
 					"/admin/users/42/email?page=2&query=bob", handlertest.WithAccessToken(),
 					handlertest.WithPathValue("userId", "42"),

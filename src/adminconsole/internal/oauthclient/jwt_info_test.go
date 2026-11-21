@@ -10,7 +10,7 @@ import (
 )
 
 // Decision 12: the granted scope is read from the token response, matched exactly.
-func TestJwtInfo_HasScope(t *testing.T) {
+func TestJWTInfo_HasScope(t *testing.T) {
 	testCases := []struct {
 		name    string
 		granted string
@@ -31,7 +31,7 @@ func TestJwtInfo_HasScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			info := oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{Scope: tc.granted}}
+			info := oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{Scope: tc.granted}}
 
 			assert.Equal(t, tc.want, info.HasScope(tc.scope))
 		})

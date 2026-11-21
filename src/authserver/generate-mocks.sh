@@ -12,7 +12,7 @@ echo "========================================"
 # Three modules have a config and each writes only inside itself. That was not true
 # until #385: authserver/.mockery.yaml wrote the HttpHelper mock into
 # ../core/handlerhelpers/mocks and both applications imported it from there, which the
-# renderer split ended -- each module now declares its own HttpHelper port and
+# renderer split ended -- each module now declares its own HTTPHelper port and
 # generates its own mock beside its own port. Never add a config that writes a file
 # another one writes; whichever module runs last silently wins, with nothing saying so.
 # adminconsole gained its config in #385, when the JWT session middleware and its two

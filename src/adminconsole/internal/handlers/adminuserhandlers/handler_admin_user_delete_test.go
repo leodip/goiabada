@@ -15,35 +15,35 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// deleteUserApiClient answers the two reads the confirmation page performs, and records the
+// deleteUserAPIClient answers the two reads the confirmation page performs, and records the
 // groups call so a handler that stopped making it is caught by more than an empty bind.
-type deleteUserApiClient struct {
+type deleteUserAPIClient struct {
 	user       *api.UserResponse
 	groups     []api.GroupResponse
 	askedGroup []int64
 }
 
-func (c *deleteUserApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *deleteUserAPIClient) GetUserByID(_ context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *deleteUserApiClient) GetUserGroups(_ context.Context, accessToken string,
-	userId int64) (*api.UserResponse, []api.GroupResponse, error) {
+func (c *deleteUserAPIClient) GetUserGroups(_ context.Context, accessToken string,
+	userID int64) (*api.UserResponse, []api.GroupResponse, error) {
 
-	c.askedGroup = append(c.askedGroup, userId)
+	c.askedGroup = append(c.askedGroup, userID)
 	return c.user, c.groups, nil
 }
 
-// The rest of the ports deleteUserApiClient is passed to, which no test here reaches.
+// The rest of the ports deleteUserAPIClient is passed to, which no test here reaches.
 
-func (*deleteUserApiClient) DeleteUser(context.Context, string, int64) error {
+func (*deleteUserAPIClient) DeleteUser(context.Context, string, int64) error {
 	panic("unexpected call to DeleteUser")
 }
 
-func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]interface{} {
+func renderUserDelete(t *testing.T, client *deleteUserAPIClient) map[string]interface{} {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Maybe()
 
@@ -61,7 +61,7 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 // populated, so a confirmation screen for a destructive action told every administrator the user
 // belonged to no groups. The handler loads them now, from the endpoint that serves them (#350).
 func TestHandleDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T) {
-	client := &deleteUserApiClient{
+	client := &deleteUserAPIClient{
 		user: &api.UserResponse{ID: 7, Email: "someone@example.com"},
 		groups: []api.GroupResponse{
 			{ID: 2, GroupIdentifier: "admins"},
@@ -84,7 +84,7 @@ func TestHandleDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T)
 // A user in no groups still renders, and the row's "none" arm is what it renders. This is the case
 // that was indistinguishable from the defect above before the fix.
 func TestHandleDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
-	bind := renderUserDelete(t, &deleteUserApiClient{user: &api.UserResponse{ID: 7}})
+	bind := renderUserDelete(t, &deleteUserAPIClient{user: &api.UserResponse{ID: 7}})
 
 	groups, ok := bind["groups"].([]api.GroupResponse)
 	require.True(t, ok, "the bind carries no groups key")
@@ -108,7 +108,7 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bind := renderUserDelete(t, &deleteUserApiClient{user: tc.user})
+			bind := renderUserDelete(t, &deleteUserAPIClient{user: tc.user})
 			assert.Equal(t, tc.wants, bind["userFullName"])
 		})
 	}
@@ -116,12 +116,12 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 
 // The deletion asks for the user's email typed, as the client, group and resource deletions ask for
 // the identifier: a blank field and another address are each refused on the page, with nothing
-// deleted, which deleteUserApiClient's DeleteUser would panic on (#617).
+// deleted, which deleteUserAPIClient's DeleteUser would panic on (#617).
 func TestHandleDeletePost_RefusesAnEmailThatIsNotTheUsers(t *testing.T) {
 	for _, typed := range []string{"", "  ", "someone-else@example.com"} {
 		t.Run(typed, func(t *testing.T) {
-			client := &deleteUserApiClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}}
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			client := &deleteUserAPIClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}}
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Once()
 

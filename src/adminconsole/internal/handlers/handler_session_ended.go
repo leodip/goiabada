@@ -61,7 +61,7 @@ type sessionEndedStore interface {
 // the ended sign-in sent it here; the notice goes home with it in the home page's query, which
 // writes nothing. A request with no cookie at all had no sign-in to end and is told nothing.
 func HandleSessionEndedGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionEndedStore,
 ) http.HandlerFunc {
 

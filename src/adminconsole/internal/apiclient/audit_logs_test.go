@@ -22,9 +22,9 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 	testCases := []struct {
 		name       string
 		auditEvent string
-		requestId  string
-		userId     int64
-		wantUserId string
+		requestID  string
+		userID     int64
+		wantUserID string
 	}{
 		{"neither", "", "", 0, ""},
 		{"the event alone", "user_login", "", 0, ""},
@@ -58,7 +58,7 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			defer server.Close()
 
 			client := NewAuthServerClient(server.URL, nil, nil)
-			resp, err := client.GetAuditLogsPaginated(context.Background(), "an-access-token", 1, 20, tc.auditEvent, tc.requestId, tc.userId)
+			resp, err := client.GetAuditLogsPaginated(context.Background(), "an-access-token", 1, 20, tc.auditEvent, tc.requestID, tc.userID)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
 
@@ -67,22 +67,22 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 			assert.Equal(t, "20", got.Get("size"))
 
 			// Byte for byte, and once only: a value that split would arrive as two.
-			assert.Equal(t, tc.requestId, got.Get("requestId"), "the request id did not survive the URL")
+			assert.Equal(t, tc.requestID, got.Get("requestId"), "the request id did not survive the URL")
 			assert.Equal(t, tc.auditEvent, got.Get("auditEvent"), "the event did not survive the URL")
 			assert.LessOrEqual(t, len(got["requestId"]), 1, "requestId arrived more than once")
 			assert.LessOrEqual(t, len(got["auditEvent"]), 1, "auditEvent arrived more than once")
-			assert.Equal(t, tc.wantUserId, got.Get("userId"), "the user id did not reach the server")
+			assert.Equal(t, tc.wantUserID, got.Get("userId"), "the user id did not reach the server")
 			assert.LessOrEqual(t, len(got["userId"]), 1, "userId arrived more than once")
 
 			// An empty filter is absent rather than present and empty, which is what the
 			// API reads as "no filter" either way but is what the URL says today.
-			if tc.requestId == "" {
+			if tc.requestID == "" {
 				assert.Empty(t, got["requestId"], "an empty request id was still sent")
 			}
 			if tc.auditEvent == "" {
 				assert.Empty(t, got["auditEvent"], "an empty event was still sent")
 			}
-			if tc.userId == 0 {
+			if tc.userID == 0 {
 				assert.Empty(t, got["userId"], "no user filter was still sent as one")
 			}
 

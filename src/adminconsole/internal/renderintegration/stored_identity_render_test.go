@@ -75,7 +75,7 @@ type authenticationTabAPI struct {
 	secretReads  int
 }
 
-func (s *authenticationTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *authenticationTabAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
 }
 
@@ -184,7 +184,7 @@ type groupSettingsTabAPI struct {
 	stored *api.GroupResponse
 }
 
-func (s *groupSettingsTabAPI) GetGroupById(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
+func (s *groupSettingsTabAPI) GetGroupByID(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
 	return s.stored, nil
 }
 
@@ -224,7 +224,7 @@ type resourceSettingsTabAPI struct {
 	stored *api.ResourceResponse
 }
 
-func (s *resourceSettingsTabAPI) GetResourceById(_ context.Context, _ string, _ int64) (*api.ResourceResponse, error) {
+func (s *resourceSettingsTabAPI) GetResourceByID(_ context.Context, _ string, _ int64) (*api.ResourceResponse, error) {
 	return s.stored, nil
 }
 
@@ -309,11 +309,11 @@ type groupAttributeEditAPI struct {
 	stored *api.GroupAttributeResponse
 }
 
-func (s *groupAttributeEditAPI) GetGroupById(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
+func (s *groupAttributeEditAPI) GetGroupByID(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
 	return s.group, nil
 }
 
-func (s *groupAttributeEditAPI) GetGroupAttributeById(_ context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
+func (s *groupAttributeEditAPI) GetGroupAttributeByID(_ context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
 	stored := *s.stored
 	return &stored, nil
 }
@@ -357,11 +357,11 @@ type userAttributeEditAPI struct {
 	stored *api.UserAttributeResponse
 }
 
-func (s *userAttributeEditAPI) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (s *userAttributeEditAPI) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	return s.user, nil
 }
 
-func (s *userAttributeEditAPI) GetUserAttributeById(_ context.Context, _ string, _ int64) (*api.UserAttributeResponse, error) {
+func (s *userAttributeEditAPI) GetUserAttributeByID(_ context.Context, _ string, _ int64) (*api.UserAttributeResponse, error) {
 	stored := *s.stored
 	return &stored, nil
 }

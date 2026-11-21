@@ -22,10 +22,10 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// userSessionsApiClient answers the two reads this page performs and the delete its row buttons
+// userSessionsAPIClient answers the two reads this page performs and the delete its row buttons
 // perform, and nothing else. Deletes are recorded rather than counted, so a case can say which
 // session was deleted and a case expecting none can say so by asserting the slice is empty.
-type userSessionsApiClient struct {
+type userSessionsAPIClient struct {
 	user        *api.UserResponse
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error
@@ -33,17 +33,17 @@ type userSessionsApiClient struct {
 	deleted []int64
 }
 
-func (c *userSessionsApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *userSessionsAPIClient) GetUserByID(_ context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *userSessionsApiClient) GetUserSessionsByUserId(_ context.Context, accessToken string,
-	userId int64) ([]api.UserSessionDetailResponse, error) {
+func (c *userSessionsAPIClient) GetUserSessionsByUserID(_ context.Context, accessToken string,
+	userID int64) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, c.sessionsErr
 }
 
-func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessToken string, sessionId int64) error {
-	c.deleted = append(c.deleted, sessionId)
+func (c *userSessionsAPIClient) DeleteUserSessionByID(_ context.Context, accessToken string, sessionID int64) error {
+	c.deleted = append(c.deleted, sessionID)
 	return nil
 }
 
@@ -54,11 +54,11 @@ func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessT
 func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15`
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
-	apiClient := &userSessionsApiClient{
+	apiClient := &userSessionsAPIClient{
 		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
 			{ID: 1, DeviceName: "Safari 17", DeviceType: "Desktop", DeviceOS: "macOS", UserAgent: header},
@@ -87,11 +87,11 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
-	apiClient := &userSessionsApiClient{
+	apiClient := &userSessionsAPIClient{
 		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
 			{ID: 1, Started: &started, LastAccessed: &lastAccessed},
@@ -120,11 +120,11 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // nothing else: a page still recomputing would answer false here, because this request carries no
 // session identifier on its context at all (#373 decision 1).
 func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
-	apiClient := &userSessionsApiClient{
+	apiClient := &userSessionsAPIClient{
 		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
 			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
@@ -144,7 +144,7 @@ func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	require.Len(t, sessions, 2)
 
 	// Sorted by id descending, so the current one is first.
-	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.Equal(t, int64(2), sessions[0].UserSessionID)
 	assert.True(t, sessions[0].IsCurrent)
 	assert.False(t, sessions[1].IsCurrent)
 }
@@ -207,10 +207,10 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
-			apiClient := &userSessionsApiClient{
+			apiClient := &userSessionsAPIClient{
 				user:     &api.UserResponse{ID: 7},
 				sessions: testCase.sessions,
 			}
@@ -222,9 +222,9 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 			if testCase.sid == "" {
 				opts = append(opts, handlertest.WithAccessToken())
 			} else {
-				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				opts = append(opts, handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
@@ -252,15 +252,15 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 // The list read is what the answer above turns on, so a list this handler cannot read is answered
 // rather than swallowed. It swallowed the failure until #373, because the read was made only to
 // compare against a claim rather than to decide the answer.
-func TestHandleSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleSessionsPost_AListTheAPICannotReadStopsTheDelete(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
 
-	apiClient := &userSessionsApiClient{
+	apiClient := &userSessionsAPIClient{
 		user: &api.UserResponse{ID: 7},
 		sessionsErr: &apiclient.APIError{
 			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",

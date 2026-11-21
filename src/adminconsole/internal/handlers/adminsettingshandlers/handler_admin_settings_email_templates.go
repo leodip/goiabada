@@ -67,7 +67,7 @@ type EmailTemplateGroup struct {
 // EmailTemplateRow is one email of the list: its identifier, whether the console names it, and its
 // languages that are edited, invalid ones included, in the API's order.
 type EmailTemplateRow struct {
-	Id        string
+	ID        string
 	Known     bool
 	Languages []EmailTemplateLanguage
 }
@@ -119,7 +119,7 @@ type emailTemplatesLister interface {
 
 // HandleEmailTemplatesGet draws the list of every email, in the console's groups, with its edited
 // and invalid languages marked.
-func HandleEmailTemplatesGet(httpHelper HttpHelper, apiClient emailTemplatesLister) http.HandlerFunc {
+func HandleEmailTemplatesGet(httpHelper HTTPHelper, apiClient emailTemplatesLister) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
 		if !ok {
@@ -134,7 +134,7 @@ func HandleEmailTemplatesGet(httpHelper HttpHelper, apiClient emailTemplatesList
 		rows := map[string]EmailTemplateRow{}
 		var unknown []EmailTemplateRow
 		for _, summary := range summaries {
-			row := EmailTemplateRow{Id: summary.ID, Known: knownEmailTemplate(summary.ID), Languages: []EmailTemplateLanguage{}}
+			row := EmailTemplateRow{ID: summary.ID, Known: knownEmailTemplate(summary.ID), Languages: []EmailTemplateLanguage{}}
 			for _, l := range summary.Languages {
 				if l.Status == api.EmailTemplateStatusEdited || l.Status == api.EmailTemplateStatusInvalid {
 					row.Languages = append(row.Languages, EmailTemplateLanguage{Tag: l.Language, Name: languageName(l.Language), Status: l.Status})
@@ -198,7 +198,7 @@ func editorLanguage(catalogTag string, languages []api.EmailTemplateLanguageResp
 
 // HandleEmailTemplateOpenGet opens an email's editor, from the list, in the language that matches
 // the one the administrator reads the console in (#818 decision 14).
-func HandleEmailTemplateOpenGet(httpHelper HttpHelper, apiClient emailTemplateReader, baseURL string) http.HandlerFunc {
+func HandleEmailTemplateOpenGet(httpHelper HTTPHelper, apiClient emailTemplateReader, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
 		if !ok {
@@ -226,7 +226,7 @@ func emailTemplatePagePath(email, tag string) string {
 // loadEmailTemplateLanguage reads the email the path names and the language of it the path names,
 // answering the request when it cannot: the 404 page for an email or a language that is not there,
 // the language matched exactly as the API lists it.
-func loadEmailTemplateLanguage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateReader,
+func loadEmailTemplateLanguage(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateReader,
 	token string) (*api.EmailTemplateResponse, *api.EmailTemplateLanguageResponse, bool) {
 	email, err := apiClient.GetEmailTemplate(r.Context(), token, r.PathValue("email"))
 	if err != nil {
@@ -255,7 +255,7 @@ func editorText(text api.EmailTemplateTextResponse) EmailTemplateText {
 // renderEmailTemplate draws the editor of lang with form in its fields and extra beside them, the
 // notices or the refusal. The editor's text as saved goes with it, which leaving the page would
 // discard the form for, and what the preview and Send test email are drawn from.
-func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateEditorReader,
+func renderEmailTemplate(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateEditorReader,
 	token string, email *api.EmailTemplateResponse, lang *api.EmailTemplateLanguageResponse, form EmailTemplateText,
 	extra map[string]interface{}) {
 
@@ -307,7 +307,7 @@ func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 // HandleEmailTemplateGet draws the editor of one email in one language, with the editor's text in
 // the form, which for an invalid edit is the edit as stored, beside a warning saying what is wrong
 // and that the built-in text is being sent.
-func HandleEmailTemplateGet(httpHelper HttpHelper, httpSession sessionstore.Store, apiClient emailTemplateEditorReader) http.HandlerFunc {
+func HandleEmailTemplateGet(httpHelper HTTPHelper, httpSession sessionstore.Store, apiClient emailTemplateEditorReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
 		if !ok {
@@ -363,7 +363,7 @@ func emailTemplateErrorField(err error) string {
 // comes back to the editor saying so. The subject and the button label are one line each and sent
 // trimmed; the body is sent as typed, its line breaks normalized by the auth server. An email
 // without a button sends no label.
-func HandleEmailTemplatePost(httpHelper HttpHelper, httpSession sessionstore.Store, apiClient emailTemplateSaver,
+func HandleEmailTemplatePost(httpHelper HTTPHelper, httpSession sessionstore.Store, apiClient emailTemplateSaver,
 	baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
@@ -413,7 +413,7 @@ type emailTemplateResetter interface {
 
 // HandleEmailTemplateResetPost removes the language's edit, so the email is sent with the built-in
 // text, and comes back to the editor saying so. The page asks first.
-func HandleEmailTemplateResetPost(httpHelper HttpHelper, httpSession sessionstore.Store, apiClient emailTemplateResetter,
+func HandleEmailTemplateResetPost(httpHelper HTTPHelper, httpSession sessionstore.Store, apiClient emailTemplateResetter,
 	baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
@@ -445,7 +445,7 @@ func HandleEmailTemplateResetPost(httpHelper HttpHelper, httpSession sessionstor
 // leaveEmailTemplateFlash leaves the notice key for the editor at pagePath, which the write
 // redirects to, answering the request when the session cannot be saved. The other notice, never
 // shown, is dropped, so the page says only this write's.
-func leaveEmailTemplateFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
+func leaveEmailTemplateFlash(httpHelper HTTPHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
 	pagePath, key string) bool {
 	sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 	if err != nil {
@@ -464,10 +464,10 @@ func leaveEmailTemplateFlash(httpHelper HttpHelper, httpSession sessionstore.Sto
 
 // emailTemplateAccessToken answers the bearer the request carries, answering the request when it
 // carries none, which is a wiring defect: every one of these routes is mounted under RequiresScope.
-func emailTemplateAccessToken(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
-	jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+func emailTemplateAccessToken(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
+	jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 	if !ok {
-		httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+		httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 		return "", false
 	}
 	return jwtInfo.TokenResponse.AccessToken, true

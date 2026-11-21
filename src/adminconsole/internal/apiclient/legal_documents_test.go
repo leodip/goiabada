@@ -40,10 +40,10 @@ const legalDocumentDetailBody = `{
 
 // The editor reads the document, its draft and its versions out of one answer: a decode that
 // dropped the draft would open the editor on the published text and lose the administrator's work.
-func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVersions(t *testing.T) {
+func TestAuthServerClient_GetLegalDocumentByIDDecodesTheDocumentItsDraftAndItsVersions(t *testing.T) {
 	client, recorded := serves(t, legalDocumentDetailBody)
 
-	detail, err := client.GetLegalDocumentById(context.Background(), "an-access-token", 7)
+	detail, err := client.GetLegalDocumentByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 
 	gotPath, gotAuthorization := recorded()
@@ -78,12 +78,12 @@ func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVe
 
 // A document with no draft answers draft null, which must reach the editor as nil, the sign that it
 // opens on the current version's text.
-func TestAuthServerClient_GetLegalDocumentByIdDecodesANullDraftAsNil(t *testing.T) {
+func TestAuthServerClient_GetLegalDocumentByIDDecodesANullDraftAsNil(t *testing.T) {
 	client, _ := serves(t, `{"legalDocument":{"id":7,"shortName":"privacy","kind":"for_information",`+
 		`"currentVersion":1,"hasDraft":false,"retired":true,"retiredAt":"2026-10-30T10:00:00Z"},"draft":null,`+
 		`"versions":[{"version":1,"title":"Privacy notice","publishedAt":"2026-10-02T08:00:00Z"}]}`)
 
-	detail, err := client.GetLegalDocumentById(context.Background(), "an-access-token", 7)
+	detail, err := client.GetLegalDocumentByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 
 	assert.Nil(t, detail.Draft)

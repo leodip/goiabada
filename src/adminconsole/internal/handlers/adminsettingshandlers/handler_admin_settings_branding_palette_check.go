@@ -37,7 +37,7 @@ type BrandPaletteCheckResponse struct {
 
 // HandleBrandPaletteCheckPost - POST /admin/settings/branding/palette-check: the Colors section's
 // fields, paletteMode and appearance, answered with BrandPaletteCheckResponse.
-func HandleBrandPaletteCheckPost(httpHelper HttpHelper) http.HandlerFunc {
+func HandleBrandPaletteCheckPost(httpHelper HTTPHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		form := brandPaletteFormFrom(r, nil)
 		colors, err := form.drawnColors(r.Context())

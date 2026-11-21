@@ -69,7 +69,7 @@
         </td>
         <td class="cell-actions">
           {{- if eq .State "previous" }}
-          <button class="button button-sm" type="button" data-action-url="/admin/settings/keys/revoke" data-action-body="{&#34;id&#34;:{{ .Id }}}" data-dialog="revokeKey"
+          <button class="button button-sm" type="button" data-action-url="/admin/settings/keys/revoke" data-action-body="{&#34;id&#34;:{{ .ID }}}" data-dialog="revokeKey"
             data-confirm="{{ T $.ctx "adminconsole.admin_settings.keys.modal_revoke_body" }}" data-done="{{ T $.ctx "adminconsole.admin_settings.keys.revoked" }}" data-done-label="{{ T $.ctx "adminconsole.admin_settings.keys.revoked_label" }}">{{ T $.ctx "adminconsole.admin_settings.keys.revoke_link" }}<span class="sr-only"> {{ .KeyIdentifier }}</span></button>
           {{- end }}
         </td>

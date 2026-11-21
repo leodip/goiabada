@@ -56,7 +56,7 @@ func newRoutingTestServer(t *testing.T) (*Server, string) {
 	t.Cleanup(authServer.Close)
 
 	cfg := &config.Config{
-		AdminConsole: config.AdminConsoleConfig{BaseURL: "https://console.example.test", LogHttpRequests: true},
+		AdminConsole: config.AdminConsoleConfig{BaseURL: "https://console.example.test", LogHTTPRequests: true},
 		AuthServer:   config.AuthServerConfig{BaseURL: authServer.URL},
 	}
 	registry := metrics.NewRegistry()
@@ -374,10 +374,10 @@ func TestRegisterRoutes_ADirectoryUnderStaticIsThe404Page(t *testing.T) {
 	assert.Empty(t, body, "a HEAD has no content")
 }
 
-// mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape
+// mintedRequestID is the request id requestid.Middleware mints when a request carries none, the shape
 // #462 decision 6 keeps: the host name, ten base62 characters, and a counter of at least six
 // digits. A host whose name cannot be read is localhost.
-func mintedRequestId(t *testing.T) *regexp.Regexp {
+func mintedRequestID(t *testing.T) *regexp.Regexp {
 	t.Helper()
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
@@ -388,7 +388,7 @@ func mintedRequestId(t *testing.T) *regexp.Regexp {
 
 // An incoming X-Request-Id is the request's id verbatim, on its records; without one an id is
 // minted, the same prefix for every request and a counter that grows. No response carries it.
-func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
+func TestRegisterRoutes_RequestIDsAreAdoptedOrMinted(t *testing.T) {
 	s, _ := newRoutingTestServer(t)
 	logged := logtest.CaptureSlog(t)
 
@@ -407,15 +407,15 @@ func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
 
 	records = httpRequestRecords(logged)
 	require.Len(t, records, 3)
-	shape := mintedRequestId(t)
-	firstId := shape.FindStringSubmatch(records[1].Attrs["request_id"].(string))
-	secondId := shape.FindStringSubmatch(records[2].Attrs["request_id"].(string))
-	require.NotNil(t, firstId, "minted id %q", records[1].Attrs["request_id"])
-	require.NotNil(t, secondId, "minted id %q", records[2].Attrs["request_id"])
-	assert.Equal(t, firstId[1], secondId[1], "one prefix for the process")
-	firstCount, err := strconv.Atoi(firstId[2])
+	shape := mintedRequestID(t)
+	firstID := shape.FindStringSubmatch(records[1].Attrs["request_id"].(string))
+	secondID := shape.FindStringSubmatch(records[2].Attrs["request_id"].(string))
+	require.NotNil(t, firstID, "minted id %q", records[1].Attrs["request_id"])
+	require.NotNil(t, secondID, "minted id %q", records[2].Attrs["request_id"])
+	assert.Equal(t, firstID[1], secondID[1], "one prefix for the process")
+	firstCount, err := strconv.Atoi(firstID[2])
 	require.NoError(t, err)
-	secondCount, err := strconv.Atoi(secondId[2])
+	secondCount, err := strconv.Atoi(secondID[2])
 	require.NoError(t, err)
 	assert.Greater(t, secondCount, firstCount, "the counter grows")
 }

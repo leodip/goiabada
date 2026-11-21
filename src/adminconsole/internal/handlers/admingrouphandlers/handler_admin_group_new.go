@@ -12,7 +12,7 @@ import (
 )
 
 func HandleNewGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +37,7 @@ type groupNewAPI interface {
 }
 
 func HandleNewPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupNewAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -62,23 +62,23 @@ func HandleNewPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Parse form data
 		groupIdentifier := strings.TrimSpace(r.FormValue("groupIdentifier"))
 		description := strings.TrimSpace(r.FormValue("description"))
-		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInIDToken := r.FormValue("includeInIdToken") == "on"
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
 		// Create API request
 		createReq := &api.CreateGroupRequest{
 			GroupIdentifier:      groupIdentifier,
 			Description:          description,
-			IncludeInIDToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIDToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
 

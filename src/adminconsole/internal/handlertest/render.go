@@ -16,7 +16,7 @@ import (
 //
 // It is registered as Maybe() because the message is the point and the count is not: a case that
 // wants a 500 to have happened expects it itself.
-func RefuseInternalServerError(reporter guard.Reporter, httpHelper *handlersmocks.HttpHelper) {
+func RefuseInternalServerError(reporter guard.Reporter, httpHelper *handlersmocks.HTTPHelper) {
 	reporter.Helper()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -30,7 +30,7 @@ func RefuseInternalServerError(reporter guard.Reporter, httpHelper *handlersmock
 // Once(): this function deliberately chooses neither.
 //
 // Pass mock.Anything for either name to admit any.
-func ExpectRender(httpHelper *handlersmocks.HttpHelper, layout, template string) *mock.Call {
+func ExpectRender(httpHelper *handlersmocks.HTTPHelper, layout, template string) *mock.Call {
 	return httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, layout, template,
 		mock.Anything).Return(nil)
 }
@@ -44,7 +44,7 @@ func ExpectRender(httpHelper *handlersmocks.HttpHelper, layout, template string)
 //
 // context is an optional printf-style clause appended to the failure, for the table helpers whose
 // rows differ by a query string a bare message could not tell apart.
-func Bind(reporter guard.Reporter, httpHelper *handlersmocks.HttpHelper,
+func Bind(reporter guard.Reporter, httpHelper *handlersmocks.HTTPHelper,
 	context ...any) map[string]interface{} {
 	reporter.Helper()
 

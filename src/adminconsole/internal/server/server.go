@@ -113,12 +113,12 @@ func NewServer(router *routing.Router, sessionStore *sessionstore.ServerSideStor
 // the error, unlogged: main writes the one record for it and owns the exit. The client secret is
 // main's to check, before anything is built (#426, #390).
 func (s *Server) Start(ctx context.Context) error {
-	httpsHost := s.cfg.AdminConsole.ListenHostHttps
-	httpsPort := s.cfg.AdminConsole.ListenPortHttps
+	httpsHost := s.cfg.AdminConsole.ListenHostHTTPS
+	httpsPort := s.cfg.AdminConsole.ListenPortHTTPS
 	certFile := s.cfg.AdminConsole.CertFile
 	keyFile := s.cfg.AdminConsole.KeyFile
-	httpHost := s.cfg.AdminConsole.ListenHostHttp
-	httpPort := s.cfg.AdminConsole.ListenPortHttp
+	httpHost := s.cfg.AdminConsole.ListenHostHTTP
+	httpPort := s.cfg.AdminConsole.ListenPortHTTP
 	httpsEnabled, httpEnabled := s.logListenerConfiguration(ctx)
 
 	// The metrics listener is enabled by its own setting rather than by a host and port, since its
@@ -180,8 +180,8 @@ func (s *Server) Start(ctx context.Context) error {
 // logListenerConfiguration writes the start's records about the HTTPS and HTTP listeners, and
 // reports which of the two the configuration enables.
 func (s *Server) logListenerConfiguration(ctx context.Context) (httpsEnabled, httpEnabled bool) {
-	httpsHost := s.cfg.AdminConsole.ListenHostHttps
-	httpsPort := s.cfg.AdminConsole.ListenPortHttps
+	httpsHost := s.cfg.AdminConsole.ListenHostHTTPS
+	httpsPort := s.cfg.AdminConsole.ListenPortHTTPS
 	certFile := s.cfg.AdminConsole.CertFile
 	keyFile := s.cfg.AdminConsole.KeyFile
 	httpsEnabled = httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
@@ -196,8 +196,8 @@ func (s *Server) logListenerConfiguration(ctx context.Context) (httpsEnabled, ht
 		"cert_file", certFile,
 		"key_file", keyFile)
 
-	httpHost := s.cfg.AdminConsole.ListenHostHttp
-	httpPort := s.cfg.AdminConsole.ListenPortHttp
+	httpHost := s.cfg.AdminConsole.ListenHostHTTP
+	httpPort := s.cfg.AdminConsole.ListenPortHTTP
 	httpEnabled = httpHost != "" && httpPort > 0
 
 	if httpEnabled {
@@ -281,7 +281,7 @@ func (s *Server) redirectingRouter() *routing.Router {
 	r.Use(requestid.Middleware)
 	r.Use(httpmw.SecurityHeaders(false, s.assetOrigins()...))
 	r.Use(httpmw.RealIP(false, s.trustedProxies))
-	r.Use(httpmw.RequestLogger(s.cfg.AdminConsole.LogHttpRequests))
+	r.Use(httpmw.RequestLogger(s.cfg.AdminConsole.LogHTTPRequests))
 	r.Use(s.httpMetrics)
 	r.Use(httpmw.Recoverer)
 
@@ -582,9 +582,9 @@ func (s *Server) initMiddleware() *routing.Router {
 	//
 	// It stays above StripTrailingSlash, which edits r.URL.Path in place, and renders the target
 	// before calling the next handler, so its record carries the path the client sent.
-	logHttpRequests := s.cfg.AdminConsole.LogHttpRequests
-	slog.Info("http request logging configured", "enabled", logHttpRequests)
-	s.router.Use(httpmw.RequestLogger(logHttpRequests))
+	logHTTPRequests := s.cfg.AdminConsole.LogHTTPRequests
+	slog.Info("http request logging configured", "enabled", logHTTPRequests)
+	s.router.Use(httpmw.RequestLogger(logHTTPRequests))
 
 	// HTTP metrics: every request this router answers, by route, method and status. Beside the
 	// request logger and for the same reason, above Recoverer, so a panicking request is counted as

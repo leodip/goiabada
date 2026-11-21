@@ -16,10 +16,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubClientTokensApiClient implements the Tokens tab's port: the client the tab is drawn from, the
+// stubClientTokensAPIClient implements the Tokens tab's port: the client the tab is drawn from, the
 // global token settings, the token settings' write and the DPoP requirement's, each write recording
 // what it was sent.
-type stubClientTokensApiClient struct {
+type stubClientTokensAPIClient struct {
 	client *api.ClientResponse
 	// updated is what the token settings' write answers, the client as it then stands.
 	updated *api.ClientResponse
@@ -34,15 +34,15 @@ type stubClientTokensApiClient struct {
 	sentDPoPAs   string
 }
 
-func (s *stubClientTokensApiClient) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *stubClientTokensAPIClient) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
-func (s *stubClientTokensApiClient) GetSettingsTokens(_ context.Context, _ string) (*api.SettingsTokensResponse, error) {
+func (s *stubClientTokensAPIClient) GetSettingsTokens(_ context.Context, _ string) (*api.SettingsTokensResponse, error) {
 	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 300}, nil
 }
 
-func (s *stubClientTokensApiClient) UpdateClientTokens(_ context.Context, _ string, _ int64,
+func (s *stubClientTokensAPIClient) UpdateClientTokens(_ context.Context, _ string, _ int64,
 	_ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	s.tokensWrites++
 	if s.tokensErr != nil {
@@ -54,11 +54,11 @@ func (s *stubClientTokensApiClient) UpdateClientTokens(_ context.Context, _ stri
 	return s.client, nil
 }
 
-func (s *stubClientTokensApiClient) UpdateClientDPoP(_ context.Context, accessToken string, clientId int64,
+func (s *stubClientTokensAPIClient) UpdateClientDPoP(_ context.Context, accessToken string, clientID int64,
 	request *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
 	s.dpopWrites++
 	s.sentDPoP = request
-	s.sentDPoPTo = clientId
+	s.sentDPoPTo = clientID
 	s.sentDPoPAs = accessToken
 	if s.dpopErr != nil {
 		return nil, s.dpopErr
@@ -83,7 +83,7 @@ func validTokensForm(extra url.Values) url.Values {
 }
 
 // postTokens posts the Tokens tab for client 7 with form, and with query on the URL when given.
-func postTokens(t *testing.T, apiClient clientTokensAPI, httpHelper *stubHttpHelper, form url.Values, query string) *httptest.ResponseRecorder {
+func postTokens(t *testing.T, apiClient clientTokensAPI, httpHelper *stubHTTPHelper, form url.Values, query string) *httptest.ResponseRecorder {
 	t.Helper()
 	target := "/admin/clients/7/tokens"
 	if query != "" {
@@ -113,11 +113,11 @@ func TestHandleTokensGet_BindsTheDPoPRequirement(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/tokens",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
-			HandleTokensGet(httpHelper, newTestSessionStore(), &stubClientTokensApiClient{client: tc.client}).
+			HandleTokensGet(httpHelper, newTestSessionStore(), &stubClientTokensAPIClient{client: tc.client}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NoError(t, httpHelper.err)
@@ -149,9 +149,9 @@ func TestHandleTokensPost_WritesTheDPoPRequirementOnlyWhenItChanged(t *testing.T
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubClientTokensApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa",
+			apiClient := &stubClientTokensAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa",
 				DPoPBoundAccessTokens: tc.stored}}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 
 			rec := postTokens(t, apiClient, httpHelper, validTokensForm(tc.form), "")
 
@@ -176,10 +176,10 @@ func TestHandleTokensPost_WritesTheDPoPRequirementOnlyWhenItChanged(t *testing.T
 // switch for it, and a save never writes it, whatever the body says.
 func TestHandleTokensPost_NeverWritesTheSystemLevelClientsRequirement(t *testing.T) {
 	for _, form := range []url.Values{{}, {"dpopBoundAccessTokens": {"on"}}} {
-		apiClient := &stubClientTokensApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
+		apiClient := &stubClientTokensAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
 			IsSystemLevelClient: true}}
 
-		rec := postTokens(t, apiClient, &stubHttpHelper{}, validTokensForm(form), "")
+		rec := postTokens(t, apiClient, &stubHTTPHelper{}, validTokensForm(form), "")
 
 		assert.Equal(t, 1, apiClient.tokensWrites)
 		assert.Zero(t, apiClient.dpopWrites, "form %v", form)
@@ -190,9 +190,9 @@ func TestHandleTokensPost_NeverWritesTheSystemLevelClientsRequirement(t *testing
 // The switch is read from the request body alone. A switch in the URL is no submission of the form,
 // so it switches nothing on.
 func TestHandleTokensPost_IgnoresTheDPoPSwitchInTheQuery(t *testing.T) {
-	apiClient := &stubClientTokensApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa"}}
+	apiClient := &stubClientTokensAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa"}}
 
-	postTokens(t, apiClient, &stubHttpHelper{}, validTokensForm(nil), "dpopBoundAccessTokens=on")
+	postTokens(t, apiClient, &stubHTTPHelper{}, validTokensForm(nil), "dpopBoundAccessTokens=on")
 
 	assert.Zero(t, apiClient.dpopWrites, "the stored requirement is off and the body says off")
 }
@@ -202,13 +202,13 @@ func TestHandleTokensPost_IgnoresTheDPoPSwitchInTheQuery(t *testing.T) {
 // and nothing is redirected.
 func TestHandleTokensPost_ARefusedRequirementLeavesTheTokenSettingsSaved(t *testing.T) {
 	const refusal = "The admin console's client can't require DPoP for token requests."
-	apiClient := &stubClientTokensApiClient{
+	apiClient := &stubClientTokensAPIClient{
 		client:  &api.ClientResponse{ID: 7, ClientIdentifier: "spa", TokenExpirationInSeconds: 300},
 		updated: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", TokenExpirationInSeconds: 600},
 		dpopErr: &apiclient.APIError{Code: "handler.client_dpop.admin_console_not_allowed", Message: refusal,
 			StatusCode: http.StatusBadRequest},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	rec := postTokens(t, apiClient, httpHelper, validTokensForm(url.Values{
 		"tokenExpirationInSeconds": {"600"}, "dpopBoundAccessTokens": {"on"}}), "")
@@ -243,9 +243,9 @@ func TestHandleTokensPost_ARefusedTokenSettingsSaveWritesNoRequirement(t *testin
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubClientTokensApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa"},
+			apiClient := &stubClientTokensAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa"},
 				tokensErr: tc.tokensErr}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			form := validTokensForm(tc.form)
 			form.Set("dpopBoundAccessTokens", "on")
 

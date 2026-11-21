@@ -50,20 +50,20 @@ func (c *AuthServerClient) PreviewLegalDocument(ctx context.Context, accessToken
 	return response.HTML, nil
 }
 
-func (c *AuthServerClient) GetLegalDocumentById(ctx context.Context, accessToken string,
-	legalDocumentId int64) (*api.LegalDocumentDetailResponse, error) {
+func (c *AuthServerClient) GetLegalDocumentByID(ctx context.Context, accessToken string,
+	legalDocumentID int64) (*api.LegalDocumentDetailResponse, error) {
 	return execute[api.LegalDocumentDetailResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d", c.baseURL, legalDocumentId),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d", c.baseURL, legalDocumentID),
 		successStatus: http.StatusOK,
 	})
 }
 
-func (c *AuthServerClient) SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentId int64,
+func (c *AuthServerClient) SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentID int64,
 	request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error) {
 	return execute[api.LegalDocumentDetailResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/draft", c.baseURL, legalDocumentId),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/draft", c.baseURL, legalDocumentID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -73,55 +73,55 @@ func (c *AuthServerClient) SaveLegalDocumentDraft(ctx context.Context, accessTok
 // PublishLegalDocument publishes the document's saved draft as its next version. The request has no
 // body: what is published is the draft as stored.
 func (c *AuthServerClient) PublishLegalDocument(ctx context.Context, accessToken string,
-	legalDocumentId int64) (*api.LegalDocumentDetailResponse, error) {
-	return c.legalDocumentAction(ctx, accessToken, legalDocumentId, "publish")
+	legalDocumentID int64) (*api.LegalDocumentDetailResponse, error) {
+	return c.legalDocumentAction(ctx, accessToken, legalDocumentID, "publish")
 }
 
 func (c *AuthServerClient) RetireLegalDocument(ctx context.Context, accessToken string,
-	legalDocumentId int64) (*api.LegalDocumentDetailResponse, error) {
-	return c.legalDocumentAction(ctx, accessToken, legalDocumentId, "retire")
+	legalDocumentID int64) (*api.LegalDocumentDetailResponse, error) {
+	return c.legalDocumentAction(ctx, accessToken, legalDocumentID, "retire")
 }
 
 func (c *AuthServerClient) RestoreLegalDocument(ctx context.Context, accessToken string,
-	legalDocumentId int64) (*api.LegalDocumentDetailResponse, error) {
-	return c.legalDocumentAction(ctx, accessToken, legalDocumentId, "restore")
+	legalDocumentID int64) (*api.LegalDocumentDetailResponse, error) {
+	return c.legalDocumentAction(ctx, accessToken, legalDocumentID, "restore")
 }
 
 // legalDocumentAction posts one of the bodiless actions on a document.
-func (c *AuthServerClient) legalDocumentAction(ctx context.Context, accessToken string, legalDocumentId int64,
+func (c *AuthServerClient) legalDocumentAction(ctx context.Context, accessToken string, legalDocumentID int64,
 	action string) (*api.LegalDocumentDetailResponse, error) {
 	return execute[api.LegalDocumentDetailResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/%s", c.baseURL, legalDocumentId, action),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/%s", c.baseURL, legalDocumentID, action),
 		successStatus: http.StatusOK,
 	})
 }
 
-func (c *AuthServerClient) DeleteLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) error {
+func (c *AuthServerClient) DeleteLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d", c.baseURL, legalDocumentId),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d", c.baseURL, legalDocumentID),
 		successStatus: http.StatusOK,
 	})
 	return err
 }
 
-func (c *AuthServerClient) GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentId int64,
+func (c *AuthServerClient) GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentID int64,
 	version int) (*api.GetLegalDocumentVersionResponse, error) {
 	return execute[api.GetLegalDocumentVersionResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/versions/%d", c.baseURL, legalDocumentId, version),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/versions/%d", c.baseURL, legalDocumentID, version),
 		successStatus: http.StatusOK,
 	})
 }
 
 // UpdateLegalDocumentApps sets the document's Applies to and replaces its list of apps whole, with
 // the list as the page read it, so the auth server refuses a save from an outdated page.
-func (c *AuthServerClient) UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentId int64,
+func (c *AuthServerClient) UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentID int64,
 	request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error) {
 	return execute[api.LegalDocumentDetailResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/apps", c.baseURL, legalDocumentId),
+		url:           fmt.Sprintf("%s/api/v1/admin/legal-documents/%d/apps", c.baseURL, legalDocumentID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -131,10 +131,10 @@ func (c *AuthServerClient) UpdateLegalDocumentApps(ctx context.Context, accessTo
 // GetClientLegalDocuments reads the client and the legal documents that apply to it, a read of the
 // client's that the clients-read scopes reach.
 func (c *AuthServerClient) GetClientLegalDocuments(ctx context.Context, accessToken string,
-	clientId int64) (*api.GetClientLegalDocumentsResponse, error) {
+	clientID int64) (*api.GetClientLegalDocumentsResponse, error) {
 	return execute[api.GetClientLegalDocumentsResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/clients/%d/legal-documents", c.baseURL, clientId),
+		url:           fmt.Sprintf("%s/api/v1/admin/clients/%d/legal-documents", c.baseURL, clientID),
 		successStatus: http.StatusOK,
 	})
 }
@@ -142,10 +142,10 @@ func (c *AuthServerClient) GetClientLegalDocuments(ctx context.Context, accessTo
 // GetUserLegalDocumentAcceptances reads the legal document versions a user accepted, the latest
 // acceptance first, read with the users-read scopes.
 func (c *AuthServerClient) GetUserLegalDocumentAcceptances(ctx context.Context, accessToken string,
-	userId int64) ([]api.LegalDocumentAcceptanceResponse, error) {
+	userID int64) ([]api.LegalDocumentAcceptanceResponse, error) {
 	response, err := execute[api.GetLegalDocumentAcceptancesResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/legal-document-acceptances", c.baseURL, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/legal-document-acceptances", c.baseURL, userID),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {

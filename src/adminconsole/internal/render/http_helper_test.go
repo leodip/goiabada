@@ -248,15 +248,15 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		req := newRequest("GET", "/", nil)
 		ctx := req.Context()
 
-		jwtInfo := oauthclient.JwtInfo{
-			IdToken: &oauth.JWTToken{
+		jwtInfo := oauthclient.JWTInfo{
+			IDToken: &oauth.JWTToken{
 				Claims: map[string]interface{}{
 					"sub":  "user123",
 					"name": "Alice",
 				},
 			},
 		}
-		ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
+		ctx = reqctx.WithJWTInfo(ctx, jwtInfo)
 		req = req.WithContext(ctx)
 
 		data := map[string]interface{}{}
@@ -277,11 +277,11 @@ func TestRenderTemplate_Binds(t *testing.T) {
 	t.Run("isAdmin follows the granted scope", func(t *testing.T) {
 		withAccessToken := func(scope string) *http.Request {
 			req := newRequest("GET", "/", nil)
-			jwtInfo := oauthclient.JwtInfo{
+			jwtInfo := oauthclient.JWTInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: "openid " + scope},
-				IdToken:       &oauth.JWTToken{TokenBase64: "i"},
+				IDToken:       &oauth.JWTToken{TokenBase64: "i"},
 			}
-			return req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			return req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 		}
 		manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
@@ -426,8 +426,8 @@ func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := newRequest("GET", "/", nil)
-			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), oauthclient.JwtInfo{
-				IdToken: &oauth.JWTToken{Claims: map[string]interface{}{
+			req = req.WithContext(reqctx.WithJWTInfo(req.Context(), oauthclient.JWTInfo{
+				IDToken: &oauth.JWTToken{Claims: map[string]interface{}{
 					"sub":         "user123",
 					"given_name":  tc.givenName,
 					"middle_name": tc.middleName,

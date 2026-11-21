@@ -71,100 +71,100 @@ func TestWithListPosition_RendersPlainValuesAsBefore(t *testing.T) {
 	}
 }
 
-// returnURLStubApiClient answers every call the ten saving handlers make on their way to the
+// returnURLStubAPIClient answers every call the ten saving handlers make on their way to the
 // redirect, each as a success for user 7. The rest of their ports panic naming the call.
-type returnURLStubApiClient struct{}
+type returnURLStubAPIClient struct{}
 
-func (returnURLStubApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId, Email: "someone@example.com"}, nil
+func (returnURLStubAPIClient) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Email: "someone@example.com"}, nil
 }
 
-func (returnURLStubApiClient) UpdateUserAddress(_ context.Context, _ string, userId int64,
+func (returnURLStubAPIClient) UpdateUserAddress(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (returnURLStubApiClient) CreateUserAttribute(_ context.Context, _ string,
+func (returnURLStubAPIClient) CreateUserAttribute(_ context.Context, _ string,
 	request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	return &api.UserAttributeResponse{ID: 3, UserID: request.UserID}, nil
 }
 
-func (returnURLStubApiClient) GetUserAttributeById(_ context.Context, _ string,
-	attributeId int64) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{ID: attributeId, UserID: 7, Key: "k"}, nil
+func (returnURLStubAPIClient) GetUserAttributeByID(_ context.Context, _ string,
+	attributeID int64) (*api.UserAttributeResponse, error) {
+	return &api.UserAttributeResponse{ID: attributeID, UserID: 7, Key: "k"}, nil
 }
 
-func (returnURLStubApiClient) UpdateUserAttribute(_ context.Context, _ string, attributeId int64,
+func (returnURLStubAPIClient) UpdateUserAttribute(_ context.Context, _ string, attributeID int64,
 	_ *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{ID: attributeId, UserID: 7}, nil
+	return &api.UserAttributeResponse{ID: attributeID, UserID: 7}, nil
 }
 
-func (returnURLStubApiClient) DeleteUser(_ context.Context, _ string, _ int64) error {
+func (returnURLStubAPIClient) DeleteUser(_ context.Context, _ string, _ int64) error {
 	return nil
 }
 
-func (returnURLStubApiClient) UpdateUserEnabled(_ context.Context, _ string, userId int64,
+func (returnURLStubAPIClient) UpdateUserEnabled(_ context.Context, _ string, userID int64,
 	_ bool) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (returnURLStubApiClient) UpdateUserEmail(_ context.Context, _ string, userId int64,
+func (returnURLStubAPIClient) UpdateUserEmail(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (returnURLStubApiClient) CreateUserAdmin(_ context.Context, _ string,
+func (returnURLStubAPIClient) CreateUserAdmin(_ context.Context, _ string,
 	_ *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
 	return &api.CreateUserResponse{User: api.UserResponse{ID: 7}}, nil
 }
 
-func (returnURLStubApiClient) UpdateUserPhone(_ context.Context, _ string, userId int64,
+func (returnURLStubAPIClient) UpdateUserPhone(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (returnURLStubApiClient) UpdateUserProfile(_ context.Context, _ string, userId int64,
+func (returnURLStubAPIClient) UpdateUserProfile(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-// The rest of the ports returnURLStubApiClient is passed to, which no test here reaches.
+// The rest of the ports returnURLStubAPIClient is passed to, which no test here reaches.
 
-func (returnURLStubApiClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
+func (returnURLStubAPIClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
 	panic("unexpected call to GetUserGroups")
 }
 
-func (returnURLStubApiClient) UpdateUserOTP(context.Context, string, int64, *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
+func (returnURLStubAPIClient) UpdateUserOTP(context.Context, string, int64, *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
 	panic("unexpected call to UpdateUserOTP")
 }
 
-func (returnURLStubApiClient) UpdateUserPassword(context.Context, string, int64, *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
+func (returnURLStubAPIClient) UpdateUserPassword(context.Context, string, int64, *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
 	panic("unexpected call to UpdateUserPassword")
 }
 
 // Each of the ten handlers that return to the user list after a save, driven to that redirect with
 // a search the list could not have survived unescaped.
 func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
-	stub := returnURLStubApiClient{}
+	stub := returnURLStubAPIClient{}
 	store := newFlashTestStore()
 
 	testCases := []struct {
 		name     string
-		handler  func(helper *handlersmocks.HttpHelper) http.HandlerFunc
+		handler  func(helper *handlersmocks.HTTPHelper) http.HandlerFunc
 		form     url.Values
 		options  []handlertest.Option
 		wantPath string
 	}{
 		{
 			name: "address",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleAddressPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/address",
 		},
 		{
 			name: "attributes add",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleAttributesAddPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
@@ -172,7 +172,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "attributes edit",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleAttributesEditPost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"attributeKey": {"k"}},
@@ -181,14 +181,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "authentication",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleAuthenticationPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/authentication",
 		},
 		{
 			name: "delete",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleDeletePost(helper, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"Someone@Example.com"}},
@@ -196,14 +196,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "details",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleDetailsPost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/details",
 		},
 		{
 			name: "email",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleEmailPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}},
@@ -211,7 +211,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "new",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleNewPost(helper, store, stub, consoleBaseURL)
 			},
 			form:     url.Values{"email": {"someone@example.com"}, "password": {"a password"}},
@@ -220,14 +220,14 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 		},
 		{
 			name: "phone",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandlePhonePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/phone",
 		},
 		{
 			name: "profile",
-			handler: func(helper *handlersmocks.HttpHelper) http.HandlerFunc {
+			handler: func(helper *handlersmocks.HTTPHelper) http.HandlerFunc {
 				return HandleProfilePost(helper, store, stub, consoleBaseURL)
 			},
 			wantPath: "/admin/users/7/profile",
@@ -236,7 +236,7 @@ func TestUserPageSaves_ReturnToTheListPositionEscaped(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			options := append([]handlertest.Option{

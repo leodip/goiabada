@@ -37,11 +37,11 @@ func (c *AuthServerClient) CreateResource(ctx context.Context, accessToken strin
 	return &response.Resource, nil
 }
 
-// GetResourceById retrieves a single resource by ID via the auth server admin API
-func (c *AuthServerClient) GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+// GetResourceByID retrieves a single resource by ID via the auth server admin API
+func (c *AuthServerClient) GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
 	response, err := execute[api.GetResourceResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -52,10 +52,10 @@ func (c *AuthServerClient) GetResourceById(ctx context.Context, accessToken stri
 }
 
 // UpdateResource updates an existing resource via the auth server admin API
-func (c *AuthServerClient) UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+func (c *AuthServerClient) UpdateResource(ctx context.Context, accessToken string, resourceID int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
 	response, err := execute[api.UpdateResourceResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -67,10 +67,10 @@ func (c *AuthServerClient) UpdateResource(ctx context.Context, accessToken strin
 }
 
 // DeleteResource deletes a resource via the auth server admin API
-func (c *AuthServerClient) DeleteResource(ctx context.Context, accessToken string, resourceId int64) error {
+func (c *AuthServerClient) DeleteResource(ctx context.Context, accessToken string, resourceID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})

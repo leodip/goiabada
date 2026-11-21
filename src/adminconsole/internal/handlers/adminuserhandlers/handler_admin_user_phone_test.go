@@ -20,16 +20,16 @@ import (
 // refusedPhoneDescription is the sentence the fake refuses a phone save with.
 const refusedPhoneDescription = "The phone number is not valid."
 
-// phoneApiClient answers the user phone page: a user who saved Portugal, and a save the auth
+// phoneAPIClient answers the user phone page: a user who saved Portugal, and a save the auth
 // server refuses as a form error.
-type phoneApiClient struct{}
+type phoneAPIClient struct{}
 
-func (phoneApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId, Username: "jdoe", PhoneNumberCountryUniqueID: "PRT_0",
+func (phoneAPIClient) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Username: "jdoe", PhoneNumberCountryUniqueID: "PRT_0",
 		PhoneNumberCountryCallingCode: "+351", PhoneNumber: "912 345 678"}, nil
 }
 
-func (phoneApiClient) UpdateUserPhone(_ context.Context, _ string, _ int64, _ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
+func (phoneAPIClient) UpdateUserPhone(_ context.Context, _ string, _ int64, _ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
 	return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: refusedPhoneDescription,
 		StatusCode: http.StatusBadRequest}
 }
@@ -55,11 +55,11 @@ func renderedPhoneCountries(t *testing.T, bind map[string]interface{}) []phoneco
 // The page builds its country list from core, as the account phone page does, rather than asking
 // the admin API for it (#563 decision 1).
 func TestHandlePhoneGet_RendersTheCorePhoneCountryList(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_phone.html").Once()
 
-	HandlePhoneGet(httpHelper, newFlashTestStore(), phoneApiClient{}).ServeHTTP(httptest.NewRecorder(),
+	HandlePhoneGet(httpHelper, newFlashTestStore(), phoneAPIClient{}).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/users/42/phone",
 			handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42")))
 
@@ -74,11 +74,11 @@ func TestHandlePhoneGet_RendersTheCorePhoneCountryList(t *testing.T) {
 // The auth server refuses the save: the form is drawn again under its sentence, with what the
 // administrator submitted and the same core list to pick from.
 func TestHandlePhonePost_ARefusedSaveKeepsTheCorePhoneCountryList(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_phone.html").Once()
 
-	HandlePhonePost(httpHelper, newFlashTestStore(), phoneApiClient{}, consoleBaseURL).ServeHTTP(
+	HandlePhonePost(httpHelper, newFlashTestStore(), phoneAPIClient{}, consoleBaseURL).ServeHTTP(
 		httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/users/42/phone",
 			handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "42"),

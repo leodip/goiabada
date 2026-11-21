@@ -24,32 +24,32 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundGroupApiClient answers the one call the handler makes before it decides. The rest of the
+// notFoundGroupAPIClient answers the one call the handler makes before it decides. The rest of the
 // ports it is passed to panic, rather than return a helpful zero value.
-type notFoundGroupApiClient struct {
+type notFoundGroupAPIClient struct {
 	entity *api.GroupResponse
 	err    error
 }
 
-func (c *notFoundGroupApiClient) GetGroupById(_ context.Context, accessToken string, id int64) (*api.GroupResponse, error) {
+func (c *notFoundGroupAPIClient) GetGroupByID(_ context.Context, accessToken string, id int64) (*api.GroupResponse, error) {
 	return c.entity, c.err
 }
 
-// The rest of the ports notFoundGroupApiClient is passed to, which no test here reaches.
+// The rest of the ports notFoundGroupAPIClient is passed to, which no test here reaches.
 
-func (*notFoundGroupApiClient) DeleteGroupAttribute(context.Context, string, int64) error {
+func (*notFoundGroupAPIClient) DeleteGroupAttribute(context.Context, string, int64) error {
 	panic("unexpected call to DeleteGroupAttribute")
 }
 
-func (*notFoundGroupApiClient) GetGroupAttributesByGroupId(context.Context, string, int64) ([]api.GroupAttributeResponse, error) {
-	panic("unexpected call to GetGroupAttributesByGroupId")
+func (*notFoundGroupAPIClient) GetGroupAttributesByGroupID(context.Context, string, int64) ([]api.GroupAttributeResponse, error) {
+	panic("unexpected call to GetGroupAttributesByGroupID")
 }
 
-func (*notFoundGroupApiClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+func (*notFoundGroupAPIClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
 	panic("unexpected call to UpdateGroup")
 }
 
-func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
+func TestGroup_StaleOrMalformedURLAnswers404(t *testing.T) {
 	const pathValueName = "groupId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
@@ -63,7 +63,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		// the router never bound, which is how an unbound parameter reads from r.PathValue.
 		target       string
 		id           string
-		withJwt      bool
+		withJWT      bool
 		entity       *api.GroupResponse
 		apiErr       error
 		wantNotFound bool
@@ -72,14 +72,14 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an id that does not parse",
 			target:       "/admin/groups/not-a-number/attributes",
 			id:           "not-a-number",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
 		{
 			name:         "an id the router never bound",
 			target:       "/admin/groups/42/attributes",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
@@ -87,7 +87,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API says is gone",
 			target:       "/admin/groups/42/attributes",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			apiErr:       gone,
 			wantNotFound: true,
 		},
@@ -95,28 +95,28 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API returns as nil without an error",
 			target:       "/admin/groups/42/attributes",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			wantNotFound: true,
 		},
 		{
 			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
 			target:  "/admin/groups/42/attributes",
 			id:      "42",
-			withJwt: false,
+			withJWT: false,
 			entity:  present,
 		},
 		{
 			name:    "a 500 from the API, which is a server fault and stays a 500",
 			target:  "/admin/groups/42/attributes",
 			id:      "42",
-			withJwt: true,
+			withJWT: true,
 			apiErr:  broken,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -125,7 +125,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 
 			var opts []handlertest.Option
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			if testCase.id != "" {
@@ -133,7 +133,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
-			apiClient := &notFoundGroupApiClient{entity: testCase.entity, err: testCase.apiErr}
+			apiClient := &notFoundGroupAPIClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandleAttributesGet(httpHelper, apiClient)
 			w := httptest.NewRecorder()
 
@@ -163,7 +163,7 @@ func TestGroupSettings_AGoneGroupAnswers404AndAFaultAnswers500(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -173,7 +173,7 @@ func TestGroupSettings_AGoneGroupAnswers404AndAFaultAnswers500(t *testing.T) {
 
 			req := handlertest.Request(http.MethodGet, "/admin/groups/42/settings",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "42"))
-			apiClient := &notFoundGroupApiClient{err: testCase.apiErr}
+			apiClient := &notFoundGroupAPIClient{err: testCase.apiErr}
 
 			// The session store is nil: neither answer reaches it.
 			HandleSettingsGet(httpHelper, nil, apiClient).ServeHTTP(httptest.NewRecorder(), req)

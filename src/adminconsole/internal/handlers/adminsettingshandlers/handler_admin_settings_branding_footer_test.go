@@ -35,7 +35,7 @@ func refusalAt(code, message, field string) error {
 // A stored brand's links fill the rows in their order, the rest left empty, and its contact the three
 // fields, the phone number as stored. The language labels are offered for the six built-in languages.
 func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -46,12 +46,12 @@ func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
 	bind := handlertest.Bind(t, httpHelper)
 	form := bind["brand"].(BrandForm)
 	assert.Equal(t, [3]BrandFooterLinkRow{
-		{Label: "Privacy", Url: "https://autumn.example/privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
-		{Label: "Status", Url: "https://status.autumn.example"},
+		{Label: "Privacy", URL: "https://autumn.example/privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+		{Label: "Status", URL: "https://status.autumn.example"},
 		{},
 	}, form.FooterLinks)
 	assert.Equal(t, "help@autumn.example", form.SupportEmail)
-	assert.Equal(t, "https://help.autumn.example", form.SupportUrl)
+	assert.Equal(t, "https://help.autumn.example", form.SupportURL)
 	assert.Equal(t, "+15550100199", form.SupportPhone)
 
 	languages, _ := bind["footerLanguages"].([]FooterLanguage)
@@ -64,7 +64,7 @@ func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
 
 // A new brand's form starts with its three rows and its contact empty.
 func TestHandleBrandNewGet_StartsWithNoFooter(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -74,7 +74,7 @@ func TestHandleBrandNewGet_StartsWithNoFooter(t *testing.T) {
 	bind := handlertest.Bind(t, httpHelper)
 	form := bind["brand"].(BrandForm)
 	assert.Equal(t, [3]BrandFooterLinkRow{}, form.FooterLinks)
-	assert.Empty(t, form.SupportEmail+form.SupportUrl+form.SupportPhone)
+	assert.Empty(t, form.SupportEmail+form.SupportURL+form.SupportPhone)
 	assert.Len(t, bind["footerLanguages"], 6)
 }
 
@@ -84,7 +84,7 @@ func TestHandleBrandNewGet_StartsWithNoFooter(t *testing.T) {
 // labels are left out. The contact is sent as typed, the phone number with its separators, which the
 // auth server strips.
 func TestHandleBrandNewPost_SendsTheRowsInOrderSkippingEmptyOnes(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -111,7 +111,7 @@ func TestHandleBrandNewPost_SendsTheRowsInOrderSkippingEmptyOnes(t *testing.T) {
 
 // A row holding only a language label is a link, sent for the admin API to refuse at its label.
 func TestHandleBrandNewPost_ARowWithOnlyALanguageLabelIsALink(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -126,7 +126,7 @@ func TestHandleBrandNewPost_ARowWithOnlyALanguageLabelIsALink(t *testing.T) {
 // A form with every row and the contact empty sends no links and no contact, which a save of a stored
 // brand with them therefore clears: the form holds the footer now.
 func TestHandleBrandPost_SendsTheFooterTheFormHolds(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -156,7 +156,7 @@ func TestHandleBrandPost_SendsTheFooterTheFormHolds(t *testing.T) {
 // A refused form is drawn again with its links in the order they were sent, empty rows last, so the
 // link a refusal names by its index, and its sentence by its number, is the row of that number.
 func TestHandleBrandWrite_ARefusedFormDrawsItsLinksInTheOrderSent(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 	apiClient := newBrandingAPI()
@@ -213,20 +213,20 @@ func TestHandleBrandWrite_EachFooterRefusalIsShownOnItsInput(t *testing.T) {
 		var apiErr *apiclient.APIError
 		require.ErrorAs(t, tc.err, &apiErr)
 		t.Run(apiErr.Code+apiErr.Field, func(t *testing.T) {
-			for name, post := range map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
-				"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+			for name, post := range map[string]func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI){
+				"new form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 					HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 						handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 							handlertest.WithForm(footerForm(nil))))
 				},
-				"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+				"brand's form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 					HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
 						httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
 							handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(footerForm(nil))))
 				},
 			} {
 				t.Run(name, func(t *testing.T) {
-					httpHelper := handlersmocks.NewHttpHelper(t)
+					httpHelper := handlersmocks.NewHTTPHelper(t)
 					handlertest.RefuseInternalServerError(t, httpHelper)
 					handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 					apiClient := newBrandingAPI()

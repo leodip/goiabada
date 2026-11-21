@@ -12,7 +12,7 @@ import (
 
 // userExportAPI is what the user header's Download data button needs: the user's export.
 type userExportAPI interface {
-	GetUserExport(ctx context.Context, accessToken string, userId int64) (*apiclient.UserExport, error)
+	GetUserExport(ctx context.Context, accessToken string, userID int64) (*apiclient.UserExport, error)
 }
 
 // HandleExportPost answers the Download data form with the user's export, their data as one JSON
@@ -23,7 +23,7 @@ type userExportAPI interface {
 //
 // A failed call goes through the API error classifier, before anything is written.
 func HandleExportPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userExportAPI,
 ) http.HandlerFunc {
 
@@ -36,9 +36,9 @@ func HandleExportPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

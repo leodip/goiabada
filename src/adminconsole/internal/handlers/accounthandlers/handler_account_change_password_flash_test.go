@@ -33,11 +33,11 @@ import (
 // at every site, and the second shape worth covering -- two keys behind one save guard --
 // lives in adminuserhandlers where the only such guard is.
 
-// flashStubApiClient reports success on the one call the change-password POST makes.
-type flashStubApiClient struct {
+// flashStubAPIClient reports success on the one call the change-password POST makes.
+type flashStubAPIClient struct {
 }
 
-func (flashStubApiClient) UpdateAccountPassword(_ context.Context, accessToken string,
+func (flashStubAPIClient) UpdateAccountPassword(_ context.Context, accessToken string,
 	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	return &api.UserResponse{ID: 7}, nil
 }
@@ -104,7 +104,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 	store := newFlashTestStore()
 
 	// The POST: the API accepts the change, the handler flashes and redirects.
-	postHelper := handlersmocks.NewHttpHelper(t)
+	postHelper := handlersmocks.NewHTTPHelper(t)
 	form := url.Values{
 		"currentPassword":         {"P4ss!word"},
 		"newPassword":             {"N3w!word"},
@@ -114,7 +114,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	postRec := httptest.NewRecorder()
 
-	HandleChangePasswordPost(postHelper, store, flashStubApiClient{}, consoleBaseURL).
+	HandleChangePasswordPost(postHelper, store, flashStubAPIClient{}, consoleBaseURL).
 		ServeHTTP(postRec, postReq)
 
 	require.Equal(t, http.StatusFound, postRec.Code,
@@ -125,7 +125,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 	require.NotEmpty(t, jar.cookies, "the POST must have named a session for the GET to find")
 
 	// The first GET: the notice is there.
-	firstHelper := handlersmocks.NewHttpHelper(t)
+	firstHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(firstHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 	firstRec := httptest.NewRecorder()
 	firstReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
@@ -138,7 +138,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 		"the notice the POST flashed must reach the page that renders it")
 
 	// The second GET: it is gone, and gone because the first GET saved the consumption.
-	secondHelper := handlersmocks.NewHttpHelper(t)
+	secondHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(secondHelper,
 		"/layouts/menu_layout.html", "/account_change_password.html").Once()
 	secondReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
@@ -154,7 +154,7 @@ func TestHandleChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T) {
 // TestHandleChangePasswordGet_NoFlashIsNoNotice is the negative half: without it the
 // case above is satisfied by a handler that binds true unconditionally.
 func TestHandleChangePasswordGet_NoFlashIsNoNotice(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 
 	req := handlertest.Request(http.MethodGet, "/account/change-password", handlertest.WithAccessToken())

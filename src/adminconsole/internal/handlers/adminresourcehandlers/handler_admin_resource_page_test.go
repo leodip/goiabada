@@ -37,9 +37,9 @@ import (
 // no permissions defined, which is the arm that slices the list here rather
 // than asking the API for a page of it.
 
-// resourcePagingApiClient answers everything both handlers ask, from lists of a
+// resourcePagingAPIClient answers everything both handlers ask, from lists of a
 // fixed size, and records the pages it was asked for.
-type resourcePagingApiClient struct {
+type resourcePagingAPIClient struct {
 
 	// permissions is what the resource has; empty is the arm that paginates in
 	// the handler.
@@ -48,16 +48,16 @@ type resourcePagingApiClient struct {
 	asked       []int
 }
 
-func (c *resourcePagingApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "some-resource"}, nil
+func (c *resourcePagingAPIClient) GetResourceByID(_ context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{ID: resourceID, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (c *resourcePagingApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *resourcePagingAPIClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error) {
 	return c.permissions, nil
 }
 
 // GetAllGroups is the whole list, unpaginated: the handler slices it itself.
-func (c *resourcePagingApiClient) GetAllGroups(_ context.Context, accessToken string) ([]api.GroupResponse, error) {
+func (c *resourcePagingAPIClient) GetAllGroups(_ context.Context, accessToken string) ([]api.GroupResponse, error) {
 	groups := make([]api.GroupResponse, 0, c.total)
 	for i := 0; i < c.total; i++ {
 		groups = append(groups, api.GroupResponse{ID: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
@@ -65,8 +65,8 @@ func (c *resourcePagingApiClient) GetAllGroups(_ context.Context, accessToken st
 	return groups, nil
 }
 
-func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(_ context.Context, accessToken string,
-	permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
+func (c *resourcePagingAPIClient) SearchGroupsWithPermissionAnnotation(_ context.Context, accessToken string,
+	permissionID int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
 
 	c.asked = append(c.asked, page)
 
@@ -83,8 +83,8 @@ func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(_ context
 	return groups, c.total, nil
 }
 
-func (c *resourcePagingApiClient) GetUsersByPermission(_ context.Context, accessToken string,
-	permissionId int64, page, size int) ([]api.UserResponse, int, error) {
+func (c *resourcePagingAPIClient) GetUsersByPermission(_ context.Context, accessToken string,
+	permissionID int64, page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
 
@@ -99,25 +99,25 @@ func (c *resourcePagingApiClient) GetUsersByPermission(_ context.Context, access
 	return users, c.total, nil
 }
 
-// The rest of the ports resourcePagingApiClient is passed to, which no test here reaches.
+// The rest of the ports resourcePagingAPIClient is passed to, which no test here reaches.
 
-func (*resourcePagingApiClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+func (*resourcePagingAPIClient) GetGroupPermissions(context.Context, string, int64) (*api.GroupResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetGroupPermissions")
 }
 
-func (*resourcePagingApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (*resourcePagingAPIClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetUserPermissions")
 }
 
-func (*resourcePagingApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+func (*resourcePagingAPIClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
-func (*resourcePagingApiClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
+func (*resourcePagingAPIClient) UpdateGroupPermissions(context.Context, string, int64, *api.UpdateGroupPermissionsRequest) error {
 	panic("unexpected call to UpdateGroupPermissions")
 }
 
-func (*resourcePagingApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+func (*resourcePagingAPIClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
 	panic("unexpected call to UpdateUserPermissions")
 }
 
@@ -166,7 +166,7 @@ func testStore() *sessionstore.ServerSideStore {
 // asked the API for. A 500 fails the test with the error it carried, since
 // answering 500 to a typed page is half of what is being fixed.
 func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawPage string,
-	httpHelper *handlersmocks.HttpHelper) map[string]interface{} {
+	httpHelper *handlersmocks.HTTPHelper) map[string]interface{} {
 
 	t.Helper()
 
@@ -185,10 +185,10 @@ func renderPermissionPage(t *testing.T, handler http.HandlerFunc, template, rawP
 
 // newHelper is a helper mock that renders, and that fails the test rather than
 // the request if the handler reaches for a 500.
-func newHelper(t *testing.T) *handlersmocks.HttpHelper {
+func newHelper(t *testing.T) *handlersmocks.HTTPHelper {
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 	return httpHelper
@@ -234,7 +234,7 @@ func TestHandleGroupsWithPermissionGet_PageQueryParameter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &resourcePagingApiClient{total: tc.total}
+			apiClient := &resourcePagingAPIClient{total: tc.total}
 			if !tc.noPermissions {
 				apiClient.permissions = aPermission()
 			}
@@ -264,7 +264,7 @@ func TestHandleGroupsWithPermissionGet_PageQueryParameter(t *testing.T) {
 			// whole list, so the first one says which page this is.
 			if tc.total > 0 {
 				require.NotEmpty(t, result.Groups, "page %d rendered no rows at all", tc.wantPage)
-				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Groups[0].Id,
+				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Groups[0].ID,
 					"the first row is not the first of page %d", tc.wantPage)
 			} else {
 				assert.Empty(t, result.Groups)
@@ -302,7 +302,7 @@ func TestHandleGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic(t *testing
 	for _, total := range []int{0, 1, 9, 10, 11, 25} {
 		for _, raw := range raws {
 			t.Run(raw+"_over_"+strconv.Itoa(total), func(t *testing.T) {
-				apiClient := &resourcePagingApiClient{total: total} // no permissions
+				apiClient := &resourcePagingAPIClient{total: total} // no permissions
 				httpHelper := newHelper(t)
 				handler := HandleGroupsWithPermissionGet(httpHelper, apiClient)
 
@@ -320,7 +320,7 @@ func TestHandleGroupsWithPermissionGet_TheOverflowingPageDoesNotPanic(t *testing
 				assert.Equal(t, wantPage, currentPage(t, bind["paginator"].(*pagination.Paginator)))
 				if total > 0 {
 					require.NotEmpty(t, result.Groups)
-					assert.Equal(t, int64((wantPage-1)*pageSize+1), result.Groups[0].Id)
+					assert.Equal(t, int64((wantPage-1)*pageSize+1), result.Groups[0].ID)
 				}
 			})
 		}
@@ -362,7 +362,7 @@ func TestHandleUsersWithPermissionGet_PageQueryParameter(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &resourcePagingApiClient{total: tc.total}
+			apiClient := &resourcePagingAPIClient{total: tc.total}
 			if !tc.noPermissions {
 				apiClient.permissions = aPermission()
 			}
@@ -420,7 +420,7 @@ func TestHandleUsersWithPermissionAddGet_PageIsCarriedNotRefused(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.raw, func(t *testing.T) {
-			apiClient := &resourcePagingApiClient{permissions: aPermission()}
+			apiClient := &resourcePagingAPIClient{permissions: aPermission()}
 			httpHelper := newHelper(t)
 			handler := HandleUsersWithPermissionAddGet(httpHelper, apiClient)
 			bind := renderPermissionPage(t, handler, "users-with-permission/add", tc.raw, httpHelper)

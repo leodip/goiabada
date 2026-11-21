@@ -8,7 +8,7 @@
 // classifiers. A save keeps the page and search of the user list it was reached from in the URL it
 // returns to, so the list reopens where the administrator left it (#426). The groups and
 // permissions saves send the list as the page loaded it, so the API refuses it when another save
-// got there first (#428). HttpHelper is declared here rather than imported from the parent handlers
+// got there first (#428). HTTPHelper is declared here rather than imported from the parent handlers
 // package, and each handler names the API methods it calls in an unexported port beside it (#386,
 // #440).
 package adminuserhandlers

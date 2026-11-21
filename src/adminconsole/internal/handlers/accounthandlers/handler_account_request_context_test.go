@@ -34,98 +34,98 @@ import (
 
 type ctxMarkerKey struct{}
 
-// ctxRecordingApiClient records the context every stage-10 method is called with and then refuses,
+// ctxRecordingAPIClient records the context every stage-10 method is called with and then refuses,
 // so the handler takes its error path in the same pass. The tables below are typed on it, so a
 // method a handler's port gains and this fake lacks fails to compile rather than passing silently.
-type ctxRecordingApiClient struct {
+type ctxRecordingAPIClient struct {
 	seen []context.Context
 }
 
-func (s *ctxRecordingApiClient) record(ctx context.Context) error {
+func (s *ctxRecordingAPIClient) record(ctx context.Context) error {
 	s.seen = append(s.seen, ctx)
 	return errs.New("the auth server refused")
 }
 
-func (s *ctxRecordingApiClient) GetAccountProfile(ctx context.Context, _ string) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountProfile(ctx context.Context, _ string) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountProfile(ctx context.Context, _ string, _ *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountProfile(ctx context.Context, _ string, _ *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountEmail(ctx context.Context, _ string, _ *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountEmail(ctx context.Context, _ string, _ *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountPhone(ctx context.Context, _ string, _ *api.UpdateAccountPhoneRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountPhone(ctx context.Context, _ string, _ *api.UpdateAccountPhoneRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountAddress(ctx context.Context, _ string, _ *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountAddress(ctx context.Context, _ string, _ *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountPassword(ctx context.Context, _ string, _ *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountPassword(ctx context.Context, _ string, _ *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) SendAccountEmailVerification(ctx context.Context, _ string) (*api.AccountEmailVerificationSendResponse, error) {
+func (s *ctxRecordingAPIClient) SendAccountEmailVerification(ctx context.Context, _ string) (*api.AccountEmailVerificationSendResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) VerifyAccountEmail(ctx context.Context, _ string, _ *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+func (s *ctxRecordingAPIClient) VerifyAccountEmail(ctx context.Context, _ string, _ *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountOTPEnrollment(ctx context.Context, _ string) (*api.AccountOTPEnrollmentResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountOTPEnrollment(ctx context.Context, _ string) (*api.AccountOTPEnrollmentResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateAccountOTP(ctx context.Context, _ string, _ *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateAccountOTP(ctx context.Context, _ string, _ *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountRecoveryCodes(ctx context.Context, _ string) (*api.AccountRecoveryCodesResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountRecoveryCodes(ctx context.Context, _ string) (*api.AccountRecoveryCodesResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) CreateAccountRecoveryCodes(ctx context.Context, _ string, _ *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
+func (s *ctxRecordingAPIClient) CreateAccountRecoveryCodes(ctx context.Context, _ string, _ *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) CreateAccountLogoutRequest(ctx context.Context, _ string, _ *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
+func (s *ctxRecordingAPIClient) CreateAccountLogoutRequest(ctx context.Context, _ string, _ *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	return nil, nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountConnectedClients(ctx context.Context, _ string) ([]api.ConnectedClientResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountConnectedClients(ctx context.Context, _ string) ([]api.ConnectedClientResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DisconnectAccountClient(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DisconnectAccountClient(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountProfilePicture(ctx context.Context, _ string) (*api.ProfilePictureInfoResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountProfilePicture(ctx context.Context, _ string) (*api.ProfilePictureInfoResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UploadAccountProfilePicture(ctx context.Context, _ string, _ []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
+func (s *ctxRecordingAPIClient) UploadAccountProfilePicture(ctx context.Context, _ string, _ []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DeleteAccountProfilePicture(ctx context.Context, _ string) error {
+func (s *ctxRecordingAPIClient) DeleteAccountProfilePicture(ctx context.Context, _ string) error {
 	return s.record(ctx)
 }
 
 // The two session methods are stage 11's. GetAccountSessions records and succeeds rather than
 // refusing, because the delete below it is reached only through the list it answers.
-func (s *ctxRecordingApiClient) GetAccountSessions(ctx context.Context, _ string) ([]api.UserSessionDetailResponse, error) {
+func (s *ctxRecordingAPIClient) GetAccountSessions(ctx context.Context, _ string) ([]api.UserSessionDetailResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return []api.UserSessionDetailResponse{{ID: 31}}, nil
 }
 
-func (s *ctxRecordingApiClient) DeleteAccountSession(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DeleteAccountSession(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
@@ -153,7 +153,7 @@ type accountAPI interface {
 // a function so that each run gets a fresh request, whose body has not been read.
 type accountHandlerCase struct {
 	name    string
-	build   func(httpHelper *handlersmocks.HttpHelper, apiClient accountAPI) http.HandlerFunc
+	build   func(httpHelper *handlersmocks.HTTPHelper, apiClient accountAPI) http.HandlerFunc
 	request func() *http.Request
 }
 
@@ -162,7 +162,7 @@ func accountHandlerCases() []accountHandlerCase {
 	return []accountHandlerCase{
 		{
 			name: "HandleAddressGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleAddressGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -171,7 +171,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleAddressPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleAddressPost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -181,7 +181,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleApplicationsGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleApplicationsGet(h, c)
 			},
 			request: func() *http.Request {
@@ -190,7 +190,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleApplicationsDisconnectPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleApplicationsDisconnectPost(h, c)
 			},
 			request: func() *http.Request {
@@ -201,7 +201,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleChangePasswordPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleChangePasswordPost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -215,7 +215,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleEmailGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleEmailGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -226,7 +226,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleEmailPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleEmailPost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -236,7 +236,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleEmailSendVerificationPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleEmailSendVerificationPost(h, c)
 			},
 			request: func() *http.Request {
@@ -246,7 +246,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleEmailVerificationGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleEmailVerificationGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -257,7 +257,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleEmailVerificationPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleEmailVerificationPost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -269,7 +269,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleLogoutPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				// Every row takes a real store, and this one needs it even when the API refuses:
 				// it clears the console's own session before it asks the auth server to end the
 				// upstream one.
@@ -279,25 +279,25 @@ func accountHandlerCases() []accountHandlerCase {
 			// unauthenticated arm without both of them.
 			request: func() *http.Request {
 				return handlertest.Request(http.MethodPost, "/account/logout",
-					handlertest.WithJwtInfo(oauthclient.JwtInfo{
+					handlertest.WithJWTInfo(oauthclient.JWTInfo{
 						TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-						IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
+						IDToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 					}))
 			},
 		},
 		{
-			name: "HandleOtpGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
-				return HandleOtpGet(h, c)
+			name: "HandleOTPGet",
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
+				return HandleOTPGet(h, c)
 			},
 			request: func() *http.Request {
 				return handlertest.Request(http.MethodGet, "/account/otp", handlertest.WithAccessToken())
 			},
 		},
 		{
-			name: "HandleOtpPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
-				return HandleOtpPost(h, c, consoleBaseURL)
+			name: "HandleOTPPost",
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
+				return HandleOTPPost(h, c, consoleBaseURL)
 			},
 			request: func() *http.Request {
 				return handlertest.Request(http.MethodPost, "/account/otp",
@@ -307,9 +307,9 @@ func accountHandlerCases() []accountHandlerCase {
 			},
 		},
 		{
-			name: "HandleOtpPost new recovery codes",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
-				return HandleOtpPost(h, c, consoleBaseURL)
+			name: "HandleOTPPost new recovery codes",
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
+				return HandleOTPPost(h, c, consoleBaseURL)
 			},
 			request: func() *http.Request {
 				return handlertest.Request(http.MethodPost, "/account/otp",
@@ -320,7 +320,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandlePhoneGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandlePhoneGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -329,7 +329,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandlePhonePost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandlePhonePost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -339,7 +339,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandlePictureGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandlePictureGet(h, c)
 			},
 			request: func() *http.Request {
@@ -348,7 +348,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleProfileGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleProfileGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -357,7 +357,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleProfilePost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleProfilePost(h, newFlashTestStore(), c, consoleBaseURL)
 			},
 			request: func() *http.Request {
@@ -367,7 +367,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleSessionsGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleSessionsGet(h, c)
 			},
 			request: func() *http.Request {
@@ -376,7 +376,7 @@ func accountHandlerCases() []accountHandlerCase {
 		},
 		{
 			name: "HandleSessionsEndSessionPost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleSessionsEndSessionPost(h, c)
 			},
 			request: func() *http.Request {
@@ -389,10 +389,10 @@ func accountHandlerCases() []accountHandlerCase {
 	}
 }
 
-func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
+func TestAccountHandlers_EveryHandlerConsultsTheAPIClientWithTheRequestsContext(t *testing.T) {
 	for _, tc := range accountHandlerCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			// Every writer is admitted: which one a handler picks is pattern 7's decision and is
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
@@ -402,7 +402,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			apiClient := &ctxRecordingApiClient{}
+			apiClient := &ctxRecordingAPIClient{}
 
 			request := tc.request()
 			marked := request.WithContext(context.WithValue(request.Context(), ctxMarkerKey{}, tc.name))
@@ -422,12 +422,12 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 // and the other is the only DELETE here.
 func TestAccountHandlers_ThePictureHandlersCarryTheRequestsContext(t *testing.T) {
 	t.Run("HandleProfilePictureDelete", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 
-		apiClient := &ctxRecordingApiClient{}
+		apiClient := &ctxRecordingAPIClient{}
 		request := handlertest.Request(http.MethodDelete, "/account/profile-picture",
 			handlertest.WithAccessToken())
 		marked := request.WithContext(context.WithValue(request.Context(), ctxMarkerKey{}, "delete"))

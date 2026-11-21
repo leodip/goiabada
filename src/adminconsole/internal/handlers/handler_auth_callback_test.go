@@ -126,7 +126,7 @@ type callbackHarness struct {
 	backend    *armableBackend
 	store      *sessionstore.ServerSideStore
 	parser     *oauthclient.JWKSTokenParser
-	httpHelper *handlersmocks.HttpHelper
+	httpHelper *handlersmocks.HTTPHelper
 	logs       *logtest.SlogCapture
 	profiles   *recordingProfiles
 }
@@ -144,7 +144,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	require.NoError(t, err)
 
 	signing, _ := oauthclienttest.Keys(t)
-	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey(callbackKid, &signing.PublicKey))
+	jwks, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey(callbackKid, &signing.PublicKey))
 	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
@@ -153,7 +153,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		backend:    backend,
 		store:      store,
 		parser:     parser,
-		httpHelper: handlersmocks.NewHttpHelper(t),
+		httpHelper: handlersmocks.NewHTTPHelper(t),
 		logs:       logtest.CaptureSlog(t),
 		profiles:   &recordingProfiles{},
 	}

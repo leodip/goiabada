@@ -19,10 +19,10 @@ import (
 // of its "use the global setting" choices names the value of, the token settings write, and the
 // write of "Require DPoP for token requests", which the auth server keeps on a route of its own.
 type clientTokensAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetSettingsTokens(ctx context.Context, accessToken string) (*api.SettingsTokensResponse, error)
-	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
-	UpdateClientDPoP(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientDPoPRequest) (*api.ClientResponse, error)
+	UpdateClientTokens(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
+	UpdateClientDPoP(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientDPoPRequest) (*api.ClientResponse, error)
 }
 
 // clientTokens is what the Tokens tab's inputs show: the client as stored on a first draw, or as
@@ -38,7 +38,7 @@ type clientTokens struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds string
 	RefreshTokenOfflineMaxLifetimeInSeconds string
 	IncludeOpenIDConnectClaimsInAccessToken string
-	IncludeOpenIDConnectClaimsInIdToken     string
+	IncludeOpenIDConnectClaimsInIDToken     string
 	DPoPBoundAccessTokens                   bool
 }
 
@@ -49,13 +49,13 @@ func clientTokensFrom(c *api.ClientResponse) clientTokens {
 		RefreshTokenOfflineIdleTimeoutInSeconds: strconv.Itoa(c.RefreshTokenOfflineIdleTimeoutInSeconds),
 		RefreshTokenOfflineMaxLifetimeInSeconds: strconv.Itoa(c.RefreshTokenOfflineMaxLifetimeInSeconds),
 		IncludeOpenIDConnectClaimsInAccessToken: c.IncludeOpenIDConnectClaimsInAccessToken,
-		IncludeOpenIDConnectClaimsInIdToken:     c.IncludeOpenIDConnectClaimsInIDToken,
+		IncludeOpenIDConnectClaimsInIDToken:     c.IncludeOpenIDConnectClaimsInIDToken,
 		DPoPBoundAccessTokens:                   c.DPoPBoundAccessTokens,
 	}
 }
 
 func HandleTokensGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientTokensAPI,
 ) http.HandlerFunc {
@@ -75,13 +75,13 @@ func HandleTokensGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleTokensGet(
 // is drawn again from the client as it now stands, saying the settings were saved, with the refusal
 // beside the switch.
 func HandleTokensPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientTokensAPI,
 	baseURL string,
@@ -161,13 +161,13 @@ func HandleTokensPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -187,7 +187,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: strings.TrimSpace(r.FormValue("refreshTokenOfflineIdleTimeoutInSeconds")),
 			RefreshTokenOfflineMaxLifetimeInSeconds: strings.TrimSpace(r.FormValue("refreshTokenOfflineMaxLifetimeInSeconds")),
 			IncludeOpenIDConnectClaimsInAccessToken: strings.TrimSpace(r.FormValue("includeOpenIDConnectClaimsInAccessToken")),
-			IncludeOpenIDConnectClaimsInIdToken:     strings.TrimSpace(r.FormValue("includeOpenIDConnectClaimsInIdToken")),
+			IncludeOpenIDConnectClaimsInIDToken:     strings.TrimSpace(r.FormValue("includeOpenIDConnectClaimsInIdToken")),
 			DPoPBoundAccessTokens:                   requireDPoP,
 		}
 
@@ -238,7 +238,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: refreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: refreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: settingsInfo.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		updated, err := apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)

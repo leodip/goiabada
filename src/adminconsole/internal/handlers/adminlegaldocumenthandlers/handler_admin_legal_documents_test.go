@@ -42,18 +42,18 @@ type fakeLegalDocumentsAPI struct {
 
 	writeErr error
 
-	readIds       []int64
+	readIDs       []int64
 	versionsAsked []int
 	created       *api.CreateLegalDocumentRequest
 	saved         *api.SaveLegalDocumentDraftRequest
-	savedId       int64
+	savedID       int64
 	previewed     *string
 	published     []int64
 	retired       []int64
 	restored      []int64
 	deleted       []int64
 	appsSaved     *api.UpdateLegalDocumentAppsRequest
-	appsSavedId   int64
+	appsSavedID   int64
 }
 
 func (f *fakeLegalDocumentsAPI) GetAllLegalDocuments(context.Context, string) ([]api.LegalDocumentResponse, error) {
@@ -77,8 +77,8 @@ func (f *fakeLegalDocumentsAPI) PreviewLegalDocument(_ context.Context, _ string
 	return f.html, nil
 }
 
-func (f *fakeLegalDocumentsAPI) GetLegalDocumentById(_ context.Context, _ string, id int64) (*api.LegalDocumentDetailResponse, error) {
-	f.readIds = append(f.readIds, id)
+func (f *fakeLegalDocumentsAPI) GetLegalDocumentByID(_ context.Context, _ string, id int64) (*api.LegalDocumentDetailResponse, error) {
+	f.readIDs = append(f.readIDs, id)
 	if f.detail == nil {
 		return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Legal document not found", StatusCode: http.StatusNotFound}
 	}
@@ -87,7 +87,7 @@ func (f *fakeLegalDocumentsAPI) GetLegalDocumentById(_ context.Context, _ string
 
 func (f *fakeLegalDocumentsAPI) SaveLegalDocumentDraft(_ context.Context, _ string, id int64,
 	request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error) {
-	f.savedId, f.saved = id, request
+	f.savedID, f.saved = id, request
 	if f.writeErr != nil {
 		return nil, f.writeErr
 	}
@@ -140,7 +140,7 @@ func (f *fakeLegalDocumentsAPI) GetAllClients(context.Context, string) ([]api.Cl
 
 func (f *fakeLegalDocumentsAPI) UpdateLegalDocumentApps(_ context.Context, _ string, id int64,
 	request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error) {
-	f.appsSavedId, f.appsSaved = id, request
+	f.appsSavedID, f.appsSaved = id, request
 	if f.writeErr != nil {
 		return nil, f.writeErr
 	}
@@ -183,9 +183,9 @@ func newSessionStore(t *testing.T) sessionstore.Store {
 	return store
 }
 
-// pageHelper is the HttpHelper mock admitting one page and refusing a 500.
-func pageHelper(t *testing.T, template string) *handlersmocks.HttpHelper {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+// pageHelper is the HTTPHelper mock admitting one page and refusing a 500.
+func pageHelper(t *testing.T, template string) *handlersmocks.HTTPHelper {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", template).Once()
 	return httpHelper
@@ -271,7 +271,7 @@ func TestHandleDraftGet_OpensOnTheDraft(t *testing.T) {
 			handlertest.WithPathValue("legalDocumentId", "7")))
 
 	bind := handlertest.Bind(t, httpHelper)
-	assert.Equal(t, []int64{7}, fake.readIds)
+	assert.Equal(t, []int64{7}, fake.readIDs)
 	assert.Empty(t, fake.versionsAsked)
 	assert.Equal(t, "Terms of use (2027)", bind["title"])
 	assert.Equal(t, "New *terms*.", bind["markdown"])
@@ -313,7 +313,7 @@ func TestHandleDraftPost_SavesTheDraftAndSaysSo(t *testing.T) {
 
 	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	assert.Equal(t, consoleBaseURL+"/admin/legal-documents/7/draft", rec.Header().Get("Location"))
-	assert.Equal(t, int64(7), fake.savedId)
+	assert.Equal(t, int64(7), fake.savedID)
 	require.NotNil(t, fake.saved)
 	assert.Equal(t, api.SaveLegalDocumentDraftRequest{ShortName: "privacy-notice", Title: "Privacy notice",
 		Markdown: "# Privacy\n\nWe keep your email.\n"}, *fake.saved)
@@ -411,10 +411,10 @@ func TestHandlePreviewPost_AnswersTheAuthServersRendering(t *testing.T) {
 	require.NotNil(t, fake.previewed)
 	assert.Equal(t, "# Privacy", *fake.previewed)
 	var answer struct {
-		Html string `json:"html"`
+		HTML string `json:"html"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
-	assert.Equal(t, "<h1>Privacy</h1>\n", answer.Html)
+	assert.Equal(t, "<h1>Privacy</h1>\n", answer.HTML)
 }
 
 // A refused preview is answered as JSON, which the editor's script shows beside the text.
@@ -501,30 +501,30 @@ func TestHandleVersionGet_ReadsTheVersionThePathNames(t *testing.T) {
 func TestHandlers_AnAddressNamingNothingIsNotFound(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		build  func(HttpHelper) http.HandlerFunc
+		build  func(HTTPHelper) http.HandlerFunc
 		values [][2]string
 	}{
-		{"draft, an id that is not a number", func(h HttpHelper) http.HandlerFunc {
+		{"draft, an id that is not a number", func(h HTTPHelper) http.HandlerFunc {
 			return HandleDraftGet(h, newSessionStore(t), &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", "seven"}}},
-		{"versions, an id that is not a number", func(h HttpHelper) http.HandlerFunc {
+		{"versions, an id that is not a number", func(h HTTPHelper) http.HandlerFunc {
 			return HandleVersionsGet(h, newSessionStore(t), &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", "x"}}},
-		{"version, a number that is not one", func(h HttpHelper) http.HandlerFunc {
+		{"version, a number that is not one", func(h HTTPHelper) http.HandlerFunc {
 			return HandleVersionGet(h, &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", "7"}, {"version", "first"}}},
-		{"delete, no id", func(h HttpHelper) http.HandlerFunc {
+		{"delete, no id", func(h HTTPHelper) http.HandlerFunc {
 			return HandleDeleteGet(h, &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", ""}}},
-		{"draft, a document the API does not find", func(h HttpHelper) http.HandlerFunc {
+		{"draft, a document the API does not find", func(h HTTPHelper) http.HandlerFunc {
 			return HandleDraftGet(h, newSessionStore(t), &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", "70"}}},
-		{"version, a version the API does not find", func(h HttpHelper) http.HandlerFunc {
+		{"version, a version the API does not find", func(h HTTPHelper) http.HandlerFunc {
 			return HandleVersionGet(h, &fakeLegalDocumentsAPI{})
 		}, [][2]string{{"legalDocumentId", "7"}, {"version", "9"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 			opts := []handlertest.Option{handlertest.WithAccessToken()}

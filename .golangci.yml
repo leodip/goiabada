@@ -253,28 +253,3 @@ linters:
         linters: [gosec]
       - path: authserver/cmd/schemadump/
         linters: [gosec]
-      # ST1003 in the directories not yet respelled (#482 decision 10). Each names ST1003
-      # alone, so staticcheck's other checks run there, and matches its own directory, not
-      # those below it. A directory leaves the list in the change that respells it, and the
-      # list only shrinks until it is gone. The admin console's sessionkeys, which holds the
-      # one suppressed name, is never on it.
-      - {path: '^src/adminconsole/internal/apiclient/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/config/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/accounthandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/adminclienthandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/admingrouphandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/adminlegaldocumenthandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/adminresourcehandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/adminsettingshandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlers/adminuserhandlers/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/handlertest/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/oauthclient/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/oauthclient/oauthclienttest/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/pagination/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/render/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/renderintegration/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/reqctx/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/server/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/internal/sessionbackend/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/adminconsole/web/[^/]+$', linters: [staticcheck], text: '^ST1003:'}

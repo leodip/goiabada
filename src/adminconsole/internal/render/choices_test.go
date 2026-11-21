@@ -26,10 +26,10 @@ func TestResourceChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 	})
 
 	assert.Equal(t, []Choice{
-		{Id: 1, Identifier: "orders-api", Label: "orders-api – Order management API", Description: "Order management API"},
-		{Id: 2, Identifier: "reporting", Label: "reporting – Internal reporting, dashboards and scheduled expo…",
+		{ID: 1, Identifier: "orders-api", Label: "orders-api – Order management API", Description: "Order management API"},
+		{ID: 2, Identifier: "reporting", Label: "reporting – Internal reporting, dashboards and scheduled expo…",
 			Description: "Internal reporting, dashboards and scheduled exports for finance"},
-		{Id: 3, Identifier: "bare", Label: "bare"},
+		{ID: 3, Identifier: "bare", Label: "bare"},
 	}, choices)
 }
 
@@ -40,8 +40,8 @@ func TestGroupChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 	})
 
 	assert.Equal(t, []Choice{
-		{Id: 4, Identifier: "finance", Label: "finance – Finance team", Description: "Finance team"},
-		{Id: 5, Identifier: "bare", Label: "bare"},
+		{ID: 4, Identifier: "finance", Label: "finance – Finance team", Description: "Finance team"},
+		{ID: 5, Identifier: "bare", Label: "bare"},
 	}, choices)
 }
 
@@ -52,7 +52,7 @@ func TestPermissionChoices_NameEachByItsPermissionIdentifier(t *testing.T) {
 	})
 
 	assert.Equal(t, []Choice{
-		{Id: 6, Identifier: "read", Label: "read – Read orders", Description: "Read orders"},
-		{Id: 7, Identifier: "write", Label: "write"},
+		{ID: 6, Identifier: "read", Label: "read – Read orders", Description: "Read orders"},
+		{ID: 7, Identifier: "write", Label: "write"},
 	}, choices)
 }

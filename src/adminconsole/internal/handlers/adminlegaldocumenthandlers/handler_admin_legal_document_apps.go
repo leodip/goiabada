@@ -23,7 +23,7 @@ import (
 type legalDocumentAppsAPI interface {
 	legalDocumentReader
 	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
-	UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentId int64, request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error)
+	UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentID int64, request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error)
 }
 
 // appsForm is the tab's choice as it is drawn: as stored, or as posted when a save was refused.
@@ -43,7 +43,7 @@ func storedApps(doc api.LegalDocumentResponse) appsForm {
 
 // renderApps draws the tab with form in its fields and extra beside them, the flash or the
 // refusal. It reads the apps to offer, answering the request when it cannot.
-func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentAppsAPI, token string,
+func renderApps(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentAppsAPI, token string,
 	detail *api.LegalDocumentDetailResponse, form appsForm, extra map[string]interface{}) {
 	clients, err := apiClient.GetAllClients(r.Context(), token)
 	if err != nil {
@@ -56,7 +56,7 @@ func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 			continue
 		}
 		apps = append(apps, appChoice{
-			Id:          client.ID,
+			ID:          client.ID,
 			Identifier:  client.ClientIdentifier,
 			Description: client.Description,
 			Selected:    !form.allApps && form.selected[client.ID],
@@ -82,7 +82,7 @@ func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 }
 
 func HandleAppsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentAppsAPI,
 ) http.HandlerFunc {
@@ -108,9 +108,9 @@ func HandleAppsGet(
 	}
 }
 
-// postedIds reads the ids posted under name, in the order posted. A value that is not an id is
+// postedIDs reads the ids posted under name, in the order posted. A value that is not an id is
 // left out: only an edited page sends one.
-func postedIds(r *http.Request, name string) []int64 {
+func postedIDs(r *http.Request, name string) []int64 {
 	ids := []int64{}
 	for _, value := range r.PostForm[name] {
 		if id, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -122,7 +122,7 @@ func postedIds(r *http.Request, name string) []int64 {
 
 // HandleAppsPost saves the tab's choice. All apps sends no app, whatever boxes were left ticked.
 func HandleAppsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentAppsAPI,
 	baseURL string,
@@ -147,11 +147,11 @@ func HandleAppsPost(
 		request := &api.UpdateLegalDocumentAppsRequest{
 			AppliesTo:         appliesTo,
 			ClientIDs:         []int64{},
-			ExpectedClientIDs: postedIds(r, "expectedClientId"),
+			ExpectedClientIDs: postedIDs(r, "expectedClientId"),
 		}
 		form := appsForm{allApps: appliesTo == appliesToAllApps, selected: map[int64]bool{}}
 		if !form.allApps {
-			request.ClientIDs = postedIds(r, "clientId")
+			request.ClientIDs = postedIDs(r, "clientId")
 			for _, id := range request.ClientIDs {
 				form.selected[id] = true
 			}

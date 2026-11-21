@@ -21,7 +21,7 @@ type accountEmailAPI interface {
 }
 
 func HandleEmailGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailAPI,
 ) http.HandlerFunc {
@@ -29,9 +29,9 @@ func HandleEmailGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -93,7 +93,7 @@ var accountEmailErrorFields = map[string]string{
 }
 
 func HandleEmailPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailAPI,
 	baseURL string,
@@ -101,9 +101,9 @@ func HandleEmailPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info and current user for re-render on error
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

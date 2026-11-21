@@ -25,43 +25,43 @@ import (
 // columns, so a field that stopped arriving renders an empty cell rather than failing. Each case
 // below reads one bind the template cannot do without.
 //
-// groupBindApiClient answers the reads each page performs. The rest of the ports it is passed to
+// groupBindAPIClient answers the reads each page performs. The rest of the ports it is passed to
 // panic, rather than answer a helpful zero value.
-type groupBindApiClient struct {
+type groupBindAPIClient struct {
 	group      *api.GroupResponse
 	attributes []api.GroupAttributeResponse
 }
 
-func (c *groupBindApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
+func (c *groupBindAPIClient) GetGroupByID(_ context.Context, accessToken string, groupID int64) (*api.GroupResponse, error) {
 	return c.group, nil
 }
 
-func (c *groupBindApiClient) GetGroupAttributesByGroupId(_ context.Context, accessToken string,
-	groupId int64) ([]api.GroupAttributeResponse, error) {
+func (c *groupBindAPIClient) GetGroupAttributesByGroupID(_ context.Context, accessToken string,
+	groupID int64) ([]api.GroupAttributeResponse, error) {
 
 	return c.attributes, nil
 }
 
-// The rest of the ports groupBindApiClient is passed to, which no test here reaches.
+// The rest of the ports groupBindAPIClient is passed to, which no test here reaches.
 
-func (*groupBindApiClient) DeleteGroup(context.Context, string, int64) error {
+func (*groupBindAPIClient) DeleteGroup(context.Context, string, int64) error {
 	panic("unexpected call to DeleteGroup")
 }
 
-func (*groupBindApiClient) DeleteGroupAttribute(context.Context, string, int64) error {
+func (*groupBindAPIClient) DeleteGroupAttribute(context.Context, string, int64) error {
 	panic("unexpected call to DeleteGroupAttribute")
 }
 
-func (*groupBindApiClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+func (*groupBindAPIClient) UpdateGroup(context.Context, string, int64, *api.UpdateGroupRequest) (*api.GroupResponse, error) {
 	panic("unexpected call to UpdateGroup")
 }
 
-func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page string,
-	handler func(*handlersmocks.HttpHelper) http.HandlerFunc) map[string]interface{} {
+func renderGroupPage(t *testing.T, client *groupBindAPIClient, target, page string,
+	handler func(*handlersmocks.HTTPHelper) http.HandlerFunc) map[string]interface{} {
 
 	t.Helper()
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", page).Maybe()
 
@@ -79,7 +79,7 @@ func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page stri
 // off responses now, and the group's three scalars are three separate keys on the bind rather than
 // one object, so a field lost between the two is lost silently.
 func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
-	client := &groupBindApiClient{
+	client := &groupBindAPIClient{
 		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators"},
 		attributes: []api.GroupAttributeResponse{
 			{ID: 7, Key: "tier", Value: "gold", GroupID: 4, IncludeInIDToken: true},
@@ -88,7 +88,7 @@ func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 	}
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/attributes", "/admin_groups_attributes.html",
-		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
 			return HandleAttributesGet(h, client)
 		})
 
@@ -108,13 +108,13 @@ func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 // second return value beside the group. The page is a confirmation screen for a destructive
 // action, so a count that silently became zero tells the administrator the group is empty.
 func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
-	client := &groupBindApiClient{
+	client := &groupBindAPIClient{
 		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators",
 			MemberCount: 17},
 	}
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/delete", "/admin_groups_delete.html",
-		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
 			return HandleDeleteGet(h, client)
 		})
 
@@ -130,7 +130,7 @@ func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
 // The settings page's two checkboxes. They are booleans, so a bind that lost one renders it
 // unchecked, which is a valid-looking page asserting the opposite of the truth.
 func TestHandleSettingsGet_BindsBothTokenFlags(t *testing.T) {
-	client := &groupBindApiClient{
+	client := &groupBindAPIClient{
 		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators",
 			IncludeInIDToken: true, IncludeInAccessToken: false},
 	}
@@ -140,7 +140,7 @@ func TestHandleSettingsGet_BindsBothTokenFlags(t *testing.T) {
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 
 	bind := renderGroupPage(t, client, "/admin/groups/4/settings", "/admin_groups_settings.html",
-		func(h *handlersmocks.HttpHelper) http.HandlerFunc {
+		func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
 			return HandleSettingsGet(h, httpSession, client)
 		})
 

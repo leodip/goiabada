@@ -23,7 +23,7 @@ type accountEmailVerificationAPI interface {
 }
 
 func HandleEmailVerificationGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
@@ -31,9 +31,9 @@ func HandleEmailVerificationGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
@@ -85,7 +85,7 @@ func HandleEmailVerificationGet(
 }
 
 func HandleEmailSendVerificationPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
 
@@ -94,9 +94,9 @@ func HandleEmailSendVerificationPost(
 		result := EmailSendVerificationResult{}
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -116,7 +116,7 @@ func HandleEmailSendVerificationPost(
 }
 
 func HandleEmailVerificationPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountEmailVerificationAPI,
 	baseURL string,
@@ -125,9 +125,9 @@ func HandleEmailVerificationPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info for API calls and current profile rendering
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

@@ -15,13 +15,13 @@ import (
 // userDeleteAPI is what the user delete page needs: the user, the groups it warns about, and the
 // delete.
 type userDeleteAPI interface {
-	DeleteUser(ctx context.Context, accessToken string, userId int64) error
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserGroups(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error)
+	DeleteUser(ctx context.Context, accessToken string, userID int64) error
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	GetUserGroups(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.GroupResponse, error)
 }
 
 func HandleDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userDeleteAPI,
 ) http.HandlerFunc {
 
@@ -39,13 +39,13 @@ func HandleDeleteGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -82,7 +82,7 @@ func HandleDeleteGet(
 }
 
 func HandleDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userDeleteAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -101,9 +101,9 @@ func HandleDeletePost(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -111,7 +111,7 @@ func HandleDeletePost(
 		// one holding manage, is shown on the confirmation page again rather than as the 500 page
 		// (#402 decision 12).
 		renderError := func(message string) {
-			user, getErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+			user, getErr := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 			if getErr != nil {
 				render.HandleAPIError(httpHelper, w, r, getErr)
 				return
@@ -141,7 +141,7 @@ func HandleDeletePost(
 
 		// The email typed to confirm, compared as the API compares addresses, without regard to
 		// case, with the user as stored now.
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

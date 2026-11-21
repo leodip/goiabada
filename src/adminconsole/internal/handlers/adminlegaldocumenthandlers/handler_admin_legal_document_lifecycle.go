@@ -14,19 +14,19 @@ import (
 // the write.
 type legalDocumentRetireAPI interface {
 	legalDocumentReader
-	RetireLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error)
+	RetireLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error)
 }
 
 // legalDocumentRestoreAPI is the same for Restore.
 type legalDocumentRestoreAPI interface {
 	legalDocumentReader
-	RestoreLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error)
+	RestoreLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error)
 }
 
 // HandleRetirePost retires a published document: it applies to no one from then on, and its
 // versions stay, readable here. It can be restored.
 func HandleRetirePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentRetireAPI,
 	baseURL string,
@@ -36,7 +36,7 @@ func HandleRetirePost(
 
 // HandleRestorePost restores a retired document as it was, its current version included.
 func HandleRestorePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentRestoreAPI,
 	baseURL string,
@@ -47,12 +47,12 @@ func HandleRestorePost(
 // lifecycleAction asks the API to act on the document the path names and opens its versions,
 // saying so through flash, or says the API's refusal there.
 func lifecycleAction(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentReader,
 	baseURL string,
 	flash string,
-	act func(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error),
+	act func(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error),
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

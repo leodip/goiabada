@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-type HttpHelper interface {
+type HTTPHelper interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
@@ -18,11 +18,11 @@ type HttpHelper interface {
 }
 
 type AuthHelper interface {
-	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
+	IsAuthenticated(jwtInfo oauthclient.JWTInfo) bool
 }
 
 // TokenParser is the sign-in's one question to the parser: is this token response, answering a
 // sign-in that sent this nonce, one the console may accept.
 type TokenParser interface {
-	DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*oauthclient.JwtInfo, error)
+	DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*oauthclient.JWTInfo, error)
 }

@@ -16,16 +16,16 @@ import (
 // A hand-made delete of the admin console's own client is answered with the delete page again and
 // its refusal, as the resource page answers one for the auth server's own resource, rather than the
 // 500 page (#632 decision 5). It is refused first, before the identifier is read, and DeleteClient
-// is never reached, which refusingClientApiClient proves by panicking if it is.
+// is never reached, which refusingClientAPIClient proves by panicking if it is.
 func TestAdminClientDeletePost_RefusesTheConsolesOwnClient(t *testing.T) {
 	// Refused first: with no identifier typed, the refusal is still that this client cannot go.
 	for _, typed := range []string{"billing-app", ""} {
 		t.Run("clientIdentifier="+typed, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_delete.html").Once()
 
-			handler := HandleDeletePost(httpHelper, &refusingClientApiClient{isSystemLevel: true}, consoleBaseURL)
+			handler := HandleDeletePost(httpHelper, &refusingClientAPIClient{isSystemLevel: true}, consoleBaseURL)
 			req := handlertest.Request(http.MethodPost, "/admin/clients/3/delete",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithForm(url.Values{"clientIdentifier": {typed}}))

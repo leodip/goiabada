@@ -124,7 +124,7 @@ func (s *stubTokens) Invalidate() {
 func newStubTokens() *stubTokens { return &stubTokens{token: "the-token"} }
 
 // The identifier used throughout, long enough to be recognisable in a request target.
-const httpTestSessionId = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+const httpTestSessionID = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 func alwaysOK(body interface{}) func(http.ResponseWriter, int) {
 	return func(w http.ResponseWriter, _ int) {
@@ -153,23 +153,23 @@ func TestHTTPBackend_EachOperationHitsItsOwnPath(t *testing.T) {
 		call      func(sessionstore.Backend) error
 	}{
 		{"load", api.SessionLoadResponse{Data: "ciphertext", ExpiresAt: expiresAt}, func(b sessionstore.Backend) error {
-			_, err := b.Load(context.Background(), httpTestSessionId)
+			_, err := b.Load(context.Background(), httpTestSessionID)
 			return err
 		}},
 		{"create", api.SessionWriteResponse{ExpiresAt: expiresAt}, func(b sessionstore.Backend) error {
-			_, err := b.Create(context.Background(), httpTestSessionId, []byte("ciphertext"), true)
+			_, err := b.Create(context.Background(), httpTestSessionID, []byte("ciphertext"), true)
 			return err
 		}},
 		{"update", api.SessionWriteResponse{ExpiresAt: expiresAt}, func(b sessionstore.Backend) error {
-			_, err := b.Update(context.Background(), httpTestSessionId, []byte("ciphertext"), true)
+			_, err := b.Update(context.Background(), httpTestSessionID, []byte("ciphertext"), true)
 			return err
 		}},
 		{"touch", api.SessionWriteResponse{ExpiresAt: expiresAt}, func(b sessionstore.Backend) error {
-			_, err := b.Touch(context.Background(), httpTestSessionId, false)
+			_, err := b.Touch(context.Background(), httpTestSessionID, false)
 			return err
 		}},
 		{"delete", nil, func(b sessionstore.Backend) error {
-			return b.Delete(context.Background(), httpTestSessionId)
+			return b.Delete(context.Background(), httpTestSessionID)
 		}},
 	}
 
@@ -199,22 +199,22 @@ func TestHTTPBackend_TheIdentifierNeverReachesTheRequestTarget(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
-	_, err = backend.Create(context.Background(), httpTestSessionId, []byte("x"), false)
+	_, err = backend.Create(context.Background(), httpTestSessionID, []byte("x"), false)
 	require.NoError(t, err)
-	_, err = backend.Update(context.Background(), httpTestSessionId, []byte("x"), false)
+	_, err = backend.Update(context.Background(), httpTestSessionID, []byte("x"), false)
 	require.NoError(t, err)
-	_, err = backend.Touch(context.Background(), httpTestSessionId, false)
+	_, err = backend.Touch(context.Background(), httpTestSessionID, false)
 	require.NoError(t, err)
-	require.NoError(t, backend.Delete(context.Background(), httpTestSessionId))
+	require.NoError(t, backend.Delete(context.Background(), httpTestSessionID))
 
 	recorded := stub.recorded()
 	require.Len(t, recorded, 5)
 	for _, request := range recorded {
-		assert.NotContains(t, request.target, httpTestSessionId,
+		assert.NotContains(t, request.target, httpTestSessionID,
 			"the session identifier must never appear in the request line")
-		assert.Contains(t, request.body, httpTestSessionId,
+		assert.Contains(t, request.body, httpTestSessionID,
 			"it travels in the body instead, so the body must actually carry it")
 	}
 }
@@ -232,7 +232,7 @@ func TestHTTPBackend_LoadCarriesTheRecordBack(t *testing.T) {
 	}))
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	record, err := backend.Load(context.Background(), httpTestSessionId)
+	record, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("the-ciphertext"), record.Data)
 	assert.True(t, lastAccessed.Equal(record.LastAccessed))
@@ -247,9 +247,9 @@ func TestHTTPBackend_WriteOperationsCarryTheirArguments(t *testing.T) {
 	stub := newStubEndpoint(t, alwaysOK(api.SessionWriteResponse{ExpiresAt: time.Now().UTC()}))
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Create(context.Background(), httpTestSessionId, []byte("the-ciphertext"), true)
+	_, err := backend.Create(context.Background(), httpTestSessionID, []byte("the-ciphertext"), true)
 	require.NoError(t, err)
-	_, err = backend.Touch(context.Background(), httpTestSessionId, true)
+	_, err = backend.Touch(context.Background(), httpTestSessionID, true)
 	require.NoError(t, err)
 
 	recorded := stub.recorded()
@@ -257,7 +257,7 @@ func TestHTTPBackend_WriteOperationsCarryTheirArguments(t *testing.T) {
 
 	var created api.SessionWriteRequest
 	require.NoError(t, json.Unmarshal([]byte(recorded[0].body), &created))
-	assert.Equal(t, httpTestSessionId, created.ID)
+	assert.Equal(t, httpTestSessionID, created.ID)
 	assert.Equal(t, "the-ciphertext", created.Data)
 	assert.True(t, created.Authenticated)
 
@@ -276,7 +276,7 @@ func TestHTTPBackend_NotFoundIsErrNotFoundAndEverythingElseFailsClosed(t *testin
 		stub := newStubEndpoint(t, alwaysStatus(http.StatusNotFound))
 		backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-		_, err := backend.Load(context.Background(), httpTestSessionId)
+		_, err := backend.Load(context.Background(), httpTestSessionID)
 		assert.ErrorIs(t, err, sessionstore.ErrNotFound)
 	})
 
@@ -291,7 +291,7 @@ func TestHTTPBackend_NotFoundIsErrNotFoundAndEverythingElseFailsClosed(t *testin
 			stub := newStubEndpoint(t, alwaysStatus(status))
 			backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-			_, err := backend.Load(context.Background(), httpTestSessionId)
+			_, err := backend.Load(context.Background(), httpTestSessionID)
 			require.Error(t, err)
 			assert.NotErrorIs(t, err, sessionstore.ErrNotFound,
 				"a refusal that is not 404 must never read as a session that is gone")
@@ -308,7 +308,7 @@ func TestHTTPBackend_AGarbageBodyIsAnError(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, sessionstore.ErrNotFound)
 }
@@ -332,7 +332,7 @@ func TestHTTPBackend_ADroppedConnectionIsRetriedOnce(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	record, err := backend.Load(context.Background(), httpTestSessionId)
+	record, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("ciphertext"), record.Data)
 	assert.Len(t, stub.recorded(), 2, "one retry, and the second attempt is the one that succeeded")
@@ -351,7 +351,7 @@ func TestHTTPBackend_ASecondDroppedConnectionIsNotRetried(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 	assert.Len(t, stub.recorded(), 2, "the initial attempt and exactly one retry")
 }
@@ -369,7 +369,7 @@ func TestHTTPBackend_A401DrivesExactlyOneRefresh(t *testing.T) {
 	tokens := newStubTokens()
 	backend := New(stub.server.URL, tokens, nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
 
 	recorded := stub.recorded()
@@ -387,7 +387,7 @@ func TestHTTPBackend_APersistent401StopsAfterOneRefresh(t *testing.T) {
 	tokens := newStubTokens()
 	backend := New(stub.server.URL, tokens, nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, sessionstore.ErrNotFound)
 	assert.Len(t, stub.recorded(), 2)
@@ -402,7 +402,7 @@ func TestHTTPBackend_ATokenFailureIsNotRetried(t *testing.T) {
 	tokens := &stubTokens{err: errors.New("the token endpoint is down")}
 	backend := New(stub.server.URL, tokens, nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 	assert.Empty(t, stub.recorded(), "no request can be sent without a token")
 	assert.Equal(t, 1, tokens.handedOut)
@@ -416,7 +416,7 @@ func TestHTTPBackend_AnEmptyTokenIsRefusedBeforeTheWire(t *testing.T) {
 	stub := newStubEndpoint(t, alwaysOK(api.SessionLoadResponse{}))
 	backend := New(stub.server.URL, &stubTokens{token: "   "}, nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 	assert.Empty(t, stub.recorded())
 }
@@ -428,7 +428,7 @@ func TestHTTPBackend_TrailingSlashInTheBaseURLDoesNotDoubleUp(t *testing.T) {
 	stub := newStubEndpoint(t, alwaysOK(api.SessionLoadResponse{}))
 	backend := New(stub.server.URL+"/", newStubTokens(), nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
 
 	recorded := stub.recorded()
@@ -447,7 +447,7 @@ func TestHTTPBackend_ACancelledContextIsNotRetried(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := backend.Load(ctx, httpTestSessionId)
+	_, err := backend.Load(ctx, httpTestSessionID)
 	require.Error(t, err)
 	assert.Empty(t, stub.recorded())
 }
@@ -480,7 +480,7 @@ func TestHTTPBackend_AnAnswerThatCouldNotBeReadIsNotRetried(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Create(context.Background(), httpTestSessionId, []byte("ciphertext"), true)
+	_, err := backend.Create(context.Background(), httpTestSessionID, []byte("ciphertext"), true)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, sessionstore.ErrNotFound)
 	assert.Len(t, stub.recorded(), 1, "the create is not sent a second time: the first one committed")
@@ -509,14 +509,14 @@ func TestHTTPBackend_AMaximalSessionCrossesTheWireInBothDirections(t *testing.T)
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	record, err := backend.Load(context.Background(), httpTestSessionId)
+	record, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err, "a maximal blob must survive the response cap, envelope included")
 	assert.Len(t, record.Data, sessionstore.MaxSessionDataBytes)
 
 	// The request half, measured rather than sent: the endpoint reads the whole body under
 	// one MaxBytesReader, so what has to fit is the encoded envelope and not the blob.
 	encoded, err := json.Marshal(api.SessionWriteRequest{
-		ID: httpTestSessionId, Data: maximal, Authenticated: true,
+		ID: httpTestSessionID, Data: maximal, Authenticated: true,
 	})
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(encoded), sessionstore.MaxSessionWireBytes,
@@ -537,7 +537,7 @@ func TestHTTPBackend_RefusesAResponseOverTheCap(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 
 	require.Error(t, err)
 	require.ErrorIs(t, err, boundedread.ErrResponseTooLarge,
@@ -556,7 +556,7 @@ func TestHTTPBackend_AcceptsAResponseOfExactlyTheCap(t *testing.T) {
 	})
 	backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-	record, err := backend.Load(context.Background(), httpTestSessionId)
+	record, err := backend.Load(context.Background(), httpTestSessionID)
 
 	require.NoError(t, err, "the cap is the largest accepted answer, not the first refused one")
 	assert.NotEmpty(t, record.Data)

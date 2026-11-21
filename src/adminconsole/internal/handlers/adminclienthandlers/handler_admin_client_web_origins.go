@@ -27,12 +27,12 @@ type effectiveWebOrigin struct {
 // checks against, and the write.
 type clientWebOriginsAPI interface {
 	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
-	UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
+	UpdateClientWebOrigins(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
 }
 
 func HandleWebOriginsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientWebOriginsAPI,
 ) http.HandlerFunc {
@@ -51,13 +51,13 @@ func HandleWebOriginsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -104,14 +104,14 @@ func HandleWebOriginsGet(
 		// is needed when the client's app is JavaScript in a browser, which no flow flag
 		// expresses, and the auth server's own endpoint stopped asking too (#250).
 		adminClientWebOrigins := struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
 			IsPublic            bool
 		}{
-			ClientId:            clientResp.ID,
+			ClientID:            clientResp.ID,
 			ClientIdentifier:    clientResp.ClientIdentifier,
 			EffectiveWebOrigins: effectiveWebOrigins,
 			IsSystemLevelClient: clientResp.IsSystemLevelClient,
@@ -157,7 +157,7 @@ func HandleWebOriginsGet(
 }
 
 func HandleWebOriginsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientWebOriginsAPI,
 ) http.HandlerFunc {
@@ -178,9 +178,9 @@ func HandleWebOriginsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -189,7 +189,7 @@ func HandleWebOriginsPost(
 			WebOrigins:         data.WebOrigins,
 			ExpectedWebOrigins: data.ExpectedWebOrigins,
 		}
-		_, err = apiClient.UpdateClientWebOrigins(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
+		_, err = apiClient.UpdateClientWebOrigins(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientID, req)
 		if err != nil {
 			// Not JSONError directly: the API refuses a web origin with a 400 whose description
 			// names the offending value and says what an origin should look like, and that

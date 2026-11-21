@@ -32,7 +32,7 @@
       {{ $device := print .DeviceName " " .DeviceType " " .DeviceOS }}
       <tr>
         <td class="cell-wrap sm:whitespace-nowrap">
-          <a class="text-link" href="/admin/users/{{ .UserId }}/details">{{ .UserEmail }}</a>
+          <a class="text-link" href="/admin/users/{{ .UserID }}/details">{{ .UserEmail }}</a>
           {{ if .UserFullName }}<span class="cell-secondary">{{ .UserFullName }}</span>{{ end }}
         </td>
         <td class="cell-wrap sm:min-w-40" data-label="{{ T $.ctx "adminconsole.admin_clients.usersessions.col_device" }}" title="{{ .UserAgent }}">
@@ -44,14 +44,14 @@
             {{ range .Clients }}<li>{{ . }}</li>{{ end }}
           </ul>
         </td>
-        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_clients.usersessions.col_ip" }}">{{ .IpAddress }}</td>
+        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_clients.usersessions.col_ip" }}">{{ .IPAddress }}</td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_clients.usersessions.col_started" }}">{{ DateTime $.ctx .Started }}<span class="cell-secondary">{{ Since $.ctx .Started }}</span></td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_clients.usersessions.col_last_accessed" }}">{{ DateTime $.ctx .LastAccessed }}<span class="cell-secondary">{{ Since $.ctx .LastAccessed }}</span></td>
         <td class="cell-actions">
           {{ if .IsCurrent }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_clients.usersessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_clients.usersessions.end_button" }}<span class="sr-only"> {{ .UserEmail }}, {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_clients.usersessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_clients.usersessions.end_button" }}<span class="sr-only"> {{ .UserEmail }}, {{ $device }}</span></button>
           {{ else }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_clients.usersessions.end_confirm" "user" .UserEmail "device" $device }}">{{ T $.ctx "adminconsole.admin_clients.usersessions.end_button" }}<span class="sr-only"> {{ .UserEmail }}, {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_clients.usersessions.end_confirm" "user" .UserEmail "device" $device }}">{{ T $.ctx "adminconsole.admin_clients.usersessions.end_button" }}<span class="sr-only"> {{ .UserEmail }}, {{ $device }}</span></button>
           {{ end }}
         </td>
       </tr>

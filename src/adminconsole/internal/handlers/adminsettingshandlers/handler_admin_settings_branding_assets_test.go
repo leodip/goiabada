@@ -56,7 +56,7 @@ func uploadRequest(t *testing.T, kind, field, filename string, data []byte) *htt
 }
 
 // jsonErrorOf is the refusal a handler answered through JSONError.
-func jsonErrorOf(t *testing.T, httpHelper *handlersmocks.HttpHelper) *oauth.ErrorDetail {
+func jsonErrorOf(t *testing.T, httpHelper *handlersmocks.HTTPHelper) *oauth.ErrorDetail {
 	t.Helper()
 	for _, call := range httpHelper.Calls {
 		if call.Method == "JSONError" {
@@ -74,7 +74,7 @@ func jsonErrorOf(t *testing.T, httpHelper *handlersmocks.HttpHelper) *oauth.Erro
 func TestHandleBrandAssetPost_UploadsTheFileAsAnAssetOfItsKind(t *testing.T) {
 	for _, kind := range []string{"logo", "favicon", "background", "font"} {
 		t.Run(kind, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 			apiClient := &brandAssetAPI{}
 
@@ -95,7 +95,7 @@ func TestHandleBrandAssetPost_UploadsTheFileAsAnAssetOfItsKind(t *testing.T) {
 // A file the admin API refuses, for its type, its size, its pixels or its animation, is answered with
 // the API's code and sentence, for the editor to show at the field.
 func TestHandleBrandAssetPost_AnswersTheAPIsRefusal(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	apiClient := &brandAssetAPI{err: refusal("validator.image.animated", "Animated images are not allowed. Upload a still image.")}
 
@@ -120,7 +120,7 @@ func TestHandleBrandAssetPost_AFileOverTheBodyLimitIsRefusedWithItsKindsLimit(t 
 		{"font", "validator.font.too_large", "The font can be at most 2097152 bytes."},
 	} {
 		t.Run(tc.kind, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 			apiClient := &brandAssetAPI{}
 			w := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestHandleBrandAssetPost_AFileOverTheBodyLimitIsRefusedWithItsKindsLimit(t 
 
 // An upload without the file in its field is a malformed request, refused before the admin API.
 func TestHandleBrandAssetPost_AnUploadWithoutTheFileIsRefused(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	apiClient := &brandAssetAPI{}
 

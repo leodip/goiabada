@@ -25,19 +25,19 @@ type stubSignOutListAPI struct {
 	updateErr error
 	client    *api.ClientResponse
 	settings  *api.SettingsGeneralResponse
-	// sent and sentClientId are what the handler handed the API.
+	// sent and sentClientID are what the handler handed the API.
 	sent         *api.UpdateClientPostLogoutRedirectURIsRequest
-	sentClientId int64
+	sentClientID int64
 }
 
-func (s *stubSignOutListAPI) UpdateClientPostLogoutRedirectURIs(_ context.Context, _ string, clientId int64,
+func (s *stubSignOutListAPI) UpdateClientPostLogoutRedirectURIs(_ context.Context, _ string, clientID int64,
 	request *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
 	s.sent = request
-	s.sentClientId = clientId
+	s.sentClientID = clientID
 	return nil, s.updateErr
 }
 
-func (s *stubSignOutListAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *stubSignOutListAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
@@ -48,7 +48,7 @@ func (s *stubSignOutListAPI) GetSettingsGeneral(_ context.Context, _ string) (*a
 // signOutListBind serves the tab for client 7 and returns the "client" value it bound.
 func signOutListBind(t *testing.T, apiClient *stubSignOutListAPI) reflect.Value {
 	t.Helper()
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/sign-out-redirect-uris",
 		handlertest.WithAccessToken(),
 		handlertest.WithPathValue("clientId", "7"),
@@ -82,7 +82,7 @@ func TestHandleSignOutRedirectURIsGet_ListsTheSignOutList(t *testing.T) {
 	field := client.FieldByName("SignOutRedirectURIs")
 	require.True(t, field.IsValid(), "the bind carries no SignOutRedirectURIs")
 	assert.Equal(t, []string{"https://app.example.com/bye?state=fixed", "https://app.example.com/signed-out"}, field.Interface())
-	assert.Equal(t, int64(7), client.FieldByName("ClientId").Int())
+	assert.Equal(t, int64(7), client.FieldByName("ClientID").Int())
 	assert.Equal(t, "a-web-app", client.FieldByName("ClientIdentifier").String())
 }
 
@@ -184,7 +184,7 @@ func TestHandleSignOutRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 			HandleSignOutRedirectURIsPost(render.New(nil, nil), nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent, "the handler sent nothing")
-			assert.Equal(t, int64(9), stub.sentClientId)
+			assert.Equal(t, int64(9), stub.sentClientID)
 			assert.Equal(t, tc.wantWanted, stub.sent.PostLogoutRedirectURIs)
 			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedPostLogoutRedirectURIs)
 
@@ -213,7 +213,7 @@ func TestHandleSignOutRedirectURIsPost_ASavedListIsSaidOnTheReloadedTab(t *testi
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.JSONEq(t, `{"Success":true}`, rec.Body.String())
 
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	reload := handlertest.Request(http.MethodGet, "/admin/clients/9/sign-out-redirect-uris",
 		handlertest.WithAccessToken(),
 		handlertest.WithPathValue("clientId", "9"),

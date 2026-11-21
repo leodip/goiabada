@@ -33,10 +33,10 @@ func renderFooterForm(t *testing.T, errorField string) string {
 		"brand": adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "auto", Theme: "plum",
 			Corners: "rounded", Font: "system-ui", BackgroundFit: "cover",
 			FooterLinks: [3]adminsettingshandlers.BrandFooterLinkRow{
-				{Label: "Privacy <b>", Url: "https://autumn.example/privacy?a=1&b=2", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
-				{Label: "Status", Url: "https://status.autumn.example"},
+				{Label: "Privacy <b>", URL: "https://autumn.example/privacy?a=1&b=2", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+				{Label: "Status", URL: "https://status.autumn.example"},
 			},
-			SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
+			SupportEmail: "help@autumn.example", SupportURL: "https://help.autumn.example", SupportPhone: "+15550100199"},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[1],
 		"footerLanguages": renderFooterLanguages,

@@ -19,10 +19,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubApiClient implements the redirect URIs page's port, and nothing beyond it, so a call the
+// stubAPIClient implements the redirect URIs page's port, and nothing beyond it, so a call the
 // page's port does not name does not compile. There is no generated mock: adminconsole has no
 // .mockery.yaml.
-type stubApiClient struct {
+type stubAPIClient struct {
 	updateErr error
 	client    *api.ClientResponse
 	settings  *api.SettingsGeneralResponse
@@ -30,69 +30,69 @@ type stubApiClient struct {
 	sent *api.UpdateClientRedirectURIsRequest
 }
 
-func (s *stubApiClient) UpdateClientRedirectURIs(_ context.Context, accessToken string, clientId int64,
+func (s *stubAPIClient) UpdateClientRedirectURIs(_ context.Context, accessToken string, clientID int64,
 	request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
 	s.sent = request
 	return nil, s.updateErr
 }
 
-func (s *stubApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
+func (s *stubAPIClient) GetClientByID(_ context.Context, accessToken string, clientID int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
-func (s *stubApiClient) GetSettingsGeneral(_ context.Context, accessToken string) (*api.SettingsGeneralResponse, error) {
+func (s *stubAPIClient) GetSettingsGeneral(_ context.Context, accessToken string) (*api.SettingsGeneralResponse, error) {
 	return s.settings, nil
 }
 
-// stubHttpHelper captures the bind instead of rendering it. The template is proved separately,
+// stubHTTPHelper captures the bind instead of rendering it. The template is proved separately,
 // in renderintegration, from a bind the test hands it; that case cannot see whether this handler
 // built the bind correctly, which is what these cases are for.
 //
-// It embeds no interface and defines every HttpHelper method itself, so a writer missing from
-// the stub is a compile error, and a method added to HttpHelper is one too, until this stub
+// It embeds no interface and defines every HTTPHelper method itself, so a writer missing from
+// the stub is a compile error, and a method added to HTTPHelper is one too, until this stub
 // says what it does (#476). The two JSON writers no case here drives through the stub fail
 // the test instead: the handlers' JSON paths are proved with the real render.New, so a call
 // reaching this stub means a case strayed onto a writer it never meant to exercise.
-type stubHttpHelper struct {
+type stubHTTPHelper struct {
 	bind map[string]interface{}
 	err  error
 }
 
-func (s *stubHttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
+func (s *stubHTTPHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
 	templateName string, data map[string]interface{}) error {
 	s.bind = data
 	return nil
 }
 
-func (s *stubHttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *stubHTTPHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	s.err = err
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func (s *stubHttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
+func (s *stubHTTPHelper) NotFound(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (*stubHttpHelper) JSONError(http.ResponseWriter, *http.Request, error) {
+func (*stubHTTPHelper) JSONError(http.ResponseWriter, *http.Request, error) {
 	panic("unexpected call to JSONError")
 }
 
-func (*stubHttpHelper) EncodeJSON(http.ResponseWriter, *http.Request, interface{}) {
+func (*stubHTTPHelper) EncodeJSON(http.ResponseWriter, *http.Request, interface{}) {
 	panic("unexpected call to EncodeJSON")
 }
 
 // The unexpected writers say which writer was reached, not just that a pointer was nil: that is
 // the message a case that strays onto a JSON path reads, and what stops a copy of this stub
 // growing an answer no test here asked for (#476).
-func TestStubHttpHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
+func TestStubHTTPHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
 	writers := []struct {
 		name string
-		call func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request)
+		call func(s *stubHTTPHelper, w http.ResponseWriter, r *http.Request)
 	}{
-		{"JSONError", func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request) {
+		{"JSONError", func(s *stubHTTPHelper, w http.ResponseWriter, r *http.Request) {
 			s.JSONError(w, r, nil)
 		}},
-		{"EncodeJSON", func(s *stubHttpHelper, w http.ResponseWriter, r *http.Request) {
+		{"EncodeJSON", func(s *stubHTTPHelper, w http.ResponseWriter, r *http.Request) {
 			s.EncodeJSON(w, r, nil)
 		}},
 	}
@@ -100,7 +100,7 @@ func TestStubHttpHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
 		t.Run(writer.name, func(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings")
 			assert.PanicsWithValue(t, "unexpected call to "+writer.name, func() {
-				writer.call(&stubHttpHelper{}, httptest.NewRecorder(), req)
+				writer.call(&stubHTTPHelper{}, httptest.NewRecorder(), req)
 			})
 		})
 	}
@@ -108,13 +108,13 @@ func TestStubHttpHelper_FailsTheTestOnAWriterItDoesNotServe(t *testing.T) {
 
 // An embedded interface would compile and pass every case here while promoting any method the
 // stub does not define from a nil interface, so a writer missing from the stub, or one added to
-// HttpHelper later, would be a nil-pointer panic at test time again rather than a compile error.
-func TestStubHttpHelper_EmbedsNoInterface(t *testing.T) {
-	stubType := reflect.TypeOf(stubHttpHelper{})
+// HTTPHelper later, would be a nil-pointer panic at test time again rather than a compile error.
+func TestStubHTTPHelper_EmbedsNoInterface(t *testing.T) {
+	stubType := reflect.TypeOf(stubHTTPHelper{})
 	for i := 0; i < stubType.NumField(); i++ {
 		field := stubType.Field(i)
 		assert.False(t, field.Anonymous && field.Type.Kind() == reflect.Interface,
-			"stubHttpHelper embeds the interface %s; define its methods instead (#476)", field.Name)
+			"stubHTTPHelper embeds the interface %s; define its methods instead (#476)", field.Name)
 	}
 }
 
@@ -197,7 +197,7 @@ func TestHandleRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			// httpSession is nil: every case here returns before the session is touched.
-			handler := HandleRedirectURIsPost(httpHelper, nil, &stubApiClient{updateErr: tc.apiErr})
+			handler := HandleRedirectURIsPost(httpHelper, nil, &stubAPIClient{updateErr: tc.apiErr})
 			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.wantStatus, rec.Code)
@@ -263,7 +263,7 @@ func TestHandleRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
-			stub := &stubApiClient{updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			stub := &stubAPIClient{updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 			HandleRedirectURIsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 			if !assert.NotNil(t, stub.sent) {
@@ -329,8 +329,8 @@ func TestHandleRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
-			httpHelper := &stubHttpHelper{}
-			apiClient := &stubApiClient{
+			httpHelper := &stubHTTPHelper{}
+			apiClient := &stubAPIClient{
 				client: &api.ClientResponse{
 					ID:                       7,
 					ClientIdentifier:         "an-implicit-app",

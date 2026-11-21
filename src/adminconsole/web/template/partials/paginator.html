@@ -6,7 +6,7 @@
   <ul class="pager">
     <li>
       {{- if $p.HasPrevious }}
-      <a class="pager-item" href="{{ addUrlParam $link "page" $p.Previous }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.previous" }}</span></a>
+      <a class="pager-item" href="{{ addURLParam $link "page" $p.Previous }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.previous" }}</span></a>
       {{- else }}
       <span class="pager-item" aria-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.previous" }}</span></span>
       {{- end }}
@@ -14,17 +14,17 @@
     {{- range $p.Pages }}
     <li>
       {{- if .IsCurrent }}
-      <a class="pager-item" aria-current="page" href="{{ addUrlParam $link "page" .Num }}">{{ .Num }}</a>
+      <a class="pager-item" aria-current="page" href="{{ addURLParam $link "page" .Num }}">{{ .Num }}</a>
       {{- else if eq .Num -1 }}
       <span class="pager-item" aria-hidden="true">…</span>
       {{- else }}
-      <a class="pager-item" href="{{ addUrlParam $link "page" .Num }}">{{ .Num }}</a>
+      <a class="pager-item" href="{{ addURLParam $link "page" .Num }}">{{ .Num }}</a>
       {{- end }}
     </li>
     {{- end }}
     <li>
       {{- if $p.HasNext }}
-      <a class="pager-item" href="{{ addUrlParam $link "page" $p.Next }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.next" }}</span></a>
+      <a class="pager-item" href="{{ addURLParam $link "page" $p.Next }}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.next" }}</span></a>
       {{- else }}
       <span class="pager-item" aria-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg><span class="sr-only">{{ T $ctx "adminconsole.paginator.next" }}</span></span>
       {{- end }}

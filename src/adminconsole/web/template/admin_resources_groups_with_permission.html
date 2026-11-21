@@ -13,7 +13,7 @@
     <label class="field-label" for="permissionSelect">{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.field.permission" }}</label>
     <select class="control" id="permissionSelect" name="permission">
       {{ range .permissionChoices }}
-      <option value="{{ .Id }}"{{ if eq $.selectedPermission .Id }} selected{{ end }}>{{ .Label }}</option>
+      <option value="{{ .ID }}"{{ if eq $.selectedPermission .ID }} selected{{ end }}>{{ .Label }}</option>
       {{ end }}
     </select>
   </div>
@@ -41,14 +41,14 @@
       {{ $confirm := T $.ctx "adminconsole.admin_resources.groups_with_permission.remove_confirm" "scope" (print $.resourceIdentifier ":" $.selectedPermissionIdentifier) "group" .GroupIdentifier }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link font-mono text-sm" href="/admin/groups/{{ .Id }}/settings">{{ .GroupIdentifier }}</a>
+          <a class="text-link font-mono text-sm" href="/admin/groups/{{ .ID }}/settings">{{ .GroupIdentifier }}</a>
           {{ if .Description }}<span class="cell-secondary">{{ .Description }}</span>{{ end }}
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.col_has_permission" }}"><span class="tag tag-positive" data-row-state{{ if not .HasPermission }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.yes" }}</span></td>
         <td class="cell-actions">
-          <button class="button button-sm" type="button" id="grant-{{ .Id }}" data-action-url="/admin/resources/{{ $.resourceId }}/groups-with-permission/add/{{ .Id }}/{{ $.selectedPermission }}" data-swap="remove-{{ .Id }}"
+          <button class="button button-sm" type="button" id="grant-{{ .ID }}" data-action-url="/admin/resources/{{ $.resourceId }}/groups-with-permission/add/{{ .ID }}/{{ $.selectedPermission }}" data-swap="remove-{{ .ID }}"
             data-done="{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.granted" }}"{{ if .HasPermission }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.grant_button" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></button>
-          <button class="button button-sm" type="button" id="remove-{{ .Id }}" data-action-url="/admin/resources/{{ $.resourceId }}/groups-with-permission/remove/{{ .Id }}/{{ $.selectedPermission }}" data-swap="grant-{{ .Id }}" data-row-state-shown data-dialog="removeGroupPermission"
+          <button class="button button-sm" type="button" id="remove-{{ .ID }}" data-action-url="/admin/resources/{{ $.resourceId }}/groups-with-permission/remove/{{ .ID }}/{{ $.selectedPermission }}" data-swap="grant-{{ .ID }}" data-row-state-shown data-dialog="removeGroupPermission"
             data-confirm="{{ $confirm }}" data-done="{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.removed" }}"{{ if not .HasPermission }} hidden{{ end }}>{{ T $.ctx "adminconsole.admin_resources.groups_with_permission.remove_button" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></button>
         </td>
       </tr>

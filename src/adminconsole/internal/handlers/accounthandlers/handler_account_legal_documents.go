@@ -18,15 +18,15 @@ type accountLegalDocumentsAPI interface {
 // linked to its version's public page, or marked no longer in effect when its document is retired
 // (#622 decision 10). It only reads: acceptances are never edited or removed by hand.
 func HandleLegalDocumentsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountLegalDocumentsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

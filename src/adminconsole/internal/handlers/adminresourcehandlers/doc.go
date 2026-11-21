@@ -8,7 +8,7 @@
 // classifiers. An identifier is checked here with the same rule the auth server applies,
 // core/inputvalidation's, named through IdentifierValidator, so a page refuses what the API would.
 // The permissions save sends the list as the page loaded it, so the API refuses it when another
-// save got there first (#428). HttpHelper is declared here rather than imported from the parent
+// save got there first (#428). HTTPHelper is declared here rather than imported from the parent
 // handlers package, and each handler names the API methods it calls in an unexported port beside
 // it (#386, #440).
 package adminresourcehandlers

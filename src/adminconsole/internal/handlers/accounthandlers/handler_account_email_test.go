@@ -23,18 +23,18 @@ import (
 
 const accountEmailFormPassword = "My-Current-P4ss"
 
-// emailRecordingApiClient records the email change the handler sent and answers it with refusal,
+// emailRecordingAPIClient records the email change the handler sent and answers it with refusal,
 // or with success when refusal is nil.
-type emailRecordingApiClient struct {
+type emailRecordingAPIClient struct {
 	sent    []*api.UpdateAccountEmailRequest
 	refusal error
 }
 
-func (*emailRecordingApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
+func (*emailRecordingAPIClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
 	return &api.UserResponse{ID: 11, Email: "old@example.com", EmailVerified: true}, nil
 }
 
-func (c *emailRecordingApiClient) UpdateAccountEmail(_ context.Context, _ string,
+func (c *emailRecordingAPIClient) UpdateAccountEmail(_ context.Context, _ string,
 	request *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
 	c.sent = append(c.sent, request)
 	if c.refusal != nil {
@@ -44,7 +44,7 @@ func (c *emailRecordingApiClient) UpdateAccountEmail(_ context.Context, _ string
 }
 
 // requireNoPasswordInBind fails when any value the page was rendered with carries the password.
-func requireNoPasswordInBind(t *testing.T, httpHelper *handlersmocks.HttpHelper) {
+func requireNoPasswordInBind(t *testing.T, httpHelper *handlersmocks.HTTPHelper) {
 	t.Helper()
 	for key, value := range handlertest.Bind(t, httpHelper) {
 		assert.NotContains(t, fmt.Sprint(value), accountEmailFormPassword,
@@ -53,7 +53,7 @@ func requireNoPasswordInBind(t *testing.T, httpHelper *handlersmocks.HttpHelper)
 }
 
 func TestHandleEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
-	apiClient := &emailRecordingApiClient{}
+	apiClient := &emailRecordingAPIClient{}
 	form := url.Values{
 		"email":             {"New@Example.com"},
 		"emailConfirmation": {"new@example.com"},
@@ -63,7 +63,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleEmailPost(handlersmocks.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(handlersmocks.NewHTTPHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -76,7 +76,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordFromTheFormBody(t *testing.T) {
 // compares intact, so a trimmed one would be refused as wrong and charged to the account's budget.
 func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 	const password = "  " + accountEmailFormPassword + "  "
-	apiClient := &emailRecordingApiClient{}
+	apiClient := &emailRecordingAPIClient{}
 	form := url.Values{
 		"email":             {"new@example.com"},
 		"emailConfirmation": {"new@example.com"},
@@ -86,7 +86,7 @@ func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	rr := httptest.NewRecorder()
 
-	HandleEmailPost(handlersmocks.NewHttpHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
+	HandleEmailPost(handlersmocks.NewHTTPHelper(t), newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code, "a successful change redirects")
 	require.Len(t, apiClient.sent, 1)
@@ -97,9 +97,9 @@ func TestHandleEmailPost_SendsTheCurrentPasswordAsTyped(t *testing.T) {
 // password in a request target reaches browser history, Referers and proxy logs, so one there is
 // never read. The API then refuses the blank password itself, which is why it is still called.
 func TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
-	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
+	apiClient := &emailRecordingAPIClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "VALIDATION_ERROR", Message: "Current password is required."}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{"email": {"new@example.com"}, "emailConfirmation": {"new@example.com"}}
 	req := handlertest.Request(http.MethodPost, "/account/email?currentPassword="+accountEmailFormPassword,
@@ -113,10 +113,10 @@ func TestHandleEmailPost_IgnoresACurrentPasswordInTheQuery(t *testing.T) {
 }
 
 func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
-	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
+	apiClient := &emailRecordingAPIClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusBadRequest, Code: "AUTHENTICATION_FAILED",
 		Message: "That password isn't right. Try again."}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
 		"email":             {"new@example.com"},
@@ -139,10 +139,10 @@ func TestHandleEmailPost_ARefusedPasswordReRendersWithoutIt(t *testing.T) {
 // rate-limit sentence rather than the 500 page; the password, again, is not (#562 decision 7,
 // #559 decision 10).
 func TestHandleEmailPost_TooManyAttemptsReRendersWithTheSentence(t *testing.T) {
-	apiClient := &emailRecordingApiClient{refusal: &apiclient.APIError{
+	apiClient := &emailRecordingAPIClient{refusal: &apiclient.APIError{
 		StatusCode: http.StatusTooManyRequests, Code: "TOO_MANY_REQUESTS",
 		Message: "Too many requests. Please wait and try again later."}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
@@ -162,8 +162,8 @@ func TestHandleEmailPost_TooManyAttemptsReRendersWithTheSentence(t *testing.T) {
 }
 
 func TestHandleEmailPost_AConfirmationMismatchReRendersWithoutThePassword(t *testing.T) {
-	apiClient := &emailRecordingApiClient{}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	apiClient := &emailRecordingAPIClient{}
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 	form := url.Values{
 		"email":             {"new@example.com"},

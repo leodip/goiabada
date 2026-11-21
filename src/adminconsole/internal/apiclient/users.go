@@ -32,10 +32,10 @@ func (c *AuthServerClient) SearchUsersPaginated(ctx context.Context, accessToken
 	return response.Users, response.Total, nil
 }
 
-func (c *AuthServerClient) GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *AuthServerClient) GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
 	response, err := execute[api.GetUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10),
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -45,10 +45,10 @@ func (c *AuthServerClient) GetUserById(ctx context.Context, accessToken string, 
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserEnabled(ctx context.Context, accessToken string, userId int64, enabled bool) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserEnabled(ctx context.Context, accessToken string, userID int64, enabled bool) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/enabled",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/enabled",
 		jsonBody:      api.UpdateUserEnabledRequest{Enabled: enabled},
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -59,10 +59,10 @@ func (c *AuthServerClient) UpdateUserEnabled(ctx context.Context, accessToken st
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserProfile(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserProfile(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/profile",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -73,10 +73,10 @@ func (c *AuthServerClient) UpdateUserProfile(ctx context.Context, accessToken st
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserAddress(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserAddress(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/address",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/address",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -87,10 +87,10 @@ func (c *AuthServerClient) UpdateUserAddress(ctx context.Context, accessToken st
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserPhone(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/phone",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/phone",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -101,10 +101,10 @@ func (c *AuthServerClient) UpdateUserPhone(ctx context.Context, accessToken stri
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserEmail(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserEmail(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/email",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/email",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -115,10 +115,10 @@ func (c *AuthServerClient) UpdateUserEmail(ctx context.Context, accessToken stri
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserPassword(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserPassword(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/password",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/password",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -129,10 +129,10 @@ func (c *AuthServerClient) UpdateUserPassword(ctx context.Context, accessToken s
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserOTP(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
+func (c *AuthServerClient) UpdateUserOTP(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
 	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/otp",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/otp",
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -157,17 +157,17 @@ func (c *AuthServerClient) CreateUserAdmin(ctx context.Context, accessToken stri
 	})
 }
 
-func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {
+func (c *AuthServerClient) GetUserProfilePicture(ctx context.Context, accessToken string, userID int64) (*api.ProfilePictureInfoResponse, error) {
 	return execute[api.ProfilePictureInfoResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile-picture",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/profile-picture",
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
 }
 
 // UploadUserProfilePicture uploads a profile picture for a user (admin)
-func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
+func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessToken string, userID int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
 	body, contentType, err := multipartPicture(filename, pictureData)
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessT
 
 	return execute[api.ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile-picture",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/profile-picture",
 		rawBody:       body,
 		contentType:   contentType,
 		successStatus: http.StatusOK,
@@ -183,20 +183,20 @@ func (c *AuthServerClient) UploadUserProfilePicture(ctx context.Context, accessT
 }
 
 // DeleteUserProfilePicture deletes a user's profile picture (admin)
-func (c *AuthServerClient) DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error {
+func (c *AuthServerClient) DeleteUserProfilePicture(ctx context.Context, accessToken string, userID int64) error {
 	// No Content-Type: this request carries no body, and the header it never set is left unset.
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile-picture",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/profile-picture",
 		successStatus: http.StatusOK,
 	})
 	return err
 }
 
-func (c *AuthServerClient) DeleteUser(ctx context.Context, accessToken string, userId int64) error {
+func (c *AuthServerClient) DeleteUser(ctx context.Context, accessToken string, userID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10),
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -218,11 +218,11 @@ type UserExport struct {
 // GetUserExport asks for one user's export, their data as one JSON document. It
 // asks for gzip and never decodes or reads the answer, so the document's size is not held to the
 // ceiling every other answer is.
-func (c *AuthServerClient) GetUserExport(ctx context.Context, accessToken string, userId int64) (*UserExport, error) {
+func (c *AuthServerClient) GetUserExport(ctx context.Context, accessToken string, userID int64) (*UserExport, error) {
 	//nolint:bodyclose // the body is the caller's: UserExport hands it on, and the caller closes it
 	resp, err := c.passThrough(ctx, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/export",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/export",
 		successStatus: http.StatusOK,
 	})
 	if err != nil {

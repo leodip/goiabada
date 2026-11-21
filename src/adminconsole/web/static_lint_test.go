@@ -15,10 +15,10 @@ import (
 // in either JavaScript quote style, since the chain uses both.
 var splitJoinRe = regexp.MustCompile(`\.split\(\s*("(?:[^"\\]*)"|'(?:[^'\\]*)')\s*\)\s*\.join\(\s*("(?:[^"\\]*)"|'(?:[^'\\]*)')\s*\)`)
 
-// escapeHtmlBodyRe captures the body of function escapeHtml, up to the first closing brace in
+// escapeHTMLBodyRe captures the body of function escapeHtml, up to the first closing brace in
 // column zero. The chain lives entirely inside it, so a `.split().join()` elsewhere in the file
 // cannot be mistaken for part of the escaping.
-var escapeHtmlBodyRe = regexp.MustCompile(`(?s)function\s+escapeHtml\s*\([^)]*\)\s*\{(.*?)\n\}`)
+var escapeHTMLBodyRe = regexp.MustCompile(`(?s)function\s+escapeHtml\s*\([^)]*\)\s*\{(.*?)\n\}`)
 
 // jsLiteral decodes a JavaScript string literal that contains no backslash escapes.
 //
@@ -124,7 +124,7 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 	}
 }
 
-// TestUtilsJS_EscapeHtmlEscapes pins the function half: escapeHtml, as written in the real file,
+// TestUtilsJS_EscapeHTMLEscapes pins the function half: escapeHtml, as written in the real file,
 // still turns each of the five HTML-significant characters into its entity, and still does the
 // ampersand first.
 //
@@ -140,13 +140,13 @@ func TestUtilsJS_ErrorDescriptionReachesTheDialogAsText(t *testing.T) {
 // a string separator followed by join is a global literal replace, which strings.ReplaceAll matches
 // exactly, so the simulation is faithful for the chain shape this function has. It is not a
 // JavaScript engine, and it proves nothing about a rewrite of escapeHtml into some other shape: a
-// body that stops matching escapeHtmlBodyRe, or that escapes by some means other than split/join,
+// body that stops matching escapeHTMLBodyRe, or that escapes by some means other than split/join,
 // fails here rather than being approximated, and whoever makes that change owns replacing this guard
 // with one that can see the new shape.
-func TestUtilsJS_EscapeHtmlEscapes(t *testing.T) {
+func TestUtilsJS_EscapeHTMLEscapes(t *testing.T) {
 	content := utilsJS(t)
 
-	body := escapeHtmlBodyRe.FindStringSubmatch(content)
+	body := escapeHTMLBodyRe.FindStringSubmatch(content)
 	if body == nil {
 		t.Fatalf("static/utils.js: function escapeHtml not found, or its body is not a brace " +
 			"block ending at column zero; this guard cannot read it (#122)")

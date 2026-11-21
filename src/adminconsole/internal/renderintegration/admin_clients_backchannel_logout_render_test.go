@@ -115,7 +115,7 @@ func renderBackchannelLogout(t *testing.T, bind map[string]interface{}) string {
 // A refusal is drawn at the top of the form and marks the field it is about: invalid, described by
 // the notice, focused. The URI keeps what was typed (#784 decision 9).
 func TestRender_AdminClientBackchannelLogout_ARefusalMarksItsField(t *testing.T) {
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app",
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app",
 		CanManageBackchannelLogout: true, BackchannelLogoutURI: "ftp://typed.example.com/bcl"}
 
 	out := renderBackchannelLogout(t, map[string]interface{}{"client": client,
@@ -138,7 +138,7 @@ func TestRender_AdminClientBackchannelLogout_ARefusalMarksItsField(t *testing.T)
 // (#784 decision 15).
 func TestRender_AdminClientBackchannelLogout_SaysWhoSetsTheURI(t *testing.T) {
 	const manageOnly = "Only an administrator holding authserver:manage can set or change it. You can clear it."
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 
 	withManage := renderBackchannelLogout(t, map[string]interface{}{"client": client})
 	assert.NotContains(t, withManage, manageOnly)
@@ -152,7 +152,7 @@ func TestRender_AdminClientBackchannelLogout_SaysWhoSetsTheURI(t *testing.T) {
 
 // A save drawn back from its redirect says it was saved.
 func TestRender_AdminClientBackchannelLogout_Saved(t *testing.T) {
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 
 	out := renderBackchannelLogout(t, map[string]interface{}{"client": client, "savedSuccessfully": true})
 
@@ -183,7 +183,7 @@ func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 			{"savedSuccessfully": true},
 			{"isAdmin": false},
 		} {
-			bind["client"] = adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+			bind["client"] = adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 			if _, ok := bind["isAdmin"]; !ok {
 				bind["isAdmin"] = true
 			}

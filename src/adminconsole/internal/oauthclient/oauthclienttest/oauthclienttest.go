@@ -67,8 +67,8 @@ func Keys(t testing.TB) (signing, attacker *rsa.PrivateKey) {
 	return signingKey, attackerKey
 }
 
-// JwkFromPublicKey publishes pub under kid, as the auth server's /certs does.
-func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.JWK {
+// JWKFromPublicKey publishes pub under kid, as the auth server's /certs does.
+func JWKFromPublicKey(kid string, pub *rsa.PublicKey) oauth.JWK {
 	return oauth.JWK{
 		Alg: "RS256",
 		Kid: kid,
@@ -79,17 +79,17 @@ func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.JWK {
 	}
 }
 
-// NewJwksServer serves the given keys at /certs and counts how many times it is hit, so a test
+// NewJWKSServer serves the given keys at /certs and counts how many times it is hit, so a test
 // can assert the parser caches rather than refetching per token.
-func NewJwksServer(t testing.TB, keys ...oauth.JWK) (*httptest.Server, *atomic.Int32) {
+func NewJWKSServer(t testing.TB, keys ...oauth.JWK) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
-	server := NewMutableJwksServer(t, keys...)
+	server := NewMutableJWKSServer(t, keys...)
 	return server.Server, &server.Hits
 }
 
-// JwksServer serves at /certs the keys it was last told to publish and counts the fetches, so a
+// JWKSServer serves at /certs the keys it was last told to publish and counts the fetches, so a
 // test can change the auth server's key set under a parser that has already cached it.
-type JwksServer struct {
+type JWKSServer struct {
 	*httptest.Server
 	// Hits counts the requests for /certs, answered or refused.
 	Hits atomic.Int32
@@ -99,10 +99,10 @@ type JwksServer struct {
 	down bool
 }
 
-// NewMutableJwksServer starts a JwksServer publishing keys.
-func NewMutableJwksServer(t testing.TB, keys ...oauth.JWK) *JwksServer {
+// NewMutableJWKSServer starts a JWKSServer publishing keys.
+func NewMutableJWKSServer(t testing.TB, keys ...oauth.JWK) *JWKSServer {
 	t.Helper()
-	s := &JwksServer{keys: keys}
+	s := &JWKSServer{keys: keys}
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/certs" {
 			w.WriteHeader(http.StatusNotFound)
@@ -125,14 +125,14 @@ func NewMutableJwksServer(t testing.TB, keys ...oauth.JWK) *JwksServer {
 
 // Publish replaces the keys /certs publishes, as a rotation or a key deletion on the auth
 // server does.
-func (s *JwksServer) Publish(keys ...oauth.JWK) {
+func (s *JWKSServer) Publish(keys ...oauth.JWK) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keys = keys
 }
 
 // GoDown makes /certs answer 503 from now on, an auth server that cannot give out its keys.
-func (s *JwksServer) GoDown() {
+func (s *JWKSServer) GoDown() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.down = true

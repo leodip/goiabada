@@ -35,7 +35,7 @@ func authServerHostname(authServerBaseURL string) string {
 // empty on every load (#642 decision 11). The page names the host the widget must list,
 // authServerBaseURL's.
 func HandleTurnstileGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTurnstileAPI,
 	authServerBaseURL string,
@@ -44,9 +44,9 @@ func HandleTurnstileGet(
 	authServerHost := authServerHostname(authServerBaseURL)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -95,7 +95,7 @@ func HandleTurnstileGet(
 // HandleTurnstilePost saves the challenge's settings. The auth server decides every refusal, and a
 // refused save is redrawn as it was submitted, with the refusal at the field its code names.
 func HandleTurnstilePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsTurnstileAPI,
 	baseURL string,
@@ -105,9 +105,9 @@ func HandleTurnstilePost(
 	authServerHost := authServerHostname(authServerBaseURL)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

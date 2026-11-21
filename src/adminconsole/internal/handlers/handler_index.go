@@ -11,7 +11,7 @@ import (
 
 func HandleIndexGet(
 	authHelper AuthHelper,
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	authServerBaseURL string,
 ) http.HandlerFunc {
@@ -34,7 +34,7 @@ func HandleIndexGet(
 			}
 		}
 
-		bind["AuthServerBaseUrl"] = authServerBaseURL
+		bind["AuthServerBaseURL"] = authServerBaseURL
 
 		isAuthenticated := false
 		loggedInUser := ""
@@ -42,11 +42,11 @@ func HandleIndexGet(
 
 		// The index is the one page mounted outside RequiresScope, so an absent token set is the
 		// anonymous visitor rather than a fault.
-		jwtInfo, signedIn := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, signedIn := reqctx.JWTInfoFrom(r.Context())
 		if signedIn {
 			isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
 			if isAuthenticated {
-				loggedInUser = jwtInfo.IdToken.StringClaim("email")
+				loggedInUser = jwtInfo.IDToken.StringClaim("email")
 				logoutLink = "/auth/logout"
 			}
 		}

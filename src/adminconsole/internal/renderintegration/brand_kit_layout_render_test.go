@@ -57,7 +57,7 @@ var (
 		"/admin_settings_keys.html", func() map[string]interface{} {
 			created := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 			return map[string]interface{}{"keys": []adminsettingshandlers.SettingsKey{{
-				Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1", Type: "RSA", Algorithm: "RS256"}}}
+				ID: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1", Type: "RSA", Algorithm: "RS256"}}}
 		}}
 	accountConsolePage = consolePage{"an Account page", "/layouts/menu_layout.html", "/account/phone",
 		"/account_phone.html", func() map[string]interface{} {
@@ -66,7 +66,7 @@ var (
 		}}
 	homeConsolePage = consolePage{"the home page", "/layouts/no_menu_layout.html", "/",
 		"/index.html", func() map[string]interface{} {
-			return map[string]interface{}{"AuthServerBaseUrl": "https://id.example.test", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
+			return map[string]interface{}{"AuthServerBaseURL": "https://id.example.test", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 				"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false}
 		}}
 	// An error answered for an admin URL is a card page, and so an end-user page (#813 decision 9).

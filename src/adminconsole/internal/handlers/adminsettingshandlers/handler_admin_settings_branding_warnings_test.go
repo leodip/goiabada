@@ -136,7 +136,7 @@ func TestHandleBrandPost_TheSavedPageListsTheBrandsFailingPairs(t *testing.T) {
 	failing := failingBrand()
 	failing.ID = 4
 	apiClient.brands[0] = failing
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
 
@@ -158,7 +158,7 @@ func TestHandleBrandPost_TheSavedPageListsTheBrandsFailingPairs(t *testing.T) {
 // A brand created with a failing palette goes back to the brand list, as any creation does, with no
 // notice: the list marks it there.
 func TestHandleBrandNewPost_AFailingPaletteGoesBackToTheList(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 	w := httptest.NewRecorder()
@@ -185,7 +185,7 @@ func TestHandleBrandingGet_MarksABrandWithFailingPairs(t *testing.T) {
 	apiClient.brands[5].ContrastWarnings = one.ContrastWarnings
 	apiClient.brands[0].ContrastWarnings = []api.BrandContrastWarning{}
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding.html").Once()
 	HandleBrandingGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(),

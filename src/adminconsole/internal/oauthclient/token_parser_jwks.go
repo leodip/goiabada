@@ -61,9 +61,9 @@ type JWKSTokenParser struct {
 	fetchMu sync.Mutex
 
 	mu         sync.RWMutex
-	cachedJwks publishedKeys
+	cachedJWKS publishedKeys
 	fetchedAt  time.Time
-	// generation counts the fetches that replaced cachedJwks; it is how a request that waited
+	// generation counts the fetches that replaced cachedJWKS; it is how a request that waited
 	// on fetchMu tells that the fetch it was waiting for has already happened.
 	generation uint64
 }
@@ -108,7 +108,7 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client, upstream *upstr
 // so an empty expected nonce is refused rather than skipping the check. The claim must be
 // nonceHash of the raw value the session kept, the scheme OIDC Core 15.5.2 describes. Only the
 // ID token is decoded; the access and refresh tokens are carried as the strings they arrived as.
-func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*JwtInfo, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*JWTInfo, error) {
 	if tokenResponse == nil {
 		return nil, errs.New("there is no token response")
 	}
@@ -138,7 +138,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, 
 		return nil, errs.New("the id token's nonce is not the one this sign-in sent")
 	}
 
-	return &JwtInfo{TokenResponse: *tokenResponse, IdToken: idToken}, nil
+	return &JWTInfo{TokenResponse: *tokenResponse, IDToken: idToken}, nil
 }
 
 // DecodeAndValidateRefreshResponse accepts the token response to a refresh grant. previous is
@@ -151,7 +151,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, 
 // it; and requires iat not to go backwards. An iss that differs from previous is
 // ErrForeignToken; every other mismatch is not, because a different user or sign-in time in a
 // refresh is something someone must look at rather than a changed setting.
-func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*JwtInfo, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*JWTInfo, error) {
 	if tokenResponse == nil {
 		return nil, errs.New("there is no token response")
 	}
@@ -165,7 +165,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context,
 	if tokenResponse.IDToken == "" {
 		kept := *tokenResponse
 		kept.IDToken = previous.TokenBase64
-		return &JwtInfo{TokenResponse: kept, IdToken: previous}, nil
+		return &JWTInfo{TokenResponse: kept, IDToken: previous}, nil
 	}
 
 	idToken, err := tp.verifyIDToken(ctx, tokenResponse.IDToken, true)
@@ -176,7 +176,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context,
 		return nil, err
 	}
 
-	return &JwtInfo{TokenResponse: *tokenResponse, IdToken: idToken}, nil
+	return &JWTInfo{TokenResponse: *tokenResponse, IDToken: idToken}, nil
 }
 
 // DecodeAndValidateStoredIDToken re-verifies the ID token a session holds, on every request:
@@ -373,7 +373,7 @@ func (tp *JWKSTokenParser) keyFunc(ctx context.Context) jwt.Keyfunc {
 				return pub, nil
 			}
 		}
-		if err := tp.refreshJwksSince(ctx, generation); err != nil {
+		if err := tp.refreshJWKSSince(ctx, generation); err != nil {
 			return nil, err
 		}
 		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
@@ -391,10 +391,10 @@ func (tp *JWKSTokenParser) cacheState() (generation uint64, fresh bool) {
 	return tp.generation, tp.now().Sub(tp.fetchedAt) < jwksMaxAge
 }
 
-// refreshJwksSince fetches /certs unless the cache has been replaced since the caller found it
+// refreshJWKSSince fetches /certs unless the cache has been replaced since the caller found it
 // wanting at generation seen: a request that waited on fetchMu behind another request's fetch
 // uses that fetch rather than making its own.
-func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) error {
+func (tp *JWKSTokenParser) refreshJWKSSince(ctx context.Context, seen uint64) error {
 	tp.fetchMu.Lock()
 	defer tp.fetchMu.Unlock()
 
@@ -404,7 +404,7 @@ func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) er
 	if replaced {
 		return nil
 	}
-	return tp.refreshJwks(ctx)
+	return tp.refreshJWKS(ctx)
 }
 
 // getPublicKeyFromCache answers the cached key kid names, or for a token without a kid the JWKS's
@@ -415,12 +415,12 @@ func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
 	defer tp.mu.RUnlock()
 	if kid == "" {
 		// If no kid, attempt current key if single
-		if len(tp.cachedJwks.Keys) == 1 {
-			return verificationKey(tp.cachedJwks.Keys[0])
+		if len(tp.cachedJWKS.Keys) == 1 {
+			return verificationKey(tp.cachedJWKS.Keys[0])
 		}
 		return nil
 	}
-	for _, k := range tp.cachedJwks.Keys {
+	for _, k := range tp.cachedJWKS.Keys {
 		if k.Kid == kid {
 			if pub := verificationKey(k); pub != nil {
 				return pub
@@ -506,7 +506,7 @@ func memberAbsentOr(members map[string]json.RawMessage, name, want string) bool 
 	return value == want
 }
 
-func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
+func (tp *JWKSTokenParser) refreshJWKS(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tp.jwksURL, nil)
 	if err != nil {
 		return err
@@ -539,7 +539,7 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 		return err
 	}
 	tp.mu.Lock()
-	tp.cachedJwks = jwks
+	tp.cachedJWKS = jwks
 	tp.fetchedAt = tp.now()
 	tp.generation++
 	tp.mu.Unlock()

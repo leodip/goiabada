@@ -15,31 +15,31 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// userLegalDocumentsApiClient answers the two reads the user's Legal documents tab performs, and
+// userLegalDocumentsAPIClient answers the two reads the user's Legal documents tab performs, and
 // records which user's acceptances were read.
-type userLegalDocumentsApiClient struct {
+type userLegalDocumentsAPIClient struct {
 	user        *api.UserResponse
 	acceptances []api.LegalDocumentAcceptanceResponse
 
 	readFor []int64
 }
 
-func (c *userLegalDocumentsApiClient) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (c *userLegalDocumentsAPIClient) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *userLegalDocumentsApiClient) GetUserLegalDocumentAcceptances(_ context.Context, accessToken string,
-	userId int64) ([]api.LegalDocumentAcceptanceResponse, error) {
+func (c *userLegalDocumentsAPIClient) GetUserLegalDocumentAcceptances(_ context.Context, accessToken string,
+	userID int64) ([]api.LegalDocumentAcceptanceResponse, error) {
 	if accessToken != handlertest.AccessToken {
 		panic("the tab must forward the signed-in administrator's token")
 	}
-	c.readFor = append(c.readFor, userId)
+	c.readFor = append(c.readFor, userID)
 	return c.acceptances, nil
 }
 
 // The tab binds the user's acceptances as the API answers them, with the list's page and search.
 func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_legal_documents.html").Maybe()
 
@@ -47,7 +47,7 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 		{ID: 4, LegalDocumentID: 8, ShortName: "house", Version: 1, Title: "House rules", Retired: true},
 		{ID: 3, LegalDocumentID: 7, ShortName: "terms", Version: 2, Title: "Terms of use"},
 	}
-	apiClient := &userLegalDocumentsApiClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}, acceptances: acceptances}
+	apiClient := &userLegalDocumentsAPIClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}, acceptances: acceptances}
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/legal-documents?page=2&query=some",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "7"))
@@ -66,20 +66,20 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 func TestHandleLegalDocumentsGet_NotFound(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		userId string
+		userID string
 		user   *api.UserResponse
 	}{
-		{name: "an address that is not an id", userId: "abc"},
-		{name: "a user that does not exist", userId: "7"},
+		{name: "an address that is not an id", userID: "abc"},
+		{name: "a user that does not exist", userID: "7"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
-			apiClient := &userLegalDocumentsApiClient{user: tc.user}
+			apiClient := &userLegalDocumentsAPIClient{user: tc.user}
 
-			req := handlertest.Request(http.MethodGet, "/admin/users/"+tc.userId+"/legal-documents",
-				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", tc.userId))
+			req := handlertest.Request(http.MethodGet, "/admin/users/"+tc.userID+"/legal-documents",
+				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", tc.userID))
 			HandleLegalDocumentsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Empty(t, apiClient.readFor, "no acceptances are read for a user that is not there")

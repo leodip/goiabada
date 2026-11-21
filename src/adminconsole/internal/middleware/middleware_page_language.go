@@ -33,7 +33,7 @@ type sessionReader interface {
 func PageLanguage(sessions sessionReader, sessionName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if _, signedIn := reqctx.JwtInfoFrom(r.Context()); signedIn {
+			if _, signedIn := reqctx.JWTInfoFrom(r.Context()); signedIn {
 				if sess, err := sessions.Get(r, sessionName); err == nil {
 					if pageLanguage, _ := sess.Values[sessionkeys.PageLanguage].(string); pageLanguage != "" {
 						r = r.WithContext(i18n.WithPageLanguage(r.Context(), pageLanguage))

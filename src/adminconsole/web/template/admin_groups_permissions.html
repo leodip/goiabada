@@ -5,11 +5,11 @@
 {{end}}
 
 {{define "page"}}
-{{ template "group_header" (args "permissions" .group.GroupId .group.GroupIdentifier $.ctx) }}
+{{ template "group_header" (args "permissions" .group.GroupID .group.GroupIdentifier $.ctx) }}
 
 {{/* The permissions are drawn as stored; permission-list.js edits them in the page and saves the
      set whole, with the set as drawn, so the server refuses a save from an outdated page (#428). */}}
-<form class="panel" id="permissionListForm" novalidate data-save-url="/admin/groups/{{ .group.GroupId }}/permissions" data-owner-key="groupId" data-owner-id="{{ .group.GroupId }}" data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"
+<form class="panel" id="permissionListForm" novalidate data-save-url="/admin/groups/{{ .group.GroupID }}/permissions" data-owner-key="groupId" data-owner-id="{{ .group.GroupID }}" data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"
   data-choose-permission="{{ T $.ctx "adminconsole.admin_groups.permissions.select_permission" }}" data-unchosen="{{ T $.ctx "adminconsole.admin_groups.permissions.error_select_permission" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_groups.permissions.error_already_in_list" }}"
   data-added="{{ T $.ctx "adminconsole.admin_groups.permissions.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_groups.permissions.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_groups.permissions.remove_label" }}">
   <div class="panel-body stacked">
@@ -28,7 +28,7 @@
         <select class="control" id="resourcesSelect" data-resource-select aria-describedby="resourcesSelect-description">
           <option value="">{{ T $.ctx "adminconsole.admin_groups.permissions.select_resource" }}</option>
           {{ range .resources }}
-          <option value="{{ .Id }}" data-resource-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
+          <option value="{{ .ID }}" data-resource-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
           {{ end }}
         </select>
         <p class="field-hint" id="resourcesSelect-description" data-choice-description-for="resourcesSelect" aria-live="polite"></p>
@@ -57,7 +57,7 @@
           </thead>
           <tbody data-list-rows>
             {{ range .granted }}
-            <tr data-id="{{ .Id }}">
+            <tr data-id="{{ .ID }}">
               <td class="cell-mono cell-wrap">{{ .Scope }}</td>
               <td class="cell-actions"><button class="button button-sm" type="button" data-list-remove>{{ T $.ctx "adminconsole.admin_groups.permissions.remove_label" }}<span class="sr-only"> {{ .Scope }}</span></button></td>
             </tr>

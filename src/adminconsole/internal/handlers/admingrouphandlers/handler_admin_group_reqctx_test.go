@@ -25,72 +25,72 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *groupCtxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HTTPHelper, apiClient *groupCtxRecordingAPIClient) http.HandlerFunc
 		request *http.Request
 	}{
-		{"HandleListGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleListGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleListGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups")},
-		{"HandleNewPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleNewPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleNewPost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/new",
 			handlertest.WithForm(url.Values{"groupIdentifier": {"a-group"}}))},
-		{"HandleAttributesGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/attributes", routed)},
-		{"HandleAttributesRemovePost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesRemovePost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesRemovePost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/attributes/remove/5", routed,
 			handlertest.WithPathValue("attributeId", "5"))},
-		{"HandleAttributesAddGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesAddGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesAddGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/attributes/add", routed)},
-		{"HandleAttributesAddPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesAddPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesAddPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/attributes/add", routed,
 			handlertest.WithForm(url.Values{"attributeKey": {"a-key"}}))},
-		{"HandleAttributesEditGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesEditGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesEditGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/attributes/edit/5", routed,
 			handlertest.WithPathValue("attributeId", "5"))},
-		{"HandleAttributesEditPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleAttributesEditPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleAttributesEditPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/attributes/edit/5", routed,
 			handlertest.WithPathValue("attributeId", "5"), handlertest.WithForm(url.Values{}))},
-		{"HandleDeleteGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleDeleteGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleDeleteGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/delete", routed)},
-		{"HandleDeletePost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleDeletePost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleDeletePost(h, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/delete", routed,
 			handlertest.WithForm(url.Values{"groupIdentifier": {"a-group"}}))},
-		{"HandleMembersGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleMembersGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleMembersGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/members", routed)},
-		{"HandleMembersAddGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleMembersAddGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleMembersAddGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/members/add", routed)},
-		{"HandleMembersSearchGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleMembersSearchGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleMembersSearchGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/members/search?query=jane", routed)},
-		{"HandleMembersAddPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleMembersAddPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleMembersAddPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/members/add?userId=7", routed)},
-		{"HandleMembersRemoveUserPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleMembersRemoveUserPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleMembersRemoveUserPost(h, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/members/remove/7", routed,
 			handlertest.WithPathValue("userId", "7"))},
-		{"HandlePermissionsGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandlePermissionsGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandlePermissionsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/permissions", routed)},
-		{"HandlePermissionsPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandlePermissionsPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandlePermissionsPost(h, nil, c)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/permissions", routed,
 			handlertest.WithBody(strings.NewReader(`{"groupId":3}`)))},
-		{"HandleSettingsGet", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleSettingsGet", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleSettingsGet(h, nil, c)
 		}, handlertest.Request(http.MethodGet, "/admin/groups/3/settings", routed)},
-		{"HandleSettingsPost", func(h *handlersmocks.HttpHelper, c *groupCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleSettingsPost", func(h *handlersmocks.HTTPHelper, c *groupCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleSettingsPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/admin/groups/3/settings", routed,
 			handlertest.WithForm(url.Values{}))},
@@ -98,17 +98,17 @@ func TestAdminGroupHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var answered []error
 			record := func(args mock.Arguments) { answered = append(answered, args.Get(2).(error)) }
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
 
-			apiClient := &groupCtxRecordingApiClient{}
+			apiClient := &groupCtxRecordingAPIClient{}
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)
 
 			require.Len(t, answered, 1, "the handler answers once")
-			require.ErrorIs(t, answered[0], reqctx.ErrNoJwtInfo, "answered with %v", answered[0])
+			require.ErrorIs(t, answered[0], reqctx.ErrNoJWTInfo, "answered with %v", answered[0])
 			assert.Empty(t, apiClient.seen, "nothing is asked of the API without a token")
 		})
 	}

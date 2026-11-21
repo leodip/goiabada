@@ -15,13 +15,13 @@ import (
 // resourceDeleteAPI is what the resource delete page needs: the resource, the permissions it
 // warns about, and the delete.
 type resourceDeleteAPI interface {
-	DeleteResource(ctx context.Context, accessToken string, resourceId int64) error
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	DeleteResource(ctx context.Context, accessToken string, resourceID int64) error
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
 }
 
 func HandleDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceDeleteAPI,
 ) http.HandlerFunc {
 
@@ -38,13 +38,13 @@ func HandleDeleteGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -71,7 +71,7 @@ func HandleDeleteGet(
 }
 
 func HandleDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient resourceDeleteAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -90,13 +90,13 @@ func HandleDeletePost(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/routing"
 )
 
-// TestInitMiddleware_CsrfIsRegistered makes the claim the CSRF unit tables in
+// TestInitMiddleware_CSRFIsRegistered makes the claim the CSRF unit tables in
 // src/core/httpmw cannot: that httpmw.CSRF is actually mounted on the admin console's
 // router. Those tables pass perfectly against a middleware nobody wired up, and #155 rewrote this
 // wiring, so a deleted Use() line is exactly the regression they would miss.
@@ -29,7 +29,7 @@ import (
 // The two halves are otherwise identical requests, differing only in their origin headers. That
 // pairing is what makes the 403 attributable to the CSRF middleware rather than to anything else in
 // the chain: a lone 403 would prove nothing.
-func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
+func TestInitMiddleware_CSRFIsRegistered(t *testing.T) {
 	// The settings cache points at an address nothing listens on, and that is deliberate: it is
 	// what keeps this a unit test. middleware.SettingsCache is the next entry after CSRF in
 	// initMiddleware, and on a fetch failure it answers through http.Error rather than panicking,

@@ -27,12 +27,12 @@ import (
 // picture, so a broken API looked exactly like an empty profile. An account with no picture is a
 // 200 from the API with HasPicture false, so every error here is a real one, and it now goes
 // through the classifier (#425).
-type accountPictureApiClient struct {
+type accountPictureAPIClient struct {
 	picture *api.ProfilePictureInfoResponse
 	err     error
 }
 
-func (c *accountPictureApiClient) GetAccountProfilePicture(_ context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error) {
+func (c *accountPictureAPIClient) GetAccountProfilePicture(_ context.Context, accessToken string) (*api.ProfilePictureInfoResponse, error) {
 	return c.picture, c.err
 }
 
@@ -43,8 +43,8 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		err          error
 		wantNotFound bool
 		wantError    bool
-		// wantUrlPrefix is what profilePictureUrl must start with; empty means it must be empty.
-		wantUrlPrefix string
+		// wantURLPrefix is what profilePictureUrl must start with; empty means it must be empty.
+		wantURLPrefix string
 	}{
 		{
 			name:         "a 404 from the API renders the 404 page",
@@ -64,7 +64,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		{
 			name:          "a picture renders the page with its address",
 			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureURL: "https://auth.example/account/picture"},
-			wantUrlPrefix: "https://auth.example/account/picture?t=",
+			wantURLPrefix: "https://auth.example/account/picture?t=",
 		},
 		{
 			name:    "no picture renders the page without one",
@@ -74,7 +74,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			switch {
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
@@ -85,7 +85,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_picture.html").Once()
 			}
 
-			HandlePictureGet(httpHelper, &accountPictureApiClient{picture: testCase.picture, err: testCase.err}).
+			HandlePictureGet(httpHelper, &accountPictureAPIClient{picture: testCase.picture, err: testCase.err}).
 				ServeHTTP(httptest.NewRecorder(),
 					handlertest.Request(http.MethodGet, "/account/picture", handlertest.WithAccessToken()))
 
@@ -97,10 +97,10 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 			}
 
 			url, _ := handlertest.Bind(t, httpHelper)["profilePictureUrl"].(string)
-			if testCase.wantUrlPrefix == "" {
+			if testCase.wantURLPrefix == "" {
 				assert.Empty(t, url)
 			} else {
-				assert.True(t, strings.HasPrefix(url, testCase.wantUrlPrefix), "got %q", url)
+				assert.True(t, strings.HasPrefix(url, testCase.wantURLPrefix), "got %q", url)
 			}
 		})
 	}
@@ -119,16 +119,16 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 //
 // The 400 rows are the point of the whole stage: a request the browser got wrong is answered as
 // the browser's mistake. The 500 rows are what stops that from becoming "everything is a 4xx".
-type pictureApiClient struct {
+type pictureAPIClient struct {
 	response *api.ProfilePictureUploadResponse
 	err      error
 }
 
-func (c *pictureApiClient) UploadAccountProfilePicture(_ context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
+func (c *pictureAPIClient) UploadAccountProfilePicture(_ context.Context, accessToken string, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error) {
 	return c.response, c.err
 }
 
-func (c *pictureApiClient) DeleteAccountProfilePicture(_ context.Context, accessToken string) error {
+func (c *pictureAPIClient) DeleteAccountProfilePicture(_ context.Context, accessToken string) error {
 	return c.err
 }
 
@@ -145,7 +145,7 @@ func multipartPicture(t *testing.T, fieldName string) (*bytes.Buffer, string) {
 	return body, writer.FormDataContentType()
 }
 
-func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing.T) {
+func TestAccountProfilePicturePost_AnswersThroughTheSharedJSONWriters(t *testing.T) {
 	testCases := []struct {
 		name string
 		// fieldName is the multipart field the request carries; the handler reads "picture".
@@ -153,7 +153,7 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 		// rawBody, when set, replaces the multipart body entirely.
 		rawBody     string
 		contentType string
-		withJwt     bool
+		withJWT     bool
 		apiErr      error
 		// wantStatus is the status that must reach the browser; 0 means JSONError's generic 500
 		// arm, with the detail going to the log.
@@ -164,21 +164,21 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 			name:        "a body that is not a multipart form",
 			rawBody:     "this is not multipart",
 			contentType: "multipart/form-data; boundary=nothing-matches-this",
-			withJwt:     true,
+			withJWT:     true,
 			wantStatus:  http.StatusBadRequest,
 			wantCode:    "invalid_request_body",
 		},
 		{
 			name:       "a multipart form with no picture in it",
 			fieldName:  "somethingElse",
-			withJwt:    true,
+			withJWT:    true,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "invalid_request_body",
 		},
 		{
 			name:       "a picture the API refuses",
 			fieldName:  "picture",
-			withJwt:    true,
+			withJWT:    true,
 			apiErr:     &apiclient.APIError{Code: "FILE_TOO_LARGE", Message: "The picture is too large", StatusCode: http.StatusBadRequest},
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "FILE_TOO_LARGE",
@@ -186,19 +186,19 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 		{
 			name:      "no JWT info in context, which is a middleware invariant and is a 500",
 			fieldName: "picture",
-			withJwt:   false,
+			withJWT:   false,
 		},
 		{
 			name:      "a server fault behind the upload, which is logged rather than shown",
 			fieldName: "picture",
-			withJwt:   true,
+			withJWT:   true,
 			apiErr:    &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the disk is full", StatusCode: http.StatusInternalServerError},
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -213,12 +213,12 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 				handlertest.WithBody(body),
 				handlertest.WithContentType(contentType),
 			}
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			req := handlertest.Request(http.MethodPost, "/account/picture", opts...)
 
-			handler := HandleProfilePicturePost(httpHelper, &pictureApiClient{err: testCase.apiErr})
+			handler := HandleProfilePicturePost(httpHelper, &pictureAPIClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
@@ -261,7 +261,7 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	form, contentType := multipartPicture(t, "picture")
 	body := form.Bytes()
 
-	serve := func(t *testing.T, limit int, httpHelper *handlersmocks.HttpHelper, apiClient *uploadRecorder) *httptest.ResponseRecorder {
+	serve := func(t *testing.T, limit int, httpHelper *handlersmocks.HTTPHelper, apiClient *uploadRecorder) *httptest.ResponseRecorder {
 		rr := httptest.NewRecorder()
 		req := handlertest.Request(http.MethodPost, "/account/picture",
 			handlertest.WithContentType(contentType), handlertest.WithAccessToken())
@@ -274,14 +274,14 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	t.Run("at exactly the limit the picture is forwarded", func(t *testing.T) {
 		apiClient := &uploadRecorder{}
 
-		rr := serve(t, len(body), handlersmocks.NewHttpHelper(t), apiClient)
+		rr := serve(t, len(body), handlersmocks.NewHTTPHelper(t), apiClient)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.Equal(t, []byte("not really a jpeg, but bytes are bytes here"), apiClient.picture)
 	})
 
 	t.Run("one byte short it is the JSON 400 and nothing is forwarded", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			var detail *oauth.ErrorDetail
 			return errors.As(err, &detail) && detail.Code() == "invalid_request_body" &&
@@ -296,36 +296,36 @@ func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
 	})
 }
 
-// TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters covers the handler that did
+// TestAccountProfilePictureDelete_AnswersThroughTheSharedJSONWriters covers the handler that did
 // not take an httpHelper at all before #279, which is why its errors were hand-rolled: there was
 // nothing else to answer with.
-func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testing.T) {
+func TestAccountProfilePictureDelete_AnswersThroughTheSharedJSONWriters(t *testing.T) {
 	testCases := []struct {
 		name       string
-		withJwt    bool
+		withJWT    bool
 		apiErr     error
 		wantStatus int
 	}{
 		{
 			name:       "a picture that is already gone",
-			withJwt:    true,
+			withJWT:    true,
 			apiErr:     &apiclient.APIError{Code: "NOT_FOUND", Message: "No picture", StatusCode: http.StatusNotFound},
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:    "no JWT info in context",
-			withJwt: false,
+			withJWT: false,
 		},
 		{
 			name:    "a server fault behind the delete",
-			withJwt: true,
+			withJWT: true,
 			apiErr:  &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the disk is full", StatusCode: http.StatusInternalServerError},
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -333,12 +333,12 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 				}).Return().Once()
 
 			var opts []handlertest.Option
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			req := handlertest.Request(http.MethodDelete, "/account/picture", opts...)
 
-			handler := HandleProfilePictureDelete(httpHelper, &pictureApiClient{err: testCase.apiErr})
+			handler := HandleProfilePictureDelete(httpHelper, &pictureAPIClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

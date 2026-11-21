@@ -20,9 +20,9 @@ func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_permissions.html", map[string]interface{}{
 		"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 		"granted": []struct {
-			Id    int64
+			ID    int64
 			Scope string
-		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		}{{ID: 3, Scope: "some-resource:read"}, {ID: 4, Scope: "some-resource:write"}},
 		"resources":         []render.Choice{},
 		"page":              "2",
 		"query":             "",
@@ -45,10 +45,10 @@ func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_groups.html", map[string]interface{}{
 		"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 		"memberships": []struct {
-			Id              int64
+			ID              int64
 			GroupIdentifier string
-		}{{Id: 3, GroupIdentifier: "admins"}, {Id: 4, GroupIdentifier: "auditors"}},
-		"groupChoices":      []render.Choice{{Id: 3, Identifier: "admins", Label: "admins"}},
+		}{{ID: 3, GroupIdentifier: "admins"}, {ID: 4, GroupIdentifier: "auditors"}},
+		"groupChoices":      []render.Choice{{ID: 3, Identifier: "admins", Label: "admins"}},
 		"page":              "",
 		"query":             "",
 		"savedSuccessfully": false,
@@ -64,7 +64,7 @@ func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 
 // TestRender_AdminUsersPaginator is the template hop of the paginator (#271): the partial reads a
 // *pagination.Paginator, so what needs proving is that a Go template resolves its exported fields,
-// and that addUrlParam turns them into page links.
+// and that addURLParam turns them into page links.
 //
 // 73 users at 10 a page on page 4 is 8 pages, which exercises both ends of the bar at once:
 // "1 2 3 [4] 5 6 ...". The lone "1" is decision 3's rule, the one place this change departs from
@@ -102,7 +102,7 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	assert.Contains(t, out, `<a class="pager-item" aria-current="page" href="/admin/users?page=4">4</a>`)
 	assert.Equal(t, 1, strings.Count(out, `href="/admin/users?page=4"`))
 
-	// The -1 sentinel must never reach addUrlParam: it means "ellipsis", not a page.
+	// The -1 sentinel must never reach addURLParam: it means "ellipsis", not a page.
 	assert.NotContains(t, out, "page=-1")
 
 	// A search's pages carry the search as the handler encoded it, a plus-addressed email's "+" as

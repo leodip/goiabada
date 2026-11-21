@@ -28,80 +28,80 @@ func TestAdminResourceHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *test
 	}
 	request := handlertest.Request
 
-	type build func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc
+	type build func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc
 	testCases := []struct {
 		name    string
 		build   build
 		request *http.Request
 	}{
-		{"HandleListGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleListGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleListGet(h, c)
 		}, request(http.MethodGet, "/admin/resources")},
-		{"HandleNewPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleNewPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleNewPost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/new",
 			handlertest.WithForm(url.Values{"resourceIdentifier": {"some-resource"}}))},
-		{"HandleSettingsGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleSettingsGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleSettingsGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/settings", routed)},
-		{"HandleSettingsPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleSettingsPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleSettingsPost(h, testStore(), c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/3/settings", routed, handlertest.WithForm(url.Values{}))},
-		{"HandleDeleteGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleDeleteGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleDeleteGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/delete", routed)},
-		{"HandleDeletePost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleDeletePost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleDeletePost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/resources/3/delete", routed, handlertest.WithForm(url.Values{}))},
-		{"HandlePermissionsGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandlePermissionsGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandlePermissionsGet(h, testStore(), c)
 		}, request(http.MethodGet, "/admin/resources/3/permissions", routed)},
-		{"HandlePermissionsPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandlePermissionsPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandlePermissionsPost(h, testStore(), c)
 		}, request(http.MethodPost, "/admin/resources/3/permissions", routed,
 			handlertest.WithBody(strings.NewReader(`{"resourceId":3,"permissions":[],"expectedPermissions":[]}`)),
 			handlertest.WithContentType("application/json"))},
-		{"HandleUsersWithPermissionGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleUsersWithPermissionGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleUsersWithPermissionGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission", routed)},
-		{"HandleUsersWithPermissionAddGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleUsersWithPermissionAddGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleUsersWithPermissionAddGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8", routed,
 			handlertest.WithPathValue("permissionId", "8"))},
-		{"HandleUsersWithPermissionSearchGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleUsersWithPermissionSearchGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleUsersWithPermissionSearchGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/users-with-permission-add/8/search?query=jdoe", routed,
 			handlertest.WithPathValue("permissionId", "8"))},
-		{"HandleUsersWithPermissionAddPermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleUsersWithPermissionAddPermissionPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleUsersWithPermissionAddPermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/add/5/8", grant("userId")...)},
-		{"HandleUsersWithPermissionRemovePermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleUsersWithPermissionRemovePermissionPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleUsersWithPermissionRemovePermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/users-with-permission/remove/5/8", grant("userId")...)},
-		{"HandleGroupsWithPermissionGet", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleGroupsWithPermissionGet", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleGroupsWithPermissionGet(h, c)
 		}, request(http.MethodGet, "/admin/resources/3/groups-with-permission", routed)},
-		{"HandleGroupsWithPermissionAddPermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleGroupsWithPermissionAddPermissionPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleGroupsWithPermissionAddPermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/groups-with-permission/add/5/8", grant("groupId")...)},
-		{"HandleGroupsWithPermissionRemovePermissionPost", func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+		{"HandleGroupsWithPermissionRemovePermissionPost", func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 			return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 		}, request(http.MethodPost, "/admin/resources/3/groups-with-permission/remove/5/8", grant("groupId")...)},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var answered []error
 			record := func(args mock.Arguments) { answered = append(answered, args.Get(2).(error)) }
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Run(record).Maybe()
 
-			apiClient := &resourceCtxRecordingApiClient{}
+			apiClient := &resourceCtxRecordingAPIClient{}
 			tc.build(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), tc.request)
 
 			require.Len(t, answered, 1, "the handler answers once")
-			require.ErrorIs(t, answered[0], reqctx.ErrNoJwtInfo, "answered with %v", answered[0])
+			require.ErrorIs(t, answered[0], reqctx.ErrNoJWTInfo, "answered with %v", answered[0])
 			assert.Empty(t, apiClient.seen, "nothing is asked of the API without a token")
 		})
 	}

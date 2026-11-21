@@ -8,10 +8,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-func (c *AuthServerClient) GetUserAttributesByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserAttributeResponse, error) {
+func (c *AuthServerClient) GetUserAttributesByUserID(ctx context.Context, accessToken string, userID int64) ([]api.UserAttributeResponse, error) {
 	response, err := execute[api.GetUserAttributesResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/attributes",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/attributes",
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -21,10 +21,10 @@ func (c *AuthServerClient) GetUserAttributesByUserId(ctx context.Context, access
 	return response.Attributes, nil
 }
 
-func (c *AuthServerClient) GetUserAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.UserAttributeResponse, error) {
+func (c *AuthServerClient) GetUserAttributeByID(ctx context.Context, accessToken string, attributeID int64) (*api.UserAttributeResponse, error) {
 	response, err := execute[api.GetUserAttributeResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -48,10 +48,10 @@ func (c *AuthServerClient) CreateUserAttribute(ctx context.Context, accessToken 
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) UpdateUserAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
+func (c *AuthServerClient) UpdateUserAttribute(ctx context.Context, accessToken string, attributeID int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	response, err := execute[api.UpdateUserAttributeResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeID, 10),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -62,10 +62,10 @@ func (c *AuthServerClient) UpdateUserAttribute(ctx context.Context, accessToken 
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) DeleteUserAttribute(ctx context.Context, accessToken string, attributeId int64) error {
+func (c *AuthServerClient) DeleteUserAttribute(ctx context.Context, accessToken string, attributeID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})

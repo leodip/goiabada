@@ -14,15 +14,15 @@ import (
 // userConnectedClientsAPI is what the user's Connected clients tab needs: the user, the clients it
 // is connected to, and the disconnect of one (#135 decisions 2 and 7).
 type userConnectedClientsAPI interface {
-	DisconnectUserClient(ctx context.Context, accessToken string, userId, clientId int64) error
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserConnectedClients(ctx context.Context, accessToken string, userId int64) ([]api.ConnectedClientResponse, error)
+	DisconnectUserClient(ctx context.Context, accessToken string, userID, clientID int64) error
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	GetUserConnectedClients(ctx context.Context, accessToken string, userID int64) ([]api.ConnectedClientResponse, error)
 }
 
 // HandleConnectedClientsGet draws the user's Connected clients tab: every client the user is
 // connected to, in the API's order.
 func HandleConnectedClientsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userConnectedClientsAPI,
 ) http.HandlerFunc {
 
@@ -40,13 +40,13 @@ func HandleConnectedClientsGet(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -82,7 +82,7 @@ func HandleConnectedClientsGet(
 // it answers 404 for a user or client that does not exist and for a client the user no longer has
 // anything with, which is a stale page and is answered as one (#135 decision 2).
 func HandleConnectedClientsDisconnectPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userConnectedClientsAPI,
 ) http.HandlerFunc {
 
@@ -100,23 +100,23 @@ func HandleConnectedClientsDisconnectPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// The id decodes straight into an int64, so a fraction is refused rather than truncated
 		// and a large id is not rounded to a neighbour's: either could name another client.
 		var data struct {
-			ClientId int64 `json:"clientId"`
+			ClientID int64 `json:"clientId"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil || data.ClientId <= 0 {
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil || data.ClientID <= 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
-		if err := apiClient.DisconnectUserClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, data.ClientId); err != nil {
+		if err := apiClient.DisconnectUserClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, data.ClientID); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

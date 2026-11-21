@@ -20,10 +20,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// ErrNoJwtInfo is what a reader answers its request with when no token set is on the context.
+// ErrNoJWTInfo is what a reader answers its request with when no token set is on the context.
 // Every route that reads one is mounted under RequiresScope, which sends a browser without one to
 // sign in, so reaching a reader without it is a wiring defect.
-var ErrNoJwtInfo = errors.New("no token set on the request context")
+var ErrNoJWTInfo = errors.New("no token set on the request context")
 
 // ErrNoSettings is what a reader answers its request with when the settings middleware did not
 // run before it: every application route is mounted under that middleware, so reaching a reader
@@ -38,14 +38,14 @@ const (
 	safeModeKey
 )
 
-func WithJwtInfo(ctx context.Context, jwtInfo oauthclient.JwtInfo) context.Context {
+func WithJWTInfo(ctx context.Context, jwtInfo oauthclient.JWTInfo) context.Context {
 	return context.WithValue(ctx, jwtInfoKey, jwtInfo)
 }
 
-// JwtInfoFrom answers false when the browser holds no signed-in session, which the scope check and
-// the page language treat as an anonymous request and every other reader as ErrNoJwtInfo.
-func JwtInfoFrom(ctx context.Context) (oauthclient.JwtInfo, bool) {
-	jwtInfo, ok := ctx.Value(jwtInfoKey).(oauthclient.JwtInfo)
+// JWTInfoFrom answers false when the browser holds no signed-in session, which the scope check and
+// the page language treat as an anonymous request and every other reader as ErrNoJWTInfo.
+func JWTInfoFrom(ctx context.Context) (oauthclient.JWTInfo, bool) {
+	jwtInfo, ok := ctx.Value(jwtInfoKey).(oauthclient.JWTInfo)
 	return jwtInfo, ok
 }
 

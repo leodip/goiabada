@@ -1,6 +1,6 @@
 // Package handlertest carries the wiring every admin console handler test builds by hand: the
 // values a handler reads off its request context, the path values its URL carries, and
-// the expectations and call-log reads its rendering performs against the HttpHelper mock.
+// the expectations and call-log reads its rendering performs against the HTTPHelper mock.
 //
 // It is a sibling of internal/handlers rather than a child on purpose. The slog convention guard
 // and the dead-interface guard both key on the adminconsole/internal/handlers path, and neither
@@ -40,7 +40,7 @@ type requestSpec struct {
 	contentType string
 	pathValues  [][2]string
 	accessToken *string
-	jwtInfo     *oauthclient.JwtInfo
+	jwtInfo     *oauthclient.JWTInfo
 	settings    *api.PublicSettingsResponse
 	hasSettings bool
 	locale      string
@@ -66,10 +66,10 @@ func Request(method, target string, opts ...Option) *http.Request {
 
 	ctx := req.Context()
 	if spec.jwtInfo != nil {
-		ctx = reqctx.WithJwtInfo(ctx, *spec.jwtInfo)
+		ctx = reqctx.WithJWTInfo(ctx, *spec.jwtInfo)
 	} else if spec.accessToken != nil {
-		ctx = reqctx.WithJwtInfo(ctx,
-			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
+		ctx = reqctx.WithJWTInfo(ctx,
+			oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
 	}
 	if spec.hasSettings {
 		ctx = reqctx.WithSettings(ctx, spec.settings)
@@ -90,13 +90,13 @@ func WithAccessToken() Option {
 	}
 }
 
-// WithJwtInfo puts a whole oauthclient.JwtInfo on the context, for the handlers that read the
+// WithJWTInfo puts a whole oauthclient.JWTInfo on the context, for the handlers that read the
 // verified ID token rather than the raw bearer alone. WithAccessToken fills
-// TokenResponse.AccessToken and leaves IdToken nil, which is indistinguishable from a visitor who
+// TokenResponse.AccessToken and leaves IDToken nil, which is indistinguishable from a visitor who
 // never authenticated: the logout page, which requires both, takes its unauthenticated arm.
 //
 // It replaces whatever WithAccessToken set, so the two are not combined.
-func WithJwtInfo(jwtInfo oauthclient.JwtInfo) Option {
+func WithJWTInfo(jwtInfo oauthclient.JWTInfo) Option {
 	return func(spec *requestSpec) {
 		spec.jwtInfo = &jwtInfo
 	}

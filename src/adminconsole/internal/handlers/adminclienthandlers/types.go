@@ -51,22 +51,22 @@ var clientAuthenticationErrorFields = map[string]string{
 // grantedPermission is a permission a client holds, as its permissions tab lists it: the
 // permission's id, which the save sends, and its scope, resource:permission, which the row shows.
 type grantedPermission struct {
-	Id    int64
+	ID    int64
 	Scope string
 }
 
 type PermissionsPostInput struct {
-	ClientId               int64   `json:"clientId"`
-	AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
-	// ExpectedPermissionIds is the set as the page loaded it, passed through unchanged so the auth
+	ClientID               int64   `json:"clientId"`
+	AssignedPermissionsIDs []int64 `json:"assignedPermissionsIds"`
+	// ExpectedPermissionIDs is the set as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 // listedResource is a resource on a client's introspection list, as its Introspection tab lists
 // it: the resource's id, which the save sends, and its identifier, which the row shows.
 type listedResource struct {
-	Id         int64
+	ID         int64
 	Identifier string
 }
 
@@ -74,12 +74,12 @@ type listedResource struct {
 // loaded it, passed through unchanged so the auth server can refuse a save from an outdated page
 // (#428). The client is the route's.
 type IntrospectionPostInput struct {
-	ResourceIds         []int64 `json:"resourceIds"`
-	ExpectedResourceIds []int64 `json:"expectedResourceIds"`
+	ResourceIDs         []int64 `json:"resourceIds"`
+	ExpectedResourceIDs []int64 `json:"expectedResourceIds"`
 }
 
 type RedirectURIsPostInput struct {
-	ClientId     int64    `json:"clientId"`
+	ClientID     int64    `json:"clientId"`
 	RedirectURIs []string `json:"redirectURIs"`
 	// ExpectedRedirectURIs is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
@@ -90,13 +90,13 @@ type RedirectURIsPostInput struct {
 // list as the page loaded it, passed through unchanged so the auth server can refuse a save from an
 // outdated page (#428).
 type SignOutRedirectURIsPostInput struct {
-	ClientId                    int64    `json:"clientId"`
+	ClientID                    int64    `json:"clientId"`
 	SignOutRedirectURIs         []string `json:"signOutRedirectURIs"`
 	ExpectedSignOutRedirectURIs []string `json:"expectedSignOutRedirectURIs"`
 }
 
 type WebOriginsPostInput struct {
-	ClientId   int64    `json:"clientId"`
+	ClientID   int64    `json:"clientId"`
 	WebOrigins []string `json:"webOrigins"`
 	// ExpectedWebOrigins is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
@@ -104,8 +104,8 @@ type WebOriginsPostInput struct {
 }
 
 type SessionInfo struct {
-	UserSessionId int64
-	UserId        int64
+	UserSessionID int64
+	UserID        int64
 	UserEmail     string
 	UserFullName  string
 	IsCurrent     bool
@@ -116,7 +116,7 @@ type SessionInfo struct {
 	// time.Format has no locale and Duration.String() is not anybody's language (#373).
 	Started      *time.Time
 	LastAccessed *time.Time
-	IpAddress    string
+	IPAddress    string
 	DeviceName   string
 	DeviceType   string
 	DeviceOS     string

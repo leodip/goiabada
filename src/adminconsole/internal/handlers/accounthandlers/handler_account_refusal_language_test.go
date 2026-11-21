@@ -23,7 +23,7 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 	testCases := []struct {
 		name       string
 		template   string
-		handler    func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
+		handler    func(httpHelper *handlersmocks.HTTPHelper) http.HandlerFunc
 		target     string
 		form       url.Values
 		english    string
@@ -32,8 +32,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an email change whose confirmation differs",
 			template: "/account_email.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailPost(h, nil, &emailRecordingApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailPost(h, nil, &emailRecordingAPIClient{}, consoleBaseURL)
 			},
 			target: "/account/email",
 			form: url.Values{"email": {"new@example.com"}, "emailConfirmation": {"other@example.com"},
@@ -44,8 +44,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a password change whose confirmation differs",
 			template: "/account_change_password.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleChangePasswordPost(h, nil, &passwordRecordingApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleChangePasswordPost(h, nil, &passwordRecordingAPIClient{}, consoleBaseURL)
 			},
 			target: "/account/change-password",
 			form: url.Values{"currentPassword": {accountPasswordFormCurrent},
@@ -56,8 +56,8 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a two-factor enrolment with no code",
 			template: "/account_otp.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleOtpPost(h, newStubApiClient(false), consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleOTPPost(h, newStubAPIClient(false), consoleBaseURL)
 			},
 			target:     accountOTPPath,
 			form:       url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {""}},
@@ -72,7 +72,7 @@ func TestAccountPages_RefuseInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, testCase.template).Once()
 

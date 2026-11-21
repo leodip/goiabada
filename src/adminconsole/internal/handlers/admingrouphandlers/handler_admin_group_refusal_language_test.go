@@ -15,15 +15,15 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// refusingGroupDeleteApiClient answers the group the delete page reads, and panics on the delete:
+// refusingGroupDeleteAPIClient answers the group the delete page reads, and panics on the delete:
 // both refusals below happen before the console asks the API to delete anything.
-type refusingGroupDeleteApiClient struct{}
+type refusingGroupDeleteAPIClient struct{}
 
-func (*refusingGroupDeleteApiClient) GetGroupById(_ context.Context, _ string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{ID: groupId, GroupIdentifier: "staff"}, nil
+func (*refusingGroupDeleteAPIClient) GetGroupByID(_ context.Context, _ string, groupID int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{ID: groupID, GroupIdentifier: "staff"}, nil
 }
 
-func (*refusingGroupDeleteApiClient) DeleteGroup(context.Context, string, int64) error {
+func (*refusingGroupDeleteAPIClient) DeleteGroup(context.Context, string, int64) error {
 	panic("unexpected call to DeleteGroup")
 }
 
@@ -57,11 +57,11 @@ func TestAdminGroupDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_groups_delete.html").Once()
 
-				handler := HandleDeletePost(httpHelper, &refusingGroupDeleteApiClient{}, consoleBaseURL)
+				handler := HandleDeletePost(httpHelper, &refusingGroupDeleteAPIClient{}, consoleBaseURL)
 				req := handlertest.Request(http.MethodPost, "/admin/groups/4/delete",
 					handlertest.WithAccessToken(), handlertest.WithPathValue("groupId", "4"),
 					handlertest.WithLocale(language.tag),

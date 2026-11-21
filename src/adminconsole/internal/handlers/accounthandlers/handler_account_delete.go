@@ -55,7 +55,7 @@ func isHandledAccountDeleteError(code string) bool {
 // accountDeletionShown says whether the page is there: only while the public settings say users
 // may delete their own account, as the account menu draws it (#783 decision 6). The auth server
 // checks the setting itself on every deletion, so this decides only what is shown.
-func accountDeletionShown(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) bool {
+func accountDeletionShown(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) bool {
 	settings, ok := reqctx.SettingsFrom(r.Context())
 	if !ok {
 		httpHelper.InternalServerError(w, r, reqctx.ErrNoSettings)
@@ -72,7 +72,7 @@ func accountDeletionShown(httpHelper HttpHelper, w http.ResponseWriter, r *http.
 // password, and while two-factor authentication is on, the authentication code, with the recovery
 // code as the other choice (#783 decisions 2 and 9). It answers 404 while deletion is off.
 func HandleDeleteAccountGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountDeleteAPI,
 ) http.HandlerFunc {
 
@@ -80,9 +80,9 @@ func HandleDeleteAccountGet(
 		if !accountDeletionShown(httpHelper, w, r) {
 			return
 		}
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		renderDeleteAccountPage(httpHelper, apiClient, w, r, jwtInfo.TokenResponse.AccessToken, map[string]interface{}{
@@ -101,7 +101,7 @@ func HandleDeleteAccountGet(
 // user chose. Which one it posted is what the redrawn form shows again, and where a refusal of a
 // missing code is drawn.
 func HandleDeleteAccountPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountDeleteAPI,
 	baseURL string,
@@ -111,9 +111,9 @@ func HandleDeleteAccountPost(
 		if !accountDeletionShown(httpHelper, w, r) {
 			return
 		}
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -169,7 +169,7 @@ func HandleDeleteAccountPost(
 
 // renderDeleteAccountPage draws the form with bind's entries, asking for a second factor while the
 // account has two-factor authentication on now, read from the auth server each time.
-func renderDeleteAccountPage(httpHelper HttpHelper, apiClient accountDeleteAPI, w http.ResponseWriter, r *http.Request,
+func renderDeleteAccountPage(httpHelper HTTPHelper, apiClient accountDeleteAPI, w http.ResponseWriter, r *http.Request,
 	accessToken string, bind map[string]interface{}) {
 
 	user, err := apiClient.GetAccountProfile(r.Context(), accessToken)
@@ -188,7 +188,7 @@ func renderDeleteAccountPage(httpHelper HttpHelper, apiClient accountDeleteAPI, 
 // without a menu. It is the same page for anyone who opens it: it reads no session and calls
 // nothing, so it is mounted outside the account pages' sign-in (#783 decision 8).
 func HandleAccountDeletedGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

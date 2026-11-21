@@ -148,7 +148,7 @@ func TestRender_MenuLabelWithNoNameClaimsShowsTheEmailAlone(t *testing.T) {
 	assert.NotContains(t, label, "user-menu-name", "with no name there is no name line")
 }
 
-// The ID token carries the name and email claims only when IncludeOpenIDConnectClaimsInIdToken is
+// The ID token carries the name and email claims only when IncludeOpenIDConnectClaimsInIDToken is
 // on — the seeded default, but an administrator may turn it off globally or for the admin console's
 // own client, and then `sub` is all that arrives. The guard on the map is still satisfied, since a
 // one-key map is truthy, so the label renders with a missing `Email` key. A missing key on a

@@ -192,9 +192,9 @@ func serveEditor(t *testing.T, apiClient *emailTemplatesAPI, language string, op
 // server with SMTP on.
 func signedInWithSMTP() []handlertest.Option {
 	return []handlertest.Option{
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-			IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+			IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 		}),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true}),
 	}

@@ -37,9 +37,9 @@ func scopeHints(fragment string) []string {
 func TestRender_ApplicationsPageLabelsEachScopeListItHas(t *testing.T) {
 	out := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
-			{ClientId: 1, Client: "consent-only", ClientName: "Consent only", HasConsent: true, ConsentScope: "openid email"},
-			{ClientId: 2, Client: "grants-only", ClientName: "Grants only", GrantScope: "openid profile"},
-			{ClientId: 3, Client: "both", ClientName: "Both", HasConsent: true, ConsentScope: "openid",
+			{ClientID: 1, Client: "consent-only", ClientName: "Consent only", HasConsent: true, ConsentScope: "openid email"},
+			{ClientID: 2, Client: "grants-only", ClientName: "Grants only", GrantScope: "openid profile"},
+			{ClientID: 3, Client: "both", ClientName: "Both", HasConsent: true, ConsentScope: "openid",
 				GrantScope: "openid offline_access"},
 		},
 	})
@@ -74,7 +74,7 @@ func TestRender_ApplicationsPageLabelsEachScopeListItHas(t *testing.T) {
 func TestRender_ApplicationsPageNamesEachScopeListByItsLabel(t *testing.T) {
 	out := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
-			{ClientId: 3, Client: "both", ClientName: "Both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid"},
+			{ClientID: 3, Client: "both", ClientName: "Both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid"},
 		},
 	})
 
@@ -91,8 +91,8 @@ func TestRender_ApplicationsPageNamesEachScopeListByItsLabel(t *testing.T) {
 func TestRender_ApplicationsPageTagsTheCurrentApplicationInPlaceOfDisconnect(t *testing.T) {
 	out := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
-			{ClientId: 1, Client: "admin-console-client", ClientName: "Admin console", GrantScope: "openid", IsCurrent: true},
-			{ClientId: 2, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
+			{ClientID: 1, Client: "admin-console-client", ClientName: "Admin console", GrantScope: "openid", IsCurrent: true},
+			{ClientID: 2, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
 		},
 	})
 	rows := applicationRows(t, out)
@@ -111,8 +111,8 @@ func TestRender_ApplicationsPageTagsTheCurrentApplicationInPlaceOfDisconnect(t *
 func TestRender_ApplicationsPageConfirmationSaysWhatADisconnectDoes(t *testing.T) {
 	out := renderMenuPageIn(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
-			{ClientId: 1, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
-			{ClientId: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, GrantScope: "openid"},
+			{ClientID: 1, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
+			{ClientID: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, GrantScope: "openid"},
 		},
 	}, "en", true)
 

@@ -64,7 +64,7 @@ func TestHandleTurnstileGet_ThePageIsToldWhetherASecretKeyIsSaved(t *testing.T) 
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_turnstile.html").Once()
 			apiClient := &turnstileSettingsAPI{stored: tc.stored}
@@ -141,7 +141,7 @@ func TestHandleTurnstilePost_TheFormBecomesKeepReplaceOrRemove(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &turnstileSettingsAPI{}
 			w := httptest.NewRecorder()
@@ -161,7 +161,7 @@ func TestHandleTurnstilePost_TheFormBecomesKeepReplaceOrRemove(t *testing.T) {
 // The secret key is read from the body alone: one in the query string would sit in the browser's
 // history and every proxy's access log, and is never a submission (#202).
 func TestHandleTurnstilePost_TheSecretKeyIsNotReadFromTheQuery(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := &turnstileSettingsAPI{}
 
@@ -274,7 +274,7 @@ func TestHandleTurnstilePost_ARefusedSaveIsRedrawnWithTheRefusalAtItsField(t *te
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_turnstile.html").Once()
 			apiClient := &turnstileSettingsAPI{saveErr: &apiclient.APIError{

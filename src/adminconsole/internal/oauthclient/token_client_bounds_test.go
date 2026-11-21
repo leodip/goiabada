@@ -201,7 +201,7 @@ func assertTokenExchangeDeadline(t *testing.T, deadline, before, after time.Time
 // context onto every record, so context.Background() would silence this grant in the
 // operator's log. Passing ctx straight through is the one-token change this case
 // exists to catch.
-func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestId(t *testing.T) {
+func TestTokenClient_TheSingleUseGrantsSurviveACancelledCallerAndKeepItsRequestID(t *testing.T) {
 	for _, g := range singleUseGrants {
 		t.Run(g.name, func(t *testing.T) {
 			const wantRequestID = "the-inbound-request-id"
@@ -293,7 +293,7 @@ func TestClientCredentials_KeepsTheCallersCancellationUnderTheSharedDeadline(t *
 // is an attribute rather than concatenated into the message, so a query can find it.
 // The request id is not named here or in the client; it reaches the record because
 // it rode on the context and the installed handler read it off there.
-func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenUrlAndTheRequestId(t *testing.T) {
+func TestExchangeCode_TheExchangeIsDebugAndCarriesTheTokenURLAndTheRequestID(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	ctx := requestid.NewContext(context.Background(), "req-admin-callback")
 

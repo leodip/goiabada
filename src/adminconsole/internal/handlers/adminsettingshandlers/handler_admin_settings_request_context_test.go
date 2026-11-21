@@ -28,122 +28,122 @@ import (
 
 type settingsCtxMarkerKey struct{}
 
-// ctxRecordingApiClient records the context every settings method is called with and then refuses,
+// ctxRecordingAPIClient records the context every settings method is called with and then refuses,
 // so the handler takes its error path in the same pass.
-type ctxRecordingApiClient struct {
+type ctxRecordingAPIClient struct {
 	seen []context.Context
 }
 
-func (s *ctxRecordingApiClient) record(ctx context.Context) error {
+func (s *ctxRecordingAPIClient) record(ctx context.Context) error {
 	s.seen = append(s.seen, ctx)
 	return errs.New("the auth server refused")
 }
 
-func (s *ctxRecordingApiClient) GetSettingsAuditLogs(ctx context.Context, _ string) (*api.SettingsAuditLogsResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsAuditLogs(ctx context.Context, _ string) (*api.SettingsAuditLogsResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsAuditLogs(ctx context.Context, _ string, _ *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsAuditLogs(ctx context.Context, _ string, _ *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAuditLogsPaginated(ctx context.Context, _ string, _, _ int, _, _ string, _ int64) (*api.GetAuditLogsResponse, error) {
+func (s *ctxRecordingAPIClient) GetAuditLogsPaginated(ctx context.Context, _ string, _, _ int, _, _ string, _ int64) (*api.GetAuditLogsResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAuditEventTypes(ctx context.Context, _ string) (*api.GetAuditEventTypesResponse, error) {
+func (s *ctxRecordingAPIClient) GetAuditEventTypes(ctx context.Context, _ string) (*api.GetAuditEventTypesResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsEmail(ctx context.Context, _ string) (*api.SettingsEmailResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsEmail(ctx context.Context, _ string) (*api.SettingsEmailResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsEmail(ctx context.Context, _ string, _ *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsEmail(ctx context.Context, _ string, _ *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) SendTestEmail(ctx context.Context, _ string, _ *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
+func (s *ctxRecordingAPIClient) SendTestEmail(ctx context.Context, _ string, _ *api.SendTestEmailRequest) (*api.SendTestEmailResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsGeneral(ctx context.Context, _ string, _ *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsGeneral(ctx context.Context, _ string, _ *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsKeys(ctx context.Context, _ string) ([]api.SettingsSigningKeyResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsKeys(ctx context.Context, _ string) ([]api.SettingsSigningKeyResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) RotateSettingsKeys(ctx context.Context, _ string) error {
+func (s *ctxRecordingAPIClient) RotateSettingsKeys(ctx context.Context, _ string) error {
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DeleteSettingsKey(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DeleteSettingsKey(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsSessions(ctx context.Context, _ string) (*api.SettingsSessionsResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsSessions(ctx context.Context, _ string) (*api.SettingsSessionsResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsSessions(ctx context.Context, _ string, _ *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsSessions(ctx context.Context, _ string, _ *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsTokens(ctx context.Context, _ string) (*api.SettingsTokensResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsTokens(ctx context.Context, _ string) (*api.SettingsTokensResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsTokens(ctx context.Context, _ string, _ *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsTokens(ctx context.Context, _ string, _ *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetSettingsTurnstile(ctx context.Context, _ string) (*api.SettingsTurnstileResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsTurnstile(ctx context.Context, _ string) (*api.SettingsTurnstileResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateSettingsTurnstile(ctx context.Context, _ string, _ *api.UpdateSettingsTurnstileRequest) (*api.SettingsTurnstileResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateSettingsTurnstile(ctx context.Context, _ string, _ *api.UpdateSettingsTurnstileRequest) (*api.SettingsTurnstileResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAllBrands(ctx context.Context, _ string) ([]api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) GetAllBrands(ctx context.Context, _ string) ([]api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetBrandById(ctx context.Context, _ string, _ int64) (*api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) GetBrandByID(ctx context.Context, _ string, _ int64) (*api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetBrandThemes(ctx context.Context, _ string) ([]api.BrandThemeResponse, error) {
+func (s *ctxRecordingAPIClient) GetBrandThemes(ctx context.Context, _ string) ([]api.BrandThemeResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetBrandAssetById(ctx context.Context, _ string, _ int64) (*api.BrandAssetResponse, error) {
+func (s *ctxRecordingAPIClient) GetBrandAssetByID(ctx context.Context, _ string, _ int64) (*api.BrandAssetResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UploadBrandAsset(ctx context.Context, _ string, _ string, _ []byte, _ string) (*api.BrandAssetResponse, error) {
+func (s *ctxRecordingAPIClient) UploadBrandAsset(ctx context.Context, _ string, _ string, _ []byte, _ string) (*api.BrandAssetResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) CreateBrand(ctx context.Context, _ string, _ *api.CreateBrandRequest) (*api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) CreateBrand(ctx context.Context, _ string, _ *api.CreateBrandRequest) (*api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateBrand(ctx context.Context, _ string, _ int64, _ *api.UpdateBrandRequest) (*api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateBrand(ctx context.Context, _ string, _ int64, _ *api.UpdateBrandRequest) (*api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DeleteBrand(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DeleteBrand(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) MakeBrandDefault(ctx context.Context, _ string, _ int64) (*api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) MakeBrandDefault(ctx context.Context, _ string, _ int64) (*api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
@@ -168,40 +168,40 @@ func newSettingsTestStore() *sessionstore.ServerSideStore {
 	return store
 }
 
-func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
+func TestAdminSettingsHandlers_EveryHandlerConsultsTheAPIClientWithTheRequestsContext(t *testing.T) {
 	// The cache is never reached: every row's client refuses, and the three handlers holding one
 	// invalidate it only after a successful save.
 	settingsCache := &invalidationRecorder{}
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *handlersmocks.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HTTPHelper, apiClient *ctxRecordingAPIClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAuditLogsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleAuditLogsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAuditLogViewerGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleAuditLogViewerGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs/viewer", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleEmailGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleEmailPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email",
@@ -212,7 +212,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleEmailSendTestGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleEmailSendTestGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/email/send-test",
@@ -220,7 +220,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleEmailSendTestPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleEmailSendTestPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/email/send-test",
@@ -230,14 +230,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleGeneralGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleGeneralGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/general", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleGeneralPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleGeneralPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/general",
@@ -248,14 +248,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleKeysGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleKeysGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/keys", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleKeysRotatePost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleKeysRotatePost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
@@ -263,7 +263,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleKeysRevokePost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleKeysRevokePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/keys/revoke",
@@ -271,14 +271,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleSessionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSessionsGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/sessions", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleSessionsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSessionsPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/sessions",
@@ -291,14 +291,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleTokensGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTokensGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/tokens", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleTokensPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTokensPost(h, newSettingsTestStore(), c, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/tokens",
@@ -310,14 +310,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleTurnstileGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTurnstileGet(h, newSettingsTestStore(), c, turnstileAuthServerBaseURL)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/turnstile", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleTurnstilePost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTurnstilePost(h, newSettingsTestStore(), c, consoleBaseURL, turnstileAuthServerBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/turnstile",
@@ -327,21 +327,21 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandingGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandingGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleBrandNewGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandNewGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleBrandNewPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandNewPost(h, c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
@@ -349,14 +349,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandAssetPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandAssetPost(h, c, "background")
 			},
 			request: uploadRequest(t, "background", "file", "beach.webp", []byte("the-file-bytes")),
 		},
 		{
 			name: "HandleBrandGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandGet(h, newSettingsTestStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
@@ -364,7 +364,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
@@ -373,7 +373,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandMakeDefaultPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandMakeDefaultPost(h, newSettingsTestStore(), c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/branding/4/make-default", handlertest.WithAccessToken(),
@@ -381,7 +381,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandDeleteGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/settings/branding/4/delete", handlertest.WithAccessToken(),
@@ -389,7 +389,7 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		},
 		{
 			name: "HandleBrandDeletePost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBrandDeletePost(h, c, settingsCache, consoleBaseURL)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/settings/branding/4/delete", handlertest.WithAccessToken(),
@@ -399,14 +399,14 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			apiClient := &ctxRecordingApiClient{}
+			apiClient := &ctxRecordingAPIClient{}
 
 			marked := tc.request.WithContext(
 				context.WithValue(tc.request.Context(), settingsCtxMarkerKey{}, tc.name))

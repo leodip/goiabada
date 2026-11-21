@@ -28,7 +28,7 @@ type clientPagesAPI struct {
 	resourcesRead int
 }
 
-func (s *clientPagesAPI) GetClientById(context.Context, string, int64) (*api.ClientResponse, error) {
+func (s *clientPagesAPI) GetClientByID(context.Context, string, int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
@@ -70,7 +70,7 @@ func (s *clientPagesAPI) GetAllClients(context.Context, string) ([]api.ClientRes
 	return []api.ClientResponse{*s.client}, nil
 }
 
-func (s *clientPagesAPI) GetClientSessionsByClientId(context.Context, string, int64, int, int) (*api.GetClientSessionsResponse, error) {
+func (s *clientPagesAPI) GetClientSessionsByClientID(context.Context, string, int64, int, int) (*api.GetClientSessionsResponse, error) {
 	return &api.GetClientSessionsResponse{}, nil
 }
 
@@ -140,8 +140,8 @@ func (*clientPagesAPI) DeleteClientLogo(context.Context, string, int64) error {
 	panic("unexpected call to DeleteClientLogo")
 }
 
-func (*clientPagesAPI) DeleteUserSessionById(context.Context, string, int64) error {
-	panic("unexpected call to DeleteUserSessionById")
+func (*clientPagesAPI) DeleteUserSessionByID(context.Context, string, int64) error {
+	panic("unexpected call to DeleteUserSessionByID")
 }
 
 // serveClientTab draws one tab of client 7 through its real handler and the real renderer, in the

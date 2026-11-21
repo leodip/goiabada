@@ -52,7 +52,7 @@ func TestRender_LayoutsPublishTheCatalogLanguage(t *testing.T) {
 			"savedSuccessfully": false, "permissions": []api.PermissionResponse{},
 		}},
 		{"/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
-			"AuthServerBaseUrl": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
+			"AuthServerBaseURL": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 			"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false,
 		}},
 	} {
@@ -129,9 +129,9 @@ func TestAjax_ThePagesLanguageOutranksTheBrowser(t *testing.T) {
 			defer upstream.Close()
 
 			req := handlertest.Request(http.MethodPost, tc.target,
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"locale": "en"}},
+					IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"locale": "en"}},
 				}),
 				handlertest.WithPathValue("resourceId", "7"),
 				handlertest.WithBody(strings.NewReader(`{"resourceId":7,"permissions":[],"expectedPermissions":[]}`)))

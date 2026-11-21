@@ -6,7 +6,7 @@ import (
 )
 
 type GroupInfo struct {
-	Id              int64
+	ID              int64
 	GroupIdentifier string
 	Description     string
 	HasPermission   bool
@@ -27,14 +27,14 @@ type UsersWithPermissionPageResult struct {
 }
 
 type Permission struct {
-	Id          int64  `json:"id"`
+	ID          int64  `json:"id"`
 	Identifier  string `json:"permissionIdentifier"`
 	Description string `json:"description"`
 }
 
 type SavePermissionsInput struct {
 	Permissions []Permission `json:"permissions"`
-	ResourceId  int64        `json:"resourceId"`
+	ResourceID  int64        `json:"resourceId"`
 	// ExpectedPermissions is the list as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
 	ExpectedPermissions []Permission `json:"expectedPermissions"`
@@ -57,7 +57,7 @@ type ValidatePermissionResult struct {
 // UserResult is one user the user search found, as the grant-permission script reads it. Each field
 // declares the key the script reads, so a field is respelled without moving its key (#482 decision 7).
 type UserResult struct {
-	Id            int64  `json:"Id"`
+	ID            int64  `json:"Id"`
 	Subject       string `json:"Subject"`
 	Username      string `json:"Username"`
 	Email         string `json:"Email"`
@@ -71,12 +71,12 @@ type SearchResult struct {
 	Users []UserResult
 }
 
-// permissionIdsOf is the ids of the grants a handler read, sent as the save's loaded set when it
+// permissionIDsOf is the ids of the grants a handler read, sent as the save's loaded set when it
 // grants or revokes one permission from that read: the auth server refuses the save with 409 when
 // the stored grants changed in between, rather than let the whole set it writes undo that change.
 // Never nil, so a user or group read with no grants sends [] and not the null the save refuses
 // (#428).
-func permissionIdsOf(permissions []api.PermissionResponse) []int64 {
+func permissionIDsOf(permissions []api.PermissionResponse) []int64 {
 	ids := make([]int64, 0, len(permissions))
 	for _, p := range permissions {
 		ids = append(ids, p.ID)
@@ -88,7 +88,7 @@ func permissionIdsOf(permissions []api.PermissionResponse) []int64 {
 // back, the identifier and description, and whether it is one of the authserver resource's
 // built-in permissions, which the tab draws without Edit or Remove.
 type permissionEntry struct {
-	Id          int64
+	ID          int64
 	Identifier  string
 	Description string
 	BuiltIn     bool

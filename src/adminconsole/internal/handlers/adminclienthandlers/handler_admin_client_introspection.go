@@ -25,12 +25,12 @@ import (
 // client's own list.
 type clientIntrospectionAPI interface {
 	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
-	GetClientIntrospectionResources(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.ResourceResponse, error)
-	UpdateClientIntrospectionResources(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientIntrospectionResourcesRequest) error
+	GetClientIntrospectionResources(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, []api.ResourceResponse, error)
+	UpdateClientIntrospectionResources(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientIntrospectionResourcesRequest) error
 }
 
 func HandleIntrospectionGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientIntrospectionAPI,
 ) http.HandlerFunc {
@@ -42,9 +42,9 @@ func HandleIntrospectionGet(
 			httpHelper.NotFound(w, r)
 			return
 		}
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -59,13 +59,13 @@ func HandleIntrospectionGet(
 		}
 
 		adminClientIntrospection := struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			IsSystemLevelClient bool
 			Resources           []listedResource
 		}{
-			ClientId:            clientResp.ID,
+			ClientID:            clientResp.ID,
 			ClientIdentifier:    clientResp.ClientIdentifier,
 			IsPublic:            clientResp.IsPublic,
 			IsSystemLevelClient: clientResp.IsSystemLevelClient,
@@ -73,7 +73,7 @@ func HandleIntrospectionGet(
 		}
 		for _, resource := range listed {
 			adminClientIntrospection.Resources = append(adminClientIntrospection.Resources, listedResource{
-				Id:         resource.ID,
+				ID:         resource.ID,
 				Identifier: resource.ResourceIdentifier,
 			})
 		}
@@ -125,7 +125,7 @@ func HandleIntrospectionGet(
 }
 
 func HandleIntrospectionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientIntrospectionAPI,
 ) http.HandlerFunc {
@@ -151,17 +151,17 @@ func HandleIntrospectionPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Both lists pass through unchanged, the loaded one included, so the auth server refuses a
 		// save from an outdated page and a list for a client made public since the page loaded.
 		req := &api.UpdateClientIntrospectionResourcesRequest{
-			ResourceIDs:         data.ResourceIds,
-			ExpectedResourceIDs: data.ExpectedResourceIds,
+			ResourceIDs:         data.ResourceIDs,
+			ExpectedResourceIDs: data.ExpectedResourceIDs,
 		}
 		if updateErr := apiClient.UpdateClientIntrospectionResources(r.Context(), jwtInfo.TokenResponse.AccessToken, id, req); updateErr != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, updateErr)

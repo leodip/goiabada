@@ -48,11 +48,11 @@ func TestHandleAppsGet_OffersEveryAppButTheAdminConsoleAndMarksTheSelected(t *te
 	HandleAppsGet(httpHelper, newSessionStore(t), fake).ServeHTTP(httptest.NewRecorder(), appsRequest(http.MethodGet, nil))
 
 	bind := handlertest.Bind(t, httpHelper)
-	assert.Equal(t, []int64{7}, fake.readIds)
+	assert.Equal(t, []int64{7}, fake.readIDs)
 	assert.Equal(t, false, bind["allApps"])
 	assert.Equal(t, []appChoice{
-		{Id: 6, Identifier: "blog"},
-		{Id: 4, Identifier: "shop", Description: "The shop", Selected: true},
+		{ID: 6, Identifier: "blog"},
+		{ID: 4, Identifier: "shop", Description: "The shop", Selected: true},
 	}, bind["apps"], "every app but the admin console's own, by identifier")
 	assert.Equal(t, []int64{4}, bind["expectedClientIds"], "the list as drawn goes back with the save")
 	assert.Equal(t, false, bind["noApps"])
@@ -103,7 +103,7 @@ func TestHandleAppsPost_SavesTheAppsTickedAndSaysSo(t *testing.T) {
 
 	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	assert.Equal(t, consoleBaseURL+"/admin/legal-documents/7/apps", rec.Header().Get("Location"))
-	assert.Equal(t, int64(7), fake.appsSavedId)
+	assert.Equal(t, int64(7), fake.appsSavedID)
 	require.NotNil(t, fake.appsSaved)
 	assert.Equal(t, api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIDs: []int64{6, 4},
 		ExpectedClientIDs: []int64{4}}, *fake.appsSaved)
@@ -150,8 +150,8 @@ func TestHandleAppsPost_ARefusalKeepsWhatWasChosen(t *testing.T) {
 			assert.Equal(t, "the API's sentence", bind["error"])
 			assert.Equal(t, false, bind["allApps"], "the choice made is kept")
 			assert.Equal(t, []appChoice{
-				{Id: 6, Identifier: "blog", Selected: true},
-				{Id: 4, Identifier: "shop", Description: "The shop"},
+				{ID: 6, Identifier: "blog", Selected: true},
+				{ID: 4, Identifier: "shop", Description: "The shop"},
 			}, bind["apps"], "and so are the boxes ticked")
 			assert.Equal(t, []int64{}, bind["expectedClientIds"], "the list as stored, to retry against")
 		})

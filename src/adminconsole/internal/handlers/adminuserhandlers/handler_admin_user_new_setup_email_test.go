@@ -41,7 +41,7 @@ func TestHandleNewPost_ASetupEmailNotSentIsShownOnTheNewUsersPage(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newFlashTestStore()
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/new",

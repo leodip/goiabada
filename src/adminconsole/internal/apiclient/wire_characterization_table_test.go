@@ -87,11 +87,11 @@ var (
 	charUpdateLegalDocApps  = &api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIDs: []int64{3, 4}, ExpectedClientIDs: []int64{3}}
 
 	charSaveEmailTemplate    = &api.SaveEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}"}
-	charBrandId              = int64(4)
+	charBrandID              = int64(4)
 	charPreviewEmailTemplate = &api.PreviewEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset",
-		Body: "Hello {{name}},\n\n{{button}}\n\n{{link}}", BrandID: &charBrandId}
+		Body: "Hello {{name}},\n\n{{button}}\n\n{{link}}", BrandID: &charBrandID}
 	charSendTestEmailTemplate = &api.SendTestEmailTemplateRequest{To: "jane@example.com", Subject: "Reset your password",
-		ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}", BrandID: &charBrandId}
+		ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}", BrandID: &charBrandID}
 )
 
 const (
@@ -434,9 +434,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 201, reply: `{"brand":{"id":5}}`, want: int64(5),
 		},
 		{
-			name: "GetBrandById",
+			name: "GetBrandByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetBrandById(ctx, charAccessToken, 5)
+				got, err := c.GetBrandByID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
@@ -508,9 +508,9 @@ func wireCharacterization() []wireCase {
 			want:          []any{int64(41), "background", "https://auth.example.com/brand-assets/41?v=ab", 1600},
 		},
 		{
-			name: "GetBrandAssetById",
+			name: "GetBrandAssetByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetBrandAssetById(ctx, charAccessToken, 41)
+				got, err := c.GetBrandAssetByID(ctx, charAccessToken, 41)
 				if err != nil {
 					return nil, err
 				}
@@ -583,9 +583,9 @@ func wireCharacterization() []wireCase {
 			reply: `{"clients":[{"id":3}]}`, want: int64(3),
 		},
 		{
-			name: "GetClientById",
+			name: "GetClientByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientById(ctx, charAccessToken, 3)
+				got, err := c.GetClientByID(ctx, charAccessToken, 3)
 				if err != nil {
 					return nil, err
 				}
@@ -810,9 +810,9 @@ func wireCharacterization() []wireCase {
 
 		// --- group_attributes.go ----------------------------------------------------------
 		{
-			name: "GetGroupAttributesByGroupId",
+			name: "GetGroupAttributesByGroupID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupAttributesByGroupId(ctx, charAccessToken, 5)
+				got, err := c.GetGroupAttributesByGroupID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
@@ -822,9 +822,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"attributes":[{"id":11}]}`, want: int64(11),
 		},
 		{
-			name: "GetGroupAttributeById",
+			name: "GetGroupAttributeByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupAttributeById(ctx, charAccessToken, 11)
+				got, err := c.GetGroupAttributeByID(ctx, charAccessToken, 11)
 				if err != nil {
 					return nil, err
 				}
@@ -919,9 +919,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 201, reply: `{"group":{"id":6}}`, want: int64(6),
 		},
 		{
-			name: "GetGroupById",
+			name: "GetGroupByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupById(ctx, charAccessToken, 5)
+				got, err := c.GetGroupByID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
@@ -1137,9 +1137,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 201, reply: `{"resource":{"id":2}}`, want: int64(2),
 		},
 		{
-			name: "GetResourceById",
+			name: "GetResourceByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetResourceById(ctx, charAccessToken, 2)
+				got, err := c.GetResourceByID(ctx, charAccessToken, 2)
 				if err != nil {
 					return nil, err
 				}
@@ -1172,9 +1172,9 @@ func wireCharacterization() []wireCase {
 
 		// --- sessions.go ------------------------------------------------------------------
 		{
-			name: "GetUserSessionsByUserId",
+			name: "GetUserSessionsByUserID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserSessionsByUserId(ctx, charAccessToken, 42)
+				got, err := c.GetUserSessionsByUserID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
@@ -1184,17 +1184,17 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
 		},
 		{
-			name: "DeleteUserSessionById",
+			name: "DeleteUserSessionByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteUserSessionById(ctx, charAccessToken, 31)
+				return nil, c.DeleteUserSessionByID(ctx, charAccessToken, 31)
 			},
 			verb: "DELETE", path: "/api/v1/admin/user-sessions/31", contentType: charJSON,
 			successStatus: 200, reply: `{"success":true}`,
 		},
 		{
-			name: "GetClientSessionsByClientId",
+			name: "GetClientSessionsByClientID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientSessionsByClientId(ctx, charAccessToken, 3, 1, 10)
+				got, err := c.GetClientSessionsByClientID(ctx, charAccessToken, 3, 1, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -1408,9 +1408,9 @@ func wireCharacterization() []wireCase {
 
 		// --- user_attributes.go -----------------------------------------------------------
 		{
-			name: "GetUserAttributesByUserId",
+			name: "GetUserAttributesByUserID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserAttributesByUserId(ctx, charAccessToken, 42)
+				got, err := c.GetUserAttributesByUserID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
@@ -1420,9 +1420,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"attributes":[{"id":21}]}`, want: int64(21),
 		},
 		{
-			name: "GetUserAttributeById",
+			name: "GetUserAttributeByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserAttributeById(ctx, charAccessToken, 21)
+				got, err := c.GetUserAttributeByID(ctx, charAccessToken, 21)
 				if err != nil {
 					return nil, err
 				}
@@ -1506,9 +1506,9 @@ func wireCharacterization() []wireCase {
 			want: []any{int64(42), 5},
 		},
 		{
-			name: "GetUserById",
+			name: "GetUserByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserById(ctx, charAccessToken, 42)
+				got, err := c.GetUserByID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
@@ -1721,9 +1721,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"html":"<h1>Terms</h1>"}`, want: "<h1>Terms</h1>",
 		},
 		{
-			name: "GetLegalDocumentById",
+			name: "GetLegalDocumentByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetLegalDocumentById(ctx, charAccessToken, 7)
+				got, err := c.GetLegalDocumentByID(ctx, charAccessToken, 7)
 				if err != nil {
 					return nil, err
 				}

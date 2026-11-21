@@ -1,11 +1,11 @@
 # This config covers the interfaces the admin console owns and mocks. Since #385 that
 # is the JWT session middleware's two ports, AuthHelper and tokenParser, which moved
 # here out of core/middleware along with the middleware that holds them, and this
-# module's own HttpHelper port.
+# module's own HTTPHelper port.
 #
 # Every dir below is inside adminconsole, and since #385 the same is true of every
 # other config: no module writes a mock outside its own tree any more. This one's
-# HttpHelper mock is what ended that. The auth server used to generate it into
+# HTTPHelper mock is what ended that. The auth server used to generate it into
 # core/handlerhelpers/mocks and both modules imported it from there, which worked only
 # because the auth server's port is the wider of the two -- it declares
 # LookupFromUrlQueryOrFormPost and this module's does not -- so the console was
@@ -43,7 +43,7 @@ packages:
   # <declaring package>/mocks, package <declaring package>mocks (#431).
   github.com/leodip/goiabada/adminconsole/internal/handlers:
     interfaces:
-      HttpHelper:
+      HTTPHelper:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "handlersmocks"

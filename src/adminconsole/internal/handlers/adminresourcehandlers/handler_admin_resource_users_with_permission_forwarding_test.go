@@ -30,37 +30,37 @@ import (
 //
 // The 400 row is the reason the classifier rather than a bare JSONNotFound: forwarding the API's
 // own sentence is what the browser shows.
-type usersWithPermissionApiClient struct {
+type usersWithPermissionAPIClient struct {
 	err error
 }
 
-func (c *usersWithPermissionApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *usersWithPermissionAPIClient) GetResourceByID(_ context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
 	return nil, c.err
 }
 
-// The rest of the ports usersWithPermissionApiClient is passed to, which no test here reaches.
+// The rest of the ports usersWithPermissionAPIClient is passed to, which no test here reaches.
 
-func (*usersWithPermissionApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+func (*usersWithPermissionAPIClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
 	panic("unexpected call to GetPermissionsByResource")
 }
 
-func (*usersWithPermissionApiClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (*usersWithPermissionAPIClient) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	panic("unexpected call to GetUserPermissions")
 }
 
-func (*usersWithPermissionApiClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
+func (*usersWithPermissionAPIClient) GetUsersByPermission(context.Context, string, int64, int, int) ([]api.UserResponse, int, error) {
 	panic("unexpected call to GetUsersByPermission")
 }
 
-func (*usersWithPermissionApiClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
+func (*usersWithPermissionAPIClient) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	panic("unexpected call to SearchUsersWithPermissionAnnotation")
 }
 
-func (*usersWithPermissionApiClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
+func (*usersWithPermissionAPIClient) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
 	panic("unexpected call to UpdateUserPermissions")
 }
 
-func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *testing.T) {
+func TestResourceUsersWithPermissionRemovePost_ForwardsTheAPIsStatusAsJSON(t *testing.T) {
 	testCases := []struct {
 		name   string
 		apiErr error
@@ -102,7 +102,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var captured error
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -117,7 +117,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 				handlertest.WithPathValue("permissionId", "5"))
 
 			HandleUsersWithPermissionRemovePermissionPost(httpHelper,
-				&usersWithPermissionApiClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
+				&usersWithPermissionAPIClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 			require.Error(t, captured, "the handler answered nothing")

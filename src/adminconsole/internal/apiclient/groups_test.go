@@ -33,10 +33,10 @@ const groupBodyFields = `
 // carry one. It is a field on the response now, filled by the same handler from the same query, so
 // a method that answered the group but dropped the count would leave the delete confirmation
 // offering to delete a group it says has no members.
-func TestAuthServerClient_GetGroupByIdDecodesEveryFieldTheGroupPagesBind(t *testing.T) {
+func TestAuthServerClient_GetGroupByIDDecodesEveryFieldTheGroupPagesBind(t *testing.T) {
 	client, recorded := serves(t, `{"group":{`+groupBodyFields+`}}`)
 
-	group, err := client.GetGroupById(context.Background(), "an-access-token", 4)
+	group, err := client.GetGroupByID(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 	require.NotNil(t, group)
 

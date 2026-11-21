@@ -19,25 +19,25 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubApiClient implements the keys page's port. The method no test here reaches panics, which is
+// stubAPIClient implements the keys page's port. The method no test here reaches panics, which is
 // the right outcome for a call the test did not expect. There is no generated mock: adminconsole
 // has no .mockery.yaml. Same shape as adminclienthandlers' stub, for the same reason.
-type stubApiClient struct {
+type stubAPIClient struct {
 	rotateErr error
 	keys      []api.SettingsSigningKeyResponse
 }
 
-func (s *stubApiClient) RotateSettingsKeys(_ context.Context, accessToken string) error {
+func (s *stubAPIClient) RotateSettingsKeys(_ context.Context, accessToken string) error {
 	return s.rotateErr
 }
 
-func (s *stubApiClient) GetSettingsKeys(_ context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error) {
+func (s *stubAPIClient) GetSettingsKeys(_ context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error) {
 	return s.keys, nil
 }
 
-// The rest of the ports stubApiClient is passed to, which no test here reaches.
+// The rest of the ports stubAPIClient is passed to, which no test here reaches.
 
-func (*stubApiClient) DeleteSettingsKey(context.Context, string, int64) error {
+func (*stubAPIClient) DeleteSettingsKey(context.Context, string, int64) error {
 	panic("unexpected call to DeleteSettingsKey")
 }
 
@@ -60,14 +60,14 @@ func TestHandleKeysRotatePost_ARefusalRedrawsThePageWithItsSentence(t *testing.T
 		{&apiclient.APIError{Code: "ROTATION_OUTCOME_UNKNOWN", Message: outcomeUnknown, StatusCode: http.StatusConflict}, outcomeUnknown},
 	} {
 		apiErr, refusal := refused.apiErr, refused.refusal
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
 		keys := []api.SettingsSigningKeyResponse{{ID: 1, State: "current", KeyIdentifier: "key-1"}}
 
 		req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 		rec := httptest.NewRecorder()
-		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubApiClient{rotateErr: apiErr, keys: keys}, consoleBaseURL).ServeHTTP(rec, req)
+		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubAPIClient{rotateErr: apiErr, keys: keys}, consoleBaseURL).ServeHTTP(rec, req)
 
 		bind := handlertest.Bind(t, httpHelper)
 		assert.Equal(t, refusal, bind["error"])
@@ -80,11 +80,11 @@ func TestHandleKeysRotatePost_AServerFaultIsTheErrorPage(t *testing.T) {
 		&apiclient.APIError{Code: "KEY_SET_INCOMPLETE", Message: "Expected current and next keys to exist", StatusCode: http.StatusInternalServerError},
 		errors.New("connection refused"),
 	} {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
 		req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
-		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubApiClient{rotateErr: apiErr}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+		HandleKeysRotatePost(httpHelper, newSettingsTestStore(), &stubAPIClient{rotateErr: apiErr}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 		httpHelper.AssertNotCalled(t, "RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	}
@@ -93,12 +93,12 @@ func TestHandleKeysRotatePost_AServerFaultIsTheErrorPage(t *testing.T) {
 // A rotation answers with a redirect to the keys page, which says once that the keys rotated.
 func TestHandleKeysRotatePost_ARotationRedirectsToThePageThatSaysSo(t *testing.T) {
 	store := newSettingsTestStore()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 	rec := httptest.NewRecorder()
-	HandleKeysRotatePost(httpHelper, store, &stubApiClient{}, consoleBaseURL).ServeHTTP(rec, req)
+	HandleKeysRotatePost(httpHelper, store, &stubAPIClient{}, consoleBaseURL).ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusFound, rec.Code)
 	assert.Equal(t, consoleBaseURL+"/admin/settings/keys", rec.Header().Get("Location"))
@@ -109,13 +109,13 @@ func TestHandleKeysRotatePost_ARotationRedirectsToThePageThatSaysSo(t *testing.T
 		for _, cookie := range rec.Result().Cookies() {
 			get.AddCookie(cookie)
 		}
-		HandleKeysGet(httpHelper, store, &stubApiClient{}).ServeHTTP(httptest.NewRecorder(), get)
+		HandleKeysGet(httpHelper, store, &stubAPIClient{}).ServeHTTP(httptest.NewRecorder(), get)
 		assert.Equal(t, want, handlertest.Bind(t, httpHelper)["keysRotated"], "said once, then no more")
 		httpHelper.Calls = nil
 	}
 }
 
-// TestHandleKeysGet_RendersTheApiOrder owns the console half of the claim that freed
+// TestHandleKeysGet_RendersTheAPIOrder owns the console half of the claim that freed
 // KeyState from core (#385 decision 7). The page used to re-sort the list with a structurally
 // identical copy of the loop GET /api/v1/admin/settings/keys already applies, which is the only
 // reason the console named a signing-key state at all.
@@ -128,7 +128,7 @@ func TestHandleKeysRotatePost_ARotationRedirectsToThePageThatSaysSo(t *testing.T
 // The producer's own guarantee is pinned where it is produced, in the auth server's
 // handler_api_settings_keys_test.go. Without that half this file would only prove its own stub
 // returned what it was told to.
-func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
+func TestHandleKeysGet_RendersTheAPIOrder(t *testing.T) {
 
 	testCases := []struct {
 		name  string
@@ -176,7 +176,7 @@ func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
 				})
 			}
 
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper,
 				"/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
@@ -184,7 +184,7 @@ func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/settings/keys",
 				handlertest.WithAccessToken())
 
-			handler := HandleKeysGet(httpHelper, newSettingsTestStore(), &stubApiClient{keys: apiKeys})
+			handler := HandleKeysGet(httpHelper, newSettingsTestStore(), &stubAPIClient{keys: apiKeys})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
 
 			bind := handlertest.Bind(t, httpHelper, "for %v", tc.given)

@@ -21,26 +21,26 @@ import (
 	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
-// connectedClientsApiClient holds one user with the connected clients it is given, records each
+// connectedClientsAPIClient holds one user with the connected clients it is given, records each
 // disconnect as its user id and client id, and answers each with disconnectErr: the whole of
 // userConnectedClientsAPI.
-type connectedClientsApiClient struct {
+type connectedClientsAPIClient struct {
 	clients       []api.ConnectedClientResponse
 	disconnectErr error
 
 	disconnected [][2]int64
 }
 
-func (c *connectedClientsApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{ID: userId, Email: "jdoe@example.com"}, nil
+func (c *connectedClientsAPIClient) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Email: "jdoe@example.com"}, nil
 }
 
-func (c *connectedClientsApiClient) GetUserConnectedClients(_ context.Context, _ string, _ int64) ([]api.ConnectedClientResponse, error) {
+func (c *connectedClientsAPIClient) GetUserConnectedClients(_ context.Context, _ string, _ int64) ([]api.ConnectedClientResponse, error) {
 	return c.clients, nil
 }
 
-func (c *connectedClientsApiClient) DisconnectUserClient(_ context.Context, _ string, userId, clientId int64) error {
-	c.disconnected = append(c.disconnected, [2]int64{userId, clientId})
+func (c *connectedClientsAPIClient) DisconnectUserClient(_ context.Context, _ string, userID, clientID int64) error {
+	c.disconnected = append(c.disconnected, [2]int64{userID, clientID})
 	return c.disconnectErr
 }
 
@@ -51,11 +51,11 @@ func (c *connectedClientsApiClient) DisconnectUserClient(_ context.Context, _ st
 func TestHandleConnectedClientsGet_BindsTheUserAndEveryConnectedClient(t *testing.T) {
 	grantedAt := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_connected_clients.html").Once()
 
-	apiClient := &connectedClientsApiClient{clients: []api.ConnectedClientResponse{
+	apiClient := &connectedClientsAPIClient{clients: []api.ConnectedClientResponse{
 		{ClientID: 4, ClientIdentifier: "portal", ClientName: "Customer portal", ClientDescription: "Orders",
 			Consent:    &api.ConnectedClientConsentResponse{ID: 11, Scope: "openid email", GrantedAt: &grantedAt},
 			GrantScope: "openid"},
@@ -78,18 +78,18 @@ func TestHandleConnectedClientsGet_BindsTheUserAndEveryConnectedClient(t *testin
 	clients, ok := bind["clients"].([]render.ConnectedClientInfo)
 	require.True(t, ok, "the bind carries no []ConnectedClientInfo")
 	assert.Equal(t, []render.ConnectedClientInfo{
-		{ClientId: 4, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders",
+		{ClientID: 4, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders",
 			HasConsent: true, ConsentScope: "openid email", GrantedAt: &grantedAt, GrantScope: "openid"},
-		{ClientId: 9, Client: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
-		{ClientId: 1, Client: "admin-console-client", ClientName: "Admin console", GrantScope: "openid", IsCurrent: true},
+		{ClientID: 9, Client: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
+		{ClientID: 1, Client: "admin-console-client", ClientName: "Admin console", GrantScope: "openid", IsCurrent: true},
 	}, clients)
 }
 
-func disconnectClient(t *testing.T, apiClient *connectedClientsApiClient, userId, body string) *httptest.ResponseRecorder {
+func disconnectClient(t *testing.T, apiClient *connectedClientsAPIClient, userID, body string) *httptest.ResponseRecorder {
 	t.Helper()
 
-	req := handlertest.Request(http.MethodPost, "/admin/users/"+userId+"/connected-clients",
-		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
+	req := handlertest.Request(http.MethodPost, "/admin/users/"+userID+"/connected-clients",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userID),
 		handlertest.WithBody(strings.NewReader(body)),
 		handlertest.WithContentType("application/json"))
 	recorder := httptest.NewRecorder()
@@ -104,7 +104,7 @@ func disconnectClient(t *testing.T, apiClient *connectedClientsApiClient, userId
 // the user the page is about, and answers the success row-actions.js reads.
 func TestHandleConnectedClientsDisconnectPost_DisconnectsTheRowsClientFromThePagesUser(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	apiClient := &connectedClientsApiClient{}
+	apiClient := &connectedClientsAPIClient{}
 
 	recorder := disconnectClient(t, apiClient, "42", `{"clientId":9}`)
 
@@ -120,7 +120,7 @@ func TestHandleConnectedClientsDisconnectPost_DisconnectsTheRowsClientFromThePag
 // rather than a 500 with a stack (#440 decision 6).
 func TestHandleConnectedClientsDisconnectPost_NothingLeftToEndIs404WithNothingLogged(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
-	apiClient := &connectedClientsApiClient{disconnectErr: &apiclient.APIError{
+	apiClient := &connectedClientsAPIClient{disconnectErr: &apiclient.APIError{
 		Code: "NOT_FOUND", Message: "Not found", StatusCode: http.StatusNotFound}}
 
 	recorder := disconnectClient(t, apiClient, "42", `{"clientId":9}`)
@@ -134,8 +134,8 @@ func TestHandleConnectedClientsDisconnectPost_NothingLeftToEndIs404WithNothingLo
 
 // An id beyond float64's exact integers reaches the auth server unchanged: a float decode would
 // round it to a neighbouring id, which can name another client.
-func TestHandleConnectedClientsDisconnectPost_ALargeIdReachesTheAuthServerExactly(t *testing.T) {
-	apiClient := &connectedClientsApiClient{}
+func TestHandleConnectedClientsDisconnectPost_ALargeIDReachesTheAuthServerExactly(t *testing.T) {
+	apiClient := &connectedClientsAPIClient{}
 
 	recorder := disconnectClient(t, apiClient, "42", `{"clientId":9007199254740993}`)
 
@@ -149,7 +149,7 @@ func TestHandleConnectedClientsDisconnectPost_ALargeIdReachesTheAuthServerExactl
 func TestHandleConnectedClientsDisconnectPost_ABodyNamingNoClientIsRefused(t *testing.T) {
 	for _, body := range []string{`{}`, `{"clientId":0}`, `{"clientId":-9}`, `{"clientId":9.5}`, `{"clientId":"9"}`, `{"consentId":9}`, `not json`} {
 		t.Run(body, func(t *testing.T) {
-			apiClient := &connectedClientsApiClient{}
+			apiClient := &connectedClientsAPIClient{}
 
 			recorder := disconnectClient(t, apiClient, "42", body)
 
@@ -163,8 +163,8 @@ func TestHandleConnectedClientsDisconnectPost_ABodyNamingNoClientIsRefused(t *te
 }
 
 // A user id that does not parse names no user, so nothing is disconnected and the answer is 404.
-func TestHandleConnectedClientsDisconnectPost_AnUnparsableUserIdIsNotFound(t *testing.T) {
-	apiClient := &connectedClientsApiClient{}
+func TestHandleConnectedClientsDisconnectPost_AnUnparsableUserIDIsNotFound(t *testing.T) {
+	apiClient := &connectedClientsAPIClient{}
 
 	recorder := disconnectClient(t, apiClient, "abc", `{"clientId":9}`)
 

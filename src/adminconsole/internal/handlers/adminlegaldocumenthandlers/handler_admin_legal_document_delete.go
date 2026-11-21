@@ -13,13 +13,13 @@ import (
 // legalDocumentDeleteAPI is what the delete page needs: the document it confirms, and the delete.
 type legalDocumentDeleteAPI interface {
 	legalDocumentReader
-	DeleteLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) error
+	DeleteLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) error
 }
 
 // renderDelete draws the delete confirmation of the document beside extra. A published document is
 // never deleted, so the record of what users accepted is kept: its page says to retire it instead
 // and offers no deletion.
-func renderDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, doc api.LegalDocumentResponse,
+func renderDelete(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, doc api.LegalDocumentResponse,
 	extra map[string]interface{}) {
 	bind := map[string]interface{}{
 		"doc":        doc,
@@ -35,7 +35,7 @@ func renderDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request,
 }
 
 func HandleDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentReader,
 ) http.HandlerFunc {
 
@@ -57,7 +57,7 @@ func HandleDeleteGet(
 // HandleDeletePost deletes a document never published, once its short name is typed. The API
 // refuses a published one, whatever the page offered.
 func HandleDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentDeleteAPI,
 	baseURL string,
 ) http.HandlerFunc {

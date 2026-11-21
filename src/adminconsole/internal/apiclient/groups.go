@@ -39,10 +39,10 @@ func (c *AuthServerClient) CreateGroup(ctx context.Context, accessToken string, 
 // The member count used to be a second return value, because the record.Group this rebuilt did
 // not carry one. api.GroupResponse does, filled by the same handler from the same query, so the
 // delete page reads it off the response like every other field (#350).
-func (c *AuthServerClient) GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
+func (c *AuthServerClient) GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error) {
 	response, err := execute[api.GetGroupResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupID),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
@@ -51,10 +51,10 @@ func (c *AuthServerClient) GetGroupById(ctx context.Context, accessToken string,
 	return &response.Group, nil
 }
 
-func (c *AuthServerClient) UpdateGroup(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error) {
+func (c *AuthServerClient) UpdateGroup(ctx context.Context, accessToken string, groupID int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error) {
 	response, err := execute[api.UpdateGroupResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -65,10 +65,10 @@ func (c *AuthServerClient) UpdateGroup(ctx context.Context, accessToken string, 
 	return &response.Group, nil
 }
 
-func (c *AuthServerClient) DeleteGroup(ctx context.Context, accessToken string, groupId int64) error {
+func (c *AuthServerClient) DeleteGroup(ctx context.Context, accessToken string, groupID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupID),
 		successStatus: http.StatusOK,
 	})
 	return err
@@ -76,10 +76,10 @@ func (c *AuthServerClient) DeleteGroup(ctx context.Context, accessToken string, 
 
 // GetUserGroups answers two values out of one envelope: the user the endpoint resolved and the
 // groups it holds. UpdateUserGroups below returns the same envelope for the same reason.
-func (c *AuthServerClient) GetUserGroups(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error) {
+func (c *AuthServerClient) GetUserGroups(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.GroupResponse, error) {
 	response, err := execute[api.GetUserGroupsResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userID),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
@@ -88,10 +88,10 @@ func (c *AuthServerClient) GetUserGroups(ctx context.Context, accessToken string
 	return &response.User, response.Groups, nil
 }
 
-func (c *AuthServerClient) GetGroupMembers(ctx context.Context, accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error) {
+func (c *AuthServerClient) GetGroupMembers(ctx context.Context, accessToken string, groupID int64, page, size int) ([]api.UserResponse, int, error) {
 	response, err := execute[api.GetGroupMembersResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members?page=%d&size=%d", c.baseURL, groupId, page, size),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members?page=%d&size=%d", c.baseURL, groupID, page, size),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
@@ -100,31 +100,31 @@ func (c *AuthServerClient) GetGroupMembers(ctx context.Context, accessToken stri
 	return response.Members, response.Total, nil
 }
 
-func (c *AuthServerClient) AddUserToGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error {
+func (c *AuthServerClient) AddUserToGroup(ctx context.Context, accessToken string, groupID int64, userID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "POST",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members", c.baseURL, groupId),
-		jsonBody:      api.AddGroupMemberRequest{UserID: userId},
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members", c.baseURL, groupID),
+		jsonBody:      api.AddGroupMemberRequest{UserID: userID},
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusCreated,
 	})
 	return err
 }
 
-func (c *AuthServerClient) RemoveUserFromGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error {
+func (c *AuthServerClient) RemoveUserFromGroup(ctx context.Context, accessToken string, groupID int64, userID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members/%d", c.baseURL, groupId, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members/%d", c.baseURL, groupID, userID),
 		successStatus: http.StatusOK,
 	})
 	return err
 }
 
-func (c *AuthServerClient) SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error) {
+func (c *AuthServerClient) SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupID int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error) {
 	response, err := execute[api.SearchUsersWithGroupAnnotationResponse](ctx, c, accessToken, apiRequest{
 		method: "GET",
 		url: fmt.Sprintf("%s/api/v1/admin/users/search?query=%s&annotateGroupMembership=%d&page=%d&size=%d",
-			c.baseURL, url.QueryEscape(query), groupId, page, size),
+			c.baseURL, url.QueryEscape(query), groupID, page, size),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
@@ -134,11 +134,11 @@ func (c *AuthServerClient) SearchUsersWithGroupAnnotation(ctx context.Context, a
 }
 
 // SearchGroupsWithPermissionAnnotation queries groups with a HasPermission flag
-// for the given permissionId, using server-side pagination.
-func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
+// for the given permissionID, using server-side pagination.
+func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionID int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
 	response, err := execute[api.SearchGroupsWithPermissionAnnotationResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/groups/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size),
+		url:           fmt.Sprintf("%s/api/v1/admin/groups/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionID, page, size),
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
@@ -147,10 +147,10 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(ctx context.Cont
 	return response.Groups, response.Total, nil
 }
 
-func (c *AuthServerClient) UpdateUserGroups(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
+func (c *AuthServerClient) UpdateUserGroups(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
 	response, err := execute[api.GetUserGroupsResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,

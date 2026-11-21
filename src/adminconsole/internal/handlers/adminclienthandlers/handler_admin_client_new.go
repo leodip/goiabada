@@ -13,7 +13,7 @@ import (
 )
 
 func HandleNewGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +36,7 @@ type clientNewAPI interface {
 }
 
 func HandleNewPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientNewAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -60,9 +60,9 @@ func HandleNewPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

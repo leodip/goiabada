@@ -134,7 +134,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 			mw := NewJWT(mockSessionStore, nil, "test-session", nil, nil, mockAuthHelper,
 				stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
-			jwtInfo := oauthclient.JwtInfo{}
+			jwtInfo := oauthclient.JWTInfo{}
 			mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 			mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
 			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything,
@@ -142,7 +142,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 				testCase.redirectBack).Return(nil)
 
 			req := httptest.NewRequest(http.MethodGet, testCase.requestURI, nil)
-			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 
 			rr := httptest.NewRecorder()
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +234,7 @@ func TestRequiresScope_FallsBackToTheHomePageWhenTheSealIsTooLong(t *testing.T) 
 			mw := NewJWT(new(sessionstoremocks.Store), nil, "test-session", nil, nil, mockAuthHelper,
 				stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
-			jwtInfo := oauthclient.JwtInfo{}
+			jwtInfo := oauthclient.JWTInfo{}
 			mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 			mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
 			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
@@ -245,7 +245,7 @@ func TestRequiresScope_FallsBackToTheHomePageWhenTheSealIsTooLong(t *testing.T) 
 			}
 
 			req := httptest.NewRequest(http.MethodGet, tc.requestURI, nil)
-			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 			rr := httptest.NewRecorder()
 			mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				t.Error("an anonymous request never reaches the page it asked for")

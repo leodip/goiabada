@@ -164,7 +164,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
 
 	want := []string{
 		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
-		"RefTimezone", "ScopeList", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
+		"RefTimezone", "ScopeList", "Since", "T", "add", "addURLParam", "args", "concat", "deref",
 		"isAdminBrandingPage", "isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",
 	}

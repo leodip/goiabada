@@ -44,16 +44,16 @@
           <div class="grid gap-3">
             {{ if .HasConsent }}
             <div class="grid gap-1">
-              <span class="block text-sm text-ink-muted" id="consent-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.consent_scope_label" }}</span>
-              <ul class="grid gap-1 font-mono text-[0.8125rem]" aria-labelledby="consent-scope-{{ .ClientId }}">
+              <span class="block text-sm text-ink-muted" id="consent-scope-{{ .ClientID }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.consent_scope_label" }}</span>
+              <ul class="grid gap-1 font-mono text-[0.8125rem]" aria-labelledby="consent-scope-{{ .ClientID }}">
                 {{ range ScopeList $.ctx .ConsentScope }}<li>{{ .Scope }}</li>{{ end }}
               </ul>
             </div>
             {{ end }}
             {{ if .GrantScope }}
             <div class="grid gap-1">
-              <span class="block text-sm text-ink-muted" id="grant-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.grant_scope_label" }}</span>
-              <ul class="grid gap-1 font-mono text-[0.8125rem]" aria-labelledby="grant-scope-{{ .ClientId }}">
+              <span class="block text-sm text-ink-muted" id="grant-scope-{{ .ClientID }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.grant_scope_label" }}</span>
+              <ul class="grid gap-1 font-mono text-[0.8125rem]" aria-labelledby="grant-scope-{{ .ClientID }}">
                 {{ range ScopeList $.ctx .GrantScope }}<li>{{ .Scope }}</li>{{ end }}
               </ul>
             </div>
@@ -65,7 +65,7 @@
           {{ if .IsCurrent }}
           <span class="tag tag-note">{{ T $.ctx "adminconsole.admin_users.connected_clients.current_tag" }}</span>
           {{ else }}
-          <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.ID }}/connected-clients" data-action-body="{&#34;clientId&#34;:{{ .ClientId }}}" data-dialog="disconnectClient"
+          <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.ID }}/connected-clients" data-action-body="{&#34;clientId&#34;:{{ .ClientID }}}" data-dialog="disconnectClient"
             data-confirm="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnect_confirm" "client" .Client }}" data-done="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnected" }}" data-done-label="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnected_label" }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnect_button" }}<span class="sr-only"> {{ .Client }}</span></button>
           {{ end }}
         </td>

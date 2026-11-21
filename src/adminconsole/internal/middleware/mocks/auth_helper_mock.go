@@ -53,7 +53,7 @@ func (_m *AuthHelper) EXPECT() *AuthHelper_Expecter {
 }
 
 // IsAuthenticated provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool {
+func (_mock *AuthHelper) IsAuthenticated(jwtInfo oauthclient.JWTInfo) bool {
 	ret := _mock.Called(jwtInfo)
 
 	if len(ret) == 0 {
@@ -61,7 +61,7 @@ func (_mock *AuthHelper) IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool {
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(oauthclient.JwtInfo) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(oauthclient.JWTInfo) bool); ok {
 		r0 = returnFunc(jwtInfo)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -75,16 +75,16 @@ type AuthHelper_IsAuthenticated_Call struct {
 }
 
 // IsAuthenticated is a helper method to define mock.On call
-//   - jwtInfo oauthclient.JwtInfo
+//   - jwtInfo oauthclient.JWTInfo
 func (_e *AuthHelper_Expecter) IsAuthenticated(jwtInfo any) *AuthHelper_IsAuthenticated_Call {
 	return &AuthHelper_IsAuthenticated_Call{Call: _e.mock.On("IsAuthenticated", jwtInfo)}
 }
 
-func (_c *AuthHelper_IsAuthenticated_Call) Run(run func(jwtInfo oauthclient.JwtInfo)) *AuthHelper_IsAuthenticated_Call {
+func (_c *AuthHelper_IsAuthenticated_Call) Run(run func(jwtInfo oauthclient.JWTInfo)) *AuthHelper_IsAuthenticated_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 oauthclient.JwtInfo
+		var arg0 oauthclient.JWTInfo
 		if args[0] != nil {
-			arg0 = args[0].(oauthclient.JwtInfo)
+			arg0 = args[0].(oauthclient.JWTInfo)
 		}
 		run(
 			arg0,
@@ -98,13 +98,13 @@ func (_c *AuthHelper_IsAuthenticated_Call) Return(b bool) *AuthHelper_IsAuthenti
 	return _c
 }
 
-func (_c *AuthHelper_IsAuthenticated_Call) RunAndReturn(run func(jwtInfo oauthclient.JwtInfo) bool) *AuthHelper_IsAuthenticated_Call {
+func (_c *AuthHelper_IsAuthenticated_Call) RunAndReturn(run func(jwtInfo oauthclient.JWTInfo) bool) *AuthHelper_IsAuthenticated_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // IsAuthorizedToAccessResource provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauthclient.JwtInfo, scopesAnyOf []string) bool {
+func (_mock *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauthclient.JWTInfo, scopesAnyOf []string) bool {
 	ret := _mock.Called(jwtInfo, scopesAnyOf)
 
 	if len(ret) == 0 {
@@ -112,7 +112,7 @@ func (_mock *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauthclient.JwtInf
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(oauthclient.JwtInfo, []string) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(oauthclient.JWTInfo, []string) bool); ok {
 		r0 = returnFunc(jwtInfo, scopesAnyOf)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -126,17 +126,17 @@ type AuthHelper_IsAuthorizedToAccessResource_Call struct {
 }
 
 // IsAuthorizedToAccessResource is a helper method to define mock.On call
-//   - jwtInfo oauthclient.JwtInfo
+//   - jwtInfo oauthclient.JWTInfo
 //   - scopesAnyOf []string
 func (_e *AuthHelper_Expecter) IsAuthorizedToAccessResource(jwtInfo any, scopesAnyOf any) *AuthHelper_IsAuthorizedToAccessResource_Call {
 	return &AuthHelper_IsAuthorizedToAccessResource_Call{Call: _e.mock.On("IsAuthorizedToAccessResource", jwtInfo, scopesAnyOf)}
 }
 
-func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) Run(run func(jwtInfo oauthclient.JwtInfo, scopesAnyOf []string)) *AuthHelper_IsAuthorizedToAccessResource_Call {
+func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) Run(run func(jwtInfo oauthclient.JWTInfo, scopesAnyOf []string)) *AuthHelper_IsAuthorizedToAccessResource_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 oauthclient.JwtInfo
+		var arg0 oauthclient.JWTInfo
 		if args[0] != nil {
-			arg0 = args[0].(oauthclient.JwtInfo)
+			arg0 = args[0].(oauthclient.JWTInfo)
 		}
 		var arg1 []string
 		if args[1] != nil {
@@ -155,7 +155,7 @@ func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) Return(b bool) *AuthHelp
 	return _c
 }
 
-func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) RunAndReturn(run func(jwtInfo oauthclient.JwtInfo, scopesAnyOf []string) bool) *AuthHelper_IsAuthorizedToAccessResource_Call {
+func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) RunAndReturn(run func(jwtInfo oauthclient.JWTInfo, scopesAnyOf []string) bool) *AuthHelper_IsAuthorizedToAccessResource_Call {
 	_c.Call.Return(run)
 	return _c
 }

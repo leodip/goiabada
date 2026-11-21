@@ -43,7 +43,7 @@ func (a *sessionsAPI) UpdateSettingsSessions(_ context.Context, _ string, reques
 // The page shows the per-user session cap beside the two lifetimes (#564 decision 6), and whether
 // users stay signed in after the browser closes (#743 decision 4).
 func TestHandleSessionsGet_ShowsTheCapAndKeepSignedInBesideTheLifetimes(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	var bind map[string]interface{}
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html",
@@ -70,7 +70,7 @@ func TestHandleSessionsPost_AlwaysSendsTheCap(t *testing.T) {
 		sent  int
 	}{{"5", 5}, {"0", 0}, {" 12 ", 12}} {
 		t.Run(entered.value, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &sessionsAPI{}
 
@@ -107,7 +107,7 @@ func TestHandleSessionsPost_RefusesAValueThatIsNotAWholeNumberAtItsField(t *test
 	for _, tc := range testCases {
 		for _, entered := range []string{"abc", ""} {
 			t.Run(tc.name+" "+entered, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_settings_sessions.html").Once()
 				apiClient := &sessionsAPI{}
@@ -135,7 +135,7 @@ func TestHandleSessionsPost_RefusesAValueThatIsNotAWholeNumberAtItsField(t *test
 // A refused save redraws the form with the cap as it was entered, beside the auth server's refusal,
 // which marks the field its code names.
 func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	var bind map[string]interface{}
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/menu_layout.html",
@@ -170,7 +170,7 @@ func TestHandleSessionsPost_ARefusedSaveRedrawsTheCapAsEntered(t *testing.T) {
 func TestHandleSessionsPost_SendsTheKeepSignedInModeChosen(t *testing.T) {
 	for _, mode := range []string{"always", "ask", "never"} {
 		t.Run(mode, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &sessionsAPI{}
 
@@ -194,7 +194,7 @@ func TestHandleSessionsPost_SendsTheKeepSignedInModeChosen(t *testing.T) {
 // With no mode chosen the save sends none, and the auth server's refusal comes back at the radio
 // buttons, with the other fields as entered.
 func TestHandleSessionsPost_ARefusedKeepSignedInIsMarkedAtItsRadioButtons(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_settings_sessions.html").Once()
 	refusal := "Choose whether users stay signed in after the browser closes."

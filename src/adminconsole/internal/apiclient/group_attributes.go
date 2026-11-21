@@ -8,10 +8,10 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-func (c *AuthServerClient) GetGroupAttributesByGroupId(ctx context.Context, accessToken string, groupId int64) ([]api.GroupAttributeResponse, error) {
+func (c *AuthServerClient) GetGroupAttributesByGroupID(ctx context.Context, accessToken string, groupID int64) ([]api.GroupAttributeResponse, error) {
 	response, err := execute[api.GetGroupAttributesResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/attributes",
+		url:           c.baseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupID, 10) + "/attributes",
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -21,10 +21,10 @@ func (c *AuthServerClient) GetGroupAttributesByGroupId(ctx context.Context, acce
 	return response.Attributes, nil
 }
 
-func (c *AuthServerClient) GetGroupAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.GroupAttributeResponse, error) {
+func (c *AuthServerClient) GetGroupAttributeByID(ctx context.Context, accessToken string, attributeID int64) (*api.GroupAttributeResponse, error) {
 	response, err := execute[api.GetGroupAttributeResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -48,10 +48,10 @@ func (c *AuthServerClient) CreateGroupAttribute(ctx context.Context, accessToken
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+func (c *AuthServerClient) UpdateGroupAttribute(ctx context.Context, accessToken string, attributeID int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	response, err := execute[api.UpdateGroupAttributeResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeID, 10),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -62,10 +62,10 @@ func (c *AuthServerClient) UpdateGroupAttribute(ctx context.Context, accessToken
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) DeleteGroupAttribute(ctx context.Context, accessToken string, attributeId int64) error {
+func (c *AuthServerClient) DeleteGroupAttribute(ctx context.Context, accessToken string, attributeID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
