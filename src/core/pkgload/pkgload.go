@@ -166,7 +166,7 @@ func LoadBuilds(builds []Build, dirs ...string) ([][]*packages.Package, error) {
 // cache in its place, whose own //line directives lead back to it, so there it is the position those
 // give: the original file's, at its line. A //line directive the original carries itself is copied
 // into cgo's output after cgo's own and moves the position there, as it moves the go command's
-// diagnostics, since nothing in that output tells the two kinds apart.
+// diagnostics: in that file Position reads the adjusted position, which follows every directive.
 func Position(p *packages.Package, pos token.Pos) token.Position {
 	at := p.Fset.PositionFor(pos, false)
 	if slices.Contains(p.GoFiles, at.Filename) {
