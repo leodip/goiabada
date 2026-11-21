@@ -27,6 +27,7 @@ max_rerun=20
 
 worktree="$(git rev-parse --show-toplevel)" || exit 1
 main="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")" || exit 1
+suite="$worktree/e2e/playwright"
 
 [[ -f "$main/e2e/.env" ]] || { echo "no $main/e2e/.env: copy e2e/.env.example there and set E2E_VPS_HOST" >&2; exit 1; }
 if [[ "$main" != "$worktree" ]]; then
@@ -82,13 +83,23 @@ rerun_failed_tests() { # first_status
     echo "No rerun: $count tests failed or did not run, more than the $max_rerun the gate reruns."
     return "$1"
   fi
-  if ! names="$(cd "$worktree/e2e/playwright" &&
+  if ! names="$(cd "$suite" &&
     npx playwright test --list --last-failed --last-failed-file "$last_run" --no-deps | grep '^  \[')"; then
     echo "No rerun: Playwright could not list the tests that did not pass."
     return "$1"
   fi
 
+  # Each Playwright run clears test-results/ and playwright-report/ when it starts, so the
+  # first run's traces, screenshots and report move aside before the sweep's.
+  mv "$suite/test-results" "$suite/test-results-first-run" 2>/dev/null
+  mv "$suite/playwright-report" "$suite/playwright-report-first-run" 2>/dev/null
   echo
+  if [[ -d "$suite/test-results-first-run" ]]; then
+    echo "The first run's traces and screenshots are in e2e/playwright/test-results-first-run/."
+  fi
+  if [[ -d "$suite/playwright-report-first-run" ]]; then
+    echo "The first run's report: (cd e2e/playwright && npx playwright show-report playwright-report-first-run)"
+  fi
   echo "Rerunning these tests once, after the setup project's sweep:"
   printf '%s\n' "$names"
   if ! "$worktree/e2e/test.sh" --project=setup --no-deps; then
@@ -110,6 +121,9 @@ rerunnable=1
 for arg in "$@"; do
   [[ "$arg" == -* ]] && rerunnable=0
 done
+
+# What an earlier run's rerun kept of its first run, so that what this run leaves is its own.
+rm -rf "$suite/test-results-first-run" "$suite/playwright-report-first-run"
 
 if ((rerunnable)); then
   PLAYWRIGHT_LAST_RUN_OUTPUT_FILE="$last_run" "$worktree/e2e/run.sh" --source "$@"
