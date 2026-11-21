@@ -65,6 +65,12 @@ run = json.load(open(sys.argv[1]))
 print(len(run["failedTests"]) if run.get("status") == "failed" else 0)' "$last_run" 2>/dev/null || echo 0
 }
 
+# Renames a folder to a name nothing holds, so that it never lands inside another folder; fails,
+# and moves nothing, when the name is taken or the folder is not there.
+move_aside() { # from to
+  [[ -d "$1" && ! -e "$2" ]] && mv "$1" "$2"
+}
+
 # The suite's failures here have come from the shared environment, not from the tests: a
 # request the VPS leaves unanswered fails a test, a different one on each run. So the tests
 # that did not pass run once more, and only they: --no-deps leaves out the setup project and
@@ -90,14 +96,13 @@ rerun_failed_tests() { # first_status
   fi
 
   # Each Playwright run clears test-results/ and playwright-report/ when it starts, so the
-  # first run's traces, screenshots and report move aside before the sweep's.
-  mv "$suite/test-results" "$suite/test-results-first-run" 2>/dev/null
-  mv "$suite/playwright-report" "$suite/playwright-report-first-run" 2>/dev/null
+  # first run's traces, screenshots and report move aside before the sweep's, and each is
+  # announced only once it has moved.
   echo
-  if [[ -d "$suite/test-results-first-run" ]]; then
+  if move_aside "$suite/test-results" "$suite/test-results-first-run"; then
     echo "The first run's traces and screenshots are in e2e/playwright/test-results-first-run/."
   fi
-  if [[ -d "$suite/playwright-report-first-run" ]]; then
+  if move_aside "$suite/playwright-report" "$suite/playwright-report-first-run"; then
     echo "The first run's report: (cd e2e/playwright && npx playwright show-report playwright-report-first-run)"
   fi
   echo "Rerunning these tests once, after the setup project's sweep:"
