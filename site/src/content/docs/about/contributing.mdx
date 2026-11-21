@@ -122,7 +122,7 @@ Some committed files are written by a tool. When your change touches what one is
 
 `schemadump` regenerates the `schema.golden` file of all four databases, which the data tier compares against a freshly migrated database. The `lint` tier reruns the mocks, the ownership table and the CSS, and fails when any of them differs from what's committed.
 
-`e2e/screenshots.sh` builds both servers from your checkout, captures the screenshots the docs home page and the README show, writes them over `site/src/assets`, and removes the containers it started. It keeps the images it built, so the next run is faster, and the [e2e README](https://github.com/leodip/goiabada/blob/main/e2e/README.md#screenshots) says how to remove them. It needs no dev container, Node.js or VPS.
+`e2e/screenshots.sh` builds both servers from your checkout, captures the screenshots the docs home page and the README show, writes them over `site/src/assets`, and removes the containers it started. It leaves the images it built in Docker, and the [e2e README](https://github.com/leodip/goiabada/blob/main/e2e/README.md#screenshots) says how to remove them. It needs no dev container, Node.js or VPS.
 
 ## Write docs
 

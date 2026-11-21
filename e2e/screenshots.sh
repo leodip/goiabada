@@ -8,7 +8,7 @@
 # It builds both servers from the release Dockerfiles, starts them on a new database beside Mailpit
 # and the browser of Playwright's image, captures the images listed in
 # e2e/playwright/screenshots/images.json, and removes the containers, network and volumes it
-# started. It keeps the images it built, for the next run; e2e/README.md says how to remove them.
+# started. It leaves the images it built in Docker; e2e/README.md says how to remove them.
 # The committed images are replaced only once the capture and that removal have both succeeded; a
 # run that fails leaves them as they were and says which step failed, with the servers' last log
 # lines.

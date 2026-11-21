@@ -232,9 +232,9 @@ that fails says which step failed, with the servers' last log lines when they we
 leaves the committed images as they were. Run twice on the same tree on one machine, it writes the same bytes.
 `e2e/screenshots.sh --help` says the same in short.
 
-It keeps the three images it builds, so the next run rebuilds only what changed. They are named for
-the checkout: `goiabada-screenshots-<number>-authserver`, `-adminconsole`, and `-check`, the one
-the images are checked in. To remove this checkout's, from the repository root:
+It leaves the three images it builds in Docker, named for the checkout:
+`goiabada-screenshots-<number>-authserver`, `-adminconsole`, and `-check`, the one the images are
+checked in. To remove this checkout's, from the repository root:
 
 ```bash
 docker image ls --format '{{.Repository}}:{{.Tag}}' "goiabada-screenshots-$(printf '%s' "$PWD" | cksum | cut -d ' ' -f 1)-*" | xargs -r docker image rm
