@@ -5,8 +5,10 @@ package guard
 //
 // The real caller walks a clean tree -- #439 moved the rate limiter's credential reservation, the
 // last raw read #433 left outside internal/reqctx, in behind it -- so it passes identically
-// whether the rule still fires or has quietly stopped resolving anything. Every fixture below is a shape the auth server had, or one
-// that would make the walk answer by spelling rather than by type.
+// whether the rule still fires or has quietly stopped resolving anything. Every fixture below is a
+// shape the auth server had, or one that would make the walk answer by spelling rather than by
+// type. Each tree is a module the go command loads, and compiles: the guard reads it through
+// pkgload, where a package that does not compile is fatal (#420).
 
 import (
 	"strconv"
@@ -36,7 +38,7 @@ func SettingsFrom(ctx context.Context) (string, bool) {
 `
 
 // contextFixtureLimiter is the rate limiter's shape: a private key written and read in one file,
-// the read through r.Context(), which resolves only because net/http is read from source.
+// the read through r.Context(), whose type comes from net/http.
 const contextFixtureLimiter = `package limiter
 
 import (
@@ -117,11 +119,12 @@ func Raw(ctx context.Context, r *http.Request) {
 	_ = wrapped{ctx}.Value("k") // site:embedded-read
 	read := ctx.Value // site:method-value
 	_ = read
-	_ = other.Make().Value("k") // site:unresolved
+	_ = other.Make().Value("k") // site:other-package-read
 }
 `
 
-// contextFixtureOther is a package the importer stubs, so a value of its type is unresolvable.
+// contextFixtureOther returns a context from another package of the module. A hand-written
+// importer that stubbed it could not tell what its Value call read; the type checker can.
 const contextFixtureOther = `package other
 
 import "context"
@@ -174,10 +177,10 @@ func TestContextValues_ThePassingTreeReportsNothing(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Empty(t, walk.findings)
-	assert.Empty(t, walk.blocked)
 	assert.Empty(t, walk.problems)
-	// The accessor's write and read, and the limiter's write and read. The test file's two are
-	// not walked, and nothing in clean.go is a site.
+	// The accessor's write and read, and the limiter's write and read, each counted once however
+	// many of the builds read select its file. The test file's two are not walked, and nothing in
+	// clean.go is a site.
 	assert.Equal(t, 4, walk.sites)
 }
 
@@ -200,12 +203,8 @@ func TestContextValues_TheRuleTable(t *testing.T) {
 		at("request-read") + " a context Value read",
 		at("embedded-read") + " a context Value read",
 		at("method-value") + " a context Value read",
+		at("other-package-read") + " a context Value read",
 	}, contextFindingNames(walk.findings))
-
-	require.Len(t, walk.blocked, 1)
-	assert.Equal(t, "handlers/raw.go", walk.blocked[0].file)
-	assert.Equal(t, lineOf(t, contextFixtureRaw, "unresolved"), walk.blocked[0].line)
-	assert.Contains(t, walk.blocked[0].why, "cannot resolve")
 
 	assert.Empty(t, walk.problems)
 }
@@ -262,11 +261,11 @@ func TestContextValues_TheReportingHalfFailsOnARawRead(t *testing.T) {
 
 	assert.True(t, report.Failed())
 	assert.False(t, report.Stopped)
-	assert.Contains(t, report.Text(), "6 raw context value read(s) or write(s) outside reqctx")
+	assert.Contains(t, report.Text(), "7 raw context value read(s) or write(s) outside reqctx")
 	assert.Contains(t, report.Text(),
 		"handlers/raw.go:"+strconv.Itoa(lineOf(t, contextFixtureRaw, "plain-read"))+": a context Value read")
 	assert.Contains(t, report.Text(),
-		"handlers/raw.go:"+strconv.Itoa(lineOf(t, contextFixtureRaw, "unresolved"))+": a Value call")
+		"handlers/raw.go:"+strconv.Itoa(lineOf(t, contextFixtureRaw, "other-package-read"))+": a context Value read")
 }
 
 func TestContextValues_TheReportingHalfReportsExemptionProblems(t *testing.T) {
@@ -294,11 +293,107 @@ func TestContextValues_TheReportingHalfPassesTheCleanTree(t *testing.T) {
 	assert.False(t, report.Failed(), report.Text())
 }
 
+// contextFixtureSiteless is an accessor package renamed away from the context: the names
+// clean.go calls, and no site.
+const contextFixtureSiteless = `package reqctx
+
+import "context"
+
+func WithSettings(ctx context.Context, s string) context.Context { return ctx }
+
+func SettingsFrom(ctx context.Context) (string, bool) { return "", false }
+`
+
+// contextFixtureWindows is a production file only the Windows release build selects: the test
+// machine's default build and the other four release builds leave it out.
+const contextFixtureWindows = `//go:build windows
+
+package handlers
+
+import "context"
+
+func OnWindows(ctx context.Context) any {
+	return ctx.Value("k") // site:windows-read
+}
+`
+
+// contextFixtureReleaseOnly is a production file only a build with the production tag selects,
+// which every release build sets and the default build does not.
+const contextFixtureReleaseOnly = `//go:build production
+
+package handlers
+
+import "context"
+
+func InRelease(ctx context.Context) context.Context {
+	return context.WithValue(ctx, "k", 1) // site:release-write
+}
+`
+
+// contextFixtureDevelopmentOnly is a production file no release build selects, as the admin
+// console's handler test support is: only the default build reads it.
+const contextFixtureDevelopmentOnly = `//go:build !production
+
+package handlers
+
+import "context"
+
+func InDevelopment(ctx context.Context) any {
+	return ctx.Value("k") // site:development-read
+}
+`
+
+// A raw read in a file only one of the builds selects is still a raw read in shipped code, or in
+// code the development server runs, so the walk reads every release build and the default build
+// and merges what they find (#420 decision 11).
+func TestContextValues_AFileOnlyOneBuildSelectsIsRead(t *testing.T) {
+	for _, tc := range []struct {
+		name, file, src, marker, what string
+	}{
+		{"another platform's release build", "handlers/platform.go", contextFixtureWindows,
+			"windows-read", "a context Value read"},
+		{"the production tag", "handlers/release.go", contextFixtureReleaseOnly,
+			"release-write", "context.WithValue"},
+		{"the default build only", "handlers/development.go", contextFixtureDevelopmentOnly,
+			"development-read", "a context Value read"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			contextFixtureModule(t, root)
+			writeFixture(t, root, "mod/"+tc.file, tc.src)
+
+			walk, err := findContextValueSites(root, "mod", "reqctx", contextFixtureExemptions)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{
+				tc.file + ":" + strconv.Itoa(lineOf(t, tc.src, tc.marker)) + " " + tc.what,
+			}, contextFindingNames(walk.findings))
+			assert.Equal(t, 5, walk.sites)
+		})
+	}
+}
+
+// A package that does not compile cannot be read whole, and a raw read in it would pass unseen,
+// so the walk stops and names it (#420 decision 3).
+func TestContextValues_APackageThatDoesNotCompileIsFatal(t *testing.T) {
+	root := t.TempDir()
+	contextFixtureModule(t, root)
+	writeFixture(t, root, "mod/broken/broken.go", "package broken\n\nfunc Broken() int { return \"x\" }\n")
+
+	report := Run(func(r Reporter) {
+		assertContextValuesThroughAccessors(r, root, "mod", "reqctx", contextFixtureExemptions)
+	})
+
+	assert.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "example.com/mod/broken")
+	assert.Contains(t, report.Fatal, "does not load or type-check")
+}
+
 func TestContextValues_AWalkThatReachedNothingIsFatal(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
 	writeFixture(t, root, "mod/handlers/clean.go", contextFixtureClean)
-	writeFixture(t, root, "mod/reqctx/reqctx.go", "package reqctx\n\nfunc SettingsFrom() {}\n")
+	writeFixture(t, root, "mod/reqctx/reqctx.go", contextFixtureSiteless)
 
 	report := Run(func(r Reporter) {
 		assertContextValuesThroughAccessors(r, root, "mod", "reqctx", nil)

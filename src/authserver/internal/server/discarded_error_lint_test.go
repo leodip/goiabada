@@ -367,9 +367,9 @@ func discardedErrorResolver(file *ast.File, ownPath string, listed map[string][]
 // source is read from the source root, and every other path is an empty stub. A receiver whose type
 // came through a stub is therefore reported as unresolved rather than guessed at.
 //
-// core/guard's stubPackages, behind the context-value and AssertNotCalled-arity guards, is the twin
-// of the stub half. It stays unexported there because exporting it for this one caller would add a
-// core symbol, and an OWNERSHIP.md row, for about twenty lines (#434).
+// core/guard's stubPackages, behind the AssertNotCalled-arity guard, is the twin of the stub half.
+// It stays unexported there because exporting it for this one caller would add a core symbol, and
+// an OWNERSHIP.md row, for about twenty lines (#434).
 type discardedErrorPackages struct {
 	root   string
 	source map[string]bool

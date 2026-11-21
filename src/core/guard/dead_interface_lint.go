@@ -119,8 +119,8 @@ type deadInterface struct {
 
 // unresolvedShape is something the walk found and cannot answer for. It is reported as a finding
 // because the alternative -- passing over it -- is a guard silently narrowing its own scope. The
-// context-value and AssertNotCalled-arity guards report it; this guard reads type-checked
-// packages, where every name resolves, and has none.
+// AssertNotCalled-arity guard reports it; the guards that read type-checked packages through
+// pkgload, where every name resolves, have none.
 type unresolvedShape struct {
 	file string
 	line int
@@ -343,10 +343,10 @@ func relativeTo(root, path string) string {
 }
 
 // stubPackages is an importer that never reads a package. Every path it is asked for becomes an
-// empty, complete types.Package, which is enough for the two questions the context-value and
-// AssertNotCalled-arity guards ask of it -- which object an identifier binds to, and which import
-// path a package name came from -- because both are answered by lexical scoping rather than by
-// anything inside the imported package.
+// empty, complete types.Package, which is enough for the two questions the AssertNotCalled-arity
+// guard asks of it -- which object an identifier binds to, and which import path a package name
+// came from -- because both are answered by lexical scoping rather than by anything inside the
+// imported package.
 type stubPackages struct {
 	names map[string]string
 	made  map[string]*types.Package
@@ -373,7 +373,7 @@ func (s *stubPackages) Import(path string) (*types.Package, error) {
 // inventedPackageName guesses the package name of a path this walk has not read, which is the last
 // path element with any version suffix dropped. It is right for almost every package and harmless
 // when it is wrong: a name that does not match only leaves that package's own selectors
-// unresolved, and neither guard asks anything of a package it is not holding.
+// unresolved, and the guard asks nothing of a package it is not holding.
 func inventedPackageName(path string) string {
 	base := path
 	if i := strings.LastIndex(base, "/"); i >= 0 {
