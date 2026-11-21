@@ -107,11 +107,12 @@ func TestSiteScreenshots_TheChecksFail(t *testing.T) {
 		unshownScreenshots(screenshotsShown(homePage, home), []string{"screenshot-account-phone.png", "screenshot-users.png"}))
 
 	// Listed images the README names only inside comments: an inline image and an HTML <img>
-	// commented out, a reference image whose definition is commented out, and an image after a
-	// comment that is never closed. The visible one beside them is still shown.
+	// commented out, a reference image whose definition is commented out, on a line of its own
+	// inside the comment, where it reads as a definition unless the comment is taken out first, and
+	// an image after a comment that is never closed. The visible one beside them is still shown.
 	readme = "<!-- ![Hidden](site/src/assets/screenshot-a.png) -->\n" +
 		"<!--\n<img src=\"site/src/assets/screenshot-b.png\">\n-->\n" +
-		"![Defined][c]\n\n<!-- [c]: site/src/assets/screenshot-c.png -->\n" +
+		"![Defined][c]\n\n<!--\n[c]: site/src/assets/screenshot-c.png\n-->\n" +
 		"![Visible](site/src/assets/screenshot-users.png)\n" +
 		"<!-- never closed\n![Unclosed](site/src/assets/screenshot-d.png)\n"
 	written := []string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png", "screenshot-d.png", "screenshot-users.png"}

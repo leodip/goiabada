@@ -2,9 +2,9 @@ package guard
 
 // e2e/screenshots.sh writes the images its capture took over the committed ones, and a run that fails
 // leaves the committed ones as they were (#534 decision 1). These tests run the script in a copy of
-// the folders it touches, with docker replaced by a stub that plays the Compose project and hands
-// back the images a test put in its capture folder, and with cp, mv and rm replaced by stubs that fail
-// where the test says, as a full or failing disk would.
+// the folders it touches, with docker replaced by a stub that plays the Compose project, hands back
+// the images a test put in its capture folder and runs the real check of them, and with cp, mv and rm
+// replaced by stubs that fail where the test says, as a full or failing disk would.
 
 import (
 	"bytes"
@@ -16,21 +16,46 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // screenshotsStubDocker plays the Compose project: every command succeeds, logs prints a line for each server,
-// and cp copies the capture folder the test filled.
+// cp copies the capture folder the test filled, and running the check service runs
+// src/core/cmd/screenshotcheck, built as SCREENSHOT_CHECK, with the arguments and the input the
+// service would take.
 const screenshotsStubDocker = `#!/usr/bin/env bash
 echo "docker $*" >>"$STUB/log"
 case " $* " in
   *" logs "*) echo "authserver-1 | the auth server's last line"; echo "adminconsole-1 | the console's last line" ;;
   " cp "*) "$REAL_CP" -R "$STUB/out/." "${@: -1}" ;;
+  *" run "*" check "*) while [ "$1" != check ]; do shift; done; shift; exec "$SCREENSHOT_CHECK" "$@" ;;
 esac
 `
+
+// screenshotCheck builds src/core/cmd/screenshotcheck once for the tests that run the script, into
+// a temporary folder of the test binary's own, which it leaves for the system to clear.
+var screenshotCheck = sync.OnceValues(func() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", errs.Wrap(err, "getting the working directory")
+	}
+	dir, err := os.MkdirTemp("", "screenshotcheck-")
+	if err != nil {
+		return "", errs.Wrap(err, "making a folder for screenshotcheck")
+	}
+	bin := filepath.Join(dir, "screenshotcheck")
+	cmd := exec.Command("go", "build", "-o", bin, "./cmd/screenshotcheck")
+	cmd.Dir = filepath.Dir(wd)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", errs.Wrapf(err, "building screenshotcheck: %s", out)
+	}
+	return bin, nil
+})
 
 // screenshotsStubCp, screenshotsStubMv and screenshotsStubRm fail a copy into, a rename out of, or a
 // deletion of the files the test names in FAIL_CP, FAIL_MV and FAIL_RM, by file name. With
@@ -135,11 +160,13 @@ func (f screenshotsFixtureDir) run(t *testing.T, env ...string) screenshotsRun {
 		require.NoError(t, err)
 		tools[tool] = path
 	}
+	check, err := screenshotCheck()
+	require.NoError(t, err)
 	cmd := exec.Command("bash", filepath.Join(f.root, "e2e", "screenshots.sh"))
 	cmd.Dir = f.root
 	cmd.Env = append(os.Environ(),
 		"PATH="+filepath.Join(f.stub, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"TMPDIR="+f.tmp, "STUB="+f.stub, "ASSETS="+f.assets,
+		"TMPDIR="+f.tmp, "STUB="+f.stub, "ASSETS="+f.assets, "SCREENSHOT_CHECK="+check,
 		"REAL_CP="+tools["cp"], "REAL_MV="+tools["mv"], "REAL_RM="+tools["rm"],
 		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "KILL_RM=", "FULL_AFTER_RENAME=")
 	cmd.Env = append(cmd.Env, env...)
@@ -197,6 +224,11 @@ func screenshotContent(prefix, name string) string {
 // fixturePNG is a valid PNG of one grey pixel whose tEXt chunk holds text, so each image's bytes
 // are its own.
 func fixturePNG(text string) string {
+	return fixturePNGWith(text, true)
+}
+
+// fixturePNGWith is fixturePNG with its image data, or without it when data is false.
+func fixturePNGWith(text string, data bool) string {
 	var b bytes.Buffer
 	b.WriteString("\x89PNG\r\n\x1a\n")
 	chunk := func(kind string, data []byte) {
@@ -207,11 +239,13 @@ func fixturePNG(text string) string {
 	}
 	chunk("IHDR", []byte{0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0})
 	chunk("tEXt", append([]byte("Comment\x00"), text...))
-	var pixels bytes.Buffer
-	z := zlib.NewWriter(&pixels)
-	_, _ = z.Write([]byte{0, 0x80})
-	_ = z.Close()
-	chunk("IDAT", pixels.Bytes())
+	if data {
+		var pixels bytes.Buffer
+		z := zlib.NewWriter(&pixels)
+		_, _ = z.Write([]byte{0, 0x80})
+		_ = z.Close()
+		chunk("IDAT", pixels.Bytes())
+	}
 	chunk("IEND", nil)
 	return b.String()
 }
@@ -304,6 +338,12 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 			func(t *testing.T, out string) {
 				image := fixturePNG("new screenshot-b.png")
 				require.NoError(t, os.WriteFile(filepath.Join(out, "screenshot-b.png"), []byte(image[:len(image)-12]), 0o644))
+			}},
+		// A PNG's signature, its IHDR chunk and its IEND chunk, with none of the image data it must
+		// hold: its start and its end are right, and only decoding it finds it out.
+		{"a captured image is a PNG with no image data", screenshotsFixture, screenshotsLines(screenshotsFixture...), nil, "checking the images captured",
+			func(t *testing.T, out string) {
+				require.NoError(t, os.WriteFile(filepath.Join(out, "screenshot-b.png"), []byte(fixturePNGWith("new screenshot-b.png", false)), 0o644))
 			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -57,6 +57,23 @@ services:
     image: axllent/mailpit:v1.33.1
     network_mode: service:authserver
 
+  # The check of the captured images before they are written (src/core/cmd/screenshotcheck): the
+  # auth server's build stage, which the authserver build has already built, so it is the Go image
+  # the releases build in, with this checkout's core module. It reads the images as a tar stream on
+  # its standard input and reaches no network.
+  check:
+    build:
+      context: ../src
+      dockerfile: build/Dockerfile-authserver
+      target: build
+      args:
+        version: development
+        buildDate: development
+        gitCommit: development
+    network_mode: none
+    working_dir: /app/src/core
+    entrypoint: [go, run, ./cmd/screenshotcheck]
+
   # The browser: Playwright's own image at the version the e2e suite pins (e2e/playwright/
   # package.json), for this machine's platform. It copies the suite from the read-only mount,
   # installs its packages, checks its types, and runs screenshots.config.ts, which writes the images

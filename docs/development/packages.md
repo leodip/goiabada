@@ -53,7 +53,9 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   fixed version, or a Go finding whose vulnerable symbol govulncheck detects in the binary, which
   does not prove the code reaches it, merged across scanners and identifiers into one entry per
   advisory, the rest to the run's log, and the same bytes for the same scans, since the workflow
-  compares the report with the issue's body (#520)
+  compares the report with the issue's body (#520). And `screenshotcheck`, which
+  `e2e/screenshots.sh` runs in the release build's Go image to decode each image its capture wrote,
+  before it writes any over the committed ones (#534)
 - `countries/` - Self-maintained ISO 3166-1 reference data: names, alpha-2 and alpha-3 codes, flag
   emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset.
   It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)

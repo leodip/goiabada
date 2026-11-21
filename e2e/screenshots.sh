@@ -24,6 +24,7 @@ assets="$root/site/src/assets"
 # A project name of this checkout's own, so two checkouts can run the command at once.
 project="goiabada-screenshots-$(printf '%s' "$root" | cksum | cut -d ' ' -f 1)"
 capture="$project-capture"
+checker="$project-check"
 compose=(docker compose --project-name "$project" --file "$root/e2e/screenshots.yml")
 
 # The Playwright the e2e suite pins, whose image the browser runs in.
@@ -53,9 +54,10 @@ images=()
 preparing=false
 installed=false
 
-# Removes the containers, the network and the volumes of the project, and the capture's container.
+# Removes the containers, the network and the volumes of the project, and the capture's and the
+# check's containers.
 remove_project() {
-  docker rm -f "$capture" >/dev/null 2>&1 || true
+  docker rm -f "$capture" "$checker" >/dev/null 2>&1 || true
   "${compose[@]}" down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1
 }
 
@@ -101,7 +103,7 @@ trap 'exit 143' TERM
 
 step="building the servers"
 echo "screenshots: $step"
-"${compose[@]}" build --quiet authserver adminconsole
+"${compose[@]}" build --quiet authserver adminconsole check
 
 step="starting the servers"
 echo "screenshots: $step"
@@ -112,12 +114,17 @@ step="capturing the images"
 echo "screenshots: $step"
 "${compose[@]}" run --no-TTY --quiet-pull --name "$capture" capture
 docker cp --quiet "$capture:/out/." "$stage/new/"
+# Done with, and removed now so the check's run does not warn of it as an orphan of the project.
+docker rm -f "$capture" >/dev/null 2>&1 || true
 
 # The images to write, one file name to a line: the capture's own reading of images.json, so the
 # script writes exactly the images the capture took.
 # docker cp keeps a link the capture made as a link, which the host would follow into its own files,
 # so the list and each image have to be regular files, read only once they are known to be, and
 # each image a PNG: an 8-byte signature, then an IHDR chunk of 13 bytes, and an IEND chunk to end it.
+# Then the check service decodes each one whole, in the Go image the releases build in, so the host
+# needs nothing but Docker for it. tar hands it the images without following a link, and with
+# COPYFILE_DISABLE macOS's tar adds no file of attributes beside each one.
 step="checking the images captured"
 regular_file() { [ ! -L "$1" ] && [ -f "$1" ]; }
 png_start="89504e470d0a1a0a0000000d49484452"
@@ -136,6 +143,8 @@ for name in "${images[@]}"; do
   [ "$(head -c 16 "$image" | hex_bytes)" = "$png_start" ] && [ "$(tail -c 12 "$image" | hex_bytes)" = "$png_end" ] ||
     { echo "screenshots: the capture's $name is not a PNG" >&2; exit 1; }
 done
+COPYFILE_DISABLE=1 tar -cf - -C "$stage/new" -- "${images[@]}" |
+  "${compose[@]}" run --rm --no-TTY --name "$checker" check "${images[@]}"
 
 step="removing the containers"
 echo "screenshots: $step"

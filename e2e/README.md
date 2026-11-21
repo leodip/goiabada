@@ -225,7 +225,9 @@ show fixed stand-ins in place of the subjects drawn at random. The images are in
 English, at 1x, 960 or 1440 pixels wide, each at a height measured from its page.
 
 It writes the images that `playwright/screenshots/images.json` lists over the committed ones, only
-once the capture and the removal of its containers, network and volumes have both succeeded. A run
+once each is a regular file that decodes whole as a PNG, checked in the Go image the auth server's
+release build runs in, and the capture and the removal of its containers, network and volumes have
+both succeeded. A run
 that fails says which step failed, with the servers' last log lines when they were running, and
 leaves the committed images as they were. Run twice on the same tree on one machine, it writes the same bytes.
 `e2e/screenshots.sh --help` says the same in short.
