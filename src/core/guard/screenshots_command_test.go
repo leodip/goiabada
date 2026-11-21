@@ -3,7 +3,7 @@ package guard
 // e2e/screenshots.sh writes the images its capture took over the committed ones, and a run that fails
 // leaves the committed ones as they were (#534 decision 1). These tests run the script in a copy of
 // the folders it touches, with docker replaced by a stub that plays the Compose project and hands
-// back the images a test put in its capture folder, and with cp and mv replaced by stubs that fail
+// back the images a test put in its capture folder, and with cp, mv and rm replaced by stubs that fail
 // where the test says, as a full or failing disk would.
 
 import (
@@ -27,9 +27,10 @@ case " $* " in
 esac
 `
 
-// screenshotsStubCp and screenshotsStubMv fail a copy into, or a rename out of, the files the test names in FAIL_CP and
-// FAIL_MV, by file name. With FULL_AFTER_RENAME set, the assets folder takes no new file once a first
-// rename into it has succeeded, as a disk that has just filled.
+// screenshotsStubCp, screenshotsStubMv and screenshotsStubRm fail a copy into, a rename out of, or a
+// deletion of the files the test names in FAIL_CP, FAIL_MV and FAIL_RM, by file name. With
+// FULL_AFTER_RENAME set, the assets folder takes no new file once a first rename into it has
+// succeeded, as a disk that has just filled.
 const screenshotsStubCp = `#!/usr/bin/env bash
 dst="${@: -1}"
 case "$dst" in
@@ -49,30 +50,46 @@ for f in $FAIL_MV; do [ "$(basename "$src")" != "$f" ] || { echo "mv: injected f
 case "$dst" in "$ASSETS"/*) touch "$STUB/full" ;; esac
 `
 
+const screenshotsStubRm = `#!/usr/bin/env bash
+for arg in "$@"; do
+  case "$arg" in -*) continue ;; esac
+  for f in $FAIL_RM; do [ "$(basename "$arg")" != "$f" ] || { echo "rm: injected failure" >&2; exit 1; }; done
+done
+exec "$REAL_RM" "$@"
+`
+
 // The images of these tests, committed and captured.
 var screenshotsFixture = []string{"screenshot-a.png", "screenshot-b.png", "screenshot-c.png"}
 
-// screenshotsRun is a run of the script in a fixture: what it printed, how it exited, and the files
-// among the assets afterwards, by name.
+// screenshotsPrepared is the name the runs' own folders among the assets take in a screenshotsRun's
+// assets, whatever their random suffix.
+const screenshotsPrepared = ".screenshots-*"
+
+// screenshotsRun is a run of the script in a fixture: what it printed, how it exited, the files
+// among the assets afterwards, by path, with a run's own folder named screenshotsPrepared, the
+// names of the run folders left among the assets, and what is left in the temporary folder.
 type screenshotsRun struct {
-	out    string
-	err    error
-	assets map[string]string
-	tmp    []string
+	out      string
+	err      error
+	assets   map[string]string
+	prepared []string
+	tmp      []string
 }
 
-// runScreenshots runs e2e/screenshots.sh in a fixture whose assets hold "committed <name>" for each
-// committed name, whose capture took "new <name>" for each captured one and lists list in
-// images.txt (no images.txt when list is nil), and whose images.json is imagesJSON. env sets the
-// stubs' failures.
-func runScreenshots(t *testing.T, committed, captured []string, list *string, imagesJSON string, env ...string) screenshotsRun {
+// screenshotsFixtureDir is a copy of the folders the script touches, with the stubs in place.
+type screenshotsFixtureDir struct {
+	root, stub, tmp, assets string
+}
+
+// newScreenshotsFixture makes a fixture whose assets hold "committed <name>" for each committed
+// name, whose capture took "new <name>" for each captured one and lists list in images.txt (no
+// images.txt when list is nil), and whose images.json is imagesJSON.
+func newScreenshotsFixture(t *testing.T, committed, captured []string, list *string, imagesJSON string) screenshotsFixtureDir {
 	t.Helper()
 	dir := t.TempDir()
-	root := filepath.Join(dir, "repo")
-	stub := filepath.Join(dir, "stub")
-	tmp := filepath.Join(dir, "tmp")
-	assets := filepath.Join(root, "site", "src", "assets")
-	for _, d := range []string{filepath.Join(root, "e2e", "playwright", "screenshots"), assets, filepath.Join(stub, "bin"), filepath.Join(stub, "out"), tmp} {
+	f := screenshotsFixtureDir{root: filepath.Join(dir, "repo"), stub: filepath.Join(dir, "stub"), tmp: filepath.Join(dir, "tmp")}
+	f.assets = filepath.Join(f.root, "site", "src", "assets")
+	for _, d := range []string{filepath.Join(f.root, "e2e", "playwright", "screenshots"), f.assets, filepath.Join(f.stub, "bin"), filepath.Join(f.stub, "out"), f.tmp} {
 		require.NoError(t, os.MkdirAll(d, 0o755))
 	}
 	script, err := os.ReadFile(filepath.Join(filepath.Dir(SourceRoot(t)), "e2e", "screenshots.sh"))
@@ -80,48 +97,74 @@ func runScreenshots(t *testing.T, committed, captured []string, list *string, im
 	write := func(path, content string, mode os.FileMode) {
 		require.NoError(t, os.WriteFile(path, []byte(content), mode))
 	}
-	write(filepath.Join(root, "e2e", "screenshots.sh"), string(script), 0o755)
-	write(filepath.Join(root, "e2e", "playwright", "package.json"), "{\n  \"devDependencies\": {\n    \"@playwright/test\": \"1.0.0\"\n  }\n}\n", 0o644)
-	write(filepath.Join(root, "e2e", "playwright", "screenshots", "images.json"), imagesJSON, 0o644)
+	write(filepath.Join(f.root, "e2e", "screenshots.sh"), string(script), 0o755)
+	write(filepath.Join(f.root, "e2e", "playwright", "package.json"), "{\n  \"devDependencies\": {\n    \"@playwright/test\": \"1.0.0\"\n  }\n}\n", 0o644)
+	write(filepath.Join(f.root, "e2e", "playwright", "screenshots", "images.json"), imagesJSON, 0o644)
 	for _, name := range committed {
-		write(filepath.Join(assets, name), "committed "+name, 0o644)
+		write(filepath.Join(f.assets, name), "committed "+name, 0o644)
 	}
-	write(filepath.Join(assets, "goiaba.png"), "the logo", 0o644)
+	write(filepath.Join(f.assets, "goiaba.png"), "the logo", 0o644)
 	for _, name := range captured {
-		write(filepath.Join(stub, "out", name), "new "+name, 0o644)
+		write(filepath.Join(f.stub, "out", name), "new "+name, 0o644)
 	}
 	if list != nil {
-		write(filepath.Join(stub, "out", "images.txt"), *list, 0o644)
+		write(filepath.Join(f.stub, "out", "images.txt"), *list, 0o644)
 	}
-	write(filepath.Join(stub, "bin", "docker"), screenshotsStubDocker, 0o755)
-	write(filepath.Join(stub, "bin", "cp"), screenshotsStubCp, 0o755)
-	write(filepath.Join(stub, "bin", "mv"), screenshotsStubMv, 0o755)
-	realCp, err := exec.LookPath("cp")
-	require.NoError(t, err)
-	realMv, err := exec.LookPath("mv")
-	require.NoError(t, err)
+	write(filepath.Join(f.stub, "bin", "docker"), screenshotsStubDocker, 0o755)
+	write(filepath.Join(f.stub, "bin", "cp"), screenshotsStubCp, 0o755)
+	write(filepath.Join(f.stub, "bin", "mv"), screenshotsStubMv, 0o755)
+	write(filepath.Join(f.stub, "bin", "rm"), screenshotsStubRm, 0o755)
+	return f
+}
 
-	cmd := exec.Command("bash", filepath.Join(root, "e2e", "screenshots.sh"))
-	cmd.Dir = root
+// run runs e2e/screenshots.sh in the fixture; env sets the stubs' failures.
+func (f screenshotsFixtureDir) run(t *testing.T, env ...string) screenshotsRun {
+	t.Helper()
+	tools := map[string]string{}
+	for _, tool := range []string{"cp", "mv", "rm"} {
+		path, err := exec.LookPath(tool)
+		require.NoError(t, err)
+		tools[tool] = path
+	}
+	cmd := exec.Command("bash", filepath.Join(f.root, "e2e", "screenshots.sh"))
+	cmd.Dir = f.root
 	cmd.Env = append(os.Environ(),
-		"PATH="+filepath.Join(stub, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"TMPDIR="+tmp, "STUB="+stub, "ASSETS="+assets, "REAL_CP="+realCp, "REAL_MV="+realMv,
-		"FAIL_CP=", "FAIL_MV=", "FULL_AFTER_RENAME=")
+		"PATH="+filepath.Join(f.stub, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"TMPDIR="+f.tmp, "STUB="+f.stub, "ASSETS="+f.assets,
+		"REAL_CP="+tools["cp"], "REAL_MV="+tools["mv"], "REAL_RM="+tools["rm"],
+		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "FULL_AFTER_RENAME=")
 	cmd.Env = append(cmd.Env, env...)
 	out, err := cmd.CombinedOutput()
 
 	run := screenshotsRun{out: string(out), err: err, assets: map[string]string{}}
-	entries, rerr := os.ReadDir(assets)
+	entries, rerr := os.ReadDir(f.assets)
 	require.NoError(t, rerr)
 	for _, e := range entries {
-		run.assets[e.Name()] = readFile(t, filepath.Join(assets, e.Name()))
+		if !e.IsDir() {
+			run.assets[e.Name()] = readFile(t, filepath.Join(f.assets, e.Name()))
+			continue
+		}
+		require.Regexp(t, `^\.screenshots-[A-Za-z0-9]{6}$`, e.Name(), "a folder among the assets that is not a run's own")
+		run.prepared = append(run.prepared, e.Name())
+		inner, rerr := os.ReadDir(filepath.Join(f.assets, e.Name()))
+		require.NoError(t, rerr)
+		run.assets[screenshotsPrepared] = ""
+		for _, i := range inner {
+			run.assets[screenshotsPrepared+"/"+i.Name()] = readFile(t, filepath.Join(f.assets, e.Name(), i.Name()))
+		}
 	}
-	left, rerr := os.ReadDir(tmp)
+	left, rerr := os.ReadDir(f.tmp)
 	require.NoError(t, rerr)
 	for _, e := range left {
 		run.tmp = append(run.tmp, e.Name())
 	}
 	return run
+}
+
+// runScreenshots runs e2e/screenshots.sh once in a new fixture (see newScreenshotsFixture).
+func runScreenshots(t *testing.T, committed, captured []string, list *string, imagesJSON string, env ...string) screenshotsRun {
+	t.Helper()
+	return newScreenshotsFixture(t, committed, captured, list, imagesJSON).run(t, env...)
 }
 
 // screenshotAssets is what the assets folder holds when each name holds the given prefix and the name.
@@ -177,15 +220,15 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 		{"the capture lists a path", screenshotsFixture, screenshotsLines("screenshot-a.png", "../screenshot-b.png"), nil, "checking the images captured"},
 		{"the capture missed a listed image", screenshotsFixture[:2], screenshotsLines(screenshotsFixture...), nil, "checking the images captured"},
 		{"a new image cannot be written beside the committed one", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_CP=.screenshot-b.png.new"}, "preparing the replacements"},
+			[]string{"FAIL_CP=screenshot-b.png.new"}, "preparing the replacements"},
 		{"a committed image cannot be copied beside itself", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_CP=.screenshot-c.png.old"}, "preparing the replacements"},
+			[]string{"FAIL_CP=screenshot-c.png.old"}, "preparing the replacements"},
 		// The disk fills once the first image has replaced its committed one, and the second
 		// replacement fails: putting the first back has to write no data.
 		{"the second replacement fails on a full disk", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_MV=.screenshot-b.png.new", "FULL_AFTER_RENAME=1"}, "replacing the committed images"},
+			[]string{"FAIL_MV=screenshot-b.png.new", "FULL_AFTER_RENAME=1"}, "replacing the committed images"},
 		{"the last replacement fails", screenshotsFixture, screenshotsLines(screenshotsFixture...),
-			[]string{"FAIL_MV=.screenshot-c.png.new"}, "replacing the committed images"},
+			[]string{"FAIL_MV=screenshot-c.png.new"}, "replacing the committed images"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := runScreenshots(t, screenshotsFixture, tc.captured, tc.list, fixtureImagesJSON, tc.env...)
@@ -202,7 +245,7 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 // the removal.
 func TestScreenshotsCommand_AFailureAfterTheRemovalShowsTheServerLogs(t *testing.T) {
 	run := runScreenshots(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
-		"FAIL_MV=.screenshot-b.png.new")
+		"FAIL_MV=screenshot-b.png.new")
 	require.Error(t, run.err, run.out)
 	assert.Contains(t, run.out, "screenshots: failed while replacing the committed images")
 	assert.Contains(t, run.out, "--- the servers' last log lines")
@@ -214,10 +257,50 @@ func TestScreenshotsCommand_AFailureAfterTheRemovalShowsTheServerLogs(t *testing
 // where; the images it could put back or never replaced are as they were.
 func TestScreenshotsCommand_ACopyNotPutBackIsKept(t *testing.T) {
 	run := runScreenshots(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
-		"FAIL_MV=.screenshot-c.png.new .screenshot-a.png.old")
+		"FAIL_MV=screenshot-c.png.new screenshot-a.png.old")
 	require.Error(t, run.err, run.out)
 	want := screenshotAssets(map[string]string{"screenshot-a.png": "new", "screenshot-b.png": "committed", "screenshot-c.png": "committed"})
-	want[".screenshot-a.png.old"] = "committed screenshot-a.png"
+	want[screenshotsPrepared] = ""
+	want[screenshotsPrepared+"/screenshot-a.png.old"] = "committed screenshot-a.png"
 	assert.Equal(t, want, run.assets, run.out)
-	assert.Contains(t, run.out, "could not put back site/src/assets/screenshot-a.png; the committed one is site/src/assets/.screenshot-a.png.old")
+	require.Len(t, run.prepared, 1)
+	assert.Contains(t, run.out, "could not put back site/src/assets/screenshot-a.png; the committed one is site/src/assets/"+run.prepared[0]+"/screenshot-a.png.old")
+}
+
+// A run that fails after an earlier one kept a copy it could not put back leaves that copy where it
+// is: each run prepares in a folder of its own and discards only that one.
+func TestScreenshotsCommand_ARetryKeepsAnEarlierRunsCopy(t *testing.T) {
+	f := newScreenshotsFixture(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON)
+	first := f.run(t, "FAIL_MV=screenshot-b.png.new screenshot-a.png.old")
+	require.Error(t, first.err, first.out)
+	require.Len(t, first.prepared, 1, first.out)
+
+	retry := f.run(t, "FAIL_CP=screenshot-a.png.new")
+	require.Error(t, retry.err, retry.out)
+	assert.Contains(t, retry.out, "screenshots: failed while preparing the replacements")
+	want := screenshotAssets(map[string]string{"screenshot-a.png": "new", "screenshot-b.png": "committed", "screenshot-c.png": "committed"})
+	want[screenshotsPrepared] = ""
+	want[screenshotsPrepared+"/screenshot-a.png.old"] = "committed screenshot-a.png"
+	assert.Equal(t, want, retry.assets, retry.out)
+	assert.Equal(t, first.prepared, retry.prepared, "the retry left a folder of its own, or removed the first run's")
+}
+
+// Once every image is replaced the run has succeeded: a copy of a committed image it then cannot
+// delete is reported and kept, and the run exits zero having written every image, the copies
+// deleted before and after it gone.
+func TestScreenshotsCommand_ACopyNotDeletedAfterTheReplacementsIsAWarning(t *testing.T) {
+	run := runScreenshots(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
+		"FAIL_RM=screenshot-b.png.old")
+	require.NoError(t, run.err, run.out)
+	want := screenshotAssets(map[string]string{"screenshot-a.png": "new", "screenshot-b.png": "new", "screenshot-c.png": "new"})
+	want[screenshotsPrepared] = ""
+	want[screenshotsPrepared+"/screenshot-b.png.old"] = "committed screenshot-b.png"
+	assert.Equal(t, want, run.assets, run.out)
+	require.Len(t, run.prepared, 1)
+	assert.Contains(t, run.out, "screenshots: warning: could not delete site/src/assets/"+run.prepared[0]+"/screenshot-b.png.old")
+	assert.NotContains(t, run.out, "screenshots: failed")
+	for _, name := range screenshotsFixture {
+		assert.Contains(t, run.out, "screenshots: wrote site/src/assets/"+name)
+	}
+	assert.Empty(t, run.tmp, "the staging folder is left behind")
 }

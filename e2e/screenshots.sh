@@ -122,50 +122,63 @@ server_logs >"$stage/server-logs" 2>&1 || true
 remove_project
 removed=true
 
-# Every new image and a copy of every committed one are first written beside the committed images,
-# as .<name>.new and .<name>.old, so what follows writes no data: each image replaces the committed
-# one by a rename, and when one fails, the ones already replaced are put back by renaming their
-# copies over them, one that was not there before is removed, and the rest of what was prepared is
-# deleted. A copy that cannot be put back is left where it is, and the run says so.
+# Every new image and a copy of every committed one are first written into a folder of this run's
+# own beside the committed images, as <name>.new and <name>.old, so what follows writes no data:
+# each image replaces the committed one by a rename, and when one fails, the ones already replaced
+# are put back by renaming their copies over them, one that was not there before is removed, and
+# the rest of the folder is deleted. A copy that cannot be put back is left in the folder, which
+# the run names. Once every image is replaced the run has succeeded; a copy it then cannot delete
+# is only reported. The folder is this run's alone, so a later run never touches what one left.
+prepared=""
 discard_prepared() {
-  local name
-  for name in "${images[@]}"; do rm -f "$assets/.$name.new" "$assets/.$name.old"; done
+  [ -z "$prepared" ] || rm -rf "$prepared"
 }
 replaced=()
 put_back() {
-  local name
+  local name kept=false
   for name in "${images[@]}"; do
-    rm -f "$assets/.$name.new"
+    rm -f "$prepared/$name.new"
     case " ${replaced[*]-} " in
       *" $name "*) ;;
-      *) rm -f "$assets/.$name.old"; continue ;;
+      *) rm -f "$prepared/$name.old"; continue ;;
     esac
-    if [ -e "$assets/.$name.old" ]; then
-      mv -f "$assets/.$name.old" "$assets/$name" ||
-        echo "screenshots: could not put back site/src/assets/$name; the committed one is site/src/assets/.$name.old, or restore it with: git checkout -- site/src/assets/$name" >&2
+    if [ -e "$prepared/$name.old" ]; then
+      if ! mv -f "$prepared/$name.old" "$assets/$name"; then
+        kept=true
+        echo "screenshots: could not put back site/src/assets/$name; the committed one is site/src/assets/${prepared##*/}/$name.old, or restore it with: git checkout -- site/src/assets/$name" >&2
+      fi
     else
       rm -f "$assets/$name" || echo "screenshots: could not remove site/src/assets/$name, which the run added" >&2
     fi
   done
+  if [ "$kept" = false ]; then discard_prepared; fi
 }
 
 step="preparing the replacements"
 preparing=true
+prepared="$(mktemp -d "$assets/.screenshots-XXXXXX")"
 for name in "${images[@]}"; do
-  cp "$stage/new/$name" "$assets/.$name.new"
-  if [ -e "$assets/$name" ]; then cp -p "$assets/$name" "$assets/.$name.old"; fi
+  cp "$stage/new/$name" "$prepared/$name.new"
+  if [ -e "$assets/$name" ]; then cp -p "$assets/$name" "$prepared/$name.old"; fi
 done
 preparing=false
 
 step="replacing the committed images"
 for name in "${images[@]}"; do
-  if ! mv -f "$assets/.$name.new" "$assets/$name"; then
+  if ! mv -f "$prepared/$name.new" "$assets/$name"; then
     echo "screenshots: could not replace site/src/assets/$name; putting back the images replaced before it" >&2
     put_back
     exit 1
   fi
   replaced+=("$name")
 done
-for name in "${images[@]}"; do rm -f "$assets/.$name.old"; done
+
+step="deleting the copies of the committed images"
+for name in "${images[@]}"; do
+  rm -f "$prepared/$name.old" ||
+    echo "screenshots: warning: could not delete site/src/assets/${prepared##*/}/$name.old, a copy of the image it replaced; delete it by hand" >&2
+done
+rmdir "$prepared" 2>/dev/null ||
+  echo "screenshots: warning: could not delete the folder site/src/assets/${prepared##*/}; delete it by hand" >&2
 
 for name in "${images[@]}"; do echo "screenshots: wrote site/src/assets/$name"; done
