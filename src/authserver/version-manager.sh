@@ -58,12 +58,14 @@ VERSIONS_FILE="${SCRIPT_DIR}/versions.yaml"
 
 # Mailpit's image on Docker Hub, whose tags are its GitHub repository's releases, of the same
 # name. update writes it at tools.mailpit into MAILPIT_FILES, each a path relative to the
-# repository root and the image the file names, after a |: the dev container's Compose file runs
-# Docker Hub's, and the e2e server's default CI's mirror of it (#867). CI reads the pin itself.
+# repository root and the image the file names, after a |: the dev container's Compose file and
+# the screenshot command's (#534) run Docker Hub's, and the e2e server's default CI's mirror of it
+# (#867). CI reads the pin itself.
 MAILPIT_REPOSITORY="axllent/mailpit"
 MAILPIT_FILES=(
     "src/.devcontainer/docker-compose.yml|${MAILPIT_REPOSITORY}"
     "e2e/infra/lib.sh|ghcr.io/leodip/goiabada-ci/mailpit"
+    "e2e/screenshots.yml|${MAILPIT_REPOSITORY}"
 )
 
 # =============================================================================
@@ -1276,7 +1278,8 @@ cmd_update() {
     # -------------------------------------------------------------------------
     # Mailpit
     # -------------------------------------------------------------------------
-    # The dev container and the e2e server run the Mailpit CI's services run.
+    # The dev container, the e2e server and the screenshot command run the Mailpit CI's services
+    # run.
     echo -e "\n${BOLD}Mailpit${NC}"
     if update_mailpit "$MAILPIT_VERSION"; then
         ((success_count++))

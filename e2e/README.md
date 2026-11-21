@@ -26,6 +26,9 @@ or started its first PostgreSQL (#551). Against v1.7.0 the suite fails, and the 
 to start. Before a release, build the environment from the checkout instead (`--source`), which is
 what that release will ship.
 
+One script here needs none of it: `e2e/screenshots.sh` retakes the screenshots of the docs home page
+and the README on your own machine, with Docker alone (see [Screenshots](#screenshots)).
+
 ## Contribute tests
 
 The suites run against the maintainer's VPS and require SSH access to it. External contributors
@@ -195,6 +198,61 @@ suite run again and again without a reset:
   Pages of the test app and Mailpit are not watched. `tests/csp-violations.spec.ts` checks the watcher
   against pages of its own and needs no environment:
   `npx playwright test tests/csp-violations.spec.ts --project chromium --no-deps`.
+
+## Screenshots
+
+The docs home page and the README show four screenshots, in `site/src/assets`: the sign-in page,
+that page cropped to its card, the account's Phone page and the admin console's users list. A change
+to one of those pages, or to the console's menus, which two of them show, retakes them in the same
+change. From the repository root, on a machine with Docker:
+
+```bash
+e2e/screenshots.sh
+```
+
+It needs no VPS, no SSH key, no dev container and no Node.js, publishes no port, and leaves
+`e2e/.state` alone. In a Compose project of its own (`screenshots.yml`), named for the checkout so
+two checkouts can run it at once, it builds both servers from the release Dockerfiles from this
+checkout's `src/`, under the version `development`, and starts them on a new SQLite database beside
+Mailpit at the pin in `src/authserver/versions.yaml`. The browser is Playwright's own image, the
+Ubuntu Noble variant at the version `playwright/package.json` pins. It shares the auth server's
+network namespace, so it reaches both servers on `localhost`. The capture, which `screenshots.config.ts`
+runs from `playwright/screenshots/`, uses the suite's helpers: a set-up session turns on email
+sending and self-registration and gives the administrator a name, a username and a phone number
+through the console's forms, and creates the sample users (`sample.ts`); a new browser context then
+captures the password page, signs in, and captures the console pages. The users list's Subject cells
+show fixed stand-ins in place of the subjects drawn at random. The images are in the dark scheme, in
+English, at 1x, 960 or 1440 pixels wide, each at a height measured from its page.
+
+It writes the images that `playwright/screenshots/images.json` lists over the committed ones, only
+once each is a regular file that decodes whole as a PNG, checked in the Go image the auth server's
+release build runs in, and the capture and the removal of its containers, network and volumes have
+both succeeded. A run
+that fails says which step failed, with the servers' last log lines when they were running, and
+leaves the committed images as they were. Run twice on the same tree on one machine, it writes the same bytes.
+`e2e/screenshots.sh --help` says the same in short.
+
+It leaves the three images it builds in Docker, named for the checkout:
+`goiabada-screenshots-<number>-authserver`, `-adminconsole`, and `-check`, the one the images are
+checked in. To remove this checkout's, from the repository root:
+
+```bash
+docker image ls --format '{{.Repository}}:{{.Tag}}' "goiabada-screenshots-$(printf '%s' "$PWD" | cksum | cut -d ' ' -f 1)-*:latest" | xargs -r docker image rm
+```
+
+To remove every checkout's, a deleted worktree's included:
+
+```bash
+docker image ls --format '{{.Repository}}:{{.Tag}}' 'goiabada-screenshots-*:latest' | xargs -r docker image rm
+```
+
+The Playwright and Mailpit images it pulls are ordinary pulls, which `docker image rm` removes like
+any other.
+
+To add an image, add its file name, starting with `screenshot`, to `images.json`, capture it in
+`capture.screenshots.ts` under that name, and show it on the home page or in the README. The core
+unit tier fails when a `screenshot*` file among the site's assets is not one the list names, when
+one the list names is shown by neither page, and when either page shows one that does not exist.
 
 ## The VPS
 

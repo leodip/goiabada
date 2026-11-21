@@ -1,8 +1,9 @@
 package guard
 
 // Mailpit runs at one pin, tools.mailpit in versions.yaml, wherever a test meets it: CI's Mailpit
-// services, the dev container and the e2e server (#867). version-manager.sh update writes the pin
-// into the dev container's Compose file, on Docker Hub, and the e2e server's default, at CI's
+// services, the dev container and the e2e server (#867), and the screenshot command's Compose
+// project (#534 decision 7). version-manager.sh update writes the pin into the dev container's and
+// the screenshot command's Compose files, on Docker Hub, and the e2e server's default, at CI's
 // mirror (decision 8), which Lint's
 // "versions.yaml is applied" step holds to it, and check suggests a newer Mailpit only once GitHub
 // records the release public for 3 days, as it does Trivy's (#520). Check's Versions job reads the
@@ -31,13 +32,14 @@ const (
 )
 
 // mailpitPinnedFiles are the files update writes the pin into, relative to the repository root.
-var mailpitPinnedFiles = []string{"src/.devcontainer/docker-compose.yml", "e2e/infra/lib.sh"}
+var mailpitPinnedFiles = []string{"src/.devcontainer/docker-compose.yml", "e2e/infra/lib.sh", "e2e/screenshots.yml"}
 
 // mailpitImages are the image each of mailpitPinnedFiles runs Mailpit as, without its tag: the dev
-// container's from Docker Hub, the e2e server's from CI's mirror.
+// container's and the screenshot command's from Docker Hub, the e2e server's from CI's mirror.
 var mailpitImages = map[string]string{
 	"src/.devcontainer/docker-compose.yml": "axllent/mailpit",
 	"e2e/infra/lib.sh":                     ciMirror + "/mailpit",
+	"e2e/screenshots.yml":                  "axllent/mailpit",
 }
 
 // mailpitCheckSuggests sources version-manager.sh and asks check's source for the newest settled
@@ -186,9 +188,9 @@ func assertOnlyLineChanged(t *testing.T, base, name, before, want string) {
 	assert.Equal(t, 1, changed, "%s should name Mailpit's image on one line", name)
 }
 
-// update writes the pin into the dev container's Compose file and the e2e server's default, as
-// they are committed, and moves each to a new pin.
-func TestMailpitUpdate_WritesThePinIntoTheComposeFileAndTheE2EDefault(t *testing.T) {
+// update writes the pin into the dev container's and the screenshot command's Compose files and the
+// e2e server's default, as they are committed, and moves each to a new pin.
+func TestMailpitUpdate_WritesThePinIntoTheComposeFilesAndTheE2EDefault(t *testing.T) {
 	files := repositoryFiles(t, mailpitPinnedFiles)
 	base, ok, out := mailpitUpdate(t, "1.40.2", files)
 	assert.True(t, ok, "update's Mailpit step failed:\n%s", out)
@@ -196,12 +198,14 @@ func TestMailpitUpdate_WritesThePinIntoTheComposeFileAndTheE2EDefault(t *testing
 		"    image: axllent/mailpit:v1.40.2")
 	assertOnlyLineChanged(t, base, "e2e/infra/lib.sh", files["e2e/infra/lib.sh"],
 		`E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.40.2}"`)
+	assertOnlyLineChanged(t, base, "e2e/screenshots.yml", files["e2e/screenshots.yml"],
+		"    image: axllent/mailpit:v1.40.2")
 }
 
-// update, run whole over a tree holding the two files as they are committed and a versions.yaml
-// whose tools.mailpit is a new pin, moves each to it: the dev container's on Docker Hub, the e2e
-// server's at the mirror.
-func TestMailpitUpdate_TheCommandWritesANewPinIntoBothFiles(t *testing.T) {
+// update, run whole over a tree holding the three files as they are committed and a versions.yaml
+// whose tools.mailpit is a new pin, moves each to it: the dev container's and the screenshot
+// command's on Docker Hub, the e2e server's at the mirror.
+func TestMailpitUpdate_TheCommandWritesANewPinIntoEveryFile(t *testing.T) {
 	files := repositoryFiles(t, mailpitPinnedFiles)
 	base := t.TempDir()
 	for name, content := range files {
@@ -216,6 +220,8 @@ func TestMailpitUpdate_TheCommandWritesANewPinIntoBothFiles(t *testing.T) {
 		"    image: axllent/mailpit:v1.40.2")
 	assertOnlyLineChanged(t, base, "e2e/infra/lib.sh", files["e2e/infra/lib.sh"],
 		`E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.40.2}"`)
+	assertOnlyLineChanged(t, base, "e2e/screenshots.yml", files["e2e/screenshots.yml"],
+		"    image: axllent/mailpit:v1.40.2")
 }
 
 // update, run whole over a tree whose e2e default names no Mailpit image, still moves the dev
@@ -242,10 +248,14 @@ func TestMailpitUpdate_TheCommandFailsWhenAFileCannotTakeThePin(t *testing.T) {
 func TestMailpitUpdate_AnUntaggedOrOtherTagIsPinned(t *testing.T) {
 	compose := "services:\n  mailpit:\n    image: axllent/mailpit\n    ports:\n      - 8025:8025\n"
 	lib := `E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:latest}"` + "\nE2E_MAILPIT_PORT=\"${E2E_MAILPIT_PORT:-18025}\"\n"
-	base, ok, out := mailpitUpdate(t, "1.33.1", map[string]string{mailpitPinnedFiles[0]: compose, mailpitPinnedFiles[1]: lib})
+	screenshots := "services:\n  mailpit:\n    image: axllent/mailpit:latest\n    network_mode: service:authserver\n"
+	base, ok, out := mailpitUpdate(t, "1.33.1", map[string]string{
+		mailpitPinnedFiles[0]: compose, mailpitPinnedFiles[1]: lib, mailpitPinnedFiles[2]: screenshots,
+	})
 	assert.True(t, ok, "update's Mailpit step failed:\n%s", out)
 	assertOnlyLineChanged(t, base, mailpitPinnedFiles[0], compose, "    image: axllent/mailpit:v1.33.1")
 	assertOnlyLineChanged(t, base, mailpitPinnedFiles[1], lib, `E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.33.1}"`)
+	assertOnlyLineChanged(t, base, mailpitPinnedFiles[2], screenshots, "    image: axllent/mailpit:v1.33.1")
 }
 
 // A file that no longer names Mailpit's image, its line moved or renamed, fails update's step, so
@@ -344,9 +354,10 @@ func TestCheckWorkflow_MailpitServicesRunThePinAndNotForTheDataTier(t *testing.T
 	assert.Positive(t, services, "%s names no Mailpit service, so this test read nothing", file)
 }
 
-// The dev container and the e2e server run the pin versions.yaml holds, as update writes it: the
-// dev container from Docker Hub, the e2e server from the mirror.
-func TestMailpitPin_TheComposeFileAndTheE2EDefaultRunThePin(t *testing.T) {
+// The dev container, the screenshot command and the e2e server run the pin versions.yaml holds, as
+// update writes it: the dev container and the screenshot command from Docker Hub, the e2e server
+// from the mirror.
+func TestMailpitPin_TheComposeFilesAndTheE2EDefaultRunThePin(t *testing.T) {
 	for name, content := range repositoryFiles(t, mailpitPinnedFiles) {
 		want := mailpitImages[name] + ":v" + mailpitPin(t)
 		assert.Contains(t, content, want, "%s does not run Mailpit as %s; run ./version-manager.sh update", name, want)

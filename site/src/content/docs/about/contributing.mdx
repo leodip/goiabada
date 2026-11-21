@@ -28,7 +28,7 @@ Everything you need, Go, the linters, the Tailwind CLI and the four databases, r
 </Steps>
 
 Run the commands below inside the container, from the directory each names, except the npm
-commands, which run on your own machine.
+commands and `e2e/screenshots.sh`, which run on your own machine.
 
 ## Run Goiabada from source
 
@@ -104,6 +104,9 @@ external contributors don't have. You're welcome to write or improve these tests
 `npm ci` and `npm run typecheck` from `e2e/playwright` on your machine, and say in your pull request
 that the browser suites need a maintainer to run them.
 
+One script in `e2e/` needs no VPS: `e2e/screenshots.sh`, which retakes the screenshots the docs show
+(see [Commit what you generate](#commit-what-you-generate)).
+
 ## Commit what you generate
 
 Some committed files are written by a tool. When your change touches what one is written from, run its command and commit what it changes:
@@ -115,8 +118,11 @@ Some committed files are written by a tool. When your change touches what one is
 | An interface a mock is generated for | `./generate-mocks.sh` | `src/authserver` |
 | A template's CSS classes | `./build.sh` | `src/authserver` or `src/adminconsole`, whichever owns the template |
 | A tool version in `versions.yaml` | `./version-manager.sh update` | `src/authserver` |
+| The sign-in page, the account's Phone page, the users list or the admin console's menus | `e2e/screenshots.sh` | The repository root, on your own machine, with Docker |
 
 `schemadump` regenerates the `schema.golden` file of all four databases, which the data tier compares against a freshly migrated database. The `lint` tier reruns the mocks, the ownership table and the CSS, and fails when any of them differs from what's committed.
+
+`e2e/screenshots.sh` builds both servers from your checkout, captures the screenshots the docs home page and the README show, writes them over `site/src/assets`, and removes the containers it started. It leaves the images it built in Docker, and the [e2e README](https://github.com/leodip/goiabada/blob/main/e2e/README.md#screenshots) says how to remove them. It needs no dev container, Node.js or VPS.
 
 ## Write docs
 

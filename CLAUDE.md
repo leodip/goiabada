@@ -107,7 +107,8 @@ the behavior changes.
 
 ## Regenerate committed files
 
-Run the relevant command inside the dev container and include its output in the change.
+Run the relevant command inside the dev container, except `e2e/screenshots.sh`, which runs on your own
+machine with Docker and reaches no VPS, and include its output in the change.
 
 | When you change | Command | Working directory |
 |---|---|---|
@@ -116,6 +117,7 @@ Run the relevant command inside the dev container and include its output in the 
 | A mocked interface or its generator config | `./generate-mocks.sh` | `src/authserver` |
 | Template CSS classes or UI CSS | `./build.sh` | The affected server module |
 | A version pin | `./version-manager.sh update` | `src/authserver` |
+| The sign-in page, account Phone page, users list or console menus | `e2e/screenshots.sh` | Repository root, on the host |
 
 The two servers' `web/tailwindcss/ui.css` files must match; a shared CSS change updates both and
 regenerates both outputs. Built-in translations change together.
