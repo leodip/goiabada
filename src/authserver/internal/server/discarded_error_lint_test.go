@@ -168,6 +168,18 @@ func discardedErrorListedTypes(pkgs []*packages.Package, methods []discardedErro
 	return listedTypes
 }
 
+// discardedErrorEndsInError reports whether a call's type, its one result or the tuple of its
+// results, ends in the universe's error: the result the blank identifier the rule is about sits at.
+func discardedErrorEndsInError(t types.Type) bool {
+	if results, ok := t.(*types.Tuple); ok {
+		if results.Len() == 0 {
+			return false
+		}
+		t = results.At(results.Len() - 1).Type()
+	}
+	return t != nil && types.Identical(t, types.Universe.Lookup("error").Type())
+}
+
 // discardedErrorQualifier writes a type's package by its name, as a finding names a function.
 func discardedErrorQualifier(p *types.Package) string { return p.Name() }
 
@@ -190,6 +202,12 @@ func discardedErrorsIn(
 		}
 		call, ok := ast.Unparen(value).(*ast.CallExpr)
 		if !ok {
+			return
+		}
+		// The blank has to hold an error. A listed name may return one in only some builds, which
+		// the list check allows, and in a build where its last result is something else, a bool
+		// say, the same blank discards no error.
+		if !discardedErrorEndsInError(info.TypeOf(call)) {
 			return
 		}
 		var callee *ast.Ident
@@ -855,6 +873,65 @@ func seed(p string) string {
 	}, discardedErrorStrings(found))
 }
 
+// A listed name may return an error in only some builds, which the list check allows. Where its last
+// result is something else, a bool here, a blank in that place discards no error and is no finding,
+// whether the call is to the function, to the cipher's method or through an interface the cipher
+// implements. The same three calls in the build where each returns an error are three findings.
+func TestDiscardedErrors_Finder_PassesABlankThatHoldsNoError(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher.go",
+		"//go:build production\n\n"+discardedErrorCipherFixture)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher_dev.go", `//go:build !production
+
+package encryption
+
+type DataCipher struct{ key []byte }
+
+func (c *DataCipher) Decrypt(ciphertext []byte) (string, bool) { return "", true }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/idtokenhint/idtokenhint.go", `//go:build production
+
+package idtokenhint
+
+func Decrypt(hint, secret string) (string, error) { return "", nil }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/idtokenhint/idtokenhint_dev.go", `//go:build !production
+
+package idtokenhint
+
+func Decrypt(hint, secret string) (string, bool) { return "", true }
+`)
+	const calls = `
+package data
+
+import (
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
+)
+
+type opener interface{ Decrypt([]byte) (string, %s) }
+
+func open(c *encryption.DataCipher, o opener, hint string, ct []byte) {
+	a, _ := idtokenhint.Decrypt(hint, "secret")
+	b, _ := c.Decrypt(ct)
+	d, _ := o.Decrypt(ct)
+	_, _, _ = a, b, d
+}
+`
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/open.go", "//go:build production\n"+fmt.Sprintf(calls, "error"))
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/open_dev.go", "//go:build !production\n"+fmt.Sprintf(calls, "bool"))
+
+	found, _, err := findDiscardedErrors(root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"authserver/internal/data/open.go:13: idtokenhint.Decrypt",
+		"authserver/internal/data/open.go:14: (*encryption.DataCipher).Decrypt",
+		"authserver/internal/data/open.go:15: data.opener.Decrypt, which *encryption.DataCipher implements",
+	}, discardedErrorStrings(found))
+}
+
 // A package that does not compile cannot be read whole, and a discard in it would pass unseen, so
 // the walk stops and names it (#420 decision 3).
 func TestDiscardedErrors_Guard_IsFatalOnAPackageThatDoesNotCompile(t *testing.T) {
@@ -996,11 +1073,7 @@ func staleDiscardedErrorEntries(
 		return nil, err
 	}
 
-	errorType := types.Universe.Lookup("error").Type()
-	returnsError := func(fn *types.Func) bool {
-		results := fn.Signature().Results()
-		return results.Len() > 0 && types.Identical(results.At(results.Len()-1).Type(), errorType)
-	}
+	returnsError := func(fn *types.Func) bool { return discardedErrorEndsInError(fn.Signature().Results()) }
 
 	// declared holds each entry some build declares, as import path, then name or type.name.
 	declared := map[string]bool{}
