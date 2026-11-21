@@ -74,7 +74,8 @@ func removeScreenshotCheck() error {
 // screenshotsStubCp, screenshotsStubMv and screenshotsStubRm fail a copy into, a rename out of, or a
 // deletion of the files the test names in FAIL_CP, FAIL_MV and FAIL_RM, by file name. With
 // FULL_AFTER_RENAME set, the assets folder takes no new file once a first rename into it has
-// succeeded, as a disk that has just filled.
+// succeeded, as a disk that has just filled. KILL_MV's renames, once done, send the script SIGTERM,
+// as an interrupt.
 const screenshotsStubCp = `#!/usr/bin/env bash
 dst="${@: -1}"
 case "$dst" in
@@ -92,6 +93,7 @@ dst="${@: -1}"
 for f in $FAIL_MV; do [ "$(basename "$src")" != "$f" ] || { echo "mv: injected failure" >&2; exit 1; }; done
 "$REAL_MV" "$@" || exit
 case "$dst" in "$ASSETS"/*) touch "$STUB/full" ;; esac
+for f in $KILL_MV; do [ "$(basename "$src")" != "$f" ] || kill -TERM "$PPID"; done
 `
 
 // The rm stub matches FAIL_RM's names as patterns, so a test can name the staging folder, whose
@@ -182,7 +184,7 @@ func (f screenshotsFixtureDir) run(t *testing.T, env ...string) screenshotsRun {
 		"PATH="+filepath.Join(f.stub, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"TMPDIR="+f.tmp, "STUB="+f.stub, "ASSETS="+f.assets, "SCREENSHOT_CHECK="+check,
 		"REAL_CP="+tools["cp"], "REAL_MV="+tools["mv"], "REAL_RM="+tools["rm"],
-		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "KILL_RM=", "FULL_AFTER_RENAME=")
+		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "KILL_MV=", "KILL_RM=", "FULL_AFTER_RENAME=")
 	cmd.Env = append(cmd.Env, env...)
 	out, err := cmd.CombinedOutput()
 
@@ -391,6 +393,38 @@ func TestScreenshotsCommand_AFailureLeavesTheCommittedImages(t *testing.T) {
 			require.Error(t, run.err, run.out)
 			assert.Equal(t, committed, run.assets, run.out)
 			assert.Contains(t, run.out, "screenshots: failed while "+tc.step)
+			assert.NotContains(t, run.out, "screenshots: wrote")
+			assert.Empty(t, run.tmp, "the staging folder is left behind")
+		})
+	}
+}
+
+// A run stopped by SIGTERM while it replaces the committed images puts back the ones it replaced and
+// removes one it added, even when a second SIGTERM comes while it does, and leaves no folder of its
+// own beside them.
+func TestScreenshotsCommand_AnInterruptDuringTheReplacementsPutsTheImagesBack(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		committed []string
+		kill      string
+	}{
+		{"right after the first rename", screenshotsFixture, "screenshot-a.png.new"},
+		{"again while putting the first back", screenshotsFixture, "screenshot-b.png.new screenshot-a.png.old"},
+		{"right after the last rename, of an image not committed before", screenshotsFixture[:2], "screenshot-c.png.new"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := runScreenshots(t, tc.committed, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
+				"KILL_MV="+tc.kill)
+			var exit *exec.ExitError
+			require.ErrorAs(t, run.err, &exit, run.out)
+			assert.Equal(t, 143, exit.ExitCode(), run.out)
+			want := map[string]string{}
+			for _, name := range tc.committed {
+				want[name] = "committed"
+			}
+			assert.Equal(t, screenshotAssets(want), run.assets, run.out)
+			assert.Empty(t, run.prepared, "the run's own folder is left beside the images")
+			assert.Contains(t, run.out, "screenshots: failed while replacing the committed images")
 			assert.NotContains(t, run.out, "screenshots: wrote")
 			assert.Empty(t, run.tmp, "the staging folder is left behind")
 		})

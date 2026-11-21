@@ -51,7 +51,7 @@ step=""
 started=false
 removed=false
 images=()
-preparing=false
+prepared=""
 installed=false
 
 # Removes the containers, the network and the volumes of the project, and the capture's and the
@@ -65,9 +65,11 @@ remove_project() {
 # that fails after the removal still shows them.
 server_logs() { "${compose[@]}" logs --no-color --tail 40 authserver adminconsole; }
 
-# Leaving, pass or fail, Ctrl-C or SIGTERM, removes what the run started, the replacements it
-# prepared and had not yet used, and its staging folder. A failure names the step, with the servers'
-# last log lines when they had been started.
+# Leaving, pass or fail, Ctrl-C or SIGTERM, removes what the run started and its staging folder.
+# Before every image is replaced, it also puts back the committed images already replaced and
+# deletes the replacements the run prepared. Nothing else does, so that happens once, whether a
+# replacement failed or the run was stopped. A failure names the step, with the servers' last log
+# lines when they had been started.
 # Once every image is replaced the run has succeeded, so nothing after that point, a cleanup step that
 # fails or an interrupt, makes it exit non-zero: a run that does leaves the committed images as they
 # were. The cleanup itself never stops short of the exit.
@@ -78,6 +80,12 @@ finish() {
   if [ "$installed" = true ] && [ "$status" -ne 0 ]; then
     echo "screenshots: warning: stopped while $step, after every image was written; delete site/src/assets/${prepared##*/} if it is left" >&2
     status=0
+  fi
+  # A second Ctrl-C or SIGTERM is ignored from here on, so the images are put back in full. The
+  # servers are removed by then, so what is left to run is quick.
+  if [ "$installed" = false ] && [ -n "$prepared" ]; then
+    trap '' INT TERM
+    put_back
   fi
   if [ "$status" -ne 0 ]; then
     echo "screenshots: failed while $step" >&2
@@ -92,7 +100,6 @@ finish() {
   if [ "$removed" = false ]; then
     remove_project || echo "screenshots: could not remove Compose project $project; remove it with: docker compose -p $project down --volumes" >&2
   fi
-  if [ "$preparing" = true ]; then discard_prepared; fi
   rm -rf "$stage" ||
     echo "screenshots: warning: could not delete the staging folder $stage; delete it by hand" >&2
   exit "$status"
@@ -154,24 +161,27 @@ removed=true
 
 # Every new image and a copy of every committed one are first written into a folder of this run's
 # own beside the committed images, as <name>.new and <name>.old, so what follows writes no data:
-# each image replaces the committed one by a rename, and when one fails, the ones already replaced
-# are put back by renaming their copies over them, one that was not there before is removed, and
-# the rest of the folder is deleted. A copy that cannot be put back is left in the folder, which
-# the run names. Once every image is replaced the run has succeeded; a copy it then cannot delete
-# is only reported. The folder is this run's alone, so a later run never touches what one left.
-prepared=""
+# each image replaces the committed one by a rename, and when one fails or the run is stopped
+# before every image is replaced, the ones already replaced are put back by renaming their copies
+# over them, one that was not there before is removed, and the rest of the folder is deleted. A copy
+# that cannot be put back is left in the folder, which the run names. Once every image is replaced
+# the run has succeeded; a copy it then cannot delete is only reported. The folder is this run's
+# alone, so a later run never touches what one left.
 discard_prepared() {
   [ -z "$prepared" ] || rm -rf "$prepared"
 }
+# The images whose rename has begun, each recorded just before it.
 replaced=()
 put_back() {
-  local name kept=false
+  local name begun kept=false
   for name in "${images[@]}"; do
-    rm -f "$prepared/$name.new"
-    case " ${replaced[*]-} " in
-      *" $name "*) ;;
-      *) rm -f "$prepared/$name.old"; continue ;;
-    esac
+    # One whose rename has not begun, or still has its .new because the rename failed or the run
+    # stopped before it ran, left the committed image as it was.
+    case " ${replaced[*]-} " in *" $name "*) begun=true ;; *) begun=false ;; esac
+    if [ "$begun" = false ] || [ -e "$prepared/$name.new" ]; then
+      rm -f "$prepared/$name.new" "$prepared/$name.old"
+      continue
+    fi
     if [ -e "$prepared/$name.old" ]; then
       if ! mv -f "$prepared/$name.old" "$assets/$name"; then
         kept=true
@@ -185,22 +195,20 @@ put_back() {
 }
 
 step="preparing the replacements"
-preparing=true
 prepared="$(mktemp -d "$assets/.screenshots-XXXXXX")"
 for name in "${images[@]}"; do
   cp "$stage/new/$name" "$prepared/$name.new"
   if [ -e "$assets/$name" ]; then cp -p "$assets/$name" "$prepared/$name.old"; fi
 done
-preparing=false
 
+# Unless every image is replaced, finish puts back the ones this loop replaced.
 step="replacing the committed images"
 for name in "${images[@]}"; do
+  replaced+=("$name")
   if ! mv -f "$prepared/$name.new" "$assets/$name"; then
     echo "screenshots: could not replace site/src/assets/$name; putting back the images replaced before it" >&2
-    put_back
     exit 1
   fi
-  replaced+=("$name")
 done
 installed=true
 
