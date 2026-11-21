@@ -232,6 +232,18 @@ func (_mock *local) Ping(to string) error {
 	return ret.Error(0)
 }
 
+// shadowing embeds its Mock but declares an AssertNotCalled of its own, which hides testify's.
+type shadowing struct {
+	mock.Mock
+}
+
+func (s *shadowing) AssertNotCalled() {}
+
+func (s *shadowing) Ping(to string) error {
+	ret := s.Called(to)
+	return ret.Error(0)
+}
+
 // recorder is a double whose Mock is a field it names rather than embeds.
 type recorder struct {
 	backend mock.Mock
@@ -314,6 +326,11 @@ func TestRules(t *testing.T) {
 	// own to move the call to. Refused, naming the recorded Calls instead.
 	rec := &recorder{}
 	rec.backend.AssertNotCalled(t, "Ping", mock.Anything)
+
+	// Row 21: an embedded Mock whose double declares an AssertNotCalled of its own, so the call
+	// cannot move to the double. Refused, naming the recorded Calls instead.
+	sh := &shadowing{}
+	sh.Mock.AssertNotCalled(t, "Ping", mock.Anything)
 }
 `)
 	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
@@ -366,8 +383,8 @@ func TestSupport(t *testing.T) {
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 18, sites,
-		"every testify assertion is reached once, including the seven the walk refuses, and "+
+	assert.Equal(t, 19, sites,
+		"every testify assertion is reached once, including the eight the walk refuses, and "+
 			"neither call of a method merely spelled like it")
 
 	assert.Equal(t, []string{
@@ -381,7 +398,7 @@ func TestSupport(t *testing.T) {
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))
 
-	require.Len(t, blocked, 7)
+	require.Len(t, blocked, 8)
 	assert.Contains(t, blocked[0].why, "does not declare")
 	assert.Contains(t, blocked[1].why, "string literal")
 	assert.Contains(t, blocked[2].why, "variadic")
@@ -391,6 +408,7 @@ func TestSupport(t *testing.T) {
 	assert.Contains(t, blocked[5].why, "call sender.AssertNotCalled instead")
 	assert.Contains(t, blocked[6].why, `is called on the Mock field rec.backend rather than on the double`)
 	assert.Contains(t, blocked[6].why, "assert over rec.backend.Calls instead")
+	assert.Contains(t, blocked[7].why, "assert over sh.Mock.Calls instead")
 }
 
 // TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass pins the one way this guard stops

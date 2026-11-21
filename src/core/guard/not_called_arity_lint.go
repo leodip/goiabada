@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -273,13 +274,14 @@ func notCalledSitesIn(
 
 		// A Mock field named, d.Mock.AssertNotCalled: the method the name means records into that
 		// field, and the walk reads the method on the type the call is written on, which here is
-		// Mock. An embedded Mock is the double's own, so the call belongs on the double; a field the
-		// double names may be any type's recorder, so the call belongs on its recorded Calls.
+		// Mock. Where the double's own AssertNotCalled is testify's, promoted through that field, the
+		// call belongs on the double; otherwise, a field the double names or a method of its own
+		// in the way, on the field's recorded Calls.
 		if field, isField := ast.Unparen(sel.X).(*ast.SelectorExpr); isField {
 			if s, isSel := info.Selections[field]; isSel && s.Kind() == types.FieldVal && isTestifyMock(s.Obj().Type()) {
-				instead := "call " + types.ExprString(field.X) + "." + notCalledSelector + " instead"
-				if v, isVar := s.Obj().(*types.Var); !isVar || !v.Embedded() {
-					instead = "assert over " + types.ExprString(field) + ".Calls instead, which match on the name alone"
+				instead := "assert over " + types.ExprString(field) + ".Calls instead, which match on the name alone"
+				if promotesNotCalled(info.TypeOf(field.X), pkg, s.Index()) {
+					instead = "call " + types.ExprString(field.X) + "." + notCalledSelector + " instead"
 				}
 				refuse(notCalledSelector + "(t, \"" + method + "\", ...) is called on the Mock field " +
 					types.ExprString(field) + " rather than on the double, a form this walk does not read, " +
@@ -321,6 +323,15 @@ func notCalledSitesIn(
 	})
 
 	return findings, refused
+}
+
+// promotesNotCalled reports whether recv's AssertNotCalled is testify's, promoted through the field at
+// fieldIndex, so that calling it on recv is the same call as calling it on that field.
+func promotesNotCalled(recv types.Type, pkg *types.Package, fieldIndex []int) bool {
+	obj, index, _ := types.LookupFieldOrMethod(recv, true, pkg, notCalledSelector)
+	fn, ok := obj.(*types.Func)
+	return ok && fn.Pkg() != nil && fn.Pkg().Path() == testifyMockImportPath &&
+		len(index) > len(fieldIndex) && slices.Equal(index[:len(fieldIndex)], fieldIndex)
 }
 
 // isTestifyMock reports whether t is testify's Mock or a pointer to it.
