@@ -16,16 +16,18 @@
   it regenerates before its gates. The unit and lint gates check the ownership table,
   the mocks and the CSS in every slice, so a slice that leaves its regeneration to a
   later one fails its own gates. `ownership`: when the slice adds, moves or removes a
-  core exported symbol, and also when it only adds or removes a production caller of
-  one. A row's justification follows its callers, with no declaration changed: a
-  symbol's first caller in another core package makes its row `kernel`, and losing
-  the last one moves it to `own-package` or leaves it with no computed justification.
-  A symbol that only tests name has none, so `ownershipdump` refuses to write until
-  the slice gives it a `test-support` row with a note by hand (`src/core/OWNERSHIP.md`,
-  "The justifications"). `mocks`: when the slice renames or changes a mocked
-  interface; a rename also changes the key that names it in its module's
-  `.mockery.yaml`, in the same slice. `schema`: in the slice that adds or changes a
-  migration. The CSS: in the slice that adds Tailwind classes.
+  core exported symbol, and also when it only adds or removes a reference to one, a
+  test's included. A row holds the strongest justification its references give, with
+  no declaration changed: a first production reference from another core package
+  makes it `kernel`, and losing references can move it to a weaker one. A symbol that
+  only tests name has no computed justification, so `ownershipdump` refuses to write
+  until the slice gives it a `test-support` row with a note by hand. A `test-support`
+  row fails the unit gate once no test and no code of its own package names the
+  symbol, and regenerating keeps it (`src/core/OWNERSHIP.md`, "The justifications").
+  `mocks`: when the slice renames or changes a mocked interface; a rename also changes
+  the key that names it in its module's `.mockery.yaml`, in the same slice. `schema`:
+  in the slice that adds or changes a migration. The CSS: in the slice that adds
+  Tailwind classes.
 - **Documentation:** decide whether a change to reader-facing behavior, configuration,
   an API, deployment, or the admin console needs an update under
   `site/src/content/docs/`. Name the affected pages in the agreement and include
