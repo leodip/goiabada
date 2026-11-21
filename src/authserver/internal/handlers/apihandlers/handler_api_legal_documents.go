@@ -134,7 +134,7 @@ func validateLegalDocumentMarkdown(markdown string) error {
 	return nil
 }
 
-// legalDocumentId reads the {id} path value, answering the request when it is not an id.
+// legalDocumentID reads the {id} path value, answering the request when it is not an id.
 func legalDocumentID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {

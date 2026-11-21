@@ -26,7 +26,7 @@ func (fakeActingUser) ActingUserID(ctx context.Context) (int64, bool) {
 	return id, ok
 }
 
-// actingAs is a request's context once the session guard has found userId's token live.
+// actingAs is a request's context once the session guard has found userID's token live.
 func actingAs(userID int64) context.Context {
 	return context.WithValue(context.Background(), actingUserKey{}, userID)
 }

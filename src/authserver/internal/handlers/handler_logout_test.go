@@ -2678,7 +2678,7 @@ func TestClassifyIDTokenHint(t *testing.T) {
 		hintAbsent      bool
 		hintValue       *string
 		innerToken      *string
-		// clientId is the value the parameter arrived with; clientIDAbsent says it did not arrive at
+		// clientID is the value the parameter arrived with; clientIDAbsent says it did not arrive at
 		// all. The two are separate fields because the classifier reads client_id for presence, so a
 		// row that could only say "" would be unable to tell the gate's two sides apart, which is
 		// exactly the hole this pair was added to close.

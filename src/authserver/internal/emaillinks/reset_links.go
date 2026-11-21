@@ -32,7 +32,7 @@ const ForgotPasswordPath = "/forgot-password"
 // code removes the defect class rather than escaping around it, because the code's
 // alphabet is entirely RFC 3986 unreserved (#112).
 //
-// ceremonyId is the sign-in the forgot-password page's URL named, through the password
+// ceremonyID is the sign-in the forgot-password page's URL named, through the password
 // page's Forgot password? link, so that resetting in the browser that holds it carries
 // that sign-in on into the app, as an activation does (#812 decisions 9 and 10). Empty
 // for a request made on a page naming none, and for the setup link an administrator
@@ -51,7 +51,7 @@ func ResetPasswordContinuation(ceremonyID string) string {
 
 // AccountActivateLink builds the account activation link emailed to someone who has
 // just self-registered. Same shape and same reasoning as ResetPasswordLink, but for
-// ceremonyId: the sign-in the registration came from, through the password page's
+// ceremonyID: the sign-in the registration came from, through the password page's
 // Create an account link, so activating in the browser that holds it carries that
 // sign-in on into the app (#622 decision 9). Empty for a registration reached from
 // anywhere else, whose link carries the code alone. The id's alphabet is RFC 3986
@@ -67,7 +67,7 @@ func AccountActivateContinuation(ceremonyID string) string {
 	return continuationWithSignIn(AccountActivatePath, ceremonyID)
 }
 
-// linkWithSignIn is path with the code, and the sign-in when ceremonyId is not empty, as
+// linkWithSignIn is path with the code, and the sign-in when ceremonyID is not empty, as
 // its query: the shape both emailed links share.
 func linkWithSignIn(path, code, ceremonyID string) string {
 	if ceremonyID == "" {
@@ -77,7 +77,7 @@ func linkWithSignIn(path, code, ceremonyID string) string {
 }
 
 // continuationWithSignIn is path with the sign-in alone as its query, or bare when
-// ceremonyId is empty: where both links' first hops send the browser once the code is
+// ceremonyID is empty: where both links' first hops send the browser once the code is
 // dropped.
 func continuationWithSignIn(path, ceremonyID string) string {
 	if ceremonyID == "" {

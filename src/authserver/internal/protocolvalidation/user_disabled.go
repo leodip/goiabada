@@ -32,7 +32,7 @@ func (e *UserDisabledError) Unwrap() error {
 	return e.Detail
 }
 
-// userDisabled refuses a grant whose user, userId, is disabled, answering the client with
+// userDisabled refuses a grant whose user, userID, is disabled, answering the client with
 // description as invalid_grant (RFC 6749 section 5.2: the grant is no longer valid).
 func userDisabled(description string, userID int64) *UserDisabledError {
 	return &UserDisabledError{

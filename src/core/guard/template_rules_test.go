@@ -78,7 +78,7 @@ func TestTemplates_TheTitleTable(t *testing.T) {
 	assert.Equal(t, 7, n)
 }
 
-// TestTemplates_TheCsrfFieldTable holds the csrfField rule: the spelling anywhere in a template is
+// TestTemplates_TheCSRFFieldTable holds the csrfField rule: the spelling anywhere in a template is
 // rejected, in an action or not, and nothing else is.
 //
 // The "spelled around" row is the boundary the guard's own comment claims, asserted rather than
@@ -106,7 +106,7 @@ func TestTemplates_TheCSRFFieldTable(t *testing.T) {
 	assert.Equal(t, 6, n)
 }
 
-// TestTemplates_TheHtmlLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
+// TestTemplates_TheHTMLLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
 // layouts/ directory. An email layout is held to it like any other: the bodies are per-locale sibling
 // files, but the one layout they are drawn in is shared, so a hardcoded "en" marked every pt-BR email
 // English (#645 decision 10).

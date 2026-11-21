@@ -54,7 +54,7 @@ var testTemplateFS = fstest.MapFS{
 
 // auditEvent is one call the middleware made to its audit logger.
 //
-// requestId is what chi's id read off the context the call carried, recorded beside the event so
+// requestID is what chi's id read off the context the call carried, recorded beside the event so
 // the trip cases can assert that reportTrip audits under the request's own id rather than under
 // some context it reached for (#328 seam 3). Empty when the context carried none.
 type auditEvent struct {

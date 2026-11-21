@@ -119,7 +119,7 @@ func (a *administratorRemoval) leavesAnAdministrator(ctx context.Context) error 
 	return nil
 }
 
-// groupsGiveManage reports whether any of groupIds holds manage, read on the transaction.
+// groupsGiveManage reports whether any of groupIDs holds manage, read on the transaction.
 func (a *administratorRemoval) groupsGiveManage(ctx context.Context, groupIDs []int64) (bool, error) {
 	if len(groupIDs) == 0 {
 		return false, nil

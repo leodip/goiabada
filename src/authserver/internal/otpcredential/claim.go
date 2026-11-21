@@ -41,7 +41,7 @@ type ClaimDatabase interface {
 	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
-// Recheck takes userId's row in tx and answers ErrAuthenticatorRemoved unless the claim stands for
+// Recheck takes userID's row in tx and answers ErrAuthenticatorRemoved unless the claim stands for
 // the user read under it. A claim to no code takes nothing. The session writes at /auth/completed
 // and both issuers call it first in their transactions, before any other read or lock.
 //

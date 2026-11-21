@@ -582,7 +582,7 @@ func sendWelcomeEmail(
 // registerWithVerification answers a well-formed address in the mode with verification: both
 // lookups, every time and whatever the first found, then the one "check your email" page, and the
 // rest handed to a job that runs after the response (#207 decision 4). No password is read: the
-// person who follows the emailed link chooses it (#207 decision 1). ceremonyId is the sign-in the
+// person who follows the emailed link chooses it (#207 decision 1). ceremonyID is the sign-in the
 // registration came from, which the link names, or empty (#622 decision 9).
 func registerWithVerification(
 	w http.ResponseWriter,
@@ -695,7 +695,7 @@ func finishRegistration(
 // issueActivationLink writes a new address's pending registration, or gives a dead one a fresh
 // code, and mails its link.
 //
-// ceremonyId is the sign-in the registration came from, which the link names, or empty.
+// ceremonyID is the sign-in the registration came from, which the link names, or empty.
 //
 // dead is the pending registration the lookup found and judged dead, or nil when it found none.
 // Its replacement is conditional on the row still holding the dead code, so of two repeats racing

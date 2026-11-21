@@ -112,13 +112,13 @@ type administratorChangeRefusal struct {
 	// request with no target, a settings write, leaves targetKind empty and the record names neither.
 	targetKind string
 	targetID   int64
-	// permissionIds is the administrative permissions whose change caused a grant refusal, or
+	// permissionIDs is the administrative permissions whose change caused a grant refusal, or
 	// whose description a target refusal of a resource's permissions save would have changed.
 	permissionIDs []int64
-	// groupIds is the administrative groups whose membership change caused a grant refusal, when
+	// groupIDs is the administrative groups whose membership change caused a grant refusal, when
 	// the target is the user moved into or out of them.
 	groupIDs []int64
-	// resourceIds is the resources whose listing on a client's introspection resources caused a
+	// resourceIDs is the resources whose listing on a client's introspection resources caused a
 	// grant refusal: the authserver resource, the one listing reserved to authserver:manage.
 	resourceIDs []int64
 }
@@ -293,7 +293,7 @@ type administrativeGroup struct {
 	identifiers   []string
 }
 
-// administrativeGroups is which of groupIds hold an administrative permission, in groupIds' order,
+// administrativeGroups is which of groupIDs hold an administrative permission, in groupIDs' order,
 // each with what it holds of the administrative set. Read on tx, or outside any transaction when tx
 // is nil; a set of groups holding no grant at all reads nothing more.
 func administrativeGroups(ctx context.Context, database administrativeGroupPolicyDatabase, tx *sql.Tx, groupIDs []int64) ([]administrativeGroup, error) {
@@ -366,9 +366,9 @@ func recordMembershipChanges(r *http.Request, auditLogger AuditLogger, userID in
 }
 
 // membershipCeilingAllows applies the grant ceiling to moving a user into or out of groups: joining
-// a group that holds an administrative permission grants it, and leaving one revokes it. groupIds
+// a group that holds an administrative permission grants it, and leaving one revokes it. groupIDs
 // is the groups the request joins or leaves. It reports whether the change may go on, and when it
-// may not it has answered the request. When it may, it hands back which of groupIds are
+// may not it has answered the request. When it may, it hands back which of groupIDs are
 // administrative, which the change's administrative_permission_changed records are written from:
 // an authserver:manage caller is never refused, but what the groups hold is read for it too, before
 // the write, so that a change is never made without knowing which records it owes (#402 decision 6).

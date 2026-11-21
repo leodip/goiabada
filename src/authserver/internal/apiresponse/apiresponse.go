@@ -108,7 +108,7 @@ func WriteInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 	requestID := requestid.FromContext(r.Context())
 	// No request_id attribute: the installed handler reads it off the context this call
-	// passes it, so naming it here would write it twice. requestId is still read, because
+	// passes it, so naming it here would write it twice. requestID is still read, because
 	// the caller puts it on the wire for whoever hit the error (#320 decision 2).
 	record := make([]any, 0, len(attrs)+2)
 	record = append(record, "error", errs.WithStack(err))

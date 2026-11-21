@@ -463,7 +463,7 @@ func RevokeUserAuthStateTx(ctx context.Context, db Database, userID int64, excep
 }
 
 // UserWideDeliveries is the logout tokens a user-wide end of #784 decision 3 sends for the user
-// userId, whose sub is subject, read on the end's own transaction before it deletes the user's
+// userID, whose sub is subject, read on the end's own transaction before it deletes the user's
 // sessions and grants: one sub-only token to each app that was on any of the user's stored sessions
 // or holds one of the user's unrevoked, unexpired refresh tokens, and a sub+sid token for each
 // session live judges valid to each app requiring sid (see LogoutNotice). It takes each session's
@@ -920,7 +920,7 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 		RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJTIs: revokedJTIs}, nil
 }
 
-// revokeSignOutGrants is EndClientPartTx's sweep of the client clientId's session-bound grants from
+// revokeSignOutGrants is EndClientPartTx's sweep of the client clientID's session-bound grants from
 // the session sessionIdentifier, on the sign-out's transaction. The code mark comes first, as in
 // every other sweep, and each family is recorded before its tokens are flipped (#259). It answers
 // the codes it marked and the tokens it moved from live to revoked, never a nil list.
@@ -1308,8 +1308,8 @@ type DisconnectResult struct {
 	LogoutDeliveries []backchannel.Delivery
 }
 
-// disconnectDeliveries is the logout tokens a disconnect of the client clientId from the user
-// userId sends, read on the disconnect's own transaction (#135 decision 3). A client with a
+// disconnectDeliveries is the logout tokens a disconnect of the client clientID from the user
+// userID sends, read on the disconnect's own transaction (#135 decision 3). A client with a
 // back-channel logout URI is sent one token naming the user alone, which asks it to end every
 // session it has for the user (Back-Channel Logout 1.0 section 2.4). A client that registered
 // backchannel_logout_session_required is instead sent a sub+sid token for each of the user's
@@ -1877,8 +1877,8 @@ const (
 // revocation endpoint (#676 decision 11). One function, beside the operation, following the other
 // Log* helpers: the payload has one place to be asserted field by field.
 //
-// clientId is the client that revoked, which is the grant's own, since another client's token is
-// refused; userId is the grant's user; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
+// clientID is the client that revoked, which is the grant's own, since another client's token is
+// refused; userID is the grant's user; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
 //
 // Call this only after RevokeGrantTx returned without error.
 //
@@ -1899,7 +1899,7 @@ func LogRevokedGrant(ctx context.Context, auditLogger AuditLogger, clientID int6
 
 // LogTokenRevocationRefused emits EventTokenRevocationRefused, the record of a client that sent the
 // revocation endpoint another client's live token and was refused (#676 decisions 8 and 11).
-// Nothing is revoked, so there is no operation to wait for. clientId is the client that called,
+// Nothing is revoked, so there is no operation to wait for. clientID is the client that called,
 // which client authentication proved; tokenClientID the client the token was issued to, which the
 // token's signature or row proves; tokenType is TokenTypeAccessToken or TokenTypeRefreshToken.
 //
@@ -1955,8 +1955,8 @@ func RevokeAccessToken(ctx context.Context, db AccessTokenDatabase, jti string, 
 // beside the operation, following the other Log* helpers: the payload has one place to be asserted
 // field by field.
 //
-// clientId is the client that revoked, which is the token's own, since another client's token is
-// refused; userId is the token's user, for a token of the implicit flow, and 0 for a client
+// clientID is the client that revoked, which is the token's own, since another client's token is
+// refused; userID is the token's user, for a token of the implicit flow, and 0 for a client
 // credentials token, which has none and records none; jti is the token's.
 //
 // Call this only after RevokeAccessToken returned true.

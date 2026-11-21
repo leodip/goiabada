@@ -1142,7 +1142,7 @@ func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel2OptionalRequest_OT
 	started := time.Now().UTC()
 	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
-	// As in the OtpDisabled case above: the client's level is a floor acr_values never lowers
+	// As in the OTPDisabled case above: the client's level is a floor acr_values never lowers
 	// (#240), so the request is at level 2 optional only once the client is.
 	client.DefaultACRLevel = record.ACRLevel2Optional
 	err := database.UpdateClient(context.Background(), nil, client)

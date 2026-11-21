@@ -244,7 +244,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	// differing byte (#207 decision 12). Reachable only through a SHA-256 collision now that the
 	// row is located by hash, and kept so the comparison stays load-bearing rather than
 	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch, and
-	// with no preRegistrationId for the reason it gives: nothing about the row is established.
+	// with no preRegistrationID for the reason it gives: nothing about the row is established.
 	if !emailedCodeMatches(verificationCode, code) {
 		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonUnknownCode, 0)
 		return
@@ -327,7 +327,7 @@ func resolveActivationMarker(pageRenderer PageRenderer, httpSession linkMarkerSe
 		return nil, nil
 	}
 	if rejection != "" {
-		// No preRegistrationId: a rejected marker was not resolved against any row, and the id
+		// No preRegistrationID: a rejected marker was not resolved against any row, and the id
 		// it carries is a label rather than something this request established.
 		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, string(rejection), httpStatus)
 		return nil, nil

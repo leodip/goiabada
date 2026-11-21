@@ -7,9 +7,9 @@
 # other config: no module writes a mock outside its own tree any more. This one's
 # HTTPHelper mock is what ended that. The auth server used to generate it into
 # core/handlerhelpers/mocks and both modules imported it from there, which worked only
-# because the auth server's port is the wider of the two -- it declares
-# LookupFromUrlQueryOrFormPost and this module's does not -- so the console was
-# asserting against a mock of an interface it does not have (#338, #385).
+# because the auth server's port was the wider of the two -- it declared a method
+# this module's did not -- so the console was asserting against a mock of an
+# interface it does not have (#338, #385).
 filename: "{{.InterfaceName | snakecase}}_mock.go"
 structname: "{{.InterfaceName}}"
 template: testify

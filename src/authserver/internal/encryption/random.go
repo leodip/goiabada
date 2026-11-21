@@ -9,7 +9,7 @@ import (
 
 // randReader is crypto/rand in production. It is a variable so a test can make the
 // CSPRNG fail, which is the one failure a key generator must not paper over. The
-// session store's own newSessionId reads the CSPRNG through exactly this shape, and
+// session store's own newSessionID reads the CSPRNG through exactly this shape, and
 // this copies it rather than inventing a second one.
 var randReader io.Reader = rand.Reader
 

@@ -60,7 +60,7 @@ func (permissionUserSearchAPI) UpdateUserPermissions(context.Context, string, in
 
 func TestHandleUsersWithPermissionSearchGet_SendsTheKeysTheScriptReads(t *testing.T) {
 	handler := HandleUsersWithPermissionSearchGet(render.New(fstest.MapFS{}, nil), permissionUserSearchAPI{})
-	req := handlertest.Request(http.MethodGet, "/admin/resources/5/users-with-permission/11/search?query=ana",
+	req := handlertest.Request(http.MethodGet, "/admin/resources/5/users-with-permission/search/11?query=ana",
 		handlertest.WithAccessToken(),
 		handlertest.WithPathValue("resourceId", "5"), handlertest.WithPathValue("permissionId", "11"))
 	rr := httptest.NewRecorder()

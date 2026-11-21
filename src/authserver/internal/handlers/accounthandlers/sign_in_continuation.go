@@ -32,7 +32,7 @@ func (b *signInBrowser) SaveAuthContext(authContext *ceremony.AuthContext) error
 
 // carryOnSignIn signs a user who has just registered, activated their account, or reset their
 // password, into the sign-in that started it, and sends the browser on to its next step (#622
-// decision 9, #812 decision 10). ceremonyId is the sign-in the password page's Create an account or
+// decision 9, #812 decision 10). ceremonyID is the sign-in the password page's Create an account or
 // Forgot password? link named, from the page's URL (registrationCeremonyID), or empty for a page
 // reached from anywhere else. user is the account with the password the user just chose: the one
 // just created, or the one a reset just changed (carryOnReset).

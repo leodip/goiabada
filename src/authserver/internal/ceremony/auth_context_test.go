@@ -287,7 +287,7 @@ func TestGetTargetACRLevel_FirstRecognizedValueWins(t *testing.T) {
 }
 
 // When acr_values is absent, unparseable, or contains nothing recognized, the
-// client's configured DefaultAcrLevel applies.
+// client's configured DefaultACRLevel applies.
 //
 // Nothing parses on any of these inputs, so the floor never fires and this path is unchanged by
 // it. That is why the cases here pass a bare client default and the two functions above own the

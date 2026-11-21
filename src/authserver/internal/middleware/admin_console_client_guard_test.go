@@ -29,7 +29,7 @@ const (
 var apiClientNotAllowed = chainAnswer{http.StatusForbidden, challengeClientNotAllowed,
 	`{"error_code":"CLIENT_NOT_ALLOWED","error_description":"` + clientNotAllowedDescription + `"}`}
 
-// accountTokenOf is a user's Account API token issued to clientId, or to no client when clientId
+// accountTokenOf is a user's Account API token issued to clientID, or to no client when clientID
 // is empty.
 func accountTokenOf(clientID string) oauth.JWTToken {
 	claims := map[string]interface{}{

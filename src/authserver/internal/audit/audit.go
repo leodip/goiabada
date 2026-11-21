@@ -160,7 +160,7 @@ func userIDOf(details map[string]interface{}) sql.NullInt64 {
 	return sql.NullInt64{Int64: userID, Valid: true}
 }
 
-// loggedInUserId is the user whose access token made the request, NULL when none did or when the
+// loggedInUserID is the user whose access token made the request, NULL when none did or when the
 // logger was built without the port.
 func (al *Logger) loggedInUserID(ctx context.Context) sql.NullInt64 {
 	if al.actingUser == nil {

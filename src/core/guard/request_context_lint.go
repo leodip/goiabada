@@ -23,7 +23,7 @@ import (
 // methods a leading context, so that a cancelled request stops the work it started and every
 // record it produces carries request_id. The compiler forces each of those call sites to pass
 // *a* context. What no compiler forces is that the context is the request's, and a site written
-// database.GetUserById(context.Background(), tx, id) compiles, satisfies every other guard here,
+// database.GetUserByID(context.Background(), tx, id) compiles, satisfies every other guard here,
 // and gives back exactly the uncancellable, uncorrelated call the issue exists to remove. This is
 // the only thing that makes "every operation reachable from production code is cancellable by the
 // request that asked for it" a fact rather than a claim.

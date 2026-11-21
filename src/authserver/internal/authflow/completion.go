@@ -93,7 +93,7 @@ type completionBrowser interface {
 	// holds the ceremony, the create arm's check before it ends or creates anything.
 	ConfirmCeremony(ceremonyID string) error
 	// RegenerateSessionAndBind rotates the browser session's identifier and writes the user session
-	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userId.
+	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userID.
 	// It records keepSignedIn in the same write, as RecordKeepSignedIn does.
 	RegenerateSessionAndBind(ceremonyID string, userID int64, userSessionIdentifier string, keepSignedIn *bool) error
 	// RecordKeepSignedIn records in the browser session the answer the password page's Keep me

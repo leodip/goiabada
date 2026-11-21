@@ -876,7 +876,7 @@ func chunkCookieName(logicalName string, n int) string {
 	return logicalName + "-chunk-" + strconv.Itoa(n)
 }
 
-// newSessionId returns 256 bits from the CSPRNG, hex encoded.
+// newSessionID returns 256 bits from the CSPRNG, hex encoded.
 //
 // Deliberately not securerandom.String: that helper has no error return at all, because a
 // CSPRNG failure there ends the process (#211, closed by #278).

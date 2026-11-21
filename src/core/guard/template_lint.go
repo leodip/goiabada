@@ -142,7 +142,7 @@ func AssertTemplatesNoCSRFField(t *testing.T, fsys fs.FS, root string) {
 	assertTemplatesNoCSRFField(t, fsys, root)
 }
 
-// assertTemplatesNoCsrfField is the reporting half, failing through a Reporter so a rule test can drive it
+// assertTemplatesNoCSRFField is the reporting half, failing through a Reporter so a rule test can drive it
 // against a fixture FS. See Reporter in guard.go.
 func assertTemplatesNoCSRFField(r Reporter, fsys fs.FS, root string) {
 	r.Helper()
@@ -176,7 +176,7 @@ func AssertTemplatesHTMLLangNotHardcoded(t *testing.T, fsys fs.FS, root string) 
 	assertTemplatesHTMLLangNotHardcoded(t, fsys, root)
 }
 
-// assertTemplatesHtmlLangNotHardcoded is the reporting half, failing through a Reporter so a rule test can drive it
+// assertTemplatesHTMLLangNotHardcoded is the reporting half, failing through a Reporter so a rule test can drive it
 // against a fixture FS. See Reporter in guard.go.
 func assertTemplatesHTMLLangNotHardcoded(r Reporter, fsys fs.FS, root string) {
 	r.Helper()

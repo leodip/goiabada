@@ -3720,7 +3720,7 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 	}).Return().Once()
 }
 
-// signedInAs is what /auth/completed hands the session manager for a sign-in by userId that entered
+// signedInAs is what /auth/completed hands the session manager for a sign-in by userID that entered
 // a password at at and no code after it, so the password's instant is the credential's.
 func signedInAs(userID int64, methods string, acr record.ACRLevel, at *time.Time) interface{} {
 	return signedInWith(usersession.Authentication{UserID: userID, AuthMethods: methods, ACRLevel: acr, AuthTime: at,

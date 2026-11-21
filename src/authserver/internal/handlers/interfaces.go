@@ -65,7 +65,7 @@ type CeremonyStore interface {
 	// change to match a cookie store's structural immunity to session fixation (#266). It
 	// rotates only while the browser session still holds the ceremony named, and otherwise
 	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579). It keeps no ceremony held for a
-	// user other than userId, the user the rotation is for (#246).
+	// user other than userID, the user the rotation is for (#246).
 	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyID string, userID int64) error
 	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
 	// writes the new user session's identifier into the browser session as it rotates it (#266),

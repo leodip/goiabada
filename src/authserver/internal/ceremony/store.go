@@ -68,7 +68,7 @@ func (s *Store) GetAuthContext(r *http.Request) (*AuthContext, error) {
 	return s.authContextNamed(r, RequestedID(r))
 }
 
-// HeldAuthContext reads the ceremony the browser session holds under ceremonyId, whatever the
+// HeldAuthContext reads the ceremony the browser session holds under ceremonyID, whatever the
 // request names, with GetAuthContext's two refusals. The registration page reads through it the
 // sign-in its Create an account link named, which travels in the page's URL on its GET and its POST
 // alike.
@@ -76,7 +76,7 @@ func (s *Store) HeldAuthContext(r *http.Request, ceremonyID string) (*AuthContex
 	return s.authContextNamed(r, ceremonyID)
 }
 
-// authContextNamed reads the ceremony the browser session holds under ceremonyId: ErrNoAuthContext
+// authContextNamed reads the ceremony the browser session holds under ceremonyID: ErrNoAuthContext
 // when it holds none, and ErrCeremonyNotHeld when it holds others, or contexts naming none, since an
 // empty id is never held (idMatches).
 func (s *Store) authContextNamed(r *http.Request, ceremonyID string) (*AuthContext, error) {
@@ -149,7 +149,7 @@ func putHeld(values map[string]any, held []AuthContext) error {
 	return nil
 }
 
-// indexOf is where held holds the ceremony ceremonyId names, and -1 when it holds none by that id.
+// indexOf is where held holds the ceremony ceremonyID names, and -1 when it holds none by that id.
 // An empty id is never held, as idMatches refuses it.
 func indexOf(held []AuthContext, ceremonyID string) int {
 	for i := range held {
@@ -277,11 +277,11 @@ func goneIsReplaced(err error) error {
 // heldRotation is the change every rotation of the ceremony named makes to the browser session,
 // applied to the session's values as a fresh read found them: ErrCeremonyReplaced when they do not
 // hold that ceremony, and otherwise the removal of every other ceremony held for a user other than
-// userId, the user the rotation is for, and of the key before #246's, since a rotation is a write of
+// userID, the user the rotation is for, and of the key before #246's, since a rotation is a write of
 // the session (#246 decision 3). It moves no ceremony and changes none it keeps. A list that does not
 // decode is a fault and is returned as one.
 //
-// A rotation is a privilege change: a password or a code has just been accepted for userId in this
+// A rotation is a privilege change: a password or a code has just been accepted for userID in this
 // browser, or a session is being bound to them. A ceremony another user verified a password in and
 // walked away from would otherwise ride along into this user's session, outliving the pre-sign-in
 // lifetime it was stored under, and whoever used the browser next could finish it as that user: scan
@@ -375,7 +375,7 @@ func (s *Store) ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremon
 }
 
 // RegenerateSession replaces the browser session's identifier, keeping its contents, every held
-// ceremony among them but those held for a user other than userId, the user whose password or code
+// ceremony among them but those held for a user other than userID, the user whose password or code
 // the step has just accepted (heldRotation), only while the session still holds the ceremony named
 // (#579). The step loaded its context when its request began, and the ceremony may have ended or been
 // pushed out since, so the session is read afresh, the ceremony looked for in what it holds, and the
@@ -411,7 +411,7 @@ func (s *Store) RegenerateSession(w http.ResponseWriter, r *http.Request, ceremo
 // against: the session this rotation binds was started from that password entry, so its answer is
 // this one, whatever answer the browser session held before (putKeepSignedIn).
 //
-// It keeps, as RegenerateSession does, no ceremony held for a user other than userId, the user the
+// It keeps, as RegenerateSession does, no ceremony held for a user other than userID, the user the
 // session is bound to, and writes only while the browser session still holds the ceremony named,
 // answering ErrCeremonyReplaced, having written nothing and set no cookie, when it does not, or is
 // gone (#579 decision 4). The caller then abandons the user session it bound nothing to.
@@ -488,7 +488,7 @@ func (s *Store) RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, cerem
 // nothing.
 var errNewerAnswerKept = errors.New("the browser session holds the answer of a later password entry")
 
-// heldCeremony is the ceremony ceremonyId names among those values hold, as a fresh read found them,
+// heldCeremony is the ceremony ceremonyID names among those values hold, as a fresh read found them,
 // and ErrCeremonyReplaced when they hold none by that id, holds' condition.
 func heldCeremony(values map[string]any, ceremonyID string) (*AuthContext, error) {
 	ceremonies, err := heldIn(values)

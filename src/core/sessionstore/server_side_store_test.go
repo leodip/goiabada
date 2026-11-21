@@ -248,7 +248,7 @@ func (failingReader) Read(p []byte) (int, error) { return 0, errors.New("no entr
 //
 // The order is seal then identifier, so a reader that always fails only ever exercises the
 // nonce. The second case lets the nonce read succeed and fails the one after it, which is
-// the identifier's, and it is the case that would survive if newSessionId went back to
+// the identifier's, and it is the case that would survive if newSessionID went back to
 // returning the empty string on failure (#211, #266, #270).
 func TestServerSideStore_CSPRNGFailureFailsTheSave(t *testing.T) {
 	cases := []struct {

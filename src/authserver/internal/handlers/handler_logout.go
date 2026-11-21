@@ -138,8 +138,8 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 }
 
 // logoutDeclineHref is the declining control's destination: the declined page, carrying the
-// End-User's language, and clientId, the client_id the consent page carries, so the declined page
-// is drawn in that client's brand (#812 decision 5). clientId is empty when a hint was rejected, so
+// End-User's language, and clientID, the client_id the consent page carries, so the declined page
+// is drawn in that client's brand (#812 decision 5). clientID is empty when a hint was rejected, so
 // that page stays in the default brand as the others do. A decline is not a logout, so it hands the
 // RP nothing: no post_logout_redirect_uri or state, and never the id_token_hint (RP-Initiated
 // Logout 1.0 sections 2 and 3, #152); the declined page reads client_id for its look alone.

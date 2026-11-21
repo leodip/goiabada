@@ -40,7 +40,7 @@ const (
 	flashAppsSaved  = "legalDocumentAppsSaved"
 )
 
-// legalDocumentId reads the {legalDocumentId} path value; false when it is not an id.
+// legalDocumentID reads the {legalDocumentId} path value; false when it is not an id.
 func legalDocumentID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("legalDocumentId"), 10, 64)
 	return id, err == nil && id > 0

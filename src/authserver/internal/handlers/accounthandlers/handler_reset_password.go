@@ -265,7 +265,7 @@ func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession linkMarke
 		return nil, nil
 	}
 	if rejection != "" {
-		// No userId: a rejected marker was not resolved against any row, and the id it
+		// No userID: a rejected marker was not resolved against any row, and the id it
 		// carries is a label rather than something this request established.
 		rejectResetPassword(pageRenderer, auditLogger, w, r, 0, string(rejection), httpStatus)
 		return nil, nil
@@ -411,7 +411,7 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession link
 	// A second, different reset link followed while one is still live. The first
 	// continuation keeps the session and this one is refused, because one session holds one
 	// marker and the form does not name the marker that rendered it: replacing here would
-	// let a form already on screen write its password into this account instead. The userId
+	// let a form already on screen write its password into this account instead. The userID
 	// is this link's, which resolved; the account holding the live marker is not named.
 	//
 	// Audited rather than silently rendered, because a burst of these is what someone

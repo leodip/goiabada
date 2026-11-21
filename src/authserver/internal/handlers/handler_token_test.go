@@ -831,7 +831,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 // Both linkage shapes are run against the same expectations on purpose. A security-event
 // consumer must not need flow-specific logic to identify the client and user, which is
 // where this departs from EventTokenIssuedRefreshTokenResponse (codeID on one shape,
-// userId/clientId on the other).
+// userID/clientID on the other).
 //
 // The exact-key assertion is what pins the two negative requirements from decision 8: the
 // payload carries neither the presented refresh token itself nor a list of revoked JTIs.

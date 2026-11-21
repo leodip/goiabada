@@ -250,7 +250,7 @@ func brandSlotSwept(w http.ResponseWriter, r *http.Request, assets brandasset.Sl
 	return true
 }
 
-// brandId reads the {id} path value, answering the request when it is not an id.
+// brandID reads the {id} path value, answering the request when it is not an id.
 func brandID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {

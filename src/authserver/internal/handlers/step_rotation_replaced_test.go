@@ -495,7 +495,7 @@ func aNewDeviceOf(req *http.Request, minted *string) interface{} {
 
 // expectNewSessionBound arms /auth/completed's create arm's rotation, which binds the user session it
 // started to the browser session on condition it still holds this ceremony (#266, #579 decision 4),
-// for userId, the user the ceremony signed in, whom no other user's ceremony outlives (#246).
+// for userID, the user the ceremony signed in, whom no other user's ceremony outlives (#246).
 func expectNewSessionBound(ceremonyStore *handlersmocks.CeremonyStore, rr *httptest.ResponseRecorder, req *http.Request,
 	userID int64, userSessionIdentifier string) {
 	ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyID, userID, userSessionIdentifier, (*bool)(nil)).Return(nil).Once()

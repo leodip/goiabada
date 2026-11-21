@@ -286,7 +286,7 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 	return marker, "", nil
 }
 
-// ClearLinkMarker removes the marker of the continuation named by continuationId, the one
+// ClearLinkMarker removes the marker of the continuation named by continuationID, the one
 // its caller consumed, from the session.
 //
 // This does invalidate the marker, for every copy of it: the session is a row in the

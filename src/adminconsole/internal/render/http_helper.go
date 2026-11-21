@@ -62,7 +62,7 @@ func New(templateFS fs.FS, staticFS fs.FS) *Renderer {
 func (h *Renderer) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
 	requestID := requestid.FromContext(r.Context())
 	// No request_id attribute: the installed handler reads it off the context this call passes
-	// it, so naming it here would write it twice (#320 decision 2). requestId is still read,
+	// it, so naming it here would write it twice (#320 decision 2). requestID is still read,
 	// because the page below shows it to whoever hit the error.
 	slog.ErrorContext(r.Context(), "internal server error", "error", errs.WithStack(err))
 

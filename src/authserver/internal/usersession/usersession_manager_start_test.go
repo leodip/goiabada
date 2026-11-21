@@ -996,7 +996,7 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 	}
 }
 
-// authenticationOf is a sign-in by userId with a password and nothing after it, so the credential
+// authenticationOf is a sign-in by userID with a password and nothing after it, so the credential
 // instant is the password's too.
 func authenticationOf(userID int64, methods string, acr record.ACRLevel, at *time.Time) Authentication {
 	return Authentication{UserID: userID, AuthMethods: methods, ACRLevel: acr, AuthTime: at, PasswordAuthTime: at}
