@@ -89,8 +89,11 @@ rerun_failed_tests() { # first_status
     echo "No rerun: $count tests failed or did not run, more than the $max_rerun the gate reruns."
     return "$1"
   fi
+  # --reporter=list: the configured HTML reporter would run for a listing too, and rewrite
+  # playwright-report/, the first run's report the gate keeps below.
   if ! names="$(cd "$suite" &&
-    npx playwright test --list --last-failed --last-failed-file "$last_run" --no-deps | grep '^  \[')"; then
+    npx playwright test --list --reporter=list --last-failed --last-failed-file "$last_run" --no-deps |
+    grep '^  \[')"; then
     echo "No rerun: Playwright could not list the tests that did not pass."
     return "$1"
   fi
