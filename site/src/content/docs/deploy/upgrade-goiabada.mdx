@@ -146,9 +146,11 @@ The `migrate` command steps the schema without starting the server, against the 
 
 <Steps>
 
-1. **Back up the database.** A rollback discards whatever the newer release wrote into columns and tables the older one doesn't have.
+1. **Finish any rotation of the AES key under way:** run `goiabada-authserver reencrypt`, as step 3 of [the AES key's rotation](/deploy/rotate-secrets/#the-aes-key) does, until it exits 0. An older release may open stored secrets with one key alone.
 
-2. **Step the schema down with the current binary,** naming the schema version the target release expects, which its release notes state. The current binary is the one that must run it, because it's the only one carrying the migrations being rolled back.
+2. **Back up the database.** A rollback discards whatever the newer release wrote into columns and tables the older one doesn't have.
+
+3. **Step the schema down with the current binary,** naming the schema version the target release expects, which its release notes state. The current binary is the one that must run it, because it's the only one carrying the migrations being rolled back.
 
    <Tabs syncKey="platform">
      <TabItem label="Docker Compose">
@@ -170,7 +172,7 @@ The `migrate` command steps the schema without starting the server, against the 
      </TabItem>
    </Tabs>
 
-3. **Install the target release straight away,** as in [Update to a new release](#update-to-a-new-release), with its version in place of the new one. A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together here too: a digest left in place starts the newer server again, which migrates the schema back up.
+4. **Install the target release straight away,** as in [Update to a new release](#update-to-a-new-release), with its version in place of the new one. A deployment [pinned to a digest](#pin-a-deployment-to-an-image-digest) changes the tag and the digest together here too: a digest left in place starts the newer server again, which migrates the schema back up.
 
 </Steps>
 

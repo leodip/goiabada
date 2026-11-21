@@ -395,8 +395,12 @@ client's back-channel logout URI (#784).
   (decision 11): `recovery.Run` builds the notice from the settings it reads, and the command
   delivers `Outcome.Revocation.LogoutDeliveries` itself after the commit, through
   `backchannel.NewCommandSender`'s `SendAndWait`, which runs them at once and waits; no job budget
-  and no metric apply, and its `sent_logout_token` entries name the command under `command`. An
-  unusable data key leaves the recovery committed and the apps untold, said on stderr
+  and no metric apply, and its `sent_logout_token` entries name the command under `command`. The
+  command opens the signing key with the server's two-key data cipher (`readRecoverDataKey`), the
+  current key and then `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, so a recovery between a rotation's
+  swap and the end of `reencrypt` still signs its tokens, and re-encrypts nothing (#794). A data
+  key that is unusable, or a signing key neither key opens, leaves the recovery committed and the
+  apps untold, said on stderr
 - Recipients are collected inside the end's transaction, under each ended session's row
   (`AcquireUserSessionRow`), before the deletion cascades the session's apps away. The apps and their
   clients are read with `GetCommittedUserSessionClients`, a locking read on MySQL, so a sign-in that
