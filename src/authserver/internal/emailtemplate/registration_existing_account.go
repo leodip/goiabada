@@ -85,6 +85,20 @@ Altrimenti, puoi ignorare questo messaggio. Il tuo account non è stato modifica
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Masz już konto",
+			Body: `Dzień dobry,
+
+Próbowano założyć nowe konto w {{app_name}} z użyciem tego adresu e-mail, być może z Twojej inicjatywy. Ten adres ma już konto, więc nie utworzono nowego.
+
+Jeśli to Ty, zaloguj się na istniejące konto. Jeśli nie pamiętasz hasła, możesz je zresetować tutaj: {{link}}
+
+Jeśli to nie Ty, możesz zignorować tę wiadomość. Twoje konto nie zostało zmienione.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Você já tem uma conta",
 			Body: `Olá,

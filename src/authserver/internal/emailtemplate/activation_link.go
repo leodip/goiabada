@@ -111,6 +111,24 @@ Se non hai chiesto di creare un account, ignora questo messaggio: non viene crea
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject:     "Aktywuj konto",
+			ButtonLabel: "Aktywuj konto",
+			Body: `Dzień dobry,
+
+Aby dokończyć zakładanie konta w {{app_name}}, kliknij poniższy link i wybierz hasło:
+
+{{button}}
+
+{{link}}
+
+Link wygaśnie za {{expiry}}. Jeśli nie możesz go kliknąć, skopiuj go i wklej w pasku adresu przeglądarki.
+
+Jeśli prośba o założenie konta nie pochodziła od Ciebie, zignoruj tę wiadomość: konto powstanie tylko wtedy, gdy ktoś użyje linku.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		//nolint:misspell // the pt-BR text: "problemas" is Portuguese, not a misspelling of "problems"
 		"pt-BR": {
 			Subject:     "Ative sua conta",

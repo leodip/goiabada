@@ -87,6 +87,20 @@ Se l'hai usato tu e non hai più l'app di autenticazione, disattiva l'autenticaz
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Do logowania użyto kodu odzyskiwania",
+			Body: `Dzień dobry {{name}},
+
+Do zalogowania się na Twoje konto w {{app_name}} użyto jednego z Twoich kodów odzyskiwania zamiast kodu z aplikacji uwierzytelniającej. Każdy kod odzyskiwania działa tylko raz, więc ten już nie działa. Pozostałe nieużyte kody odzyskiwania: {{codes_left}}.
+
+Jeśli to Ty i nie masz już aplikacji uwierzytelniającej, wyłącz uwierzytelnianie dwuskładnikowe w ustawieniach konta i skonfiguruj nową aplikację uwierzytelniającą, z którą otrzymasz nowy zestaw kodów odzyskiwania. Jeśli nadal masz tę aplikację, wygeneruj nowy zestaw kodów odzyskiwania w ustawieniach konta, aby móc się zalogować, jeśli ją stracisz.
+
+**Jeśli to nie Ty, ktoś inny może znać Twoje hasło i mieć Twoje kody odzyskiwania.** Ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zaloguj się, wyłącz uwierzytelnianie dwuskładnikowe i skonfiguruj nową aplikację uwierzytelniającą albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Um código de recuperação foi usado para entrar",
 			Body: `Olá {{name}},

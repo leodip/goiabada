@@ -256,6 +256,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndAVanishedOneIsAutomatic(t *t
 		{Tag: "fr", Name: "French"},
 		{Tag: "id", Name: "Indonesian"},
 		{Tag: "it", Name: "Italian"},
+		{Tag: "pl", Name: "Polish"},
 		{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 	}, bind["pageLanguages"])
 }

@@ -6401,7 +6401,7 @@ components:
       description: One of the built-in languages, written exactly so
       schema:
         type: string
-        enum: [en, de, es, fr, id, it, pt-BR]
+        enum: [en, de, es, fr, id, it, pl, pt-BR]
     ResourceIdParam:
       name: id
       in: path
@@ -7084,7 +7084,7 @@ components:
             The language of Goiabada's own pages and emails for the user. Optional: when it is
             left out, the stored page language is kept, so a client that doesn't send it never
             resets it. Empty sets Automatic. Any other value must be exactly the tag of one of
-            Goiabada's built-in languages: `en`, `pt-BR`, `es`, `fr`, `it`, `de` or `id`.
+            Goiabada's built-in languages: `en`, `pt-BR`, `es`, `fr`, `it`, `de`, `id` or `pl`.
 
     UpdateUserEmailRequest:
       type: object
@@ -9800,7 +9800,7 @@ components:
       properties:
         language:
           type: string
-          enum: [en, de, es, fr, id, it, pt-BR]
+          enum: [en, de, es, fr, id, it, pl, pt-BR]
         status:
           type: string
           enum: [default, edited, invalid]
@@ -9862,7 +9862,7 @@ components:
       properties:
         language:
           type: string
-          enum: [en, de, es, fr, id, it, pt-BR]
+          enum: [en, de, es, fr, id, it, pl, pt-BR]
         status:
           type: string
           enum: [default, edited, invalid]
@@ -10504,7 +10504,7 @@ components:
           nullable: true
           description: |
             The label of each built-in language the link has its own label in, by language tag:
-            `en`, `de`, `es`, `fr`, `id`, `it` or `pt-BR`, each with the bounds of `label`. Left out,
+            `en`, `de`, `es`, `fr`, `id`, `it`, `pl` or `pt-BR`, each with the bounds of `label`. Left out,
             null or `{}` for none. A blank label is dropped, and any other tag is refused.
           additionalProperties:
             type: string

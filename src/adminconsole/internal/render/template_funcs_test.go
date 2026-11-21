@@ -115,6 +115,30 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	}
 }
 
+// TCount draws a counted phrase in the form its count's plural category takes in the page's
+// language, the count filling {{.count}} and its key-value pairs the rest, as T's do.
+func TestTCountFuncMap(t *testing.T) {
+	tmpl := template.Must(template.New("p").Funcs(templateFuncMap).Parse(
+		`{{ TCount .ctx "adminconsole.admin_branding.delete.clients" .count "defaultBrand" "Acme" }}`))
+	for _, tc := range []struct {
+		lang  string
+		count int
+		want  string
+	}{
+		{"en", 1, "1 client uses it. It will move to the default brand, Acme."},
+		{"en", 3, "3 clients use it. They will move to the default brand, Acme."},
+		{"de", 1, "1 Client verwendet sie. Er wechselt zur Standardmarke Acme."},
+	} {
+		var out strings.Builder
+		if err := tmpl.Execute(&out, map[string]any{"ctx": localeCtx(tc.lang), "count": tc.count}); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		if out.String() != tc.want {
+			t.Errorf("TCount in %s at %d = %q, want %q", tc.lang, tc.count, out.String(), tc.want)
+		}
+	}
+}
+
 // TestInstantOf holds the adapter the two entries above normalize through. It
 // exists because the responses the console binds carry both shapes deliberately:
 // a nullable column reaches the wire as *time.Time, and an audit entry's
@@ -145,7 +169,7 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyFour pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentyFive pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
 // call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
@@ -154,8 +178,9 @@ func TestInstantOf(t *testing.T) {
 // engine escaping that value itself, and CatalogLang, Lang under the name #559 gave it, in #819.
 // ScopeList came in #617, the scopes the account consents page names in words.
 // isAdminLegalDocumentPage came in #622, the sidebar's Legal documents section, and
-// isAdminBrandingPage in #810, the sidebar's Branding pages.
-func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
+// isAdminBrandingPage in #810, the sidebar's Branding pages. TCount came in #665, the counted phrase
+// a template draws in its language's plural form; the auth server's templates draw none.
+func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -164,7 +189,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyFour(t *testing.T) {
 
 	want := []string{
 		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
-		"RefTimezone", "ScopeList", "Since", "T", "add", "addURLParam", "args", "concat", "deref",
+		"RefTimezone", "ScopeList", "Since", "T", "TCount", "add", "addURLParam", "args", "concat", "deref",
 		"isAdminBrandingPage", "isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",
 	}

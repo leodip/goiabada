@@ -20,6 +20,8 @@ const asked = [
   { uiLocales: "de-AT", lang: "de" },
   { uiLocales: "gsw", lang: "en" },
   { uiLocales: "lb", lang: "en" },
+  { uiLocales: "pl", lang: "pl" },
+  { uiLocales: "pl-PL", lang: "pl" },
   { uiLocales: "nl pt-BR", lang: "pt-BR" },
   { uiLocales: "id", lang: "id" },
   { uiLocales: "in", lang: "id" },

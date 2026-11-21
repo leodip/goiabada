@@ -86,6 +86,20 @@ Se l'hai reimpostata tu, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "adres" and "nowe" are Polish, not a misspelling of "address" and "now"
+		"pl": {
+			Subject: "Zresetowano Twoje hasło",
+			Body: `Dzień dobry {{name}},
+
+Hasło do Twojego konta w {{app_name}} zostało zresetowane za pomocą linku wysłanego na ten adres e-mail.
+
+Jeśli to Ty, nie musisz nic robić.
+
+**Jeśli nie, ktoś inny może mieć dostęp do Twojej poczty e-mail i korzystać z Twojego konta.** Zabezpiecz swoje konto pocztowe, a potem ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, zaloguj się i sprawdź ustawienia uwierzytelniania dwuskładnikowego albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Sua senha foi redefinida",
 			Body: `Olá {{name}},

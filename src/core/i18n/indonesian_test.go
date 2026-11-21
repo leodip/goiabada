@@ -57,7 +57,7 @@ func TestIndonesian_OrdinaryConsoleLabels(t *testing.T) {
 		"adminconsole.admin_settings.audit_log_viewer.clear_link":    "Hapus saringan",
 		"adminconsole.account.otp.recovery_codes.new_set_button":     "Buat kode pemulihan baru",
 		"adminconsole.account.otp.recovery_codes.new_set_lead":       "Jika kode Anda hilang atau sudah habis terpakai, buat kode pemulihan baru. Masukkan kata sandi Anda untuk memastikan bahwa ini memang Anda.",
-		"adminconsole.account.otp.recovery_codes.remaining_none":     "Anda tidak memiliki kode pemulihan yang belum digunakan. Buat kode pemulihan baru, agar Anda tetap dapat masuk jika aplikasi autentikator Anda hilang.",
+		"adminconsole.account.otp.recovery_codes.remaining.none":     "Anda tidak memiliki kode pemulihan yang belum digunakan. Buat kode pemulihan baru, agar Anda tetap dapat masuk jika aplikasi autentikator Anda hilang.",
 		"auth.recovery_codes.shown_lead":                             "Kode ini hanya ditampilkan sekali. Jika Anda belum menyimpannya, buat kode pemulihan baru di konsol admin, di Akun, Autentikasi dua faktor.",
 	} {
 		assert.Equal(t, want, T(ctx, key), key)

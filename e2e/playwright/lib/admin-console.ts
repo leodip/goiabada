@@ -1,5 +1,5 @@
 // Helpers for driving the admin console as the signed-in administrator.
-import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { submitPassword } from "./browser-sign-in";
 import { env } from "./environment";
 
@@ -229,9 +229,14 @@ export async function deleteUser(page: Page, id: number) {
 // /admin/resources/7/settings.
 export async function idFromListLink(page: Page, listUrl: string, text: string): Promise<number> {
   await page.goto(listUrl);
-  const href = await page.getByRole("table").getByRole("link", { name: text, exact: true }).getAttribute("href");
-  const match = href?.match(/\/admin\/\w+\/(\d+)\//);
-  if (!match) throw new Error(`no link for ${text} on ${listUrl}`);
+  return idInRowLink(page.getByRole("table").getByRole("link", { name: text, exact: true }), `${text} on ${listUrl}`);
+}
+
+// The database id in the link a list row is named by, on a list already loaded; what names the
+// link and the list in the error when the link has no id.
+export async function idInRowLink(link: Locator, what: string): Promise<number> {
+  const match = (await link.getAttribute("href"))?.match(/\/admin\/\w+\/(\d+)\//);
+  if (!match) throw new Error(`no link for ${what}`);
   return Number(match[1]);
 }
 

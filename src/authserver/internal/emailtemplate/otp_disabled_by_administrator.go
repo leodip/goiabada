@@ -88,6 +88,20 @@ Se l'avevi chiesto tu, non devi fare nulla. Puoi configurare una nuova app di au
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Administrator wyłączył Twoje uwierzytelnianie dwuskładnikowe",
+			Body: `Dzień dobry {{name}},
+
+Administrator wyłączył uwierzytelnianie dwuskładnikowe dla Twojego konta w {{app_name}}. Aplikacja uwierzytelniająca i kody odzyskiwania nie służą już do logowania.
+
+Jeśli zmiana nastąpiła na Twoją prośbę, nie musisz nic robić. Nową aplikację uwierzytelniającą możesz skonfigurować w ustawieniach konta.
+
+**Jeśli się tego nie spodziewasz, skontaktuj się z administratorem.** Możesz też ustawić nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zalogować się i sprawdzić ustawienia uwierzytelniania dwuskładnikowego.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Um administrador desativou a sua autenticação de dois fatores",
 			Body: `Olá {{name}},

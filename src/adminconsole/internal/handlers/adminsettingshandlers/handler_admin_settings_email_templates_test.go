@@ -114,7 +114,8 @@ func passwordResetLink() *api.EmailTemplateResponse {
 			language("en", "default", "Password reset"), language("de", "default", "Password reset"),
 			language("es", "default", "Password reset"), language("fr", "edited", "Mot de passe oublié ?"),
 			language("id", "default", "Password reset"),
-			language("it", "default", "Password reset"), language("pt-BR", "default", "Password reset"),
+			language("it", "default", "Password reset"), language("pl", "default", "Password reset"),
+			language("pt-BR", "default", "Password reset"),
 		},
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,7 +112,7 @@ func TestRender_AdminClientSignOutRedirectURIs_TheSystemClientAsksBeforeSaving(t
 // and an untranslated one shows the English sentence.
 func TestRender_AdminClientSignOutRedirectURIs_InEveryLocale(t *testing.T) {
 	leakedKey := regexp.MustCompile(`adminconsole\.[a-z_.]+`)
-	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR", "id"} {
+	for _, locale := range i18n.CatalogTags() {
 		for _, client := range []*api.ClientResponse{
 			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
 				PostLogoutRedirectURIs: []api.PostLogoutRedirectURIResponse{{ID: 1, URI: "https://app.example.com/signed-out"}}},

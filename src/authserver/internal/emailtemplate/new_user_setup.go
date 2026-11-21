@@ -110,6 +110,24 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject:     "{{app_name}} – utwórz hasło do nowego konta",
+			ButtonLabel: "Utwórz hasło",
+			Body: `Dzień dobry {{name}},
+
+Aby utworzyć hasło, kliknij poniższy link:
+
+{{button}}
+
+{{link}}
+
+Jeśli nie możesz kliknąć linku, skopiuj go i wklej w pasku adresu przeglądarki.
+
+**Link jest ważny przez {{expiry}}. Jeśli wygasł, skontaktuj się z administratorem, który może ustawić Ci hasło albo pozwolić Ci poprosić o nowy link na stronie logowania.**
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		//nolint:misspell // the pt-BR text: "problemas" is Portuguese, not a misspelling of "problems"
 		"pt-BR": {
 			Subject:     "{{app_name}} - crie uma senha para sua nova conta",

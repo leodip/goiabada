@@ -17,6 +17,7 @@ func TestCatalog_NewTabNoticeInEveryBuiltInLanguage(t *testing.T) {
 		"active.it.toml":    "(si apre in una nuova scheda)",
 		"active.de.toml":    "(öffnet sich in einem neuen Tab)",
 		"active.id.toml":    "(terbuka di tab baru)",
+		"active.pl.toml":    "(otwiera się w nowej karcie)",
 	}
 	assert.ElementsMatch(t, catalogNames(t), keysOf(want), "every built-in catalog has its expected text")
 	for name, value := range want {

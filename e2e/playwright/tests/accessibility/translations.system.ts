@@ -1,7 +1,7 @@
 // Registration is a global setting, so this check runs in the serial system project and restores it,
 // for every row of the table in lib/translations.ts.
 import type { Page } from "@playwright/test";
-import { deleteUser, idFromListLink } from "../../lib/admin-console";
+import { deleteUser, idInRowLink } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { fitsIn, translations } from "../../lib/translations";
 import { expect, test } from "../../lib/fixtures";
@@ -13,7 +13,8 @@ import { uniqueIdentifier } from "../../lib/unique";
 // user. Only the users list itself, rendered with its table or its empty state, answers none: a
 // refused or failed lookup, or one that lands on another page, throws, so the test fails rather than
 // leave a user it could not look for. A row is found by the email it shows rather than by its link's
-// name, so a listed user whose link is named otherwise fails idFromListLink instead of being skipped.
+// name, so a listed user whose link is named otherwise fails idInRowLink instead of being skipped.
+// The id is read from the row already found, without loading the list again.
 async function listedUserId(page: Page, email: string): Promise<number | undefined> {
   const listUrl = `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`;
   const response = await page.goto(listUrl);
@@ -23,7 +24,7 @@ async function listedUserId(page: Page, email: string): Promise<number | undefin
   await expect(page.locator("#usersTable, .empty-state").first(), `the users list at ${listUrl}`).toBeVisible();
   const rows = page.locator("#usersTable tbody tr").filter({ has: page.getByText(email, { exact: true }) });
   if ((await rows.count()) === 0) return undefined;
-  return idFromListLink(page, listUrl, email);
+  return idInRowLink(rows.getByRole("link", { name: email, exact: true }), `${email} on ${listUrl}`);
 }
 
 for (const translation of translations) {

@@ -86,6 +86,9 @@ func TestActivationLink_InEachLanguage(t *testing.T) {
 		{"it", "Attiva il tuo account", "Attiva l'account", "Ciao,",
 			"Per completare la creazione del tuo account Acme Portal, apri questo link e scegli una password:",
 			"Il link scade tra 10 minuti. Se non riesci ad aprirlo, copialo e incollalo nel browser."},
+		{"pl", "Aktywuj konto", "Aktywuj konto", "Dzień dobry,",
+			"Aby dokończyć zakładanie konta w Acme Portal, kliknij poniższy link i wybierz hasło:",
+			"Link wygaśnie za 10 minut. Jeśli nie możesz go kliknąć, skopiuj go i wklej w pasku adresu przeglądarki."},
 		{"pt-BR", "Ative sua conta", "Ativar conta", "Olá,",
 			"Para terminar de criar sua conta no Acme Portal, clique no link abaixo e escolha uma senha:",
 			"O link expira em 10 minutos. Se tiver problemas para clicar nele, copie e cole o endereço no seu navegador."}, //nolint:misspell // the pt-BR text: "problemas" is Portuguese, not a misspelling of "problems"
@@ -117,6 +120,7 @@ func TestWelcome_InEachLanguage(t *testing.T) {
 			"Pour vous connecter, cliquez sur le lien ci-dessous\u00a0:"},
 		{"id", "Selamat datang!", "Masuk", "Selamat! Akun Anda telah dibuat.", "Anda dapat masuk melalui tautan di bawah ini:"},
 		{"it", "Benvenuto!", "Accedi", "Il tuo account è stato creato.", "Puoi accedere aprendo questo link:"},
+		{"pl", "Witamy!", "Zaloguj się", "Gratulacje! Twoje konto zostało utworzone.", "Możesz się zalogować, klikając poniższy link:"},
 		{"pt-BR", "Bem-vindo(a)!", "Entrar", "Parabéns! Sua conta foi criada.", "Você pode entrar clicando no link abaixo:"},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
@@ -156,6 +160,9 @@ func TestRegistrationExistingAccount_InEachLanguage(t *testing.T) {
 		{"it", "Hai già un account", "Ciao,",
 			"Qualcuno, forse tu, ha provato a creare un nuovo account Acme Portal con questo indirizzo email. L'indirizzo ha già un account, quindi non ne è stato creato uno nuovo.",
 			"Se hai fatto tu la richiesta, accedi con il tuo account esistente. Se non ricordi la password, puoi reimpostarla qui: "},
+		{"pl", "Masz już konto", "Dzień dobry,",
+			"Próbowano założyć nowe konto w Acme Portal z użyciem tego adresu e-mail, być może z Twojej inicjatywy. Ten adres ma już konto, więc nie utworzono nowego.", //nolint:misspell // "nowe" is Polish, not a misspelling of "now"
+			"Jeśli to Ty, zaloguj się na istniejące konto. Jeśli nie pamiętasz hasła, możesz je zresetować tutaj: "},
 		{"pt-BR", "Você já tem uma conta", "Olá,",
 			"Alguém, possivelmente você, tentou criar uma nova conta no Acme Portal com este endereço de e-mail. Este endereço já tem uma conta, então nenhuma conta nova foi criada.",
 			"Se foi você, entre com sua conta existente. Se não se lembra da sua senha, pode redefini-la aqui: "},
@@ -193,6 +200,8 @@ func TestNewUserSetup_InEachLanguage(t *testing.T) {
 			"Anda dapat membuat kata sandi Anda melalui tautan di bawah ini:", "Tautan ini berlaku selama 48 jam. Jika sudah kedaluwarsa,"},
 		{"it", "Acme Portal - crea una password per il tuo nuovo account", "Crea la password", "Ciao Ana,",
 			"Per creare la tua password, apri questo link:", "Il link è valido per 48 ore. Se è scaduto,"},
+		{"pl", "Acme Portal – utwórz hasło do nowego konta", "Utwórz hasło", "Dzień dobry Ana,",
+			"Aby utworzyć hasło, kliknij poniższy link:", "Link jest ważny przez 48 godzin. Jeśli wygasł,"},
 		{"pt-BR", "Acme Portal - crie uma senha para sua nova conta", "Criar senha", "Olá Ana,",
 			"Você pode criar sua senha clicando no link abaixo:", "O link funciona por 48 horas. Se ele tiver expirado,"},
 	} {
@@ -231,6 +240,8 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 			"Kode ini kedaluwarsa dalam 10 menit.", "Anda dapat memasukkan kode Anda di sini: "},
 		{"it", "Verifica email - codice 482915", "Ciao Ana,", "Ecco il tuo codice di verifica dell'indirizzo email:",
 			"Il codice scade tra 10 minuti.", "Puoi inserire il codice qui: "},
+		{"pl", "Weryfikacja adresu e-mail – kod 482915", "Dzień dobry Ana,", "Oto Twój kod weryfikacyjny adresu e-mail:",
+			"Kod wygaśnie za 10 minut.", "Kod możesz wpisać tutaj: "},
 		{"pt-BR", "Verificação de e-mail - código 482915", "Olá Ana,", "Este é o seu código de verificação de e-mail:",
 			"O código expira em 10 minutos.", "Você pode inserir o código aqui: "},
 	} {
@@ -247,31 +258,35 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 	}
 }
 
-// The test email: its subject, which names the app, and its two sentences.
+// The test email: its subject, which names the app, its two sentences, and the sign-off of a
+// language whose emails all close with one, as Polish's do with "Pozdrawiamy" and the app name.
 func TestTestEmail_InEachLanguage(t *testing.T) {
 	email := builtInByID(t, "test")
 	for _, tc := range []struct {
-		lang, subject, first, second string
+		lang, subject, first, second, signOff string
 	}{
 		{"en", "Acme Portal - test email", "This is a test email from Acme Portal.",
-			"It was sent from the email settings to check that email can be sent. If you can read it, there is nothing else to do."},
+			"It was sent from the email settings to check that email can be sent. If you can read it, there is nothing else to do.", ""},
 		{"de", "Acme Portal – Test-E-Mail", "Dies ist eine Test-E-Mail von Acme Portal.",
-			"Sie wurde aus den E-Mail-Einstellungen gesendet, um zu prüfen, ob E-Mails versendet werden können. Wenn Sie sie lesen können, ist nichts weiter zu tun."},
+			"Sie wurde aus den E-Mail-Einstellungen gesendet, um zu prüfen, ob E-Mails versendet werden können. Wenn Sie sie lesen können, ist nichts weiter zu tun.", ""},
 		{"es", "Acme Portal - correo de prueba", "Este es un correo de prueba enviado por Acme Portal.",
-			"Se envió desde la configuración de correo para comprobar que se pueden enviar correos. Si puedes leerlo, no tienes que hacer nada más."},
+			"Se envió desde la configuración de correo para comprobar que se pueden enviar correos. Si puedes leerlo, no tienes que hacer nada más.", ""},
 		{"fr", "Acme Portal - e-mail de test", "Ceci est un e-mail de test envoyé par Acme Portal.",
-			"Il a été envoyé depuis les paramètres des e-mails pour vérifier que l’envoi d’e-mails fonctionne. Si vous pouvez le lire, vous n’avez rien d’autre à faire."},
+			"Il a été envoyé depuis les paramètres des e-mails pour vérifier que l’envoi d’e-mails fonctionne. Si vous pouvez le lire, vous n’avez rien d’autre à faire.", ""},
 		{"id", "Acme Portal - email uji coba", "Ini adalah email uji coba dari Acme Portal.",
-			"Email ini dikirim dari pengaturan email untuk memeriksa bahwa email dapat dikirim. Jika Anda dapat membacanya, tidak ada lagi yang perlu dilakukan."},
+			"Email ini dikirim dari pengaturan email untuk memeriksa bahwa email dapat dikirim. Jika Anda dapat membacanya, tidak ada lagi yang perlu dilakukan.", ""},
 		{"it", "Acme Portal - email di prova", "Questa è un’email di prova inviata da Acme Portal.",
-			"È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro."},
+			"È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro.", ""},
+		{"pl", "Acme Portal – testowa wiadomość e-mail", "To jest testowa wiadomość e-mail z Acme Portal.",
+			"Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.",
+			"<p>Pozdrawiamy<br>\nAcme Portal</p>\n"},
 		{"pt-BR", "Acme Portal - e-mail de teste", "Este é um e-mail de teste enviado por Acme Portal.",
-			"Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada."},
+			"Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada.", ""},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			subject, body := renderedIn(t, email, tc.lang, testValues)
 			assert.Equal(t, tc.subject, subject)
-			assert.Equal(t, "<p>"+tc.first+"</p>\n<p>"+tc.second+"</p>\n", body)
+			assert.Equal(t, "<p>"+tc.first+"</p>\n<p>"+tc.second+"</p>\n"+tc.signOff, body)
 		})
 	}
 }

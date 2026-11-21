@@ -86,6 +86,20 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "adres" is Polish, not a misspelling of "address"
+		"pl": {
+			Subject: "Zmieniono Twój adres e-mail",
+			Body: `Dzień dobry {{name}},
+
+Adres e-mail Twojego konta w {{app_name}} został zmieniony, więc na ten adres nie będą już przychodzić wiadomości o tym koncie, w tym linki do resetowania hasła.
+
+Jeśli to Twoja zmiana, nie musisz nic robić.
+
+**Jeśli nie, ktoś inny może znać Twoje hasło.** Zaloguj się, zmień hasło i przywróć swój adres e-mail albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Seu endereço de e-mail foi alterado",
 			Body: `Olá {{name}},

@@ -86,6 +86,20 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Zmieniono Twoje hasło",
+			Body: `Dzień dobry {{name}},
+
+Hasło do Twojego konta w {{app_name}} zostało zmienione w ustawieniach konta.
+
+Jeśli to Twoja zmiana, nie musisz nic robić.
+
+**Jeśli nie, ktoś inny może korzystać z Twojego konta.** Ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zaloguj się i sprawdź ustawienia uwierzytelniania dwuskładnikowego albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Sua senha foi alterada",
 			Body: `Olá {{name}},

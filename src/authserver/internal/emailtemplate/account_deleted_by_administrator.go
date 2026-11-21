@@ -75,6 +75,17 @@ Se non te lo aspettavi, contatta il tuo amministratore.
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject: "Administrator usunął Twoje konto",
+			Body: `Dzień dobry {{name}},
+
+Administrator usunął Twoje konto w {{app_name}}. Nie możesz się już na nie zalogować.
+
+Jeśli się tego nie spodziewasz, skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Um administrador excluiu a sua conta",
 			Body: `Olá {{name}},

@@ -83,25 +83,20 @@ func formatSince(ctx context.Context, t *time.Time, now time.Time) string {
 	// absolute date beside it, and because a session's age is bounded by the
 	// max lifetime setting. Revisit when a page shows the relative line alone;
 	// month and year keys beside these are the next shape (#373).
-	unit, count := "second", int64(elapsed/time.Second)
+	unit, count := "second", int(elapsed/time.Second)
 	switch {
 	case elapsed >= 24*time.Hour:
-		unit, count = "day", int64(elapsed/(24*time.Hour))
+		unit, count = "day", int(elapsed/(24*time.Hour))
 	case elapsed >= time.Hour:
-		unit, count = "hour", int64(elapsed/time.Hour)
+		unit, count = "hour", int(elapsed/time.Hour)
 	case elapsed >= time.Minute:
-		unit, count = "minute", int64(elapsed/time.Minute)
+		unit, count = "minute", int(elapsed/time.Minute)
 	}
 
-	// ceiling: the plural form is chosen by count == 1, which is the rule for
-	// en, pt-BR and es, and for fr, it, de and hi among the positive whole
-	// counts above (fr and hi also use one for zero, which never reaches here).
-	// ja, zh-Hans, ko and id can repeat their one form in both keys. Locales
-	// with a few or many form — ru, pl, ar — need CLDR plural selection before
-	// they ship; count == 1 cannot express their grammar (#373, #658).
-	form := "other"
-	if count == 1 {
-		form = "one"
-	}
-	return i18n.T(ctx, keySincePrefix+unit+"."+form, map[string]any{"count": count})
+	// Each unit is a counted phrase, whose form i18n.TCount chooses by the count's CLDR plural
+	// category in the page's language: "1 minute ago" and "2 minutes ago" in English, and "1 minutę
+	// temu", "2 minuty temu", "5 minut temu" and "22 minuty temu" in Polish, with its few and many
+	// forms. A catalog carries one key per category its language's whole counts reach, which the
+	// catalog check holds it to (#373, #665).
+	return i18n.TCount(ctx, keySincePrefix+unit, count)
 }

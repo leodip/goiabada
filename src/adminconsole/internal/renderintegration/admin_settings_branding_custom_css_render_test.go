@@ -101,7 +101,7 @@ func TestRender_AdminSettingsBrandingFormMarksTheRefusedCustomCSS(t *testing.T) 
 // The field's heading, hint and sentence are in each built-in language.
 func TestRender_AdminSettingsBrandingFormDrawsTheCustomCSSFieldInEachLanguage(t *testing.T) {
 	english := renderCustomCSSForm(t, "en", "", "")
-	for _, locale := range []string{"pt-BR", "es", "fr", "it", "de", "id"} {
+	for _, locale := range []string{"pt-BR", "es", "fr", "it", "de", "id", "pl"} {
 		t.Run(locale, func(t *testing.T) {
 			form := renderCustomCSSForm(t, locale, "", "")
 			for _, id := range []string{"customCssHint", "customCssPreviewNote"} {

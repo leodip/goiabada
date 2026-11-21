@@ -266,6 +266,7 @@ func TestHandleAccountDeletionPost_TellsTheUserInTheirLanguage(t *testing.T) {
 		{"fr", "Votre compte a été supprimé"},
 		{"id-ID", "Akun Anda telah dihapus"},
 		{"it", "Il tuo account è stato eliminato"}, //nolint:misspell // the it catalog's text: "eliminato" is Italian, not a misspelling of "elimination"
+		{"pl-PL", "Usunięto Twoje konto"},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
 			f := newDeletionFixture(t)

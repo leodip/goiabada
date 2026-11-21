@@ -170,6 +170,7 @@ func TestRender_AccountProfile_ThePageLanguageSelect(t *testing.T) {
 		"fr||fr – français (French)",
 		"id||id – Indonesia (Indonesian)",
 		"it||it – italiano (Italian)",
+		"pl||pl – polski (Polish)",
 		"pt-BR||pt-BR – português (Brasil) (Portuguese (Brazil))",
 	}, drawn)
 	assert.Contains(t, out, `<p class="field-hint" id="pageLanguageHint">O idioma destas páginas, das páginas de entrada `+

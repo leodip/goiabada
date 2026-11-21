@@ -11,7 +11,8 @@
 # Typography: standard Indonesian punctuation (PUEBI): no space before : ; ? !, and
 # "straight double quotes" around quoted interface labels.
 # Numeric dates: day/month/year, 24-hour clock. Relative times are whole phrases
-# ("... yang lalu"). One plural form: both forms of a counted key say the same phrase.
+# ("... yang lalu"). Counted values have one form, other, the only CLDR plural category
+# Indonesian has.
 # Terms checked against Keycloak's Indonesian login catalog (themes/src/main/
 # resources-community/theme/base/login/messages/messages_id.properties).
 # Keep Go {{.name}} and JavaScript {{name}} placeholders exactly as in English.
@@ -65,13 +66,9 @@
 # puts it.
 "common.datetime.layout" = "02/01/2006 15:04"
 "common.since.just_now" = "baru saja"
-"common.since.second.one" = "{{.count}} detik yang lalu"
 "common.since.second.other" = "{{.count}} detik yang lalu"
-"common.since.minute.one" = "{{.count}} menit yang lalu"
 "common.since.minute.other" = "{{.count}} menit yang lalu"
-"common.since.hour.one" = "{{.count}} jam yang lalu"
 "common.since.hour.other" = "{{.count}} jam yang lalu"
-"common.since.day.one" = "{{.count}} hari yang lalu"
 "common.since.day.other" = "{{.count}} hari yang lalu"
 
 # --- Login page (auth/pwd) ---------------------------------------------------
@@ -753,9 +750,8 @@
 "adminconsole.account.otp.recovery_codes.copied" = "Kode disalin"
 "adminconsole.account.otp.recovery_codes.copy_failed_status" = "Kode tidak dapat disalin. Kode sudah dipilih, jadi Anda dapat menyalinnya sendiri."
 "adminconsole.account.otp.recovery_codes.section_title" = "Kode pemulihan"
-"adminconsole.account.otp.recovery_codes.remaining_other" = "{{.count}} dari 10 kode pemulihan Anda belum digunakan."
-"adminconsole.account.otp.recovery_codes.remaining_one" = "1 dari 10 kode pemulihan Anda belum digunakan."
-"adminconsole.account.otp.recovery_codes.remaining_none" = "Anda tidak memiliki kode pemulihan yang belum digunakan. Buat kode pemulihan baru, agar Anda tetap dapat masuk jika aplikasi autentikator Anda hilang."
+"adminconsole.account.otp.recovery_codes.remaining.other" = "{{.count}} dari 10 kode pemulihan Anda belum digunakan."
+"adminconsole.account.otp.recovery_codes.remaining.none" = "Anda tidak memiliki kode pemulihan yang belum digunakan. Buat kode pemulihan baru, agar Anda tetap dapat masuk jika aplikasi autentikator Anda hilang."
 "adminconsole.account.otp.recovery_codes.new_set_lead" = "Jika kode Anda hilang atau sudah habis terpakai, buat kode pemulihan baru. Masukkan kata sandi Anda untuk memastikan bahwa ini memang Anda."
 "adminconsole.account.otp.recovery_codes.new_set_button" = "Buat kode pemulihan baru"
 "adminconsole.account.otp.recovery_codes.confirm_title" = "Buat kode pemulihan baru?"
@@ -1803,7 +1799,6 @@
 "adminconsole.admin_branding.list.empty" = "Belum ada merek."
 "adminconsole.admin_branding.list.emails_note" = "Email juga ditampilkan dengan merek ini, masing-masing dengan merek halaman tempat email itu dikirim, atau dengan merek bawaan. Isinya diatur di templat email."
 "adminconsole.admin_branding.list.emails_link" = "Buka Templat email"
-"adminconsole.admin_branding.list.warnings.one" = "1 pasangan di bawah kontras minimum"
 "adminconsole.admin_branding.list.warnings.other" = "{{.count}} pasangan di bawah kontras minimum"
 "adminconsole.admin_branding.appearance.auto" = "Otomatis"
 "adminconsole.admin_branding.appearance.auto_hint" = "Terang atau gelap, mengikuti perangkat setiap pengunjung."
@@ -1867,7 +1862,6 @@
 "adminconsole.admin_branding.palette.color.note_ink" = "Teks catatan"
 "adminconsole.admin_branding.palette.warnings.none" = "Setiap pasangan memenuhi minimumnya."
 "adminconsole.admin_branding.palette.unchecked" = "Warna tidak dapat diperiksa. Warna diperiksa saat merek disimpan."
-"adminconsole.admin_branding.palette.warnings.one" = "1 pasangan berada di bawah minimumnya. Teks dan batas yang ditampilkan dengan pasangan itu tidak memenuhi kontras WCAG 2.2 level AA."
 "adminconsole.admin_branding.palette.warnings.other" = "{{.count}} pasangan berada di bawah minimumnya. Teks dan batas yang ditampilkan dengan pasangan itu tidak memenuhi kontras WCAG 2.2 level AA."
 "adminconsole.admin_branding.palette.warning" = "{{.mode}}: {{.foreground}} di atas {{.background}}, {{.ratio}}:1. Minimum {{.minimum}}:1."
 "adminconsole.admin_branding.brand.field.name" = "Nama"
@@ -1937,10 +1931,8 @@
 "adminconsole.admin_branding.brand.default_note" = "Ini adalah merek bawaan. Halaman setiap client yang tidak memiliki merek sendiri ditampilkan dengan merek ini, begitu pula halaman yang bukan milik client mana pun."
 "adminconsole.admin_branding.brand.other_note" = "Pilih merek ini di tab Pengaturan sebuah client untuk menampilkan halaman client itu dengan merek ini."
 "adminconsole.admin_branding.brand.clients.none" = "Tidak ada client yang menggunakan merek ini."
-"adminconsole.admin_branding.brand.clients.one" = "{{.count}} client menggunakan merek ini."
 "adminconsole.admin_branding.brand.clients.other" = "{{.count}} client menggunakan merek ini."
 "adminconsole.admin_branding.brand.saved" = "Merek disimpan."
-"adminconsole.admin_branding.brand.saved_warnings.one" = "1 pasangan warnanya berada di bawah kontras minimumnya."
 "adminconsole.admin_branding.brand.saved_warnings.other" = "{{.count}} pasangan warnanya berada di bawah kontras minimumnya."
 "adminconsole.admin_branding.brand.saved_warnings_link" = "Lihat pasangannya"
 "adminconsole.admin_branding.brand.made_default" = "Merek ini sekarang menjadi merek bawaan. Halaman setiap client yang tidak memiliki merek sendiri ditampilkan dengan merek ini."
@@ -1950,7 +1942,6 @@
 "adminconsole.admin_branding.delete.page_title" = "Hapus merek"
 "adminconsole.admin_branding.delete.lead" = "Merek ini akan dihapus."
 "adminconsole.admin_branding.delete.clients.none" = "Tidak ada client yang menggunakannya, jadi tidak ada halaman yang akan berubah."
-"adminconsole.admin_branding.delete.clients.one" = "{{.count}} client menggunakannya. Client tersebut akan dipindahkan ke merek bawaan, {{.defaultBrand}}."
 "adminconsole.admin_branding.delete.clients.other" = "{{.count}} client menggunakannya. Client tersebut akan dipindahkan ke merek bawaan, {{.defaultBrand}}."
 "adminconsole.admin_branding.delete.confirm_field_label" = "Untuk konfirmasi, ketik nama merek"
 "adminconsole.admin_branding.delete.delete_button" = "Hapus merek"
@@ -2586,5 +2577,4 @@
 "js.image_upload.delete_failed" = "Gambar tidak dapat dihapus. Coba lagi."
 "js.image_upload.unreadable" = "File itu tidak dapat dibaca sebagai gambar. Pilih file lain."
 "js.combobox.no_matches" = "Tidak ada yang cocok"
-"js.combobox.one_result" = "1 hasil"
-"js.combobox.results" = "{{count}} hasil"
+"js.combobox.results.other" = "{{count}} hasil"

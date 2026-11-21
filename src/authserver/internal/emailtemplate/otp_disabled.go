@@ -86,6 +86,20 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Wyłączono uwierzytelnianie dwuskładnikowe",
+			Body: `Dzień dobry {{name}},
+
+W ustawieniach Twojego konta w {{app_name}} wyłączono uwierzytelnianie dwuskładnikowe. Aplikacja uwierzytelniająca i kody odzyskiwania nie służą już do logowania.
+
+Jeśli to Twoja zmiana, nie musisz nic robić.
+
+**Jeśli nie, ktoś inny może znać Twoje hasło.** Ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zaloguj się i ponownie skonfiguruj uwierzytelnianie dwuskładnikowe albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "A autenticação de dois fatores foi desativada",
 			Body: `Olá {{name}},
