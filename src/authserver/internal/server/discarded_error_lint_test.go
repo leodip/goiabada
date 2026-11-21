@@ -1156,31 +1156,42 @@ func Decrypt(hint, secret string) (string, error) { return "", nil }
 
 // A listed method that one build declares and another's type has only through an embedded field is
 // one the finder passes on a direct call in that build and reports through an interface, so the list
-// check reports it though the first build declares it.
+// check reports it though the first build declares it. A promoted method that returns no error last
+// discards none, and is no such entry.
 func TestDiscardedErrors_ListCheck_ReportsAMethodABuildHasOnlyByEmbedding(t *testing.T) {
-	root := t.TempDir()
-	writeDiscardedErrorModule(t, root)
-	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher.go",
-		"//go:build production\n\n"+discardedErrorCipherFixture)
-	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher_dev.go", `//go:build !production
+	for _, tc := range []struct {
+		name, last, zero string
+		want             []string
+	}{
+		{"returning an error", "error", "nil", []string{
+			"encryption.DataCipher.Decrypt is listed, but a build's DataCipher has Decrypt only through an embedded field, " +
+				"which the finder does not match: declare it on DataCipher in every build",
+		}},
+		{"returning no error", "bool", "false", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeDiscardedErrorModule(t, root)
+			writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher.go",
+				"//go:build production\n\n"+discardedErrorCipherFixture)
+			writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher_dev.go", `//go:build !production
 
 package encryption
 
 type Envelope struct{}
 
-func (Envelope) Decrypt(ciphertext []byte) (string, error) { return "", nil }
+func (Envelope) Decrypt(ciphertext []byte) (string, `+tc.last+`) { return "", `+tc.zero+` }
 
 type DataCipher struct{ Envelope }
 
 func (c *DataCipher) Encrypt(plaintext string) ([]byte, error) { return nil, nil }
 `)
 
-	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, nil, discardedErrorMethods)
-	require.NoError(t, err)
-	assert.Equal(t, []string{
-		"encryption.DataCipher.Decrypt is listed, but a build's DataCipher has Decrypt only through an embedded field, " +
-			"which the finder does not match: declare it on DataCipher in every build",
-	}, stale)
+			stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, nil, discardedErrorMethods)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, stale)
+		})
+	}
 }
 
 // staleDiscardedErrorEntries returns, sorted, each listed function or method that none of the
@@ -1241,8 +1252,10 @@ func staleDiscardedErrorEntries(
 						}
 					}
 				}
+				// A promoted method that returns no error last discards none, so the finder passes its
+				// calls either way.
 				if obj, index, _ := types.LookupFieldOrMethod(named, true, p.Types, m.name); !declares && len(index) > 1 {
-					if _, isFunc := obj.(*types.Func); isFunc {
+					if fn, isFunc := obj.(*types.Func); isFunc && returnsError(fn) {
 						promoted[m.pkg+" "+m.recv+"."+m.name] = true
 					}
 				}
