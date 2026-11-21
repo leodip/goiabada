@@ -333,8 +333,13 @@ func TestSettingsSectionSaves_AFailedTransactionRecordsNothing(t *testing.T) {
 
 // A kept SMTP password is the one the request's host check read, not the one the save reads under
 // its lock: a save of another host and its password committed meanwhile must not have that
-// password sent to this save's host (#410 decision 2).
+// password sent to this save's host (#410 decision 2). It is that password sealed anew under the
+// data key (#492 decision 10).
 func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
+	forElsewhere, err := testDataCipher.Encrypt("the-password-for-elsewhere")
+	require.NoError(t, err)
+	forThisHost, err := testDataCipher.Encrypt("the-password-for-this-host")
+	require.NoError(t, err)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
@@ -344,7 +349,7 @@ func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 			stored := settingsAsTheRequestLoadedThem()
 			stored.SMTPHost = "elsewhere.example.test"
-			stored.SMTPPasswordEncrypted = []byte("the-password-for-elsewhere")
+			stored.SMTPPasswordEncrypted = forElsewhere
 			return &stored, nil
 		}).Once()
 	var saved record.Settings
@@ -353,19 +358,26 @@ func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
 
 	loaded := settingsAsTheRequestLoadedThem()
 	loaded.SMTPHost = "127.0.0.1"
-	loaded.SMTPPasswordEncrypted = []byte("the-password-for-this-host")
+	loaded.SMTPPasswordEncrypted = forThisHost
 	save := settingsSectionSaves()[1]
 	rr := serveSectionSave(save, database, auditLogger, save.body(t), loaded)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, "127.0.0.1", saved.SMTPHost)
-	assert.Equal(t, []byte("the-password-for-this-host"), saved.SMTPPasswordEncrypted)
+	password, err := testDataCipher.Decrypt(saved.SMTPPasswordEncrypted)
+	require.NoError(t, err)
+	assert.Equal(t, "the-password-for-this-host", password)
 }
 
 // A kept Turnstile secret key is the one the request's site key check read, not the one the save
-// reads under its lock: a save of another site key and its secret key committed meanwhile must not
-// leave this save's site key paired with that widget's secret key (#642 decision 11).
+// reads under its lock: a save of another site key and its secret key, the challenge left on,
+// committed meanwhile must not leave this save's site key paired with that widget's secret key (#642
+// decision 11). It is that secret key sealed anew under the data key (#492 decision 10).
 func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testing.T) {
+	anotherWidgets, err := testDataCipher.Encrypt("another-widget-secret-key")
+	require.NoError(t, err)
+	thisWidgets, err := testDataCipher.Encrypt("this-widget-secret-key")
+	require.NoError(t, err)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
@@ -374,8 +386,9 @@ func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testi
 	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 			stored := settingsAsTheRequestLoadedThem()
+			stored.TurnstileEnabled = true
 			stored.TurnstileSiteKey = "another-widget-site-key"
-			stored.TurnstileSecretKeyEncrypted = []byte("another-widget-secret-key")
+			stored.TurnstileSecretKeyEncrypted = anotherWidgets
 			return &stored, nil
 		}).Once()
 	var saved record.Settings
@@ -385,7 +398,7 @@ func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testi
 	loaded := settingsAsTheRequestLoadedThem()
 	loaded.TurnstileEnabled = true
 	loaded.TurnstileSiteKey = "this-widget-site-key"
-	loaded.TurnstileSecretKeyEncrypted = []byte("this-widget-secret-key")
+	loaded.TurnstileSecretKeyEncrypted = thisWidgets
 	save := settingsSectionSave{
 		name: "turnstile, keeping the secret key",
 		path: "/api/v1/admin/settings/turnstile",
@@ -398,7 +411,9 @@ func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testi
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, "this-widget-site-key", saved.TurnstileSiteKey)
-	assert.Equal(t, []byte("this-widget-secret-key"), saved.TurnstileSecretKeyEncrypted)
+	secretKey, err := testDataCipher.Decrypt(saved.TurnstileSecretKeyEncrypted)
+	require.NoError(t, err)
+	assert.Equal(t, "this-widget-secret-key", secretKey)
 }
 
 // lockingSettingsStore is one settings row behind a row lock, as an engine holds it: taken by

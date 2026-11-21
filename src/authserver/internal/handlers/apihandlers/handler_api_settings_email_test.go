@@ -2,6 +2,8 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -18,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -277,10 +280,30 @@ const emailSaveRequestId = "req-email-save"
 // settings, and answers what the save wrote, or nil when it wrote nothing.
 func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*httptest.ResponseRecorder, *record.Settings) {
 	t.Helper()
+	return serveEmailSaveUnder(t, testDataCipher, settings, nil, body)
+}
+
+// serveEmailSaveUnder is serveEmailSave by a server holding dataCipher, whose save reads locked
+// under its row lock, or the row the request loaded when locked is nil.
+func serveEmailSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, settings, locked *record.Settings,
+	body string) (*httptest.ResponseRecorder, *record.Settings) {
+	t.Helper()
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	var written *record.Settings
-	allowSettingsSave(database)
+	if locked == nil {
+		allowSettingsSave(database)
+	} else {
+		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
+		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
+		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+				stored := *locked
+				stored.SMTPPasswordEncrypted = bytes.Clone(locked.SMTPPasswordEncrypted)
+				return &stored, nil
+			}).Maybe()
+	}
 	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Run(func(args mock.Arguments) {
 			saved := *args.Get(2).(*record.Settings)
@@ -293,7 +316,7 @@ func serveEmailSave(t *testing.T, settings *record.Settings, body string) (*http
 	r = r.WithContext(requestid.NewContext(reqctx.WithSettings(r.Context(), settings), emailSaveRequestId))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 	rr := httptest.NewRecorder()
-	HandleSettingsEmailPut(database, accountvalidation.NewEmailValidator(nil), auditLogger, testDataCipher).ServeHTTP(rr, r)
+	HandleSettingsEmailPut(database, accountvalidation.NewEmailValidator(nil), auditLogger, dataCipher).ServeHTTP(rr, r)
 
 	if rr.Code != http.StatusOK {
 		database.AssertNotCalled(t, "UpdateSettings", mock.Anything, mock.Anything, mock.Anything)
@@ -314,9 +337,9 @@ func hasSMTPPasswordIn(t *testing.T, rr *httptest.ResponseRecorder) bool {
 }
 
 // An absent or empty smtpPassword keeps the stored password: the API never answers it, so a client
-// that sends the form back as it read it has nothing to put there. The row is written with the
-// stored ciphertext byte for byte, not a fresh encryption of the same password, and a change of
-// port, username, encryption or sender does not ask for it again (#410 decisions 1 and 2).
+// that sends the form back as it read it has nothing to put there, and a change of port, username,
+// encryption or sender does not ask for it again (#410 decisions 1 and 2). The password kept is
+// sealed anew, so the row's bytes change while the password does not (#492 decision 10).
 func TestHandleSettingsEmailPut_AnAbsentOrEmptyPasswordKeepsTheStoredOne(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -340,8 +363,142 @@ func TestHandleSettingsEmailPut_AnAbsentOrEmptyPasswordKeepsTheStoredOne(t *test
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.NotNil(t, written)
-			assert.Equal(t, stored, written.SMTPPasswordEncrypted, "the stored ciphertext, byte for byte")
+			assertKeptPasswordSealedAnew(t, testDataCipher, stored, written.SMTPPasswordEncrypted)
 			assert.True(t, hasSMTPPasswordIn(t, rr))
+		})
+	}
+}
+
+// assertKeptPasswordSealedAnew holds written to storedSMTPPassword sealed anew: other bytes than
+// the stored ones, which opener opens to the stored password.
+func assertKeptPasswordSealedAnew(t *testing.T, opener *encryption.DataCipher, stored, written []byte) {
+	t.Helper()
+	assert.NotEqual(t, stored, written, "the kept password is sealed anew, not written back as read")
+	plaintext, err := opener.Decrypt(written)
+	require.NoError(t, err)
+	assert.Equal(t, storedSMTPPassword, plaintext)
+}
+
+// A kept password is sealed again under the server's current data key before the save writes it.
+// It is the password the request's host check read, sealed under the previous key, and a
+// re-encryption committed during the save's connection test moved the row to the current key:
+// writing back what the request read would undo that, and leave a value under the key the
+// database is leaving. It is still the checked row's password, even when another save of another
+// host and its password committed meanwhile (#492 decision 10).
+func TestHandleSettingsEmailPut_AKeptPasswordIsSealedAgainUnderTheCurrentKey(t *testing.T) {
+	cases := []struct {
+		name           string
+		lockedHost     string
+		lockedPassword string
+	}{
+		{name: "the row re-encrypted meanwhile", lockedHost: "127.0.0.1", lockedPassword: storedSMTPPassword},
+		{name: "another host and its password saved meanwhile", lockedHost: "elsewhere.example.test",
+			lockedPassword: "the-password-for-elsewhere"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			settings := emailSaveSettings(t, "127.0.0.1", true) // sealed under the previous key
+			locked := *settings
+			locked.SMTPHost = c.lockedHost
+			resealed, err := currentKeyOnlyCipher.Encrypt(c.lockedPassword)
+			require.NoError(t, err)
+			locked.SMTPPasswordEncrypted = resealed
+
+			rr, written := serveEmailSaveUnder(t, rotatingDataCipher, settings, &locked,
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), nil))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+			assert.Equal(t, "127.0.0.1", written.SMTPHost)
+			assertKeptPasswordSealedAnew(t, currentKeyOnlyCipher, settings.SMTPPasswordEncrypted, written.SMTPPasswordEncrypted)
+			assert.True(t, hasSMTPPasswordIn(t, rr))
+		})
+	}
+}
+
+// A kept password neither data key opens cannot be sealed again: when the row still holds it, the
+// save writes it back as stored, byte for byte, and names it in a Warn record, so the rest of the
+// section still saves (#492 decision 10).
+func TestHandleSettingsEmailPut_AKeptPasswordNeitherKeyOpensIsWrittenBackAsStored(t *testing.T) {
+	strangerCipher, err := encryption.NewDataCipher([]byte("ffffffffffffffffffffffffffffffff"))
+	require.NoError(t, err)
+	unreadable, err := strangerCipher.Encrypt(storedSMTPPassword)
+	require.NoError(t, err)
+	settings := emailSaveSettings(t, "127.0.0.1", false)
+	settings.SMTPPasswordEncrypted = bytes.Clone(unreadable)
+	capture := logtest.CaptureSlog(t)
+
+	rr, written := serveEmailSaveUnder(t, rotatingDataCipher, settings, nil,
+		emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), map[string]interface{}{"smtpFromName": "Renamed"}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.NotNil(t, written)
+	assert.Equal(t, "Renamed", written.SMTPFromName)
+	assert.Equal(t, unreadable, written.SMTPPasswordEncrypted, "the stored ciphertext, byte for byte")
+	assert.True(t, hasSMTPPasswordIn(t, rr))
+	records := capture.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
+		records[0].Message)
+	assert.Equal(t, "smtp_password", records[0].Attrs["secret"])
+	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+	assert.NotContains(t, capture.Text(), storedSMTPPassword)
+}
+
+// A kept password neither data key opens is never written over other bytes the row holds when the
+// save locks it. A reencrypt run with the key it was sealed under, or another save, may have put a
+// readable password there meanwhile, and writing the request's stale bytes over it would leave an
+// unreadable value after reencrypt saw the row under the current key (#492 decisions 4 and 10). The
+// row's password is kept when it was entered for the host this save writes, a password removed
+// meanwhile stays removed, and another host's password is not paired with this save's host: that
+// save is refused, as a host change (#410 decision 2).
+func TestHandleSettingsEmailPut_AKeptPasswordNeitherKeyOpensNeverOverwritesTheRowAsLocked(t *testing.T) {
+	strangerCipher, err := encryption.NewDataCipher([]byte("ffffffffffffffffffffffffffffffff"))
+	require.NoError(t, err)
+	unreadable, err := strangerCipher.Encrypt(storedSMTPPassword)
+	require.NoError(t, err)
+	repaired, err := currentKeyOnlyCipher.Encrypt(storedSMTPPassword)
+	require.NoError(t, err)
+	elsewhere, err := currentKeyOnlyCipher.Encrypt("the-password-for-elsewhere")
+	require.NoError(t, err)
+
+	cases := []struct {
+		name           string
+		lockedHost     string
+		lockedPassword []byte
+		wantPassword   []byte
+		refused        bool
+	}{
+		{name: "the password repaired meanwhile, under the current key", lockedHost: "127.0.0.1",
+			lockedPassword: repaired, wantPassword: repaired},
+		{name: "the password removed meanwhile", lockedHost: "127.0.0.1"},
+		{name: "another host and its password saved meanwhile", lockedHost: "elsewhere.example.test",
+			lockedPassword: elsewhere, refused: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			settings := emailSaveSettings(t, "127.0.0.1", false)
+			settings.SMTPPasswordEncrypted = bytes.Clone(unreadable)
+			locked := *settings
+			locked.SMTPHost = c.lockedHost
+			locked.SMTPPasswordEncrypted = bytes.Clone(c.lockedPassword)
+
+			rr, written := serveEmailSaveUnder(t, rotatingDataCipher, settings, &locked,
+				emailSaveBody(t, "127.0.0.1", listeningSMTPPort(t), map[string]interface{}{"smtpFromName": "Renamed"}))
+
+			if c.refused {
+				assert.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+				code, _ := decodeErrorEnvelope(t, rr)
+				assert.Equal(t, "handler.settings_email.smtp_host_changed", code)
+				assert.Nil(t, written, "nothing is written")
+				return
+			}
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			require.NotNil(t, written)
+			assert.Equal(t, "Renamed", written.SMTPFromName)
+			assert.Equal(t, c.wantPassword, written.SMTPPasswordEncrypted, "the row's password, as locked")
+			assert.NotEqual(t, unreadable, written.SMTPPasswordEncrypted, "the request's stale bytes are not written")
 		})
 	}
 }
@@ -641,7 +798,7 @@ func TestHandleSettingsEmailPut_TheSameHostSpelledAnotherWayKeepsThePassword(t *
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.NotNil(t, written)
-			assert.Equal(t, stored, written.SMTPPasswordEncrypted, "the stored ciphertext, byte for byte")
+			assertKeptPasswordSealedAnew(t, testDataCipher, stored, written.SMTPPasswordEncrypted)
 			assert.True(t, hasSMTPPasswordIn(t, rr))
 		})
 	}

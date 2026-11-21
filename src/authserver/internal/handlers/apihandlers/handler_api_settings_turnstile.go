@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -154,8 +155,12 @@ func HandleSettingsTurnstilePut(
 		// The secret key written is decided here, against the row the site key check above read: a
 		// kept secret key is that row's, the one the check found entered for this site key. Keeping
 		// the one the save reads under its lock instead could pair this save's site key with another
-		// widget's secret key, saved meanwhile, as the email save's password rule explains.
-		secretKeyEncrypted := currentSettings.TurnstileSecretKeyEncrypted
+		// widget's secret key, saved meanwhile, as the email save's password rule explains. A kept
+		// secret key is sealed again under the current data key rather than written back as the
+		// request read it: a re-encryption committed since, while Cloudflare was asked, moved the
+		// row to the current key, and the bytes read before it would undo that (#492 decision 10).
+		var secretKeyEncrypted []byte
+		keptUnreadable := false
 		switch {
 		case req.ClearTurnstileSecretKey:
 			secretKeyEncrypted = nil
@@ -166,15 +171,54 @@ func HandleSettingsTurnstilePut(
 				return
 			}
 			secretKeyEncrypted = encrypted
+		case storedSecretKey:
+			kept, opened, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.TurnstileSecretKeyEncrypted,
+				"turnstile_secret_key")
+			if keepErr != nil {
+				writeInternalServerError(w, r, keepErr)
+				return
+			}
+			secretKeyEncrypted = kept
+			keptUnreadable = !opened
 		}
 
 		var oldVals map[string]interface{}
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.Id, func(stored *record.Settings) error {
+			secret := secretKeyEncrypted
+			if keptUnreadable {
+				// The kept secret key opens under neither key, so it could not be sealed again, and the
+				// row as locked decides what is written (see keptUnreadableSecret).
+				locked, keep := keptUnreadableSecret(currentSettings.TurnstileSecretKeyEncrypted, stored.TurnstileSecretKeyEncrypted,
+					siteKey == strings.TrimSpace(stored.TurnstileSiteKey))
+				if !keep {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSiteKeyChanged, nil)
+				}
+				// The challenge on needs a secret key, which another save removed meanwhile.
+				if req.TurnstileEnabled && len(locked) == 0 {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRequired, nil)
+				}
+				secret = locked
+			}
+			// A save that turns the challenge on checks the secret key it puts in use with Cloudflare
+			// first. One that checked none, since the challenge was on when its request read the row,
+			// finds it off here when another save turned it off meanwhile, and would turn it back on
+			// with a secret key it never checked: the kept one, or the row's when the kept one opens
+			// under neither data key. It is refused instead, and the secret key entered again is
+			// checked.
+			if req.TurnstileEnabled && !stored.TurnstileEnabled && checkedSecretKey == "" {
+				return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRequired, nil)
+			}
 			oldVals = turnstileSettingsAuditValues(stored)
 			stored.TurnstileEnabled = req.TurnstileEnabled
 			stored.TurnstileSiteKey = siteKey
-			stored.TurnstileSecretKeyEncrypted = secretKeyEncrypted
+			stored.TurnstileSecretKeyEncrypted = secret
+			return nil
 		})
+		var refusal *i18n.LocalizedError
+		if errors.As(err, &refusal) {
+			writeValidationError(w, r, refusal)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

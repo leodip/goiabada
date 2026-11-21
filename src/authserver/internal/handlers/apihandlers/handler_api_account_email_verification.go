@@ -274,16 +274,26 @@ func HandleAccountEmailVerificationPost(
 		// pending, and writes back nothing else of the row it loaded, which could re-enable an
 		// account an administrator disabled meanwhile, or put back an address a concurrent change
 		// replaced (#404).
-		verified, err := database.TryVerifyUserEmail(r.Context(), nil, user.Id, user.Email, user.EmailVerificationCodeEncrypted)
-		if err != nil {
-			writeInternalServerError(w, r, err)
-			return
-		}
-		if !verified {
-			// The code was right when compared and is gone now. Either a twin submission of it
-			// verified the address first, which this request answers as that one did, or a new
-			// send or an email change replaced it, which leaves it invalid. Neither was a guess,
-			// so neither spends the failure budget or writes a failed-code entry.
+		//
+		// A re-encryption that sealed the pending code again between the comparison and the write
+		// makes the write miss although the code is the one compared, so a missed write is made
+		// once more, with the bytes the row now holds, when the row still has the address and a
+		// pending code that opens to the code just compared (#492 decision 11).
+		codeEncrypted := user.EmailVerificationCodeEncrypted
+		for attempt := 1; ; attempt++ {
+			verified, err := database.TryVerifyUserEmail(r.Context(), nil, user.Id, user.Email, codeEncrypted)
+			if err != nil {
+				writeInternalServerError(w, r, err)
+				return
+			}
+			if verified {
+				break
+			}
+			// The code was right when compared and the write missed. Either a twin submission of
+			// it verified the address first, which this request answers as that one did; or a
+			// re-encryption sealed it again, which is written once more; or a new send or an email
+			// change replaced it, which leaves it invalid. None was a guess, so none spends the
+			// failure budget or writes a failed-code entry.
 			current, err := database.GetUserBySubject(r.Context(), nil, subject)
 			if err != nil {
 				writeInternalServerError(w, r, err)
@@ -292,6 +302,10 @@ func HandleAccountEmailVerificationPost(
 			if current != nil && current.EmailVerified && current.Email == user.Email {
 				writeJSON(w, r, http.StatusOK, api.UpdateUserResponse{User: *apimapping.ToUserResponse(current)})
 				return
+			}
+			if attempt == 1 && pendingCodeSealedAgain(dataCipher, current, user.Email, storedCode) {
+				codeEncrypted = current.EmailVerificationCodeEncrypted
+				continue
 			}
 			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.EmailVerificationCodeInvalid, nil), "INVALID_OR_EXPIRED_VERIFICATION_CODE", http.StatusBadRequest)
 			return
@@ -308,4 +322,19 @@ func HandleAccountEmailVerificationPost(
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
+}
+
+// pendingCodeSealedAgain reports whether current, the row read again after a verification's write
+// missed, still holds email unverified with a pending code that opens to compared, the code the
+// handler just compared: the same code, sealed again by a re-encryption (#492 decision 11). A code a
+// new send replaced opens to another code, and one no data key opens is none.
+func pendingCodeSealedAgain(dataCipher *encryption.DataCipher, current *record.User, email string, compared string) bool {
+	if current == nil || current.EmailVerified || current.Email != email || len(current.EmailVerificationCodeEncrypted) == 0 {
+		return false
+	}
+	pending, err := dataCipher.Decrypt(current.EmailVerificationCodeEncrypted)
+	if err != nil || len(pending) == 0 {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(pending), []byte(compared)) == 1
 }

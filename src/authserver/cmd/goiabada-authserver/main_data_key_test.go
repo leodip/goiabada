@@ -1,13 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// publishedSampleDataKey is the data key the Compose samples published (#501), which a start and
+// the reencrypt command refuse as the current key. This file is one of those the literal stack
+// secret guard lets name it, so the other command tests take it from here.
+const publishedSampleDataKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
 // TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart is the data key check at the process
 // (#542). A start under a key the database wasn't set up with used to go on and answer 500 from the
@@ -32,12 +42,61 @@ func TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart(t *testing.T) {
 	assert.Contains(t, refusal["remedy"], "backup")
 	assert.Contains(t, refusal["remedy"], "the last key the stored data was encrypted under",
 		"after a rotation, the key the database was set up with no longer opens it")
+	assert.Contains(t, refusal["remedy"], "put GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS back, start, and run goiabada-authserver reencrypt",
+		"a previous key removed before reencrypt reached its end is the mid-rotation case of the same refusal (#492 decision 6)")
 	messages := messagesOf(records)
 	assert.NotContains(t, messages, "unable to create the database connection", "nor reported as a connection failure")
 	assert.NotContains(t, messages, "starting the http listener", "and it never listens")
 
 	code, records = runMainSignalledAt(t, path, "starting the http listener")
 	require.Equalf(t, 0, code, "the key the database was set up with still starts it\n%s", dump(records))
+}
+
+// TestMain_ASetUpDatabaseWithNoUsableCurrentSigningKeyStopsTheStart is the start of a database that
+// has been set up and has lost its current signing key, at the process: the row is gone, or its
+// private key is empty. It is not a database not yet seeded, which the seed would set up: the seed
+// sees the settings row and writes no key, so a start that went on would listen and become ready
+// unable to sign a token. It exits 1 before it listens, with a record naming the signing key.
+func TestMain_ASetUpDatabaseWithNoUsableCurrentSigningKeyStopsTheStart(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		damage string
+	}{
+		{"the current signing key's row deleted", "DELETE FROM key_pairs WHERE state = 'current'"},
+		{"the current signing key's private key emptied", "UPDATE key_pairs SET private_key_pem = NULL WHERE state = 'current'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "k.db")
+			code, records := runMainSignalledAt(t, path, "starting the http listener")
+			require.Equalf(t, 0, code, "the first start seeds the database\n%s", dump(records))
+
+			db, err := sqlitedb.New(context.Background(), "file:"+path, false)
+			require.NoError(t, err)
+			result, err := db.DB.Exec(tc.damage)
+			require.NoError(t, err)
+			changed, err := result.RowsAffected()
+			require.NoError(t, err)
+			require.Equal(t, int64(1), changed)
+			remaining, err := db.GetAllSigningKeys(context.Background(), nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, remaining, "the seeded database still holds its other signing keys")
+			require.NoError(t, db.DB.Close())
+
+			code, records = runMainSignalledAtWith(t, path, "", singleStepEnv)
+
+			require.Equalf(t, 1, code, "a set-up database with no usable current signing key stops the start\n%s", dump(records))
+			refusal := recordNamed(records, "the database holds no current signing key, so the auth server cannot start")
+			require.NotNilf(t, refusal, "the refusal is its own record\n%s", dump(records))
+			assert.Equal(t, "ERROR", refusal["level"])
+			assert.Contains(t, refusal["error"], "the database is set up but holds no current signing key with a private key")
+			assert.Contains(t, refusal["remedy"], "backup")
+			messages := messagesOf(records)
+			assert.NotContains(t, messages, "unable to create the database connection", "nor reported as a connection failure")
+			assert.NotContains(t, messages, "the data encryption key does not decrypt the stored data, so the auth server cannot start",
+				"nor as a key that opens nothing")
+			assert.NotContains(t, messages, "starting the http listener", "and it never listens")
+		})
+	}
 }
 
 // TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase is the refusal of the data key the
@@ -48,7 +107,7 @@ func TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase(t *testing.T) 
 	path := filepath.Join(t.TempDir(), "k.db")
 
 	published := append(append([]string{}, singleStepEnv...),
-		"GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+		"GOIABADA_AES_ENCRYPTION_KEY="+publishedSampleDataKey)
 	code, records := runMainSignalledAtWith(t, path, "", published)
 
 	require.Equalf(t, 1, code, "the published key stops the start\n%s", dump(records))
@@ -60,4 +119,41 @@ func TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase(t *testing.T) 
 	assert.Equal(t, "openssl rand -hex 32", refusal["generate_with"])
 	assert.NoFileExists(t, path, "no database was opened")
 	assert.NotContains(t, messagesOf(records), "starting the http listener", "and it never listens")
+}
+
+// stillUnderPreviousRecord is the Warn record a start writes when the stored data is still under
+// the previous data key (#492 decision 6).
+const stillUnderPreviousRecord = "the stored data is still under the previous data encryption key: " +
+	"run goiabada-authserver reencrypt before removing GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS"
+
+// TestMain_AStartUnderThePreviousKeyServesAndSaysSo is the start between the swap and the end of
+// reencrypt, at the process (#492 decision 6): the database is under the old key, which is now the
+// previous one. The start serves, writes one Warn record naming the command that moves the data,
+// and moves nothing itself (#492 decision 3): the signing key is still under the old key alone.
+func TestMain_AStartUnderThePreviousKeyServesAndSaysSo(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "k.db")
+	oldKey := bytes.Repeat([]byte{0xab}, 32) // the key runMainSignalledAt seeds under
+
+	code, records := runMainSignalledAt(t, path, "starting the http listener")
+	require.Equalf(t, 0, code, "the first start seeds the database under its key\n%s", dump(records))
+	assert.Nil(t, recordNamed(records, stillUnderPreviousRecord), "a start with one key warns of nothing")
+
+	swapped := append(append([]string{}, singleStepEnv...),
+		"GOIABADA_AES_ENCRYPTION_KEY="+strings.Repeat("cd", 32),
+		"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS="+strings.Repeat("ab", 32))
+	code, records = runMainSignalledAtWith(t, path, "starting the http listener", swapped)
+
+	require.Equalf(t, 0, code, "the swapped keys start the server\n%s", dump(records))
+	assert.Equal(t, 1, count(messagesOf(records), stillUnderPreviousRecord), "one record says so\n%s", dump(records))
+	warned := recordNamed(records, stillUnderPreviousRecord)
+	require.NotNil(t, warned)
+	assert.Equal(t, "WARN", warned["level"])
+
+	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
+	require.NoError(t, err)
+	defer func() { _ = db.DB.Close() }()
+	signingKey, err := db.GetCurrentSigningKey(context.Background(), nil)
+	require.NoError(t, err)
+	_, err = encryption.DecryptText(signingKey.PrivateKeyPEM, oldKey)
+	assert.NoError(t, err, "the start re-encrypted nothing: the signing key is still under the old key")
 }

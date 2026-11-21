@@ -17,8 +17,8 @@ import (
 //   - datafactory, which builds one and returns it; its own two readers, the email case pre-flight
 //     and the startup task, take ports like everything else (#438 decision 8);
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
-//   - tests/data, which exercises all 225 of these methods on every engine, and is the tier that
-//     proves each one works there;
+//   - tests/data, which exercises these methods on every engine, and is the tier that proves
+//     each one works there;
 //   - this declaration itself, which is the compiler's check that the four engine adapters still
 //     implement a complete set -- worth more since #416 replaced their explicit delegations with
 //     embedding, because a method lost in commondb is no longer lost in four visible places.
@@ -53,11 +53,20 @@ type Database interface {
 	// comparison is the caller's (#351). It replaced BackfillLowercaseEmails, which repaired
 	// the data at startup rather than refusing to migrate it.
 	ScanEmailCase(ctx context.Context) ([]record.EmailCaseRow, error)
-	// ReencryptToKey re-encrypts every secret stored at rest, and every RSA private key, from
-	// oldKey to newKey, both 32 bytes, in one RunInTransaction: a failure leaves everything
-	// under oldKey. It decides nothing. Whether the data is under oldKey at all is the startup
-	// task's question, answered from a canary before this is called (#83, #438 decision 8).
-	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
+	// ReencryptStoredSecrets is the re-encryption sweep, which runs beside serving auth servers
+	// (#492 decisions 4 to 6). It moves every stored secret under previousKey to currentKey, row
+	// by row: it reads each column in bounded batches with no transaction across a table, and
+	// writes a value only while its row still holds the bytes it read, so a value a server
+	// replaced or cleared meanwhile stays as the server left it. The signing keys go last, and
+	// the current one last of all. A value neither key opens is left as it is and handed to
+	// unreadable as the sweep reaches it, never held until the end, and the sweep goes on. With
+	// previousKey absent, or equal to currentKey, it writes nothing and checks that everything
+	// opens under currentKey. currentKey is 32 bytes, and so is a previousKey given. A run that
+	// stops early, its context cancelled or a statement failing, answers what it did up to there
+	// beside the error, and can be run again: a write the cancellation reaches is rolled back,
+	// and one that commits is counted, so the count is what the database holds.
+	ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte,
+		unreadable func(record.StoredSecret)) (record.Reencryption, error)
 	IsEmpty(ctx context.Context) (bool, error)
 	// PoolStats answers the connection pool's statistics as database/sql keeps them: its cap, its
 	// connections by state, the requests that waited for one and for how long, and the connections
@@ -859,7 +868,7 @@ type Database interface {
 	// the current one's, and admit is asked again under both, so two pods can never both take the
 	// last slot, whichever of two adjacent windows each is charging. A key that already has a row
 	// for a later window is ErrRateLimitWindowMoved, with nothing charged. A refusal writes
-	// nothing. It owns its transaction, as ReencryptToKey does, because creating a window's row
+	// nothing. It owns its transaction rather than taking one, because creating a window's row
 	// can lose a race on the key, which on PostgreSQL aborts the transaction it ran in. expiresAt
 	// is when the current window's row stops counting.
 	ReserveRateLimitHit(ctx context.Context, keyHash string, current, previous, expiresAt time.Time,

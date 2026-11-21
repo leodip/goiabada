@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -539,14 +540,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 func verifyDirect(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	credentials CredentialFailureRecorder, submitted string) *httptest.ResponseRecorder {
 	t.Helper()
-	body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: submitted})
-	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification", bytes.NewReader(body))
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true})
-	req = setTokenContextWithClaims(req.WithContext(ctx), map[string]interface{}{"sub": verificationSubject})
-	rr := httptest.NewRecorder()
-	HandleAccountEmailVerificationPost(database, auditLogger, credentials, testDataCipher).ServeHTTP(rr, req)
-	return rr
+	return verifyDirectUnder(t, testDataCipher, database, auditLogger, credentials, submitted)
 }
 
 // pendingCodeUser is an account holding someone@example.com, unverified, with verificationCode
@@ -632,6 +626,170 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 
 			// The logger expects nothing, so an audit entry of either kind fails the case.
 			rr := verifyDirect(t, database, handlersmocks.NewAuditLogger(t), credentials, verificationCode)
+
+			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			if tc.wantStatus == http.StatusOK {
+				var resp api.UpdateUserResponse
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+				assert.True(t, resp.User.EmailVerified)
+			} else {
+				var body map[string]string
+				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+				assert.Equal(t, "INVALID_OR_EXPIRED_VERIFICATION_CODE", body["error_code"])
+			}
+			assert.Equal(t, 0, credentials.failures, "a right code that lost the row is not a guess")
+		})
+	}
+}
+
+// verifyDirectUnder is verifyDirect by a server holding dataCipher.
+func verifyDirectUnder(t *testing.T, dataCipher *encryption.DataCipher, database *datamocks.Database,
+	auditLogger *handlersmocks.AuditLogger, credentials CredentialFailureRecorder, submitted string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: submitted})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification", bytes.NewReader(body))
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true})
+	req = setTokenContextWithClaims(req.WithContext(ctx), map[string]interface{}{"sub": verificationSubject})
+	rr := httptest.NewRecorder()
+	HandleAccountEmailVerificationPost(database, auditLogger, credentials, dataCipher).ServeHTTP(rr, req)
+	return rr
+}
+
+// A verification whose pending code a re-encryption sealed again between the handler's comparison
+// and its write still verifies: the write that missed on the bytes compared is made once more with
+// the bytes the row now holds, since the row still has the address and a pending code that opens
+// to the code just compared. Nothing about it was a guess, so it spends no failure budget, and it
+// records the verification once (#492 decision 11).
+func TestHandleAccountEmailVerificationPost_ACodeSealedAgainBeforeTheWriteStillVerifies(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	user := pendingCodeUser(t) // sealed under the previous key
+	compared := user.EmailVerificationCodeEncrypted
+	resealedRow := *user
+	resealed, err := currentKeyOnlyCipher.Encrypt(verificationCode)
+	require.NoError(t, err)
+	resealedRow.EmailVerificationCodeEncrypted = resealed
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
+	database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", compared).
+		Return(false, nil).Once()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(&resealedRow, nil).Once()
+	database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", resealed).
+		Return(true, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventVerifiedEmail, mock.Anything).Return().Once()
+	credentials := &countingCredentials{}
+
+	rr := verifyDirectUnder(t, rotatingDataCipher, database, auditLogger, credentials, verificationCode)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var resp api.UpdateUserResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	assert.True(t, resp.User.EmailVerified)
+	assert.Equal(t, "someone@example.com", resp.User.Email)
+	assert.Equal(t, 0, credentials.failures)
+}
+
+// The once-more write is made only for the code just compared, at the address it was sent to: a
+// code a new send replaced, an address an email change moved, or a row verified meanwhile at another
+// address is refused as before, with no second write, no failure budget spent and no audit entry.
+// The write is made once more only: when it misses too and the row is not verified at the address,
+// the code is refused (#492 decision 11).
+func TestHandleAccountEmailVerificationPost_OnlyTheComparedCodeIsWrittenOnceMore(t *testing.T) {
+	sealedUnderCurrent := func(t *testing.T, code string) []byte {
+		t.Helper()
+		sealed, err := currentKeyOnlyCipher.Encrypt(code)
+		require.NoError(t, err)
+		return sealed
+	}
+	for _, tc := range []struct {
+		name string
+		// reread is the row the handler reads after its first write missed.
+		reread func(t *testing.T, user *record.User) *record.User
+		// retryMisses, when set, has the once-more write miss as well, and lastRead is the row read
+		// after it.
+		retryMisses bool
+		lastRead    func(user *record.User) *record.User
+		wantStatus  int
+	}{
+		{
+			name: "a new send replaced the code",
+			reread: func(t *testing.T, user *record.User) *record.User {
+				replaced := *user
+				replaced.EmailVerificationCodeEncrypted = sealedUnderCurrent(t, "WXYZ5678")
+				replaced.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+				return &replaced
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "an email change moved the address, the code sealed again",
+			reread: func(t *testing.T, user *record.User) *record.User {
+				moved := *user
+				moved.Email = "elsewhere@example.com"
+				moved.EmailVerificationCodeEncrypted = sealedUnderCurrent(t, verificationCode)
+				return &moved
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "the code was cleared",
+			reread: func(t *testing.T, user *record.User) *record.User {
+				cleared := *user
+				cleared.EmailVerificationCodeEncrypted = nil
+				return &cleared
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "the once-more write misses too",
+			reread: func(t *testing.T, user *record.User) *record.User {
+				resealed := *user
+				resealed.EmailVerificationCodeEncrypted = sealedUnderCurrent(t, verificationCode)
+				return &resealed
+			},
+			retryMisses: true,
+			lastRead: func(user *record.User) *record.User {
+				replaced := *user
+				replaced.EmailVerificationCodeEncrypted = []byte("another code's ciphertext")
+				return &replaced
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "the once-more write misses to a twin that verified the address",
+			reread: func(t *testing.T, user *record.User) *record.User {
+				resealed := *user
+				resealed.EmailVerificationCodeEncrypted = sealedUnderCurrent(t, verificationCode)
+				return &resealed
+			},
+			retryMisses: true,
+			lastRead: func(user *record.User) *record.User {
+				return &record.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+			},
+			wantStatus: http.StatusOK,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			user := pendingCodeUser(t)
+			compared := user.EmailVerificationCodeEncrypted
+			reread := tc.reread(t, user)
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
+			database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", compared).
+				Return(false, nil).Once()
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(reread, nil).Once()
+			if tc.retryMisses {
+				database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
+					reread.EmailVerificationCodeEncrypted).Return(false, nil).Once()
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).
+					Return(tc.lastRead(user), nil).Once()
+			}
+			credentials := &countingCredentials{}
+
+			// The logger expects nothing, so an audit entry of either kind fails the case; the
+			// database mock fails a write it was not told to expect.
+			rr := verifyDirectUnder(t, rotatingDataCipher, database, handlersmocks.NewAuditLogger(t), credentials, verificationCode)
 
 			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
 			if tc.wantStatus == http.StatusOK {

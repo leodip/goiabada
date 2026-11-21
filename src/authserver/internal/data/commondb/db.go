@@ -218,6 +218,25 @@ func waitOrCancel(ctx context.Context, d time.Duration) error {
 // deadlock victim back server-side and says so, and returning that would replace the error the
 // caller needs with a bookkeeping one.
 func (d *Database) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	return d.runInTransaction(ctx, false, fn)
+}
+
+// runInTransactionSettlingWhateverTheStop is RunInTransaction, deadlock reruns and the unknown
+// commit outcome included, for a body whose effect its caller counts the moment it commits: the
+// re-encryption sweep's write (#492 decision 8). Its connection is taken under ctx, so a stop ends
+// a wait for one, and the body's statements run under ctx, so a stop ends a wait for a row lock;
+// the pause between attempts still answers the stop. Only the transaction itself is begun and
+// committed under a context the stop does not reach: database/sql answers a cancelled BeginTx
+// context by rolling back on its own goroutine, which could undo a write the caller then counts,
+// and a commit refused for the stop would discard a body that succeeded. So once the body has
+// succeeded the commit is asked for whatever the stop, and its answer settles the outcome.
+func (d *Database) runInTransactionSettlingWhateverTheStop(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	return d.runInTransaction(ctx, true, fn)
+}
+
+// runInTransaction is RunInTransaction's loop, the transaction settled under ctx, or, when
+// settleWhateverTheStop is set, under ctx without its cancellation.
+func (d *Database) runInTransaction(ctx context.Context, settleWhateverTheStop bool, fn func(tx *sql.Tx) error) error {
 	const attempts = 3
 
 	var lastDeadlock error
@@ -234,7 +253,7 @@ func (d *Database) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) err
 				"attempt", attempt, "error", lastDeadlock)
 		}
 
-		err := d.runTransactionOnce(ctx, fn)
+		err := d.runTransactionOnce(ctx, settleWhateverTheStop, fn)
 		if err == nil {
 			return nil
 		}
@@ -312,10 +331,34 @@ func abandoned(cancelled error, lastDeadlock error) error {
 // runTransactionOnce is one attempt. Its own function so the rollback is deferred, which is
 // what makes a panicking fn leave no open transaction behind: the connection goes back to the
 // pool clean instead of holding its locks until the pool closes it.
-func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) error) error {
-	tx, err := d.BeginTransaction(ctx)
-	if err != nil {
-		return err
+//
+// With settleWhateverTheStop the transaction is begun on a connection taken under ctx, and begun
+// and committed under ctx without its cancellation (runInTransactionSettlingWhateverTheStop).
+func (d *Database) runTransactionOnce(ctx context.Context, settleWhateverTheStop bool, fn func(tx *sql.Tx) error) error {
+	settle := ctx
+	var tx *sql.Tx
+	if settleWhateverTheStop {
+		settle = context.WithoutCancel(ctx)
+		conn, err := d.DB.Conn(ctx)
+		if err != nil {
+			return errs.Wrap(err, "unable to take a connection")
+		}
+		// Deferred first, so it runs last: the connection goes back to the pool once the
+		// transaction on it has been committed or rolled back.
+		defer func() { _ = conn.Close() }()
+		if d.logSQL {
+			slog.InfoContext(ctx, "beginning transaction")
+		}
+		tx, err = conn.BeginTx(settle, nil)
+		if err != nil {
+			return errs.Wrap(err, "unable to begin transaction")
+		}
+	} else {
+		var err error
+		tx, err = d.BeginTransaction(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Once Commit has been attempted the transaction is finished whatever it answered, and
@@ -329,13 +372,19 @@ func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) e
 	// every cancelled request that was inside a transaction, which is an operator sent after a
 	// non-event. Only a rollback that failed for some OTHER reason is still worth the warning,
 	// and a live context still reports ErrTxDone as the anomaly it would be (#386).
+	//
+	// A transaction settled whatever the stop is not bound to ctx, so database/sql does not roll
+	// it back; the stop reaches its statement instead, and a driver may answer that by closing
+	// the connection, as pgx does, so the rollback then fails on a closed connection, which the
+	// engine answers by rolling the transaction back. That is the same non-event, and earns no
+	// record either.
 	committing := false
 	defer func() {
 		if committing {
 			return
 		}
 		rollbackErr := d.RollbackTransaction(ctx, tx)
-		if rollbackErr == nil || (ctx.Err() != nil && errors.Is(rollbackErr, sql.ErrTxDone)) {
+		if rollbackErr == nil || (ctx.Err() != nil && (settleWhateverTheStop || errors.Is(rollbackErr, sql.ErrTxDone))) {
 			return
 		}
 		slog.WarnContext(ctx, "rolling back a failed transaction reported an error, which is ignored because the transaction's own error is the one the caller needs",
@@ -347,7 +396,7 @@ func (d *Database) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) e
 	}
 
 	committing = true
-	refusedBeforeTheDriver, commitErr := d.commit(ctx, tx)
+	refusedBeforeTheDriver, commitErr := d.commit(settle, tx)
 	// A deadlock at the commit returns unchanged, so RunInTransaction reruns the whole body; so
 	// does a commit refused before the driver was asked, because a cancelled context rolled it
 	// back and its outcome is known. Any other commit failure is tagged with the

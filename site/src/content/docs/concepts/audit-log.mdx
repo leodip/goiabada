@@ -137,7 +137,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `client_id` | The client's row id, the id in the Admin API's client paths. |
 | `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
 | `code_id` | The row id of an authorization code. |
-| `command` | `goiabada-authserver recover`, on every entry the `recover` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
+| `command` | `goiabada-authserver recover` on every entry the `recover` command writes, and `goiabada-authserver reencrypt` on the entry the `reencrypt` command writes. An entry an API request made names its token's subject under `logged_in_user` instead. |
 | `consent_id` | The row id of a consent a user gave a client. |
 | `corners` | A brand's corners after the save: `square`, `rounded` or `pill`. |
 | `custom_css_bytes` | The size of a brand's custom CSS after the save, in bytes, left out when the brand has none. The CSS itself is not recorded. |
@@ -195,6 +195,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `previous_session_identifier` | The session of the other user that a sign-in on the same browser ended. |
 | `previous_user_id` | The user whose session a sign-in on the same browser ended. |
 | `reason` | Why a link was refused, such as `code_expired`, why sessions and tokens were revoked, such as `account_disabled`, why a session was deleted, such as `signed_out`, or, as `clock_ahead`, that an authenticator code was refused because the device's clock runs ahead. |
+| `reencrypted` | How many stored secrets a run of the `reencrypt` command re-encrypted to the current AES key. |
 | `refresh_token_jti` | The `jti` of the refresh token issued. |
 | `refresh_token_offline_idle_timeout_in_seconds` | Under `old` and `new`: the default idle timeout of an offline refresh token, in seconds. |
 | `refresh_token_offline_max_lifetime_in_seconds` | Under `old` and `new`: the default maximum lifetime of an offline refresh token, in seconds. |
@@ -229,6 +230,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `token_type` | The type of token a client sent to the revocation endpoint: `access_token` or `refresh_token`. |
 | `turnstile_enabled` | Under `old` and `new`: whether the Turnstile challenge is on. |
 | `turnstile_site_key` | Under `old` and `new`: the site key of the Turnstile widget. |
+| `unreadable` | How many stored secrets a run of the `reencrypt` command found that neither AES key opens. It left them as they were, and named each on its output. |
 | `user_attribute_id` | The row id of a user's custom attribute. |
 | `user_id` | The row id of the user the entry is about. It also fills the entry's `user_id` column, which the Admin API's `userId` filter matches. |
 | `user_session_id` | The row id of a user's session. |
@@ -475,6 +477,7 @@ These come from the Account API, which users reach through the admin console's a
 | `updated_audit_logs_settings` | An administrator changed where audit events go or how long they're kept. It holds the new values, and is recorded under the old ones, so turning logging off is recorded too. |
 | `rotated_keys` | An administrator rotated the signing keys: the next key became the current one, and a new next key was generated. |
 | `revoked_key` | An administrator deleted a previous signing key. |
+| `reencrypted_stored_secrets` | A run of the `reencrypt` command moved stored secrets to the current AES key, `GOIABADA_AES_ENCRYPTION_KEY`, during a [rotation of that key](/deploy/rotate-secrets/#the-aes-key). It's written as the run ends, even one stopped or failed partway, and only when it re-encrypted at least one value: a run that found everything under the current key writes none. The entry counts what it re-encrypted and what neither key opened, never a key or a value. |
 
 ## Next steps
 

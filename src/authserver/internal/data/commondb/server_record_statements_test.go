@@ -4,20 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // The statements of the records the server keeps about itself, held on all four engines to what
 // each asks of the engine: the settings row and its two conditional writes, signing keys, audit
-// logs, pending registrations, the shared rate-limit counters, the DPoP replay store, re-encryption,
+// logs, pending registrations, the shared rate-limit counters, the DPoP replay store,
 // the email-case pre-flight and the empty-database check (#644, #42).
 //
 // Most of these exist for their condition: a cleanup run is claimed only while the last one is old
@@ -485,61 +481,6 @@ func TestServerRecordStatements_TheEmailCasePreFlightAsksTheEngineToLowerEveryAd
 				answer:     wantRows,
 				statements: []string{want},
 			}, dialect, false)
-		})
-	}
-}
-
-// TestServerRecordStatements_ReencryptionRekeysEveryProtectedColumn holds the re-encryption to
-// reading each protected column whole, and to writing a row's new ciphertext, under the new key,
-// back to that row's column alone.
-func TestServerRecordStatements_ReencryptionRekeysEveryProtectedColumn(t *testing.T) {
-	oldKey := []byte(strings.Repeat("o", 32))
-	newKey := []byte(strings.Repeat("n", 32))
-	sealed, err := encryption.EncryptText("smtp secret", oldKey)
-	require.NoError(t, err)
-
-	for _, dialect := range allDialects {
-		t.Run(string(dialect), func(t *testing.T) {
-			script := &scriptedDriver{}
-			script.answer = func(query string, _ []driver.Value) *scriptedRows {
-				if query == "SELECT id, smtp_password_encrypted FROM settings" {
-					return &scriptedRows{cols: []string{"id", "value"}, values: [][]driver.Value{{int64(1), sealed}}}
-				}
-				return &scriptedRows{cols: []string{"id", "value"}}
-			}
-			started := time.Now().UTC()
-			require.NoError(t, scriptedDBFor(t, script, dialect).ReencryptToKey(context.Background(), oldKey, newKey))
-
-			var reads []string
-			for i, query := range script.statements {
-				if strings.HasPrefix(query, "SELECT") {
-					reads = append(reads, query)
-					continue
-				}
-				// The one row holding a value is written back, its new ciphertext under the new key.
-				require.Equal(t, 1, i, "the write follows its own column's read")
-				require.Len(t, script.execArgs, 1)
-				args := script.execArgs[0]
-				rendered, problems := renderStatement(dialect, query, []driver.Value{"<ciphertext>", args[1]}, started)
-				assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
-				assert.Equal(t, "UPDATE settings SET smtp_password_encrypted = '<ciphertext>' WHERE id = 1", rendered)
-				ciphertext, ok := args[0].([]byte)
-				require.True(t, ok, "the ciphertext is bound as bytes")
-				plaintext, err := encryption.DecryptText(ciphertext, newKey)
-				require.NoError(t, err)
-				assert.Equal(t, "smtp secret", plaintext)
-			}
-			assert.Equal(t, []string{
-				"SELECT id, smtp_password_encrypted FROM settings",
-				"SELECT id, turnstile_secret_key_encrypted FROM settings",
-				"SELECT id, client_secret_encrypted FROM clients",
-				"SELECT id, email_verification_code_encrypted FROM users",
-				"SELECT id, otp_secret_encrypted FROM users",
-				"SELECT id, forgot_password_code_encrypted FROM users",
-				"SELECT id, otp_enrollment_secret_encrypted FROM users",
-				"SELECT id, verification_code_encrypted FROM pre_registrations",
-				"SELECT id, private_key_pem FROM key_pairs",
-			}, reads)
 		})
 	}
 }

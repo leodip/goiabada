@@ -65,6 +65,10 @@ func TestEventTypes_ContainsCriticalEvents(t *testing.T) {
 		EventUpdatedAuditLogsSettings,
 		EventRotatedKeys,
 		EventRevokedKey,
+		// Records a run of reencrypt that moved stored secrets to the current data key (#492
+		// decision 8): with the start-up record gone, it is a data key rotation's one trace
+		// inside Goiabada.
+		EventReencryptedStoredSecrets,
 		EventDynamicClientRegistration,
 		// Records that a credential change invalidated a user's live authentication state
 		// (#106). Security-relevant in the same class as key revocation: if this event ever

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -25,28 +26,35 @@ import (
 // serves the listener beside the others, a scrape reaches it, and on SIGTERM it drains with them.
 // The child is the real main over a fresh SQLite file it migrates and seeds.
 
-// metricsChild is a running main configured for the metrics listener.
-type metricsChild struct {
+// mainChild is a running main whose records arrive as it writes them.
+type mainChild struct {
 	cmd     *exec.Cmd
 	records chan map[string]any
 	done    chan struct{}
+	reap    sync.Once
+	waitErr error
+}
+
+// reaped waits, once, for the child's stderr to be read to its end and for the child to exit,
+// and answers how it exited. wait and the cleanup startMainChild registers share it, since
+// exec.Cmd.Wait runs once.
+func (c *mainChild) reaped() error {
+	c.reap.Do(func() {
+		<-c.done
+		c.waitErr = c.cmd.Wait()
+	})
+	return c.waitErr
 }
 
 // startMetricsChild starts main with the http listener and the metrics listener on loopback, the
 // latter on metricsPort, and delivers each record it writes as it writes it. enabled is the value
 // of the metrics setting, and an empty one leaves the setting out of the environment.
-func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort int, enabled string) *metricsChild {
+func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort int, enabled string) *mainChild {
 	t.Helper()
 
 	env := []string{
-		runMainMarker + "=1",
-		"GOIABADA_DB_TYPE=sqlite",
 		"GOIABADA_DB_DSN=file:" + filepath.Join(t.TempDir(), "m.db"),
-		"GOIABADA_AUTHSERVER_LOG_FORMAT=json",
 		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
-		"GOIABADA_ADMIN_EMAIL=admin@example.com",
-		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
-		"GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=127.0.0.1",
 		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=" + strconv.Itoa(httpPort),
 		"GOIABADA_AUTHSERVER_LISTEN_HOST_METRICS=127.0.0.1",
 		"GOIABADA_AUTHSERVER_LISTEN_PORT_METRICS=" + strconv.Itoa(metricsPort),
@@ -54,14 +62,31 @@ func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort 
 	if enabled != "" {
 		env = append(env, "GOIABADA_AUTHSERVER_METRICS_ENABLED="+enabled)
 	}
+	return startMainChild(t, ctx, env)
+}
+
+// startMainChild starts main over SQLite in single-step mode, its http listener on loopback and
+// its records in JSON, with env appended last so that a variable in it replaces a default here,
+// and delivers each record it writes as it writes it. env names the database, the data keys and
+// the http port. A test that leaves before wait, on a failed assertion, still has the child killed,
+// its stderr drained and the child reaped when it ends.
+func startMainChild(t *testing.T, ctx context.Context, env []string) *mainChild {
+	t.Helper()
+
 	cmd := exec.CommandContext(ctx, os.Args[0])
-	env = append(env, singleStepEnv...)
-	cmd.Env = env
+	cmd.Env = append(append([]string{
+		runMainMarker + "=1",
+		"GOIABADA_DB_TYPE=sqlite",
+		"GOIABADA_AUTHSERVER_LOG_FORMAT=json",
+		"GOIABADA_ADMIN_EMAIL=admin@example.com",
+		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
+		"GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=127.0.0.1",
+	}, singleStepEnv...), env...)
 	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
 
-	child := &metricsChild{cmd: cmd, records: make(chan map[string]any, 1024), done: make(chan struct{})}
+	child := &mainChild{cmd: cmd, records: make(chan map[string]any, 1024), done: make(chan struct{})}
 	go func() {
 		defer close(child.done)
 		defer close(child.records)
@@ -75,19 +100,24 @@ func startMetricsChild(t *testing.T, ctx context.Context, httpPort, metricsPort 
 			child.records <- record
 		}
 	}()
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		for range child.records {
+		}
+		_ = child.reaped()
+	})
 	return child
 }
 
 // wait answers the child's exit code and every record it wrote that nothing has read yet.
-func (c *metricsChild) wait(t *testing.T, ctx context.Context) (int, []map[string]any) {
+func (c *mainChild) wait(t *testing.T, ctx context.Context) (int, []map[string]any) {
 	t.Helper()
 
 	var records []map[string]any
 	for record := range c.records {
 		records = append(records, record)
 	}
-	<-c.done
-	err := c.cmd.Wait()
+	err := c.reaped()
 	if ctx.Err() != nil {
 		t.Fatalf("main did not exit within %s\n%s", mainProcessBound, dump(records))
 	}
@@ -120,6 +150,37 @@ func getWhenUp(t *testing.T, ctx context.Context, url string) (int, string, stri
 			t.Fatalf("nothing answered %s: %v", url, err)
 		case <-time.After(50 * time.Millisecond):
 		}
+	}
+}
+
+// A test that leaves a running child before wait, as a failed health or token assertion does,
+// still has it killed, its stderr read to the end and the child reaped once the test ends, with no
+// cancellation of its context to do it. t.SkipNow stands in for the failed assertion: both leave
+// the test through runtime.Goexit.
+func TestStartMainChild_ReapsAChildTheTestLeavesBeforeWaiting(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+	defer cancel()
+
+	var child *mainChild
+	t.Run("leaves while the child serves", func(t *testing.T) {
+		port := strconv.Itoa(freePort(t))
+		child = startMainChild(t, ctx, []string{
+			"GOIABADA_DB_DSN=file:" + filepath.Join(t.TempDir(), "early.db"),
+			"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+			"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=" + port,
+		})
+		status, _, body := getWhenUp(t, ctx, "http://127.0.0.1:"+port+"/health")
+		require.Equal(t, http.StatusOK, status, body)
+		t.SkipNow()
+	})
+
+	require.NotNil(t, child)
+	require.NoError(t, ctx.Err(), "the child was not stopped by its context")
+	assert.NotNil(t, child.cmd.ProcessState, "the child was reaped")
+	select {
+	case <-child.done:
+	default:
+		t.Error("the child's stderr was not read to its end")
 	}
 }
 

@@ -568,12 +568,22 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "abc123", plaintext)
 
-	// Kept by a save that omits it, and by one that sends it empty
+	// Kept by a save that omits it, and by one that sends it empty: the same password, sealed anew
+	// under the data key (#492 decision 10)
+	assertKept := func(t *testing.T, before []byte, message string) []byte {
+		t.Helper()
+		after := storedCiphertext(t)
+		assert.NotEqual(t, before, after, message+": sealed anew")
+		kept, decryptErr := dataCipher.Decrypt(after)
+		require.NoError(t, decryptErr)
+		assert.Equal(t, "abc123", kept, message)
+		return after
+	}
 	require.Equal(t, http.StatusOK, save(t, "mailpit", nil).StatusCode)
-	assert.Equal(t, set, storedCiphertext(t), "an omitted password keeps the stored ciphertext")
+	set = assertKept(t, set, "an omitted password keeps the stored password")
 	assert.True(t, hasPassword(t))
 	require.Equal(t, http.StatusOK, save(t, "mailpit", map[string]interface{}{"smtpPassword": ""}).StatusCode)
-	assert.Equal(t, set, storedCiphertext(t), "an empty password keeps the stored ciphertext")
+	set = assertKept(t, set, "an empty password keeps the stored password")
 	assert.True(t, hasPassword(t))
 
 	// A host change without the password again is refused, and writes nothing

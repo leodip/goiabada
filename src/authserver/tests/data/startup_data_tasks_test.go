@@ -39,18 +39,15 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 }
 
 // TestNewDatabase_HandsTheStartupTasksThePreviousKey pins that the previous key NewDatabase is
-// given reaches runStartupDataTasks, rather than being dropped on the way. Dropped, the env-to-env
-// rotation of #83 is skipped in silence -- the startup succeeds, and the server then serves
-// requests against data it cannot decrypt.
+// given reaches runStartupDataTasks, rather than being dropped on the way. Dropped, a start between
+// the swap and the end of reencrypt is refused, though the server it would have started opens
+// everything (#492 decision 6).
 //
-// IT IS ALSO THE SOLE PIN ON THE CALL ITSELF. A sibling case used to hold that edge with a
-// plaintext TOTP seed the startup backfill converted; #359 deleted that conversion (#262, #98), so
-// the canary below is what is left. It only rewrites if NewDatabase calls runStartupDataTasks at
-// all, which is worth stating because deleting that call left all 598 sqlite data tests green
-// (#353): every other test in this tier passes whether or not the startup pass runs.
+// IT IS ALSO THE SOLE PIN ON THE CALL ITSELF: deleting that call left all 598 sqlite data tests
+// green (#353), and every other test in this tier passes whether or not the startup pass runs.
 //
-// The detection canary is the one the startup task reads: an encrypted RSA private key PEM. Seeded under the previous key, a startup carrying that key rewrites it under the current
-// one; a startup that lost it leaves the row as it was (#353).
+// The current signing key under the previous key is accepted, and left as it is: a start never
+// re-encrypts (#492 decision 3).
 func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the call under test is engine-independent")
@@ -59,37 +56,43 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 	currentKey := dataKey
 	previousKey := bytes.Repeat([]byte{0x5a}, 32)
 	require.NotEqual(t, currentKey, previousKey,
-		"rotation is a no-op when the two keys match, so the fixture would prove nothing")
+		"a previous key equal to the current one takes no part, so the fixture would prove nothing")
 
-	const canaryPEM = "-----BEGIN RSA PRIVATE KEY-----\nnot a real key, only a canary\n-----END RSA PRIVATE KEY-----"
-	underPreviousKey, err := encryption.EncryptText(canaryPEM, previousKey)
+	underPreviousKey, err := encryption.EncryptText(startupCanaryPEM, previousKey)
 	require.NoError(t, err)
 
-	cfg := seedThrowawayDatabase(t, "startup_rotation.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &record.KeyPair{
-			State:         record.KeyStateCurrent.String(),
-			KeyIdentifier: fake.UUID(),
-			Type:          "RSA",
-			Algorithm:     "RS256",
-			PrivateKeyPEM: underPreviousKey,
-		}), "the canary is the whole fixture")
+	cfg := seedThrowawayDatabase(t, "startup_previous_key.db", func(db data.Database) {
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, startupSigningKey(record.KeyStateCurrent, underPreviousKey)),
+			"the current signing key is the whole fixture")
 	})
 
-	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
-	require.NoError(t, err, "data under the previous key is exactly the configuration rotation exists to accept")
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, nil, false)
+	require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "without the previous key the start is refused")
+	assert.Nil(t, opened)
+
+	opened, err = datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
+	require.NoError(t, err, "data under the previous key is exactly what a start mid-rotation accepts")
 	require.NotNil(t, opened)
+	t.Cleanup(func() { _ = opened.Close() })
 
 	keys, err := opened.GetAllSigningKeys(context.Background(), nil)
 	require.NoError(t, err)
-	require.Len(t, keys, 1, "the second open must not have added or dropped a key pair")
+	require.Len(t, keys, 1, "the start must not have added or dropped a key pair")
+	assert.Equal(t, underPreviousKey, keys[0].PrivateKeyPEM, "the start wrote nothing: the signing key is the bytes seeded")
+}
 
-	rotated, err := encryption.DecryptText(keys[0].PrivateKeyPEM, currentKey)
-	require.NoError(t, err,
-		"after a startup carrying the previous key the canary reads under the current one; a failure here is the previous key never arriving")
-	assert.Equal(t, canaryPEM, rotated, "rotation re-encrypts the same plaintext, it does not replace it")
+// startupCanaryPEM is the private key the fixtures below seal: what the check opens, never parsed.
+const startupCanaryPEM = "-----BEGIN RSA PRIVATE KEY-----\nnot a real key, only a canary\n-----END RSA PRIVATE KEY-----"
 
-	_, err = encryption.DecryptText(keys[0].PrivateKeyPEM, previousKey)
-	assert.Error(t, err, "the old key must no longer open the row, which is what makes this a rotation rather than a copy")
+// startupSigningKey is a signing key in state whose private key is pem.
+func startupSigningKey(state record.KeyState, pem []byte) *record.KeyPair {
+	return &record.KeyPair{
+		State:         state.String(),
+		KeyIdentifier: fake.UUID(),
+		Type:          "RSA",
+		Algorithm:     "RS256",
+		PrivateKeyPEM: pem,
+	}
 }
 
 // TestNewDatabase_RefusesAStartupWhoseDataTasksFailed pins the last property of the same edge:
@@ -97,16 +100,14 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 // and NewDatabase has to turn that error into a refused startup rather than a usable handle.
 //
 // The case above proves the call happens and that both keys reach it, and the helper's own mock
-// table in datafactory proves the surviving branch fails closed. Neither reaches this arm:
-// changing it from `return nil, err` to `return database, nil` left all 600 sqlite data tests
-// green. That is a server reporting a successful startup after the env-to-env key rotation has
-// failed, then serving requests over data it could not re-key -- which is precisely the outcome
-// that branch is fail-closed to prevent (#353).
+// table in datafactory proves the check fails closed. Neither reaches this arm: changing it from
+// `return nil, err` to `return database, nil` left all 600 sqlite data tests green. That is a
+// server reporting a successful startup when its keys open none of the stored data, then answering
+// 500 from its first token request (#353, #542).
 //
-// The forcing fixture is the rotation canary seeded under a THIRD key. The startup task treats a canary that decrypts under the current key as "already rotated" and one that decrypts
-// under the previous key as "rotate now"; a canary that opens under neither is the one
-// misconfiguration it refuses outright rather than guessing at, so it is the cheapest real task
-// failure this tier can construct.
+// The forcing fixture is the current signing key sealed under a THIRD key: one that opens under
+// neither supplied key is the misconfiguration the check refuses outright, so it is the cheapest
+// real task failure this tier can construct.
 //
 // sqlite only, for the reason the case above gives: a DSN to a throwaway file is the one way to
 // reach NewDatabase without running the startup pass over the shared database this tier runs
@@ -120,12 +121,11 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 	previousKey := bytes.Repeat([]byte{0x5a}, 32)
 	unknownKey := bytes.Repeat([]byte{0x77}, 32)
 	require.NotEqual(t, currentKey, unknownKey,
-		"the canary has to open under neither supplied key, or the task succeeds and proves nothing")
+		"the signing key has to open under neither supplied key, or the task succeeds and proves nothing")
 	require.NotEqual(t, previousKey, unknownKey,
-		"the canary has to open under neither supplied key, or the task rotates and proves nothing")
+		"the signing key has to open under neither supplied key, or the task succeeds and proves nothing")
 
-	const canaryPEM = "-----BEGIN RSA PRIVATE KEY-----\nnot a real key, only a canary\n-----END RSA PRIVATE KEY-----"
-	underUnknownKey, err := encryption.EncryptText(canaryPEM, unknownKey)
+	underUnknownKey, err := encryption.EncryptText(startupCanaryPEM, unknownKey)
 	require.NoError(t, err)
 
 	cfg := seedThrowawayDatabase(t, "startup_tasks_failed.db", func(db data.Database) {
@@ -135,7 +135,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 			Type:          "RSA",
 			Algorithm:     "RS256",
 			PrivateKeyPEM: underUnknownKey,
-		}), "the unreadable canary is the whole fixture")
+		}), "the unreadable signing key is the whole fixture")
 	})
 
 	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
@@ -143,7 +143,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 	require.Error(t, err,
 		"a startup data task that failed must not be reported as a successful startup")
 	assert.Nil(t, opened,
-		"a refused startup must hand back no database, or the caller serves requests over data the tasks could not convert")
+		"a refused startup must hand back no database, or the caller serves requests over data its keys cannot open")
 	assert.Contains(t, err.Error(), "the data encryption key check failed",
 		"the failing task's own message has to survive the arm, since it is all the operator gets")
 	assert.Contains(t, err.Error(), "GOIABADA_AES_ENCRYPTION_KEY",
@@ -153,14 +153,9 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 // TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing is the one statement this tree can
 // make about a database that never booted 1.6.x. #359 deleted the startup conversion that
 // encrypted a plaintext RSA PEM (#262) and ships no pre-flight to refuse such a database, so what
-// is left to establish is that a startup carrying a previous key does not quietly half-convert
-// one: the canary is the first non-empty PrivateKeyPEM, a plaintext PEM decrypts under neither key,
-// and the startup task refuses before ReencryptToKey runs.
-//
-// That is why commondb.reencryptPrivateKeys keeps its plaintext-PEM branch as unreachable code
-// rather than deleting it: nothing in production can reach it, and this test is the reason that
-// claim holds. It used to call the data layer's own rotation method; #438 decision 8 moved the
-// canary to datafactory, so it goes through the startup that reads it.
+// is left to establish is that a startup carrying a previous key refuses one and writes nothing:
+// a plaintext current signing key decrypts under neither key. reencrypt reports such a key as a
+// value neither key opens and leaves it as it is (#492 decision 5).
 //
 // sqlite only, for the reason the cases above give.
 func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
@@ -201,8 +196,8 @@ func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
 	assert.Nil(t, opened)
 	assert.Contains(t, err.Error(), "decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 
-	// Nothing was re-keyed: the PEM is the plaintext it was, and the client secret still reads
-	// under the previous key, because the refusal comes before ReencryptToKey opens its transaction.
+	// Nothing was written: the PEM is the plaintext it was, and the client secret still reads
+	// under the previous key, because a start re-encrypts nothing.
 	reopened, err := sqlitedb.New(context.Background(), cfg.DSN, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = reopened.DB.Close() })
@@ -217,21 +212,19 @@ func TestNewDatabase_RefusesAPlaintextPEMCanaryAndRekeysNothing(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	plaintext, err := encryption.DecryptText(client.ClientSecretEncrypted, previousKey)
-	require.NoError(t, err, "the client secret was re-keyed by a startup that refused to rotate")
+	require.NoError(t, err, "the client secret was re-encrypted by a startup that refused")
 	assert.Equal(t, clientSec, plaintext)
 }
 
-// TestNewDatabase_ChecksTheDataKeyAtEveryStartAndStillRotates walks one database through the
-// starts a data key's life takes, each a real NewDatabase over the same SQLite file (#542). Every
-// start now reads the canary, so a key that opens none of the stored data is refused with
-// ErrDataKeyMismatch even with no previous key set, where before the start went on and the first
-// token request answered 500. The rotation of Rotate secrets is unchanged by it: the new key with the
-// old one as previous re-keys every secret, a restart with the previous key still set does nothing
-// more, and the previous key can then go. Going back to the old key alone is refused, since the data
-// is no longer under it. A refusal re-keys nothing.
+// TestNewDatabase_ChecksTheDataKeyAtEveryStartAndNeverRotates walks one database through the
+// starts a data key's life takes, each a real NewDatabase over the same SQLite file (#542, #492).
+// Every start reads the current signing key, so a key that opens none of the stored data is
+// refused with ErrDataKeyMismatch even with no previous key set. The new key with the old one as
+// previous starts and moves nothing, however often; the previous key removed before the sweep is
+// refused; after the sweep the new key alone starts, and the old key alone is refused.
 //
 // sqlite only, for the reason the cases above give.
-func TestNewDatabase_ChecksTheDataKeyAtEveryStartAndStillRotates(t *testing.T) {
+func TestNewDatabase_ChecksTheDataKeyAtEveryStartAndNeverRotates(t *testing.T) {
 	if engine := dbType(); engine != data.SQLite {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the check under test is engine-independent")
 	}
@@ -240,24 +233,15 @@ func TestNewDatabase_ChecksTheDataKeyAtEveryStartAndStillRotates(t *testing.T) {
 	newKey := bytes.Repeat([]byte{0x5b}, 32)
 	require.NotEqual(t, oldKey, newKey)
 
-	const (
-		canaryPEM = "-----BEGIN RSA PRIVATE KEY-----\nnot a real key, only a canary\n-----END RSA PRIVATE KEY-----"
-		clientSec = "a client secret"
-	)
-	pemUnderOld, err := encryption.EncryptText(canaryPEM, oldKey)
+	const clientSec = "a client secret"
+	pemUnderOld, err := encryption.EncryptText(startupCanaryPEM, oldKey)
 	require.NoError(t, err)
 	secretUnderOld, err := encryption.EncryptText(clientSec, oldKey)
 	require.NoError(t, err)
 	clientIdentifier := "c-" + fake.UUID()
 
 	cfg := seedThrowawayDatabase(t, "startup_key_life.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &record.KeyPair{
-			State:         record.KeyStateCurrent.String(),
-			KeyIdentifier: fake.UUID(),
-			Type:          "RSA",
-			Algorithm:     "RS256",
-			PrivateKeyPEM: pemUnderOld,
-		}))
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, startupSigningKey(record.KeyStateCurrent, pemUnderOld)))
 		require.NoError(t, db.CreateClient(context.Background(), nil, &record.Client{
 			ClientIdentifier:      clientIdentifier,
 			ClientSecretEncrypted: secretUnderOld,
@@ -272,40 +256,99 @@ func TestNewDatabase_ChecksTheDataKeyAtEveryStartAndStillRotates(t *testing.T) {
 		}
 		return openErr
 	}
-	storedUnder := func(key []byte) {
+	withDatabase := func(do func(db *sqlitedb.Database)) {
 		t.Helper()
 		db, openErr := sqlitedb.New(context.Background(), cfg.DSN, false)
 		require.NoError(t, openErr)
 		defer func() { _ = db.DB.Close() }()
-		keys, readErr := db.GetAllSigningKeys(context.Background(), nil)
-		require.NoError(t, readErr)
-		require.Len(t, keys, 1)
-		pem, pemErr := encryption.DecryptText(keys[0].PrivateKeyPEM, key)
-		require.NoError(t, pemErr, "the signing key is not under the key expected")
-		assert.Equal(t, canaryPEM, pem)
-		client, clientErr := db.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
-		require.NoError(t, clientErr)
-		require.NotNil(t, client)
-		secret, secretErr := encryption.DecryptText(client.ClientSecretEncrypted, key)
-		require.NoError(t, secretErr, "the client secret is not under the key expected")
-		assert.Equal(t, clientSec, secret)
+		do(db)
+	}
+	storedUnder := func(key []byte) {
+		t.Helper()
+		withDatabase(func(db *sqlitedb.Database) {
+			keys, readErr := db.GetAllSigningKeys(context.Background(), nil)
+			require.NoError(t, readErr)
+			require.Len(t, keys, 1)
+			pem, pemErr := encryption.DecryptText(keys[0].PrivateKeyPEM, key)
+			require.NoError(t, pemErr, "the signing key is not under the key expected")
+			assert.Equal(t, startupCanaryPEM, pem)
+			client, clientErr := db.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
+			require.NoError(t, clientErr)
+			require.NotNil(t, client)
+			secret, secretErr := encryption.DecryptText(client.ClientSecretEncrypted, key)
+			require.NoError(t, secretErr, "the client secret is not under the key expected")
+			assert.Equal(t, clientSec, secret)
+		})
 	}
 
 	err = start(newKey, nil)
 	require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "a new key alone opens none of the data, and the start is refused")
 	storedUnder(oldKey)
 
-	require.NoError(t, start(newKey, oldKey), "the new key with the old one as previous is a rotation")
+	require.NoError(t, start(newKey, oldKey), "the new key with the old one as previous starts")
+	storedUnder(oldKey)
+	require.NoError(t, start(newKey, oldKey), "and starts again, still moving nothing")
+	storedUnder(oldKey)
+
+	err = start(newKey, nil)
+	require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "the previous key removed before the sweep is refused")
+
+	withDatabase(func(db *sqlitedb.Database) {
+		_, sweepErr := db.ReencryptStoredSecrets(context.Background(), newKey, oldKey, nil)
+		require.NoError(t, sweepErr)
+	})
 	storedUnder(newKey)
 
-	require.NoError(t, start(newKey, oldKey), "the previous key may stay set across restarts")
-	storedUnder(newKey)
-
-	require.NoError(t, start(newKey, nil), "and then go, as Rotate secrets' last step has it")
+	require.NoError(t, start(newKey, nil), "after the sweep the previous key can go")
 
 	err = start(oldKey, nil)
 	require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "the old key alone no longer opens the data")
 	storedUnder(newKey)
+}
+
+// TestNewDatabase_ASweepStoppedBeforeTheCurrentSigningKeyIsRefused is the start after a sweep that
+// stopped with only the current signing key left to move, the previous key then removed (#492
+// decision 6). Every other stored secret, and every other signing key, is under the new key; the
+// current signing key, which the sweep moves last of all, is not. The start is refused whichever of
+// the signing keys the database holds first, since a check of whichever comes first would pass it
+// by row order.
+//
+// sqlite only, for the reason the cases above give.
+func TestNewDatabase_ASweepStoppedBeforeTheCurrentSigningKeyIsRefused(t *testing.T) {
+	if engine := dbType(); engine != data.SQLite {
+		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the check under test is engine-independent")
+	}
+
+	oldKey := dataKey
+	newKey := bytes.Repeat([]byte{0x5c}, 32)
+	pemUnderOld, err := encryption.EncryptText(startupCanaryPEM, oldKey)
+	require.NoError(t, err)
+	pemUnderNew, err := encryption.EncryptText(startupCanaryPEM, newKey)
+	require.NoError(t, err)
+
+	for name, currentFirst := range map[string]bool{"the current signing key stored first": true, "the current signing key stored last": false} {
+		t.Run(name, func(t *testing.T) {
+			cfg := seedThrowawayDatabase(t, "startup_sweep_stopped.db", func(db data.Database) {
+				current := startupSigningKey(record.KeyStateCurrent, pemUnderOld)
+				if currentFirst {
+					require.NoError(t, db.CreateKeyPair(context.Background(), nil, current))
+				}
+				require.NoError(t, db.CreateKeyPair(context.Background(), nil, startupSigningKey(record.KeyStatePrevious, pemUnderNew)))
+				require.NoError(t, db.CreateKeyPair(context.Background(), nil, startupSigningKey(record.KeyStateNext, pemUnderNew)))
+				if !currentFirst {
+					require.NoError(t, db.CreateKeyPair(context.Background(), nil, current))
+				}
+			})
+
+			opened, err := datafactory.NewDatabase(context.Background(), cfg, newKey, nil, false)
+			require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "the current signing key is still under the removed key")
+			assert.Nil(t, opened)
+
+			opened, err = datafactory.NewDatabase(context.Background(), cfg, newKey, oldKey, false)
+			require.NoError(t, err, "with the previous key put back the start serves, and reencrypt can finish")
+			require.NoError(t, opened.Close())
+		})
+	}
 }
 
 // TestNewDatabase_RefusesAStartupWhoseOpenFailed pins the first arm of the same pipeline: when

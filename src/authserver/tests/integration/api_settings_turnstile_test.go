@@ -122,13 +122,23 @@ func TestAPISettingsTurnstilePut_TheSecretKeyLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, turnstilePassingSecretKey, plaintext)
 
-	// Kept by a save that omits it, and by one that sends it empty.
+	// Kept by a save that omits it, and by one that sends it empty: the same secret key, sealed anew
+	// under the data key (#492 decision 10).
+	assertKept := func(t *testing.T, before []byte, message string) []byte {
+		t.Helper()
+		after := storedTurnstile(t).TurnstileSecretKeyEncrypted
+		assert.NotEqual(t, before, after, message+": sealed anew")
+		kept, decryptErr := dataCipher.Decrypt(after)
+		require.NoError(t, decryptErr)
+		assert.Equal(t, turnstilePassingSecretKey, kept, message)
+		return after
+	}
 	resp, _ = putTurnstile(t, accessToken, map[string]any{"turnstileEnabled": true, "turnstileSiteKey": turnstilePassingSiteKey})
 	assert.True(t, turnstileSettingsAnswer(t, resp).HasTurnstileSecretKey)
-	assert.Equal(t, set, storedTurnstile(t).TurnstileSecretKeyEncrypted, "an omitted secret key keeps the stored ciphertext")
+	set = assertKept(t, set, "an omitted secret key keeps the stored secret key")
 	resp, _ = putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{TurnstileEnabled: true, TurnstileSiteKey: turnstilePassingSiteKey})
 	assert.True(t, turnstileSettingsAnswer(t, resp).HasTurnstileSecretKey)
-	assert.Equal(t, set, storedTurnstile(t).TurnstileSecretKeyEncrypted, "an empty secret key keeps the stored ciphertext")
+	assertKept(t, set, "an empty secret key keeps the stored secret key")
 
 	// Replaced by a new one.
 	resp, _ = putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
@@ -425,7 +435,9 @@ func TestAPISettingsTurnstilePut_TurningOffAndRemovingTheSecretKeySaveWithoutThe
 	assert.Equal(t, api.SettingsTurnstileResponse{
 		TurnstileEnabled: false, TurnstileSiteKey: turnstilePassingSiteKey, HasTurnstileSecretKey: true,
 	}, turnstileSettingsAnswer(t, resp))
-	assert.Equal(t, sealedUnknown, storedTurnstile(t).TurnstileSecretKeyEncrypted, "turned off, the secret key stays")
+	stays, err := dataCipher.Decrypt(storedTurnstile(t).TurnstileSecretKeyEncrypted)
+	require.NoError(t, err)
+	assert.Equal(t, turnstileUnknownSecretKey, stays, "turned off, the secret key stays")
 
 	resp, _ = putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
 		TurnstileSiteKey: turnstilePassingSiteKey, ClearTurnstileSecretKey: true,

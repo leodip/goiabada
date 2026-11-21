@@ -31,6 +31,7 @@ func TestDispatch(t *testing.T) {
 		// The tail is handed on untouched: the flag after `to 44` is migrate's own parse to read.
 		{"a flag in the migrate tail", []string{"migrate", "to", "44", "-db-type=mysql"}, "migrate", []string{"to", "44", "-db-type=mysql"}},
 		{"recover", []string{"recover", "--email", "a@example.com", "--remove-otp"}, "recover", []string{"--email", "a@example.com", "--remove-otp"}},
+		{"reencrypt", []string{"reencrypt", "--db-dsn=file:a.db"}, "reencrypt", []string{"--db-dsn=file:a.db"}},
 	}
 	for _, tc := range accepted {
 		t.Run(tc.name, func(t *testing.T) {
@@ -42,7 +43,7 @@ func TestDispatch(t *testing.T) {
 	}
 
 	// -x reaches dispatch only as `goiabada-authserver -- -x`, the one way past the server's parse.
-	for _, first := range []string{"migrat", "serve", "version", "-x", "recovr"} {
+	for _, first := range []string{"migrat", "serve", "version", "-x", "recovr", "reencrypted", "rekey"} {
 		t.Run("refuses "+first, func(t *testing.T) {
 			rest, command, err := dispatch([]string{first, "to", "44"})
 			require.Error(t, err)
@@ -54,6 +55,7 @@ func TestDispatch(t *testing.T) {
 			assert.Contains(t, msg, "goiabada-authserver [flags] with no command to start the server")
 			assert.Contains(t, msg, "goiabada-authserver [flags] migrate to <version>")
 			assert.Contains(t, msg, "goiabada-authserver [flags] recover --email <address>")
+			assert.Contains(t, msg, "goiabada-authserver [flags] reencrypt")
 			assert.Contains(t, msg, "goiabada-authserver healthcheck, alone,")
 		})
 	}
@@ -76,7 +78,8 @@ func TestDispatch(t *testing.T) {
 			`to start the server, goiabada-authserver [flags] migrate version, or `+
 			`goiabada-authserver [flags] migrate to <version>, to manage the schema, `+
 			`goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for `+
-			`one user, or goiabada-authserver healthcheck, alone, to check the running server's `+
+			`one user, goiabada-authserver [flags] reencrypt, to move every stored secret to the current `+
+			`data key, or goiabada-authserver healthcheck, alone, to check the running server's `+
 			`health; the server's flags go before the command`, err.Error())
 	})
 }

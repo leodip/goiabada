@@ -439,7 +439,8 @@ func TestMain_RefusesAWordThatNamesNoCommandBeforeTheConfiguration(t *testing.T)
 			`to start the server, goiabada-authserver [flags] migrate version, or `+
 			`goiabada-authserver [flags] migrate to <version>, to manage the schema, `+
 			`goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for `+
-			`one user, or goiabada-authserver healthcheck, alone, to check the running server's `+
-			`health; the server's flags go before the command`+"\n", run.stderr, "%v", args)
+			`one user, goiabada-authserver [flags] reencrypt, to move every stored secret to the `+
+			`current data key, or goiabada-authserver healthcheck, alone, to check the running `+
+			`server's health; the server's flags go before the command`+"\n", run.stderr, "%v", args)
 	}
 }

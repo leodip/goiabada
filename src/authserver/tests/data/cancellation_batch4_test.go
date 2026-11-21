@@ -197,28 +197,6 @@ func TestGetPreRegistrationByEmail_RefusesAnAlreadyCancelledContext(t *testing.T
 	assert.Nil(t, got, "no row is returned alongside the refusal")
 }
 
-// TestReencryptToKey_RefusesAnAlreadyCancelledContext reaches reencrypt.go, the one file in this
-// batch whose exported method is not a query of its own: it opens one transaction and re-keys every
-// encrypted row inside it. The refusal therefore comes from RunInTransaction, before any re-keying
-// starts, which is the fail-closed direction -- a re-key that began and was then abandoned would
-// leave secrets under a key the running process does not hold.
-//
-// Two valid 32-byte keys, because the method refuses a short one before it reaches the database
-// at all. Neither is the tier's data key, so a re-key that did start against this shared database
-// would fail at its first decrypt and roll back rather than rewrite anything.
-func TestReencryptToKey_RefusesAnAlreadyCancelledContext(t *testing.T) {
-	oldKey := make([]byte, 32)
-	newKey := make([]byte, 32)
-	newKey[0] = 1
-	require.NotEqual(t, dataKey, oldKey,
-		"the old key must not be the tier's, or a re-key that did start would rewrite the shared database")
-
-	err := database.ReencryptToKey(cancelled(), oldKey, newKey)
-
-	require.Error(t, err, "the transaction must not be opened on behalf of a caller that is already gone")
-	assert.ErrorIs(t, err, context.Canceled)
-}
-
 // TestIsEmpty_RefusesAnAlreadyCancelledContext is main's first question of a new database, asked
 // through GetSettingsById. It is worth its own case because the answer is a bool and the caller
 // acts on it: a swallowed cancellation would read as "this database is empty" and send a running

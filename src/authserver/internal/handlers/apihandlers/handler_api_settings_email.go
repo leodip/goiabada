@@ -1,7 +1,10 @@
 package apihandlers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -18,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
@@ -234,7 +238,12 @@ func HandleSettingsEmailPut(
 		// password the save reads under its lock instead would let a save of another host and
 		// password, committed meanwhile, have its password sent to this save's host (#410
 		// decision 2). Two saves of the email settings are still last-writer-wins between them.
-		smtpPasswordEncrypted := currentSettings.SMTPPasswordEncrypted
+		//
+		// A kept password is sealed again under the current data key rather than written back as
+		// the request read it: a re-encryption committed since, during the dial above, moved the row
+		// to the current key, and the bytes read before it would undo that (#492 decision 10).
+		var smtpPasswordEncrypted []byte
+		keptUnreadable := false
 		switch {
 		case req.ClearSMTPPassword:
 			smtpPasswordEncrypted = nil
@@ -245,22 +254,48 @@ func HandleSettingsEmailPut(
 				return
 			}
 			smtpPasswordEncrypted = encrypted
+		case len(currentSettings.SMTPPasswordEncrypted) > 0:
+			kept, opened, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.SMTPPasswordEncrypted, "smtp_password")
+			if keepErr != nil {
+				writeInternalServerError(w, r, keepErr)
+				return
+			}
+			smtpPasswordEncrypted = kept
+			keptUnreadable = !opened
 		}
 
 		// Apply updates, onto the row as stored when the save runs (#407)
 		smtpUsername := strings.TrimSpace(req.SMTPUsername)
 		smtpFromName := strings.TrimSpace(req.SMTPFromName)
 		smtpFromEmail := senderAddressForStorage(req.SMTPFromEmail)
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.Id, func(stored *record.Settings) error {
+			password := smtpPasswordEncrypted
+			if keptUnreadable {
+				// The kept password opens under neither key, so it could not be sealed again, and the
+				// row as locked decides what is written (see keptUnreadableSecret).
+				lockedHost := hostport.Unbracket(strings.TrimSpace(stored.SMTPHost))
+				locked, keep := keptUnreadableSecret(currentSettings.SMTPPasswordEncrypted, stored.SMTPPasswordEncrypted,
+					strings.EqualFold(smtpHost, lockedHost))
+				if !keep {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsEmailSMTPHostChanged, nil)
+				}
+				password = locked
+			}
 			stored.SMTPEnabled = true
 			stored.SMTPHost = smtpHost
 			stored.SMTPPort = req.SMTPPort
 			stored.SMTPEncryption = smtpEncryption.String()
 			stored.SMTPUsername = smtpUsername
-			stored.SMTPPasswordEncrypted = smtpPasswordEncrypted
+			stored.SMTPPasswordEncrypted = password
 			stored.SMTPFromName = smtpFromName
 			stored.SMTPFromEmail = smtpFromEmail
+			return nil
 		})
+		var refusal *i18n.LocalizedError
+		if errors.As(err, &refusal) {
+			writeValidationError(w, r, refusal)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -272,6 +307,49 @@ func HandleSettingsEmailPut(
 
 		writeJSON(w, r, http.StatusOK, settingsEmailResponse(saved))
 	}
+}
+
+// sealKeptSecretAgain is what a settings save writes for a stored secret it keeps, the SMTP
+// password or the Turnstile secret key: the secret its request read, opened with the data cipher
+// and sealed anew under the current data key, so a re-encryption committed since the request read
+// it is not undone (#492 decision 10). opened is false for a secret neither data key opens, which
+// cannot be sealed again: the save then decides under the row's lock what to write, with
+// keptUnreadableSecret, and a Warn record names the secret, so the save of the rest of the section,
+// and turning the Turnstile challenge off, still go through.
+func sealKeptSecretAgain(ctx context.Context, dataCipher *encryption.DataCipher, ciphertext []byte,
+	secret string) (resealed []byte, opened bool, err error) {
+
+	plaintext, err := dataCipher.Decrypt(ciphertext)
+	if err != nil {
+		slog.WarnContext(ctx, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
+			"secret", secret, "error", err)
+		return nil, false, nil
+	}
+	resealed, err = dataCipher.Encrypt(plaintext)
+	if err != nil {
+		return nil, false, errs.Wrap(err, "unable to seal the kept stored secret again")
+	}
+	return resealed, true, nil
+}
+
+// keptUnreadableSecret is what a save keeping a secret that opens under neither data key writes, from
+// the row as locked: read is the secret its request read and checked, locked the one the row holds
+// now, and sameOwner whether the row as locked names the host or site key this save writes, the one
+// a secret is entered for. The request's bytes are never written over other bytes: a re-encryption
+// run with an older key, or another save, may have put a readable secret there meanwhile, and the
+// stale bytes would undo it after reencrypt saw it (#492 decisions 4 and 10).
+//
+//   - The row still holding the bytes read keeps them: the secret is the one the request checked.
+//   - A row whose secret was removed meanwhile keeps it removed.
+//   - A row holding another secret keeps it when the row names the host or site key this save
+//     writes, since it was entered for that one; otherwise keep is false, and the save is refused,
+//     since writing it beside this save's host or site key would send it where it was not entered
+//     for (#410 decision 2).
+func keptUnreadableSecret(read, locked []byte, sameOwner bool) (kept []byte, keep bool) {
+	if bytes.Equal(read, locked) || len(locked) == 0 || sameOwner {
+		return locked, true
+	}
+	return nil, false
 }
 
 // senderAddressForStorage is the sender address as stored: the part before the @ as typed, since

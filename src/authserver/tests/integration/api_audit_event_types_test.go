@@ -44,7 +44,7 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 		"the theme setting's event is retired with the setting (#810)")
 	assert.NotContains(t, body.AuditEventTypes, "revoked_consent_grants",
 		"a consent withdrawal writes disconnected_client now, and the old name is retired (#135)")
-	assert.Len(t, body.AuditEventTypes, 142,
+	assert.Len(t, body.AuditEventTypes, 143,
 		"the catalog is the 104 declared names less the four #351 decision 11 deleted, "+
 			"plus failed_account_activation_code (#435), requested_password_reset (#404), "+
 			"administrator_change_refused, administrative_permission_changed and "+
@@ -64,7 +64,8 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 			"updated_client_backchannel_logout and sent_logout_token (#784), and exported_own_user_data (#782), and "+
 			"updated_client_dpop (#42), and the four brand events created_brand, updated_brand, "+
 			"deleted_brand and updated_default_brand (#810), and updated_client_brand (#812), and "+
-			"uploaded_brand_asset (#813), and updated_email_template and reset_email_template (#818), less "+
+			"uploaded_brand_asset (#813), and updated_email_template and reset_email_template (#818), and "+
+			"reencrypted_stored_secrets (#492), less "+
 			"updated_ui_theme_settings, which #810 retires")
 
 	// The wire end of the chain openapi.yaml declares. The unit tier's

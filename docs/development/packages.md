@@ -479,11 +479,15 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine
   adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359,
   #386). `sqlitedb/sqlitedbtest` gives unit tests SQLite databases already at the migration head,
-  each a copy of one database its test binary migrated once
+  each a copy of one database its test binary migrated once. `ReencryptStoredSecrets` is the only
+  re-encryption of the stored secrets: the `reencrypt` command in `cmd/goiabada-authserver` runs it
+  beside serving auth servers, and parses, refuses a schema other than its head, prints and writes
+  its audit event (#492)
 - `internal/data/datafactory/` - Database composition: engine selection, config mapping, the
   email-case pre-flight, which the migrator runs under its lock on its own connection (#542), the
-  startup data tasks, which refuse a start whose data key opens none of the stored data (#353, #438,
-  #542)
+  startup data tasks, which read the current signing key, refuse a start whose data keys do not
+  open it or a seeded database without one, warn when it is under the previous key, and write
+  nothing (#353, #438, #542, #492)
 - `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed,
   whose 18 writes commit in one transaction with the bootstrap file published only after it (#424).
   A seed that loses an empty database to another instance seeding it at once (a unique key, and the
