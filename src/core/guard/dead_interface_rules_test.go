@@ -321,6 +321,30 @@ type AlsoDeadButNotGuarded interface{ B() }
 	assert.Empty(t, deadNames(dead))
 }
 
+// A directory named for the guard that ./... skips, one whose name begins with _, would be walked and
+// read none of, since the guards load ./...: the walk refuses it, naming it, rather than pass an
+// unused interface there.
+func TestNoDeadInterfaces_ADirectoryTheWildcardSkipsIsRefused(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
+
+type Live interface{ A() }
+
+func use(x Live) { _ = x }
+`)
+	writeFixture(t, root, "mod/_tools/tools.go", `package tools
+
+type Dead interface{ B() }
+`)
+	makeLoadable(t, root)
+
+	_, _, err := findDeadInterfaces(root, []string{"mod/handlers", "mod/_tools"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mod/_tools holds Go files, but ./... skips a directory named _tools")
+}
+
 // Seam 2: the reporting half. Everything above asserts on what findDeadInterfaces returned, which
 // leaves the roughly ten lines that turn those findings into a failure untested -- and those are
 // the lines whose loss disables the guard in both modules at once. Blinding them is exactly what

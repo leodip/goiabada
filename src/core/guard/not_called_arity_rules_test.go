@@ -385,6 +385,19 @@ func TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass(t *testing.T) {
 	assert.Zero(t, sites, "AssertNotCalledArity turns a zero site count into a t.Fatalf")
 }
 
+// A walked directory that ./... skips, one whose name begins with ., holds sites the load would
+// never read, so the walk refuses it, naming it.
+func TestNotCalledArity_ADirectoryTheWildcardSkipsIsRefused(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/held/held_test.go", "package held\n")
+	writeFixture(t, root, "mod/.scratch/scratch_test.go", "package scratch\n")
+
+	_, _, _, err := findNotCalledArity(root, []string{"mod"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mod/.scratch holds Go files, but ./... skips a directory named .scratch")
+}
+
 // A //line directive before the package clause moves where a diagnostic points, not where the file
 // is: a test file in a walked directory is walked whatever it maps itself to, and its site is
 // reported at its own line.
