@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 // MakeLoadable makes a fixture tree under root a set of modules the go command can load. A guard's
@@ -105,33 +106,14 @@ func fixtureGoVersion(modules []fixtureModule) (string, error) {
 
 // syntheticVersion is the version a fixture module is required at: the major its path's version
 // suffix names, which the go command holds the version to, or v0.0.0 for a path without one. The
-// suffix is /vN, from v2, or, for a gopkg.in path, .vN with an optional -unstable, where .v0 and .v1
-// are majors too (go.dev/ref/mod#major-version-suffixes).
+// suffix is read as the go command reads it (go.dev/ref/mod#major-version-suffixes): /vN from v2
+// on, after a slash, or for a gopkg.in path .vN with an optional -unstable, where .v0 and .v1 are
+// majors too.
 func syntheticVersion(modulePath string) string {
-	if strings.HasPrefix(modulePath, "gopkg.in/") {
-		suffix := strings.TrimSuffix(modulePath, "-unstable")
-		if i := strings.LastIndex(suffix, ".v"); i >= 0 && isMajor(suffix[i+2:]) {
-			return "v" + suffix[i+2:] + ".0.0"
-		}
-		return "v0.0.0"
-	}
-	// The suffix follows the path's last slash: a path that is only vN, with no slash, has none.
-	if i := strings.LastIndex(modulePath, "/"); i > 0 {
-		if n, ok := strings.CutPrefix(modulePath[i+1:], "v"); ok && isMajor(n) && n != "0" && n != "1" {
-			return "v" + n + ".0.0"
-		}
+	if _, pathMajor, ok := module.SplitPathVersion(modulePath); ok && pathMajor != "" {
+		return module.PathMajorPrefix(pathMajor) + ".0.0"
 	}
 	return "v0.0.0"
-}
-
-// isMajor reports whether n is a major version number as a suffix writes it: digits, with no
-// leading zero unless it is 0 itself.
-func isMajor(n string) bool {
-	if n == "" || (n[0] == '0' && n != "0") {
-		return false
-	}
-	_, err := strconv.ParseUint(n, 10, 64)
-	return err == nil
 }
 
 // quoteIfNeeded quotes a go.mod argument the go command would otherwise read as more than one
