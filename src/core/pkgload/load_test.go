@@ -331,7 +331,7 @@ func TestLoad_AnImportOfAPackageTheWildcardSkipsIsAnError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "example.test/mod/a in ")
 	assert.Contains(t, err.Error(), "imports example.test/mod/_bridge")
-	assert.NotErrorIs(t, err, pkgload.ErrNoPackages)
+	require.NotErrorIs(t, err, pkgload.ErrNoPackages)
 
 	root = loadable(t, map[string]string{
 		"mod/go.mod": "module example.test/mod\n",
