@@ -10,10 +10,14 @@ import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../lib/
 import { uniqueIdentifier } from "../../lib/unique";
 
 // The id of the user the users list names by exactly this email, or none when there is no such user.
+// Only a users list that rendered, its table or its empty state, answers none: a refused or failed
+// lookup throws, so the test fails rather than leave a user it could not look for.
 async function listedUserId(page: Page, email: string): Promise<number | undefined> {
   const listUrl = `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`;
-  await page.goto(listUrl);
-  if ((await page.getByRole("table").getByRole("link", { name: email, exact: true }).count()) === 0) return undefined;
+  const response = await page.goto(listUrl);
+  if (response?.status() !== 200) throw new Error(`the users list at ${listUrl} answered ${response?.status() ?? "nothing"}`);
+  await expect(page.locator("#usersTable, .empty-state").first(), `the users list at ${listUrl}`).toBeVisible();
+  if ((await page.locator("#usersTable").getByRole("link", { name: email, exact: true }).count()) === 0) return undefined;
   return idFromListLink(page, listUrl, email);
 }
 
