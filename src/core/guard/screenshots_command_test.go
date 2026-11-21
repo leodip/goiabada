@@ -37,8 +37,12 @@ case " $* " in
 esac
 `
 
+// screenshotCheckDir is the temporary folder screenshotCheck built the checker into, empty until it
+// has; TestMain removes it when the package's tests end.
+var screenshotCheckDir string
+
 // screenshotCheck builds src/core/cmd/screenshotcheck once for the tests that run the script, into
-// a temporary folder of the test binary's own, which it leaves for the system to clear.
+// a temporary folder of the test binary's own, which it removes itself when the build fails.
 var screenshotCheck = sync.OnceValues(func() (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -52,10 +56,20 @@ var screenshotCheck = sync.OnceValues(func() (string, error) {
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/screenshotcheck")
 	cmd.Dir = filepath.Dir(wd)
 	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = os.RemoveAll(dir)
 		return "", errs.Wrapf(err, "building screenshotcheck: %s", out)
 	}
+	screenshotCheckDir = dir
 	return bin, nil
 })
+
+// removeScreenshotCheck removes the checker screenshotCheck built, if it built one.
+func removeScreenshotCheck() error {
+	if screenshotCheckDir == "" {
+		return nil
+	}
+	return os.RemoveAll(screenshotCheckDir)
+}
 
 // screenshotsStubCp, screenshotsStubMv and screenshotsStubRm fail a copy into, a rename out of, or a
 // deletion of the files the test names in FAIL_CP, FAIL_MV and FAIL_RM, by file name. With
@@ -275,6 +289,28 @@ func TestScreenshotsCommand_WritesEveryImageTheCaptureLists(t *testing.T) {
 		assert.Contains(t, run.out, "screenshots: wrote site/src/assets/"+name)
 	}
 	assert.Empty(t, run.tmp, "the staging folder is left behind")
+}
+
+// The checker the tests build goes when the test process ends: a run of this package in a temporary
+// folder of its own leaves no screenshotcheck in it.
+func TestScreenshotsCommand_LeavesNoCheckerBehind(t *testing.T) {
+	if os.Getenv("SCREENSHOTCHECK_CHILD") != "" {
+		t.Skip("the run this test starts")
+	}
+	tmp := t.TempDir()
+	cmd := exec.Command(os.Args[0], "-test.run=^TestScreenshotsCommand_WritesEveryImageTheCaptureLists$", "-test.v", "-test.count=1")
+	cmd.Env = append(os.Environ(), "TMPDIR="+tmp, "SCREENSHOTCHECK_CHILD=1")
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	require.Contains(t, string(out), "--- PASS: TestScreenshotsCommand_WritesEveryImageTheCaptureLists", "the run built no checker")
+	var left []string
+	require.NoError(t, filepath.WalkDir(tmp, func(path string, d os.DirEntry, err error) error {
+		if err == nil && strings.Contains(d.Name(), "screenshotcheck") {
+			left = append(left, path)
+		}
+		return err
+	}))
+	assert.Empty(t, left, "the checker is left behind")
 }
 
 // An image the run adds, one not committed before, is written too.
