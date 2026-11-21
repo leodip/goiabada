@@ -36,8 +36,10 @@ CodeRabbit (`coderabbitai[bot]`) reviews every pull request, and again on each p
   fixture writes, is minor, whatever fixture shows it. When the guard passes that form
   silently, fix it by having the guard report the form as one it cannot read, not by
   teaching it the form; when the guard reports it already, the reply says so. Only a
-  misreading of code the tree contains is significant ("Guards that read code or
-  configuration" in `docs/development/guards.md`).
+  misreading of code the tree contains is significant, and so is a change that breaks
+  what a fixture in the tree already holds, such as the physical position a guard
+  reads past a `//line` directive, or `core/pkgload` setting `GOPACKAGESDRIVER=off`
+  ("Guards that read code or configuration" in `docs/development/guards.md`).
 - **It knows only the diff.** It often misses a decision the agreement or the
   decisions recorded, a guard elsewhere, or an engine-specific case it did not read: a
   comment that contradicts one of them is not valid, and the reply names it.

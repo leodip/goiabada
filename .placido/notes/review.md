@@ -25,7 +25,9 @@
   a form the tree does not write, or about a build environment or fixture input the
   repository does not use, such as a `//line` directive, `GOPACKAGESDRIVER`, a Windows
   test host, or a `go.mod` shape no fixture writes, is minor; say in it whether the
-  guard reads the real tree any differently.
+  guard reads the real tree any differently. A change that breaks what a fixture in
+  the tree already holds, such as the physical position a guard reads past a `//line`
+  directive, or `core/pkgload` setting `GOPACKAGESDRIVER=off`, is not minor.
 - **Generated files must be current:** the schema goldens, the core ownership table,
   the mocks, and the CSS. A stale one is a blocking finding, since it turns CI red.
 - **Documentation:** check that reader-facing changes have matching updates under
