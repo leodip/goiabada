@@ -237,13 +237,13 @@ It leaves the three images it builds in Docker, named for the checkout:
 checked in. To remove this checkout's, from the repository root:
 
 ```bash
-docker image ls --format '{{.Repository}}:{{.Tag}}' "goiabada-screenshots-$(printf '%s' "$PWD" | cksum | cut -d ' ' -f 1)-*" | xargs -r docker image rm
+docker image ls --format '{{.Repository}}:{{.Tag}}' "goiabada-screenshots-$(printf '%s' "$PWD" | cksum | cut -d ' ' -f 1)-*:latest" | xargs -r docker image rm
 ```
 
 To remove every checkout's, a deleted worktree's included:
 
 ```bash
-docker image ls --format '{{.Repository}}:{{.Tag}}' 'goiabada-screenshots-*' | xargs -r docker image rm
+docker image ls --format '{{.Repository}}:{{.Tag}}' 'goiabada-screenshots-*:latest' | xargs -r docker image rm
 ```
 
 The Playwright and Mailpit images it pulls are ordinary pulls, which `docker image rm` removes like
