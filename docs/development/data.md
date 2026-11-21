@@ -38,11 +38,13 @@ refuses such calls.
 ## Transactions
 
 Open every transaction through `RunInTransaction`; the data package's
-`begin_transaction_lint_test.go` refuses a bare `BeginTransaction` in production code. The common
-implementation in `src/authserver/internal/data/commondb/db.go` makes at most three attempts when
-the engine aborts a transaction as a deadlock victim, including a deadlock reported at commit.
-Keep attempt-local state inside the callback, return failures, and write the response and external
-effects after it succeeds. Audit events describe the committed outcome.
+`begin_transaction_lint_test.go` refuses a bare `BeginTransaction` in production code, and
+golangci-lint's forbidigo refuses `database/sql`'s own `Begin` and `BeginTx` outside
+`commondb/db.go` and the migrator. The common implementation in
+`src/authserver/internal/data/commondb/db.go` makes at most three attempts when the engine aborts a
+transaction as a deadlock victim, including a deadlock reported at commit. Keep attempt-local state
+inside the callback, return failures, and write the response and external effects after it succeeds.
+Audit events describe the committed outcome.
 
 **MySQL snapshots.** Under InnoDB's REPEATABLE READ, a transaction's first ordinary read fixes the
 snapshot that every later ordinary read in it answers. PostgreSQL and SQL Server read at READ

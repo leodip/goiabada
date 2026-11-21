@@ -2,8 +2,9 @@
 
 package data
 
-// The one place the repository is held to "every transaction is opened through
-// RunInTransaction".
+// One of the two places the repository is held to "every transaction is opened through
+// RunInTransaction". This test holds calls to the Database method BeginTransaction, and forbidigo
+// in .golangci.yml holds database/sql's own Begin and BeginTx.
 //
 // The rule exists because no lock order is imposed anywhere in the tree: two transactions on the
 // same account can take the same rows in opposite orders, and the engine then aborts one of them

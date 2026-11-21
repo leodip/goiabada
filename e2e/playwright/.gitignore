@@ -1,5 +1,7 @@
 node_modules/
 test-results/
 test-results-rate-limits/
+test-results-first-run/
 playwright-report/
 playwright-report-rate-limits/
+playwright-report-first-run/
