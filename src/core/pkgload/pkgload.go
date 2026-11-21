@@ -71,6 +71,15 @@ type Build struct {
 	Tests bool
 }
 
+// ReleaseEnv returns the variables a release build of any platform runs the go command with, beside
+// its GOOS and GOARCH: cgo off, and GOAMD64 and GOARM64 at the go command's defaults, v1 and v8.0,
+// which a release compiles at because nothing that builds one sets them. The levels are explicit
+// rather than cleared, since an empty variable falls through to a level go env -w wrote. A release
+// build's load and rule 8's go list both run with it, so every guard reads a release's files alike.
+func ReleaseEnv() []string {
+	return []string{"CGO_ENABLED=0", "GOAMD64=v1", "GOARM64=v8.0"}
+}
+
 // ReleaseBuilds returns the release build of every release platform: the production tag set, cgo
 // off, the default architecture levels and no test files, in the order of ReleasePlatforms.
 func ReleaseBuilds() []Build {
@@ -196,9 +205,7 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 		env = append(env, "GOARCH="+build.Platform.GOARCH)
 	}
 	if build.Release {
-		// The levels explicitly rather than cleared: an empty variable falls through to a level
-		// go env -w wrote, which a release build would not see either.
-		env = append(env, "CGO_ENABLED=0", "GOAMD64=v1", "GOARM64=v8.0")
+		env = append(env, ReleaseEnv()...)
 		flags = append(flags, "-tags=production")
 	}
 

@@ -1233,6 +1233,27 @@ func TestArchitecture_TheGuardFailsOnTestCodeBehindAThirdPartyModule(t *testing.
 	assert.Contains(t, report.Errors[0], " refuses in a shipped binary: authserver/cmd/goiabada-authserver -> example.net/helper -> example.net/helper/inner -> testing")
 }
 
+// Rule 8's listing reads a dependency as a release compiles it, at the default architecture levels,
+// whatever level the environment the tests run in sets: a file only GOAMD64=v3 selects, importing
+// testing, is no finding, since no release compiles it.
+func TestArchitecture_TheGuardReadsADependencyAtTheReleaseArchitectureLevels(t *testing.T) {
+	t.Setenv("GOAMD64", "v3")
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withShippedMains(map[string]string{
+		"core/api/api.go": pkg("api"),
+		"authserver/go.mod": "module example.test/authserver\n\ngo 1.21\n\n" +
+			"require example.net/helper v0.0.0\n\nreplace example.net/helper => ../../helper\n",
+		authserverMain + "/main.go": pkg("main", "example.net/helper"),
+		"../helper/go.mod":          "module example.net/helper\n\ngo 1.21\n",
+		"../helper/helper.go":       pkg("helper", "example.net/helper/inner"),
+		"../helper/inner/inner.go":  pkg("inner"),
+		"../helper/inner/v3.go":     "//go:build amd64.v3\n\n" + pkg("inner", "testing"),
+	}))
+
+	report := Run(func(r Reporter) { assertArchitecture(r, root) })
+
+	assert.False(t, report.Failed(), "findings:\n\t%s", strings.Join(report.Errors, "\n\t"))
+}
+
 // TestArchitecture_TheGuardReportsAPackageTheGoCommandCannotLoad is the compiled walk that reached
 // nothing: a dependency the go command cannot load lists no imports, so it must be a finding rather
 // than a package that silently imports nothing.

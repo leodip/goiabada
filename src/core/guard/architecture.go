@@ -665,8 +665,8 @@ func goListDeps(dir string, target pkgload.Platform) ([]listedPackage, error) {
 	cmd := exec.CommandContext(context.Background(),
 		"go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GOOS="+target.GOOS, "GOARCH="+target.GOARCH, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")
+	cmd.Env = append(append(os.Environ(),
+		"GOOS="+target.GOOS, "GOARCH="+target.GOARCH, "GOFLAGS=-mod=readonly", "GOWORK=off"), pkgload.ReleaseEnv()...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

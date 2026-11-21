@@ -851,6 +851,7 @@ command itself and fails on a tree it changed.
 | `core/pkgload` | `Platform` | kernel | — |
 | `core/pkgload` | `Position` | kernel | — |
 | `core/pkgload` | `ReleaseBuilds` | kernel | — |
+| `core/pkgload` | `ReleaseEnv` | kernel | — |
 | `core/pkgload` | `ReleasePlatforms` | kernel | — |
 | `core/requestid` | `FromContext` | kernel | — |
 | `core/requestid` | `Header` | own-package | — |

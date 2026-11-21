@@ -472,9 +472,10 @@ the loader's release builds read too (#463, #420).
 
 The refusal does not stop at the edge of the four modules. Past it, the walk follows the imports
 the go command reports: `go list -deps` under the `production` tag, run over each shipped main for
-each of the five release platforms, `pkgload.ReleasePlatforms`, supplies the imports of every
-third-party and standard-library package a main reaches, so a dependency whose own production code
-imports `testing` or testify is refused like a first-party helper that does. First-party packages
+each of the five release platforms, `pkgload.ReleasePlatforms`, with a release's cgo and
+architecture levels, `pkgload.ReleaseEnv`, supplies the imports of every third-party and
+standard-library package a main reaches, so a dependency whose own production code imports
+`testing` or testify is refused like a first-party helper that does. First-party packages
 are still read from source, with every tag but `production` free, because that covers all five
 platforms at once. A package the go command cannot load is a finding, since the walk cannot see what
 it imports.
