@@ -59,7 +59,7 @@ about = "Regenerate the core symbol ownership table, after adding or moving a co
 
 [commands.e2e]
 run   = "$PLACIDO_REPO/.placido/e2e.sh"
-about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/ and runs the e2e suite against it (e2e/run.sh --source), the rate limiter off, about twenty minutes. When at most 20 tests fail, it reruns them once against the same environment, alone and one at a time, after the setup project's sweep, a few minutes more. A failure the rerun passes prints FLAKY with the tests' names and exits 0: list the tests in the pull request, and do not diagnose them. A test that fails the rerun fails the gate. The rate-limits suite is not part of it: the user runs it by hand, before a release. Placido runs it as the last gate, after the review, and again on a fix of it; do not run it yourself."
+about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/ and runs the e2e suite against it (e2e/run.sh --source), the rate limiter off, about twenty minutes. When at most 20 tests fail in a run given no Playwright option, it reruns them once against the same environment, alone and one at a time, after the setup project's sweep, a few minutes more. A failure the rerun passes prints FLAKY with the tests' names in the gate's log and exits 0; a test that fails the rerun fails the gate. The rate-limits suite is not part of it: the user runs it by hand, before a release. Placido runs it as the last gate, after the review, and again on a fix of it; do not run it yourself."
 
 [gates]
 slice = ["vet", "unit", "lint"]  # lint too (about 8 seconds), so a finding stops the slice or fix that made it

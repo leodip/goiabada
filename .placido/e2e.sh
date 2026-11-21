@@ -109,7 +109,7 @@ rerun_failed_tests() { # first_status
   "$worktree/e2e/test.sh" --last-failed --last-failed-file "$last_run" --no-deps --workers=1 || return
 
   echo
-  echo "FLAKY: these tests did not pass on the first run and passed on the rerun; list them in the pull request:"
+  echo "FLAKY: these tests did not pass on the first run and passed on the rerun:"
   printf '%s\n' "$names"
 }
 
