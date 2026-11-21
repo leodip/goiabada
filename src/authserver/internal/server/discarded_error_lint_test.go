@@ -22,7 +22,6 @@ package server
 // dependency missing from the module cache, as any build of the module would.
 
 import (
-	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -33,7 +32,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/core/guard"
@@ -115,30 +113,19 @@ func findDiscardedErrors(
 ) (found []discardedError, files int, err error) {
 	modRoot := filepath.Join(root, filepath.FromSlash(scope))
 
-	// The loads are requested at once and pkgload runs the go command for one at a time; the first
-	// error in build order is the one returned. A build that selects no package of the module adds nothing.
-	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{})
-	loaded := make([][]*packages.Package, len(builds))
-	loadErrs := make([]error, len(builds))
-	var wg sync.WaitGroup
-	for i, build := range builds {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			loaded[i], loadErrs[i] = pkgload.Load(modRoot, build)
-		}()
+	// The first load error in build order is the one returned, and a build that selects no package of
+	// the module adds nothing.
+	loaded, err := pkgload.LoadBuilds(append(pkgload.ReleaseBuilds(), pkgload.Build{}), modRoot)
+	if err != nil {
+		return nil, 0, err
 	}
-	wg.Wait()
 
 	readFiles := map[string]bool{}
 	// seen holds each finding's physical position; a file several builds select is read once per build.
 	seen := map[token.Position]bool{}
-	for i := range builds {
-		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
-			return nil, 0, loadErrs[i]
-		}
-		listedTypes := discardedErrorListedTypes(loaded[i], methods)
-		for _, p := range loaded[i] {
+	for _, pkgs := range loaded {
+		listedTypes := discardedErrorListedTypes(pkgs, methods)
+		for _, p := range pkgs {
 			for _, file := range p.Syntax {
 				name := p.Fset.File(file.Pos()).Name()
 				readFiles[name] = true

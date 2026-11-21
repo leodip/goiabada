@@ -25,7 +25,6 @@ package ceremony
 // dependency missing from the module cache, as any build of the module would.
 
 import (
-	"errors"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -35,14 +34,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/core/guard"
 	"github.com/leodip/goiabada/core/pkgload"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/tools/go/packages"
 )
 
 // requestFieldScope is the tree the rule covers, relative to the source root, forward slashes: the
@@ -128,20 +125,12 @@ func findRequestFieldWrites(
 	var walk requestFieldWalk
 	modRoot := filepath.Join(root, filepath.FromSlash(scope))
 
-	// The loads are requested at once and pkgload runs the go command for one at a time; the first
-	// error in build order is the one returned. A build that selects no package of the module adds nothing.
-	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{})
-	loaded := make([][]*packages.Package, len(builds))
-	loadErrs := make([]error, len(builds))
-	var wg sync.WaitGroup
-	for i, build := range builds {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			loaded[i], loadErrs[i] = pkgload.Load(modRoot, build)
-		}()
+	// The first load error in build order is the one returned, and a build that selects no package of
+	// the module adds nothing.
+	loaded, err := pkgload.LoadBuilds(append(pkgload.ReleaseBuilds(), pkgload.Build{}), modRoot)
+	if err != nil {
+		return requestFieldWalk{}, err
 	}
-	wg.Wait()
 
 	readFiles := map[string]bool{}
 	// seen holds each finding's physical position; a file several builds select is read once per build.
@@ -149,12 +138,9 @@ func findRequestFieldWrites(
 	// declared holds each listed name some build's AuthContext declares; a name no build declares
 	// guards nothing.
 	declared := map[string]bool{}
-	for i := range builds {
-		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
-			return requestFieldWalk{}, loadErrs[i]
-		}
+	for _, pkgs := range loaded {
 		var rule *requestFieldRule
-		for _, p := range loaded[i] {
+		for _, p := range pkgs {
 			if p.PkgPath != requestFieldCeremonyPath {
 				continue
 			}
@@ -164,7 +150,7 @@ func findRequestFieldWrites(
 				}
 			}
 		}
-		for _, p := range loaded[i] {
+		for _, p := range pkgs {
 			for _, file := range p.Syntax {
 				name := p.Fset.File(file.Pos()).Name()
 				readFiles[name] = true

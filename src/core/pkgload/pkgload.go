@@ -98,10 +98,10 @@ var (
 	loadsMu sync.Mutex
 	// loads holds every load of the process, by build and then by module directory.
 	loads = map[Build]map[string]*loaded{}
-	// goCommandMu lets one load at a time run the go command. Each run already compiles on every
-	// CPU, so a guard's six loads at once multiply the CPU demand by six without finishing sooner,
-	// and on a four-core CI runner with a cold build cache they starve the tests running beside
-	// them, such as the auth server's process tests and their 30 s bound (#420).
+	// goCommandMu lets one load at a time run the go command, whichever goroutines call Load. Each
+	// run already compiles on every CPU, so loads run at once multiply the CPU demand without
+	// finishing sooner, and on a four-core CI runner with a cold build cache they starve the tests
+	// running beside them, such as the auth server's process tests and their 30 s bound (#420).
 	goCommandMu sync.Mutex
 )
 
@@ -132,6 +132,30 @@ func Load(dir string, build Build) ([]*packages.Package, error) {
 
 	entry.once.Do(func() { entry.pkgs, entry.err = load(abs, build) })
 	return entry.pkgs, entry.err
+}
+
+// LoadBuilds loads the modules rooted at dirs for each of builds through Load, one load after
+// another, and returns one slice per build, in the order of builds, holding every dir's packages in
+// the order of dirs. Each build's packages stay apart, because each build is a type-check of its
+// own. A dir a build selects no package of adds nothing to that build's slice. The first error in
+// build and then dir order that is not ErrNoPackages stops the loads and is the one returned.
+func LoadBuilds(builds []Build, dirs ...string) ([][]*packages.Package, error) {
+	out := make([][]*packages.Package, len(builds))
+	for b, build := range builds {
+		for _, dir := range dirs {
+			pkgs, err := Load(dir, build)
+			if errors.Is(err, ErrNoPackages) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			// out[b] starts nil, so this copies: a caller appending to a build's slice cannot write
+			// into the one Load keeps.
+			out[b] = append(out[b], pkgs...)
+		}
+	}
+	return out, nil
 }
 
 func load(dir string, build Build) ([]*packages.Package, error) {

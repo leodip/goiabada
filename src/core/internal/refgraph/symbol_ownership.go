@@ -1,7 +1,6 @@
 package refgraph
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -11,7 +10,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/pkgload"
@@ -665,50 +663,30 @@ type loadedPackage struct {
 }
 
 // loadTree loads every package of the four modules for each build, one slice per build in the
-// order given. The loads are requested at once and pkgload runs the go command for one at a time,
-// and the first error in build and then module order is the one returned, whichever finished first. A package whose
-// files are not under the root is the go command's own, a test binary's generated main, and names
-// nothing.
+// order given. The first load error in build and then module order is the one returned. A package
+// whose files are not under the root is the go command's own, a test binary's generated main, and
+// names nothing.
 func loadTree(root string, builds []pkgload.Build) ([][]loadedPackage, error) {
-	modules := sourceroot.ModuleDirs()
-	type result struct {
-		pkgs []*packages.Package
-		err  error
+	var dirs []string
+	for _, module := range sourceroot.ModuleDirs() {
+		dirs = append(dirs, filepath.Join(root, filepath.FromSlash(module)))
 	}
-	results := make([][]result, len(builds))
-	var wg sync.WaitGroup
-	for b, build := range builds {
-		results[b] = make([]result, len(modules))
-		for m, module := range modules {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				pkgs, err := pkgload.Load(filepath.Join(root, filepath.FromSlash(module)), build)
-				results[b][m] = result{pkgs: pkgs, err: err}
-			}()
-		}
+	loaded, err := pkgload.LoadBuilds(builds, dirs...)
+	if err != nil {
+		return nil, err
 	}
-	wg.Wait()
 
 	out := make([][]loadedPackage, len(builds))
-	for b := range builds {
-		for _, r := range results[b] {
-			if errors.Is(r.err, pkgload.ErrNoPackages) {
+	for b, pkgs := range loaded {
+		for _, p := range pkgs {
+			if len(p.GoFiles) == 0 {
 				continue
 			}
-			if r.err != nil {
-				return nil, r.err
+			rel, err := filepath.Rel(root, filepath.Dir(p.GoFiles[0]))
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue
 			}
-			for _, p := range r.pkgs {
-				if len(p.GoFiles) == 0 {
-					continue
-				}
-				rel, err := filepath.Rel(root, filepath.Dir(p.GoFiles[0]))
-				if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-					continue
-				}
-				out[b] = append(out[b], loadedPackage{dir: filepath.ToSlash(rel), pkg: p})
-			}
+			out[b] = append(out[b], loadedPackage{dir: filepath.ToSlash(rel), pkg: p})
 		}
 	}
 	return out, nil

@@ -1,7 +1,6 @@
 package guard
 
 import (
-	"errors"
 	"go/token"
 	"go/types"
 	"path"
@@ -9,12 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/core/internal/refgraph"
 	"github.com/leodip/goiabada/core/pkgload"
-	"golang.org/x/tools/go/packages"
 )
 
 // ContextValueExemption is one production file allowed to read or write a context value itself,
@@ -180,29 +177,18 @@ func findContextValueSites(
 
 // contextValueSitesIn loads the module rooted at modRoot for every release build and the default
 // build, and returns every site their production files hold, once each however many builds select
-// its file. The loads are requested at once and pkgload runs the go command for one at a time;
-// the first error in build order is the one returned. A build that selects no package of the module adds nothing.
+// its file. The first load error in build order is the one returned, and a build that selects no
+// package of the module adds nothing.
 func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
-	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{})
-	loaded := make([][]*packages.Package, len(builds))
-	loadErrs := make([]error, len(builds))
-	var wg sync.WaitGroup
-	for i, build := range builds {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			loaded[i], loadErrs[i] = pkgload.Load(modRoot, build)
-		}()
+	loaded, err := pkgload.LoadBuilds(append(pkgload.ReleaseBuilds(), pkgload.Build{}), modRoot)
+	if err != nil {
+		return nil, err
 	}
-	wg.Wait()
 
 	seen := map[token.Position]bool{}
 	var sites []contextValueFinding
-	for i := range builds {
-		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
-			return nil, loadErrs[i]
-		}
-		for _, p := range loaded[i] {
+	for _, pkgs := range loaded {
+		for _, p := range pkgs {
 			for ident, obj := range p.TypesInfo.Uses {
 				what, ok := contextValueObject(obj)
 				if !ok {

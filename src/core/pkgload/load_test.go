@@ -370,6 +370,120 @@ func TestLoad_AFailedLoadIsRememberedToo(t *testing.T) {
 	assert.Equal(t, first, again)
 }
 
+// ---- several builds and modules -------------------------------------------------------------
+
+var (
+	linuxRelease   = pkgload.Build{Platform: pkgload.Platform{GOOS: "linux", GOARCH: "amd64"}, Release: true}
+	windowsRelease = pkgload.Build{Platform: pkgload.Platform{GOOS: "windows", GOARCH: "amd64"}, Release: true}
+)
+
+// Each build is a type-check of its own, so its packages come back on their own, as Load returns
+// them, and in a slice of the caller's: writing into it leaves Load's packages as they were.
+func TestLoadBuilds_KeepsEachBuildsPackagesApartInBuildOrder(t *testing.T) {
+	root := loadable(t, constrainedTree)
+	dir := filepath.Join(root, "mod")
+
+	loaded, err := pkgload.LoadBuilds([]pkgload.Build{linuxRelease, windowsRelease}, dir)
+	require.NoError(t, err)
+	require.Len(t, loaded, 2)
+	require.Len(t, loaded[0], 1)
+	require.Len(t, loaded[1], 1)
+	assert.Contains(t, fileNames(loaded[0][0]), "only_linux.go")
+	assert.NotContains(t, fileNames(loaded[0][0]), "only_windows.go")
+	assert.Contains(t, fileNames(loaded[1][0]), "only_windows.go")
+
+	linux, err := pkgload.Load(dir, linuxRelease)
+	require.NoError(t, err)
+	want := linux[0]
+	assert.Same(t, want, loaded[0][0])
+
+	loaded[0][0] = nil
+	again, err := pkgload.Load(dir, linuxRelease)
+	require.NoError(t, err)
+	assert.Same(t, want, again[0])
+}
+
+func TestLoadBuilds_HoldsEveryDirsPackagesInDirOrder(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"a/go.mod": "module example.test/a\n",
+		"a/p/p.go": "package p\n",
+		"b/go.mod": "module example.test/b\n",
+		"b/q/q.go": "package q\n",
+	})
+
+	loaded, err := pkgload.LoadBuilds([]pkgload.Build{{}}, filepath.Join(root, "b"), filepath.Join(root, "a"))
+	require.NoError(t, err)
+	require.Len(t, loaded, 1)
+	var got []string
+	for _, p := range loaded[0] {
+		got = append(got, p.ID)
+	}
+	assert.Equal(t, []string{"example.test/b/q", "example.test/a/p"}, got)
+}
+
+// A build that selects no package of a dir is not a failure, and what it holds is nothing.
+func TestLoadBuilds_ABuildThatSelectsNoPackageAddsNothing(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/w/w.go": "//go:build windows\n\npackage w\n",
+	})
+
+	loaded, err := pkgload.LoadBuilds([]pkgload.Build{linuxRelease, windowsRelease}, filepath.Join(root, "mod"))
+	require.NoError(t, err)
+	require.Len(t, loaded, 2)
+	assert.Empty(t, loaded[0])
+	assert.Equal(t, []string{"example.test/mod/w"}, ids(loaded[1]))
+}
+
+// The error is the first in the order of builds, whichever build a caller would have expected to
+// fail, and a build that selects nothing before it does not stand in for it.
+func TestLoadBuilds_ReturnsTheFirstErrorInBuildOrder(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"mod/go.mod":         "module example.test/mod\n",
+		"mod/l/l_linux.go":   "package l\n\nvar L int = \"l\"\n",
+		"mod/w/w_windows.go": "package w\n\nvar W int = \"w\"\n",
+	})
+	dir := filepath.Join(root, "mod")
+
+	_, err := pkgload.LoadBuilds([]pkgload.Build{linuxRelease, windowsRelease}, dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/mod/l")
+	assert.NotContains(t, err.Error(), "example.test/mod/w")
+
+	_, err = pkgload.LoadBuilds([]pkgload.Build{windowsRelease, linuxRelease}, dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/mod/w")
+	assert.NotContains(t, err.Error(), "example.test/mod/l")
+
+	windowsOnly := loadable(t, map[string]string{
+		"mod/go.mod":         "module example.test/mod\n",
+		"mod/w/w_windows.go": "package w\n\nvar W int = \"w\"\n",
+	})
+	_, err = pkgload.LoadBuilds([]pkgload.Build{linuxRelease, windowsRelease}, filepath.Join(windowsOnly, "mod"))
+	require.Error(t, err)
+	require.NotErrorIs(t, err, pkgload.ErrNoPackages)
+	assert.Contains(t, err.Error(), "example.test/mod/w")
+}
+
+// Builds come before dirs: of a module broken on Linux and a later one broken on Windows, the
+// Windows build is the first to fail when it is listed first.
+func TestLoadBuilds_OrdersErrorsByBuildBeforeDir(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"a/go.mod":           "module example.test/a\n",
+		"a/p/p.go":           "package p\n",
+		"a/p/bad_linux.go":   "package p\n\nvar A int = \"a\"\n",
+		"b/go.mod":           "module example.test/b\n",
+		"b/q/q.go":           "package q\n",
+		"b/q/bad_windows.go": "package q\n\nvar B int = \"b\"\n",
+	})
+
+	_, err := pkgload.LoadBuilds([]pkgload.Build{windowsRelease, linuxRelease},
+		filepath.Join(root, "a"), filepath.Join(root, "b"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/b/q")
+	assert.NotContains(t, err.Error(), "example.test/a/p")
+}
+
 // ---- making a fixture tree loadable ---------------------------------------------------------
 
 // A fixture writes its go.mod files with a module line and nothing else. Without a go line the go
