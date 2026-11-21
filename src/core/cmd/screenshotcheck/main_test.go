@@ -103,6 +103,15 @@ func TestCheck_RefusesWhatIsNotTheNamedImagesAsWholePNGs(t *testing.T) {
 	}
 }
 
+// The check reads its input to the end, the padding after the archive's end included, as tar writes
+// it to fill its last record.
+func TestCheck_ReadsItsInputToTheEnd(t *testing.T) {
+	r := stream(t, entry{"screenshot-a.png", tar.TypeReg, onePixel(t, true)})
+	r.Write(make([]byte, 9*512))
+	require.NoError(t, check(r, []string{"screenshot-a.png"}))
+	assert.Zero(t, r.Len(), "the input left unread")
+}
+
 // Two names that differ only in letter case are refused before the stream is read, though the stream
 // holds both as files of their own: on a disk that ignores case they are one file.
 func TestCheck_RefusesNamesThatDifferOnlyInCase(t *testing.T) {

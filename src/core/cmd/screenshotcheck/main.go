@@ -87,6 +87,11 @@ func check(r io.Reader, names []string) error {
 			return errs.Wrapf(err, "%s is not a whole PNG", name)
 		}
 	}
+	// The padding tar writes after the archive's end is read too, so the tar writing the stream is
+	// not cut off by a check that ended first, which would fail the script's pipeline.
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return errs.Wrap(err, "reading the end of the images")
+	}
 	for _, name := range names {
 		if !seen[name] {
 			return errs.Errorf("%s is missing", name)
