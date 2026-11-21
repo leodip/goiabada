@@ -318,7 +318,8 @@ anywhere; that is what test code is for, and holding it to the production graph 
 they are about what lands in a shipped binary. Rules 1 and 4 read test files as well, for the reasons
 given in their entries. Rule 7 reads both: its four computed justifications come from production
 references, and so does what contradicts a `test-support` row, since that is about what a binary
-links; what supports one is a reference from a test anywhere.
+links; what supports one is a reference from a test anywhere, or from the declaring package's own
+production code.
 
 ## Temporary exceptions
 
