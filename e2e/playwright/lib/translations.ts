@@ -90,8 +90,12 @@ export type Translation<Tag extends string = string> = {
   };
 };
 
-// Ties a row's regional tag to its own language, so a row cannot ask for another language's region.
-function row<Tag extends string>(translation: Translation<Tag>): Translation {
+// Ties a row's regional tag to its own language, so a row cannot ask for another language's region,
+// and keeps it apart from the tag itself, which would ask for the catalog by name and leave the
+// regional match unchecked.
+function row<Tag extends string, Regional extends `${LanguageOf<NoInfer<Tag>>}-${string}`>(
+  translation: Omit<Translation<Tag>, "regionalTag"> & { regionalTag: Regional extends NoInfer<Tag> ? never : Regional },
+): Translation {
   return translation;
 }
 
