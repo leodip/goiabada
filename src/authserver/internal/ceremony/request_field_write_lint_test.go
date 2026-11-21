@@ -142,12 +142,9 @@ func findRequestFieldWrites(
 	}
 	wg.Wait()
 
-	type position struct {
-		file   string
-		offset int
-	}
 	readFiles := map[string]bool{}
-	seen := map[position]bool{}
+	// seen holds each finding's position; a file several builds select is read once per build.
+	seen := map[token.Position]bool{}
 	// declared holds each listed name some build's AuthContext declares; a name no build declares
 	// guards nothing.
 	declared := map[string]bool{}
@@ -179,10 +176,10 @@ func findRequestFieldWrites(
 				}
 				for _, w := range rule.check(file, p.PkgPath, p.TypesInfo) {
 					at := p.Fset.Position(w.pos)
-					if seen[position{at.Filename, at.Offset}] {
+					if seen[at] {
 						continue
 					}
-					seen[position{at.Filename, at.Offset}] = true
+					seen[at] = true
 					walk.found = append(walk.found, requestFieldWrite{file: filepath.ToSlash(rel), line: at.Line, what: w.what})
 				}
 			}

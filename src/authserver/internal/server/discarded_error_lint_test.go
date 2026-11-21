@@ -128,12 +128,9 @@ func findDiscardedErrors(
 	}
 	wg.Wait()
 
-	type position struct {
-		file   string
-		offset int
-	}
 	readFiles := map[string]bool{}
-	seen := map[position]bool{}
+	// seen holds each finding's position; a file several builds select is read once per build.
+	seen := map[token.Position]bool{}
 	for i := range builds {
 		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
 			return nil, 0, loadErrs[i]
@@ -149,10 +146,10 @@ func findDiscardedErrors(
 				}
 				for _, d := range discardedErrorsIn(file, p.TypesInfo, listed, methods, listedTypes) {
 					at := p.Fset.Position(d.pos)
-					if seen[position{at.Filename, at.Offset}] {
+					if seen[at] {
 						continue
 					}
-					seen[position{at.Filename, at.Offset}] = true
+					seen[at] = true
 					found = append(found, discardedError{file: filepath.ToSlash(rel), line: at.Line, fn: d.fn})
 				}
 			}

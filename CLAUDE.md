@@ -104,6 +104,9 @@ the behavior changes.
   writing one, apply `site/STYLE.md`'s **What belongs**: leave out what Goiabada's own messages
   say, code internals, history, rare-fault edge cases and upgrade-only facts (release notes). Keep
   each rule on one page, and check every claim against the code.
+- Before writing a repository guard, look for a `golangci-lint` check that holds the rule; a new
+  guard over 250 lines of its own code says why in its pull request, as the guards guide's
+  Guard shape section asks.
 
 ## Regenerate committed files
 
