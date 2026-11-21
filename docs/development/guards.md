@@ -17,8 +17,9 @@ finder directly, the reporting half through `guard.Run`, which runs it on its ow
 recorded `Fatalf` ends it in `runtime.Goexit` the way the real one does. What a guard holds, and
 why, is written in the comment above its `Assert*` function or its test, and the sections below
 describe the few that need more.
-`git grep -n 'func assert.*\(r Reporter\|r guard\.Reporter\)' -- '*.go'` lists them; no roster or
-count is kept here, because the one that was kept drifted each time a guard was added (#442).
+`git grep -n -E 'func assert[[:alnum:]]*\((r (guard\.)?Reporter|$)' -- '*.go'` lists them, a
+declaration whose parameters wrap onto the next line by its opening line; no roster or count is
+kept here, because the one that was kept drifted each time a guard was added (#442).
 
 Each guard owes three cases: a tree that must fail, a tree that must pass, and the walk that
 reached nothing. A guard whose premise is a reading of a dependency's behavior owes a fourth: a test

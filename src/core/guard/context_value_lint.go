@@ -208,7 +208,10 @@ func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
 				if !ok {
 					continue
 				}
-				at := p.Fset.Position(ident.Pos())
+				// The physical position, not one a //line directive maps: the file a site is in is what
+				// the accessor directory and the exemptions are about, and two files mapping to one
+				// line are two sites.
+				at := p.Fset.PositionFor(ident.Pos(), false)
 				if seen[at] {
 					continue
 				}

@@ -1,13 +1,16 @@
 package pkgload
 
 import (
+	"go/version"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -19,7 +22,10 @@ import (
 // gains a requirement of every other module in the tree, replaced by that module's directory, as the
 // three modules that use core require it.
 //
-// A go line the fixture wrote stays. The go line it adds is this binary's Go version, the
+// A go line the fixture wrote stays. Because every module then requires every other, and the go
+// command refuses a module that requires one with a later go line, the go lines a fixture wrote must
+// agree, and a tree whose go lines differ is an error naming both. The go line added to the other
+// modules is the one the fixture wrote, or, where it wrote none, this binary's Go version, the
 // toolchain the tests run on. A tree holding no go.mod, or a go.mod with no module line, is an
 // error naming it.
 func MakeLoadable(root string) error {
@@ -27,22 +33,18 @@ func MakeLoadable(root string) error {
 	if err != nil {
 		return err
 	}
-	version, err := goVersion()
+	goLine, err := fixtureGoVersion(modules)
 	if err != nil {
 		return err
 	}
 
 	for _, m := range modules {
-		src, err := os.ReadFile(m.file)
-		if err != nil {
-			return errs.Wrapf(err, "reading %s", m.file)
-		}
-		text := string(src)
+		text := m.src
 		if !strings.HasSuffix(text, "\n") {
 			text += "\n"
 		}
-		if !hasDirective(text, "go") {
-			text += "\ngo " + version + "\n"
+		if m.goVersion == "" {
+			text += "\ngo " + goLine + "\n"
 		}
 		for _, other := range modules {
 			if other.path == m.path {
@@ -56,7 +58,8 @@ func MakeLoadable(root string) error {
 			if !strings.HasPrefix(rel, "../") {
 				rel = "./" + rel
 			}
-			text += "\nrequire " + other.path + " v0.0.0\n\nreplace " + other.path + " => " + rel + "\n"
+			text += "\nrequire " + other.path + " " + syntheticVersion(other.path) +
+				"\n\nreplace " + other.path + " => " + quoteIfNeeded(rel) + "\n"
 		}
 		//nolint:gosec,nolintlint // G703: a go.mod the walk found under the fixture root a test gave; nolintlint because gosec v2.29.0 finds this G703 on some runs only (securego/gosec#1712, #494)
 		if err := os.WriteFile(m.file, []byte(text), 0o600); err != nil {
@@ -66,9 +69,62 @@ func MakeLoadable(root string) error {
 	return nil
 }
 
-// fixtureModule is one go.mod of a fixture tree and the module path it declares.
+// fixtureModule is one go.mod of a fixture tree: its file, its text, the module path it declares
+// and the version of its go line, empty when it has none.
 type fixtureModule struct {
-	file, path string
+	file, src, path, goVersion string
+}
+
+// fixtureGoVersion is the go line a fixture's unversioned modules get: the one its other modules
+// wrote, which must agree, or this binary's Go version when none wrote one.
+func fixtureGoVersion(modules []fixtureModule) (string, error) {
+	var pinned *fixtureModule
+	for i := range modules {
+		m := &modules[i]
+		if m.goVersion == "" {
+			continue
+		}
+		if !version.IsValid("go" + m.goVersion) {
+			return "", errs.Errorf("%s has the go line %q, which is not a Go version", m.file, m.goVersion)
+		}
+		if pinned == nil {
+			pinned = m
+			continue
+		}
+		if version.Compare("go"+m.goVersion, "go"+pinned.goVersion) != 0 {
+			return "", errs.Errorf("%s has go %s and %s has go %s; each module of a fixture tree requires the others, "+
+				"and the go command refuses a module that requires one with a later go line, so they must agree",
+				pinned.file, pinned.goVersion, m.file, m.goVersion)
+		}
+	}
+	if pinned != nil {
+		return pinned.goVersion, nil
+	}
+	return goVersion()
+}
+
+// syntheticVersion is the version a fixture module is required at: v0.0.0, or vN.0.0 for a path
+// whose last element is the major version suffix /vN, which the go command holds the version to.
+func syntheticVersion(modulePath string) string {
+	last := path.Base(modulePath)
+	if n, ok := strings.CutPrefix(last, "v"); ok && n != "" && n != "0" && n != "1" && n[0] != '0' {
+		if _, err := strconv.Atoi(n); err == nil {
+			return last + ".0.0"
+		}
+	}
+	return "v0.0.0"
+}
+
+// quoteIfNeeded quotes a go.mod argument the go command would otherwise read as more than one
+// token, such as a directory with a space in its name, and leaves any other unquoted.
+func quoteIfNeeded(arg string) string {
+	if arg == "" || strings.Contains(arg, "//") || strings.Contains(arg, "/*") ||
+		strings.ContainsFunc(arg, func(r rune) bool {
+			return unicode.IsSpace(r) || !unicode.IsPrint(r) || strings.ContainsRune("\"'`()[]{},", r)
+		}) {
+		return strconv.Quote(arg)
+	}
+	return arg
 }
 
 // fixtureModules finds every go.mod under root, in path order.
@@ -89,7 +145,9 @@ func fixtureModules(root string) ([]fixtureModule, error) {
 		if !ok {
 			return errs.Errorf("%s declares no module", path)
 		}
-		modules = append(modules, fixtureModule{file: path, path: module})
+		modules = append(modules, fixtureModule{
+			file: path, src: string(src), path: module, goVersion: directiveValue(string(src), "go"),
+		})
 		return nil
 	})
 	if err != nil {
@@ -129,14 +187,15 @@ func modulePath(src string) (string, bool) {
 	return "", false
 }
 
-// hasDirective reports whether a go.mod holds a one-line directive of that name.
-func hasDirective(src, name string) bool {
+// directiveValue is the argument of a go.mod's one-line directive of that name, or empty when it
+// has none.
+func directiveValue(src, name string) string {
 	for _, line := range directiveLines(src) {
-		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == name {
-			return true
+		if fields := strings.Fields(line); len(fields) == 2 && fields[0] == name {
+			return fields[1]
 		}
 	}
-	return false
+	return ""
 }
 
 // goVersion is this binary's Go version as a go line writes it, 1.27.4 for go1.27.4.

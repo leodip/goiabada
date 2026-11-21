@@ -18,7 +18,8 @@ package server
 // every deliberate `_ = f.Close()` in the tree, which is why this rule is a list and not a switch.
 //
 // It reads the auth server's module type-checked through core/pkgload and nothing else: no
-// database, no git, no network.
+// database and no git. The go command the loader runs reaches the network only to download a
+// dependency missing from the module cache, as any build of the module would.
 
 import (
 	"errors"
@@ -130,7 +131,7 @@ func findDiscardedErrors(
 	wg.Wait()
 
 	readFiles := map[string]bool{}
-	// seen holds each finding's position; a file several builds select is read once per build.
+	// seen holds each finding's physical position; a file several builds select is read once per build.
 	seen := map[token.Position]bool{}
 	for i := range builds {
 		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
@@ -146,7 +147,9 @@ func findDiscardedErrors(
 					return nil, 0, rErr
 				}
 				for _, d := range discardedErrorsIn(file, p.TypesInfo, listed, methods, listedTypes) {
-					at := p.Fset.Position(d.pos)
+					// The physical position, not one a //line directive maps: two files that map a discard
+					// to the same template line are two discards, and the line reported is the file's own.
+					at := p.Fset.PositionFor(d.pos, false)
 					if seen[at] {
 						continue
 					}
@@ -821,7 +824,7 @@ func seed(p string) string {
 }
 `
 	for _, tc := range []struct{ name, constraint string }{
-		{"another platform's release build", "//go:build windows\n"},
+		{"another platform's release build", "//go:build windows && production\n"},
 		{"the production tag", "//go:build production\n"},
 		{"the default build only", "//go:build !production\n"},
 	} {
@@ -838,6 +841,34 @@ func seed(p string) string {
 			assert.Equal(t, 7, files, "the six listed packages' files and the seeder, each counted once")
 		})
 	}
+}
+
+// Two files of different builds whose discards a //line directive maps to the same template line,
+// at the same offset, are two discards, each reported at its own file's line.
+func TestDiscardedErrors_Finder_KeepsTwoFilesThatMapToTheSameLine(t *testing.T) {
+	const generated = `package data
+
+import "github.com/leodip/goiabada/authserver/internal/passwordhash"
+
+func seed(p string) string {
+//line seeder.tmpl:100
+	hash, _ := passwordhash.Hash(p)
+	return hash
+}
+`
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/seeder_amd64.go", generated)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/seeder_arm64.go", generated)
+
+	found, _, err := findDiscardedErrors(root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	require.NoError(t, err)
+
+	// Which of the two a build reads first depends on the test machine's architecture.
+	assert.ElementsMatch(t, []string{
+		"authserver/internal/data/seeder_amd64.go:7: passwordhash.Hash",
+		"authserver/internal/data/seeder_arm64.go:7: passwordhash.Hash",
+	}, discardedErrorStrings(found))
 }
 
 // A package that does not compile cannot be read whole, and a discard in it would pass unseen, so

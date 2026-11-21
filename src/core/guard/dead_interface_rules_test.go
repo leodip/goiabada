@@ -249,6 +249,32 @@ func Use(x DotUsed) { _ = x }
 		"the dot-imported name is live and its unnamed neighbour is not")
 }
 
+// An external test package's import path is its package's with _test appended, which a real
+// package can also have. A reference to the external test's Seam is no reference to the real
+// package's Seam of the same name.
+func TestNoDeadInterfaces_AnExternalTestIsNotThePackageItsPathSpells(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/handlers.go", "package handlers\n")
+	writeFixture(t, root, "mod/handlers/external_test.go", `package handlers_test
+
+type Seam interface{ A() }
+
+var _ Seam
+`)
+	writeFixture(t, root, "mod/handlers_test/seam.go", `package handlers_test
+
+type Seam interface{ B() }
+`)
+	makeLoadable(t, root)
+
+	dead, files, err := findDeadInterfaces(root, []string{"mod/handlers_test"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, files)
+	assert.Equal(t, []string{"example.com/mod/handlers_test.Seam"}, deadNames(dead))
+}
+
 // TestNoDeadInterfaces_DeclarationsOutsideTheGuardedDirsAreNotHeld keeps the dirs argument
 // meaningful: the module is searched whole for references, but only what the caller named is held
 // to the rule. Without this, a caller guarding one handler package would fail on every unreferenced

@@ -21,7 +21,8 @@ package ceremony
 // write through that copy reaches the context unseen. Every other request field is a string.
 //
 // It reads the auth server's module type-checked through core/pkgload and nothing else: no
-// database, no git, no network.
+// database and no git. The go command the loader runs reaches the network only to download a
+// dependency missing from the module cache, as any build of the module would.
 
 import (
 	"errors"
@@ -143,7 +144,7 @@ func findRequestFieldWrites(
 	wg.Wait()
 
 	readFiles := map[string]bool{}
-	// seen holds each finding's position; a file several builds select is read once per build.
+	// seen holds each finding's physical position; a file several builds select is read once per build.
 	seen := map[token.Position]bool{}
 	// declared holds each listed name some build's AuthContext declares; a name no build declares
 	// guards nothing.
@@ -175,7 +176,9 @@ func findRequestFieldWrites(
 					return requestFieldWalk{}, rErr
 				}
 				for _, w := range rule.check(file, p.PkgPath, p.TypesInfo) {
-					at := p.Fset.Position(w.pos)
+					// The physical position, not one a //line directive maps: two files that map a write to
+					// the same template line are two writes, and the line reported is the file's own.
+					at := p.Fset.PositionFor(w.pos, false)
 					if seen[at] {
 						continue
 					}
@@ -750,7 +753,7 @@ func completed(ac *ceremony.AuthContext, effective string) {
 }
 `
 	for _, tc := range []struct{ name, constraint string }{
-		{"another platform's release build", "//go:build windows\n"},
+		{"another platform's release build", "//go:build windows && production\n"},
 		{"the production tag", "//go:build production\n"},
 		{"the default build only", "//go:build !production\n"},
 	} {
@@ -768,6 +771,34 @@ func completed(ac *ceremony.AuthContext, effective string) {
 			assert.Equal(t, 2, walk.files, "the ceremony fixture and the handler, each counted once")
 		})
 	}
+}
+
+// Two files of different builds whose writes a //line directive maps to the same template line,
+// at the same offset, are two writes, each reported at its own file's line.
+func TestRequestFieldWrites_Finder_KeepsTwoFilesThatMapToTheSameLine(t *testing.T) {
+	const generated = `package handlers
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext, effective string) {
+//line handler.tmpl:100
+	ac.State = effective
+}
+`
+	root := t.TempDir()
+	writeRequestFieldModule(t, root)
+	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed_amd64.go", generated)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed_arm64.go", generated)
+
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	require.NoError(t, err)
+
+	// Which of the two a build reads first depends on the test machine's architecture.
+	assert.ElementsMatch(t, []string{
+		"authserver/internal/handlers/completed_amd64.go:7: assigns State",
+		"authserver/internal/handlers/completed_arm64.go:7: assigns State",
+	}, requestFieldStrings(walk.found))
 }
 
 // A package that does not compile cannot be read whole, and a write in it would pass unseen, so the

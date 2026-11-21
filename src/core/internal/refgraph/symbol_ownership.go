@@ -160,12 +160,13 @@ type packageSymbols struct {
 	// owners are nodes too, because an exported symbol reached only through an unexported helper
 	// is still reached.
 	nodes map[string]*declNode
-	// valueType maps a package-level const or var to the same-package named type it is declared
+	// valueType maps a package-level const or var to the same-package named types it is declared
 	// with, including the type a const inherits from the nearest preceding ValueSpec carrying one.
 	// That inheritance is the Go spec's, and reading the syntax spec-by-spec instead once
 	// misclassified gender.Female, Male and Other as test-only while Gender was both-apps, caught
-	// during #385.
-	valueType map[string]string
+	// during #385. It is a set because each release build's declaration is read into the one record,
+	// and two platforms' files can declare the value with different types.
+	valueType map[string]map[string]bool
 	// ownRefs is every package-level name the package's own production code reaches, from any
 	// declaration, justified or not. Only a test-support row reads it.
 	ownRefs map[string]bool
@@ -518,12 +519,18 @@ func (c *symbolCensus) computeJustifications() map[symbolKey]string {
 					changed = true
 				}
 			}
-			for name, typeName := range pkg.valueType {
-				if !pkg.exported[name] || best[symbolKey{pkg: dir, name: typeName}] == "" {
+			for name, typeNames := range pkg.valueType {
+				if !pkg.exported[name] {
 					continue
 				}
-				if set(symbolKey{pkg: dir, name: name}, justificationReachable) {
-					changed = true
+				for typeName := range typeNames {
+					if best[symbolKey{pkg: dir, name: typeName}] == "" {
+						continue
+					}
+					if set(symbolKey{pkg: dir, name: name}, justificationReachable) {
+						changed = true
+					}
+					break
 				}
 			}
 		}
@@ -710,7 +717,7 @@ func newPackageSymbols() *packageSymbols {
 	return &packageSymbols{
 		exported:  map[string]bool{},
 		nodes:     map[string]*declNode{},
-		valueType: map[string]string{},
+		valueType: map[string]map[string]bool{},
 		ownRefs:   map[string]bool{},
 	}
 }
@@ -803,7 +810,10 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 						value = values[i]
 					}
 					if named != "" {
-						pkg.valueType[name.Name] = named
+						if pkg.valueType[name.Name] == nil {
+							pkg.valueType[name.Name] = map[string]bool{}
+						}
+						pkg.valueType[name.Name][named] = true
 					}
 					// head is the expression whose head spells this name's own type. For the
 					// positional form that is the name's own value; for the tuple form it is the
@@ -1045,16 +1055,24 @@ func (c *symbolCensus) readProductionReferences(lp loadedPackage, linked bool) {
 // readTestReferences records the core symbols one package of the test build names from its test
 // files, which is the half of a test-support row the tree can supply rather than contradict. The
 // declaring package's own tests count, internal and external alike: an internal test names a symbol
-// unqualified, an external one through the import, and both resolve to the symbol's object.
+// unqualified, an external one through the import, and both resolve to the symbol's object. An
+// internal test's own declaration of an exported name is no production symbol, even where a
+// release build's file declares the same name, so a reference to it is evidence for nothing.
 func (c *symbolCensus) readTestReferences(lp loadedPackage) {
 	for ident, obj := range lp.pkg.TypesInfo.Uses {
-		if !strings.HasSuffix(lp.pkg.Fset.Position(ident.Pos()).Filename, "_test.go") {
+		if !inTestFile(lp.pkg.Fset, ident.Pos()) {
 			continue
 		}
-		if key, ok := c.symbolOf(obj); ok {
+		if key, ok := c.symbolOf(obj); ok && !inTestFile(lp.pkg.Fset, obj.Pos()) {
 			c.tests[key] = true
 		}
 	}
+}
+
+// inTestFile reports whether pos is in a _test.go file: the file itself, not one a //line directive
+// maps it to, since the directive moves where a diagnostic points and not which build compiles it.
+func inTestFile(fset *token.FileSet, pos token.Pos) bool {
+	return strings.HasSuffix(fset.PositionFor(pos, false).Filename, "_test.go")
 }
 
 // addTo records value in the set evidence holds for key.

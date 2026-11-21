@@ -251,13 +251,15 @@ func moduleFor(root, dir string) (modRoot, modPath string, err error) {
 	return "", "", errs.Errorf("no go.mod above %s (searched up to %s)", dir, root)
 }
 
-// interfaceKey names a package-level type by the import path of its package and its name, which
-// is the one identity a declaration keeps across the builds of its package. The test build
+// declarationKey names a package-level type by where its name is declared, the file and the offset,
+// which is the one identity a declaration keeps across the builds of its package. The test build
 // type-checks a package a second time with its internal tests, and a package importing it there
-// binds to that second copy, a different types.Object for the same declaration. A name holds no
-// dot, so the last one in the key ends the path.
-func interfaceKey(pkg, name string) string {
-	return pkg + "." + name
+// binds to that second copy, a different types.Object for the same declaration. An import path and
+// a name would not do: an external test package shares its path, handlers_test, with a real
+// package of that name, and the two can declare the same name.
+func declarationKey(fset *token.FileSet, pos token.Pos) string {
+	at := fset.PositionFor(pos, false)
+	return at.Filename + ":" + strconv.Itoa(at.Offset)
 }
 
 // deadInterfacesIn loads the module rooted at modRoot, collects the top-level interfaces its
@@ -293,7 +295,7 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 			// spelling, and the universe's error and any belong to no package.
 			tn, ok := obj.(*types.TypeName)
 			if ok && tn.Pkg() != nil && tn.Pkg().Scope().Lookup(tn.Name()) == tn {
-				used[interfaceKey(tn.Pkg().Path(), tn.Name())] = true
+				used[declarationKey(p.Fset, tn.Pos())] = true
 			}
 		}
 
@@ -318,7 +320,7 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 					if _, ok := ts.Type.(*ast.InterfaceType); !ok {
 						continue
 					}
-					key := interfaceKey(p.PkgPath, ts.Name.Name)
+					key := declarationKey(p.Fset, ts.Name.Pos())
 					position := p.Fset.Position(ts.Name.Pos())
 					declared[key] = deadInterface{
 						pkg:  p.PkgPath,

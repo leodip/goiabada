@@ -136,8 +136,10 @@ func Load(dir string, build Build) ([]*packages.Package, error) {
 
 func load(dir string, build Build) ([]*packages.Package, error) {
 	// GOWORK=off and -mod=readonly read each module through its own go.mod, as the four modules are
-	// built, whatever workspace file or flags the machine running the tests has.
-	env := append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=readonly")
+	// built, whatever workspace file or flags the machine running the tests has. GOPACKAGESDRIVER=off
+	// keeps the go command the one that lists the packages: go/packages otherwise hands the load to
+	// a driver the environment names, or one named gopackagesdriver on the PATH.
+	env := append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=readonly", "GOPACKAGESDRIVER=off")
 	var flags []string
 	if build.Platform.GOOS != "" {
 		env = append(env, "GOOS="+build.Platform.GOOS)

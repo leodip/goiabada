@@ -305,8 +305,9 @@ func SettingsFrom(ctx context.Context) (string, bool) { return "", false }
 `
 
 // contextFixtureWindows is a production file only the Windows release build selects: the test
-// machine's default build and the other four release builds leave it out.
-const contextFixtureWindows = `//go:build windows
+// machine's default build and the other four release builds leave it out. The production tag keeps
+// the default build out even on a Windows test machine.
+const contextFixtureWindows = `//go:build windows && production
 
 package handlers
 
@@ -371,6 +372,34 @@ func TestContextValues_AFileOnlyOneBuildSelectsIsRead(t *testing.T) {
 			assert.Equal(t, 5, walk.sites)
 		})
 	}
+}
+
+// contextFixtureMapped is a handler whose //line directive maps its raw read into the accessor
+// package, as a generated file's directive can.
+const contextFixtureMapped = `package handlers
+
+import "context"
+
+func Generated(ctx context.Context) any {
+//line ../reqctx/generated.go:1
+	return ctx.Value("k") // site:mapped-read
+}
+`
+
+// A //line directive moves where a diagnostic points, not where the code is: a raw read in a handler
+// that maps itself into the accessor package is still a handler's raw read, reported at its own line.
+func TestContextValues_ALineDirectiveDoesNotMoveASiteIntoTheAccessor(t *testing.T) {
+	root := t.TempDir()
+	contextFixtureModule(t, root)
+	writeFixture(t, root, "mod/handlers/generated.go", contextFixtureMapped)
+
+	walk, err := findContextValueSites(root, "mod", "reqctx", contextFixtureExemptions)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"handlers/generated.go:" + strconv.Itoa(lineOf(t, contextFixtureMapped, "mapped-read")) + " a context Value read",
+	}, contextFindingNames(walk.findings))
+	assert.Empty(t, walk.problems)
 }
 
 // A package that does not compile cannot be read whole, and a raw read in it would pass unseen,

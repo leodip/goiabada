@@ -171,8 +171,9 @@ func findNotCalledArity(root string, dirs []string) ([]notCalledFinding, []notCa
 		}
 		for _, p := range pkgs {
 			for _, file := range p.Syntax {
-				position := p.Fset.Position(file.Pos())
-				if !byModule[modRoot][filepath.Dir(position.Filename)] {
+				// The file's own name, not one a //line directive maps its package clause to: the
+				// directory a file is in is what the caller's dirs are about.
+				if !byModule[modRoot][filepath.Dir(p.Fset.File(file.Pos()).Name())] {
 					continue
 				}
 				f, r := notCalledSitesIn(file, p.Fset, p.TypesInfo, p.Types, root, seen)
@@ -224,7 +225,9 @@ func notCalledSitesIn(
 		if !ok || !isNotCalledSite(info, sel) {
 			return true
 		}
-		position := fset.Position(call.Pos())
+		// The physical position, not one a //line directive maps: two files mapping to one line are
+		// two sites, and a site is reported at its own file's line.
+		position := fset.PositionFor(call.Pos(), false)
 		if seen[position] {
 			return true
 		}
@@ -235,9 +238,16 @@ func notCalledSitesIn(
 			refused = append(refused, notCalledRefusal{file: rel, line: position.Line, why: why})
 		}
 
+		// A method expression, (*doubles.Database).AssertNotCalled(db, t, ...), takes the receiver
+		// as its first argument; the assertion's own arguments follow it.
+		args := call.Args
+		if s, isSel := info.Selections[sel]; isSel && s.Kind() == types.MethodExpr && len(args) > 0 {
+			args = args[1:]
+		}
+
 		var lit *ast.BasicLit
-		if len(call.Args) >= 2 {
-			lit, _ = call.Args[1].(*ast.BasicLit)
+		if len(args) >= 2 {
+			lit, _ = args[1].(*ast.BasicLit)
 		}
 		if lit == nil || lit.Kind != token.STRING {
 			refuse(notCalledSelector + " names its method through an expression rather than a " +
@@ -267,7 +277,7 @@ func notCalledSitesIn(
 		}
 
 		want := sig.Params().Len()
-		given := len(call.Args) - 2
+		given := len(args) - 2
 		if want != given {
 			findings = append(findings, notCalledFinding{
 				file:   rel,

@@ -239,6 +239,22 @@ func TestSymbolOwnership_AConstInheritsItsType(t *testing.T) {
 	assert.Equal(t, justificationReachable, computed["core/shared.ColourBlue"])
 }
 
+// TestSymbolOwnership_AValueKeepsItsTypeFromEveryReleaseBuild: Default is declared with the
+// justified type Colour in a Linux file and with an unjustified type in a Windows file. Every
+// release build's declaration is read into one record, and the Windows build, read after the
+// Linux ones, does not take away the Linux declaration's evidence (#420).
+func TestSymbolOwnership_AValueKeepsItsTypeFromEveryReleaseBuild(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/default_linux.go":   "package shared\n\nvar Default Colour\n",
+		"core/shared/default_windows.go": "package shared\n\ntype Other string\n\nvar Default Other\n",
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationReachable, computed["core/shared.Default"])
+	assert.Empty(t, computed["core/shared.Other"])
+}
+
 // TestSymbolOwnership_AConstTypedByConversionIsReachable is the same arm where the type is in the
 // expression rather than the type slot. `TintRed = Tint("red")` and `TintRed Tint = "red"` declare
 // the same constant, and a reader choosing the first spelling should not be handed an asserted
@@ -1669,6 +1685,43 @@ import (
 
 func TestUnusedIsNamed(t *testing.T) {
 	_ = shared.Unused{}
+}
+`,
+	})
+	rows := append(symbolBaselineRows(), "core/shared Unused test-support Only a test names it.")
+
+	assert.Empty(t, checkSymbols(t, files, rows))
+}
+
+// TestSymbolOwnership_ATestOnlyDeclarationIsNoEvidenceForItsNamesake: a release build declares the
+// type Probe, and the test build, which leaves that file out, has the package's own test declare a
+// const Probe and name it. The reference is to the test's const, so nothing names the production
+// type, and its test-support row is refused (#420).
+func TestSymbolOwnership_ATestOnlyDeclarationIsNoEvidenceForItsNamesake(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/probe.go":      "//go:build production\n\npackage shared\n\ntype Probe struct{}\n",
+		"core/shared/probe_test.go": "package shared\n\nconst Probe = 1\n\nvar _ = Probe\n",
+	})
+	rows := append(symbolBaselineRows(), "core/shared Probe test-support Only a test names it.")
+
+	findings := checkSymbols(t, files, rows)
+
+	assertFindings(t, findings, "records core/shared.Probe as test-support, but nothing names it")
+}
+
+// TestSymbolOwnership_ALineDirectiveDoesNotMoveATestReference: the only reference to Unused is in a
+// test file, after a //line directive mapping it to a file that is not one. Which build compiles a
+// reference is decided by the file it is in, so it is still a test's (#420).
+func TestSymbolOwnership_ALineDirectiveDoesNotMoveATestReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
+		"core/shared/orphan_test.go": `package shared
+
+import "testing"
+
+func TestUnusedIsNamed(t *testing.T) {
+//line generated.go:1
+	_ = Unused{}
 }
 `,
 	})

@@ -25,7 +25,7 @@ func TestGuardsGuide_GuardShapeIsTheRuleWithoutARoster(t *testing.T) {
 			"`credential_read_lint.go`",
 			"`golangci-lint`",
 			"`core/pkgload`",
-			"`git grep -n 'func assert.*\\(r Reporter\\|r guard\\.Reporter\\)' -- '*.go'`",
+			"`git grep -n -E 'func assert[[:alnum:]]*\\((r (guard\\.)?Reporter|$)' -- '*.go'`",
 			"`8883642d`",
 		},
 		[]string{"the newest", "AssertNoLiteralStackSecrets", "and before it"})

@@ -328,12 +328,31 @@ func TestLoad_TheSameModuleThroughAnotherPathIsLoadedOnce(t *testing.T) {
 		"mod/a/a.go": "package a\n",
 	})
 
-	first, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	dir := filepath.Join(root, "mod")
+	// Joined by hand, because filepath.Join would clean the a/.. away before Load saw it.
+	other := dir + string(filepath.Separator) + "a" + string(filepath.Separator) + ".."
+	require.NotEqual(t, dir, other)
+
+	first, err := pkgload.Load(dir, pkgload.Build{})
 	require.NoError(t, err)
-	again, err := pkgload.Load(filepath.Join(root, "mod", "a", ".."), pkgload.Build{})
+	again, err := pkgload.Load(other, pkgload.Build{})
 	require.NoError(t, err)
 	require.Len(t, again, 1)
 	assert.Same(t, first[0], again[0])
+}
+
+// A package driver the environment names would answer in the go command's place, with whatever
+// package set it lists; the loader turns drivers off, so one that does not even exist is not run.
+func TestLoad_APackageDriverTheEnvironmentNamesIsNotUsed(t *testing.T) {
+	t.Setenv("GOPACKAGESDRIVER", filepath.Join(t.TempDir(), "no-such-driver"))
+	root := loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/a/a.go": "package a\n",
+	})
+
+	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/mod/a"}, ids(pkgs))
 }
 
 // A failed load is remembered as well, so a guard that meets it twice reports the same error.
@@ -412,6 +431,63 @@ func TestMakeLoadable_KeepsAGoLineTheFixtureWrote(t *testing.T) {
 	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
 	require.NoError(t, err)
 	assert.Equal(t, "1.21", pkgs[0].Module.GoVersion)
+}
+
+// A module with no go line takes the one the fixture wrote for another, since a module that requires
+// one with a later go line does not load.
+func TestMakeLoadable_AModuleWithNoGoLineTakesTheOneAnotherWrote(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"app/go.mod":  "module example.test/app\n\ngo 1.24\n",
+		"app/main.go": "package main\n\nimport \"example.test/lib/l\"\n\nfunc main() { l.F() }\n",
+		"lib/go.mod":  "module example.test/lib\n",
+		"lib/l/l.go":  "package l\n\nfunc F() {}\n",
+	})
+	require.NoError(t, pkgload.MakeLoadable(root))
+
+	app, err := pkgload.Load(filepath.Join(root, "app"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/app"}, ids(app))
+	lib, err := pkgload.Load(filepath.Join(root, "lib"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, "1.24", lib[0].Module.GoVersion)
+}
+
+// Go lines the fixture wrote that differ cannot all load, and setting the tree up says so rather
+// than leaving the load to fail.
+func TestMakeLoadable_GoLinesTheFixtureWroteThatDifferAreAnError(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"app/go.mod": "module example.test/app\n\ngo 1.24\n",
+		"lib/go.mod": "module example.test/lib\n\ngo 1.25\n",
+	})
+	err := pkgload.MakeLoadable(root)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Join(root, "app", "go.mod")+" has go 1.24")
+	assert.Contains(t, err.Error(), filepath.Join(root, "lib", "go.mod")+" has go 1.25")
+}
+
+// A module path ending in a major version suffix is required at that major, which the go command
+// holds it to, and a directory whose name has a space is quoted in the replace line.
+func TestMakeLoadable_RequiresAVersionedModuleAtItsMajorAndQuotesADirectoryWithASpace(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"app/go.mod":       "module example.test/app\n",
+		"app/main.go":      "package main\n\nimport (\n\t\"example.test/lib/v2/l\"\n\t\"example.test/spaced/s\"\n)\n\nfunc main() { l.F(); s.G() }\n",
+		"lib/go.mod":       "module example.test/lib/v2\n",
+		"lib/l/l.go":       "package l\n\nfunc F() {}\n",
+		"local lib/go.mod": "module example.test/spaced\n",
+		"local lib/s/s.go": "package s\n\nfunc G() {}\n",
+	})
+	require.NoError(t, pkgload.MakeLoadable(root))
+
+	src, err := os.ReadFile(filepath.Join(root, "app", "go.mod"))
+	require.NoError(t, err)
+	assert.Contains(t, string(src), "require example.test/lib/v2 v2.0.0\n")
+	assert.Contains(t, string(src), "require example.test/spaced v0.0.0\n")
+	assert.Contains(t, string(src), "replace example.test/spaced => \"../local lib\"\n")
+	assert.Contains(t, string(src), "replace example.test/lib/v2 => ../lib\n")
+
+	app, err := pkgload.Load(filepath.Join(root, "app"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/app"}, ids(app))
 }
 
 func TestMakeLoadable_ATreeWithNoModuleIsAnError(t *testing.T) {

@@ -13,6 +13,7 @@ package guard
 
 import (
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
@@ -211,7 +212,8 @@ func TestImportBinding_EveryInTreeWatchedPathCarriesItsDirectory(t *testing.T) {
 
 // declaredPackageName returns the package clause a directory's production files carry, or "" when
 // none of them parses. It is what an unaliased import of that directory binds, which is the name
-// TestImportBinding_EveryWatchedPackageIsNamedAsTheTableSays holds each watched table to.
+// TestImportBinding_EveryWatchedPackageIsNamedAsTheTableSays holds each watched table to. Only a
+// file the go command builds counts: one it ignores, such as _example.go, binds nothing.
 func declaredPackageName(dir string) string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -219,6 +221,9 @@ func declaredPackageName(dir string) string {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		if match, mErr := build.Default.MatchFile(dir, entry.Name()); mErr != nil || !match {
 			continue
 		}
 		fset := token.NewFileSet()
@@ -229,4 +234,13 @@ func declaredPackageName(dir string) string {
 		return file.Name.Name
 	}
 	return ""
+}
+
+// A file the go command ignores carries no package name: _example.go sorts before errs.go, and
+// errs.go's clause is still the one read.
+func TestDeclaredPackageName_ReadsOnlyAFileTheGoCommandBuilds(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "_example.go"), []byte("package example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "errs.go"), []byte("package errs\n"), 0o644))
+	assert.Equal(t, "errs", declaredPackageName(dir))
 }

@@ -40,16 +40,7 @@ func requireTestify(t *testing.T, root, mod string) {
 	core := filepath.Join(SourceRoot(t), "core")
 	goMod, err := os.ReadFile(filepath.Join(core, "go.mod"))
 	require.NoError(t, err)
-	versions := map[string]string{}
-	for _, line := range strings.Split(string(goMod), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) == 3 && fields[0] == "require" {
-			fields = fields[1:]
-		}
-		if len(fields) >= 2 {
-			versions[fields[0]] = fields[1]
-		}
-	}
+	versions := requiredVersions(string(goMod))
 
 	requires := "\nrequire (\n"
 	for _, path := range notCalledTestifyModules {
@@ -64,6 +55,40 @@ func requireTestify(t *testing.T, root, mod string) {
 	sum, err := os.ReadFile(filepath.Join(core, "go.sum"))
 	require.NoError(t, err)
 	writeFixture(t, root, mod+"/go.sum", string(sum))
+}
+
+// requiredVersions reads the version of each module a go.mod requires, from a one-line require or a
+// require block, with any comment removed.
+func requiredVersions(goMod string) map[string]string {
+	versions := map[string]string{}
+	inBlock := false
+	for _, line := range strings.Split(goMod, "\n") {
+		if i := strings.Index(line, "//"); i >= 0 {
+			line = line[:i]
+		}
+		fields := strings.Fields(line)
+		switch {
+		case len(fields) == 2 && fields[0] == "require" && fields[1] == "(":
+			inBlock = true
+		case inBlock && len(fields) == 1 && fields[0] == ")":
+			inBlock = false
+		case len(fields) == 3 && fields[0] == "require":
+			versions[fields[1]] = fields[2]
+		case inBlock && len(fields) == 2:
+			versions[fields[0]] = fields[1]
+		}
+	}
+	return versions
+}
+
+func TestRequiredVersions_ReadsBothRequireFormsWithTheirComments(t *testing.T) {
+	assert.Equal(t, map[string]string{
+		"github.com/stretchr/testify": "v1.12.1",
+		"github.com/stretchr/objx":    "v0.8.0",
+		"go.yaml.in/yaml/v3":          "v3.0.6",
+	}, requiredVersions("module example.com/mod\n\ngo 1.24\n\n"+
+		"require (\n\tgithub.com/stretchr/testify v1.12.1\n\tgo.yaml.in/yaml/v3 v3.0.6 // indirect\n)\n\n"+
+		"require github.com/stretchr/objx v0.8.0 // indirect\n"))
 }
 
 // notCalledFixtureModule writes the module every rule-table case shares: a package of generated
@@ -252,6 +277,11 @@ func TestRules(t *testing.T) {
 	// Row 11: a method of the name on a type that is no double. Two matchers against a Log of
 	// three would be a finding if the walk matched the spelling.
 	other.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+
+	// Rows 14 and 15: a method expression, whose first argument is the receiver. Three matchers
+	// against a CreateUser of three pass; one is a finding.
+	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
+	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", mock.Anything)
 }
 `)
 	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
@@ -304,7 +334,7 @@ func TestSupport(t *testing.T) {
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 11, sites,
+	assert.Equal(t, 13, sites,
 		"every testify assertion is reached once, including the three the walk refuses, and "+
 			"neither call of a method merely spelled like it")
 
@@ -314,6 +344,7 @@ func TestSupport(t *testing.T) {
 		"GetUserById 1/3 on *doubles.Database",
 		"CreateUser 2/3 on *doubles.Database",
 		"Send 0/2 on *local",
+		"CreateUser 1/3 on *doubles.Database",
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))
 
@@ -336,6 +367,35 @@ func TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass(t *testing.T) {
 	assert.Empty(t, findings)
 	assert.Empty(t, blocked)
 	assert.Zero(t, sites, "AssertNotCalledArity turns a zero site count into a t.Fatalf")
+}
+
+// A //line directive before the package clause moves where a diagnostic points, not where the file
+// is: a test file in a walked directory is walked whatever it maps itself to, and its site is
+// reported at its own line.
+func TestNotCalledArity_ALineDirectiveDoesNotTakeAFileOutOfTheWalk(t *testing.T) {
+	root := t.TempDir()
+	notCalledFixtureModule(t, root)
+	writeFixture(t, root, "mod/held/generated_test.go", `//line ../elsewhere/generated.go:1
+package held
+
+import (
+	"testing"
+
+	"example.com/mod/doubles"
+)
+
+func TestGenerated(t *testing.T) {
+	doubles.NewDatabase().AssertNotCalled(t, "CreateUser")
+}
+`)
+
+	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod/held"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, sites)
+	assert.Empty(t, blocked)
+	require.Equal(t, []string{"CreateUser 0/3 on *doubles.Database"}, notCalledNames(findings))
+	assert.Equal(t, "mod/held/generated_test.go", findings[0].file)
+	assert.Equal(t, 11, findings[0].line)
 }
 
 // TestNotCalledArity_SitesOutsideTheWalkedDirsAreNotHeld keeps the dirs argument meaningful: the
@@ -479,7 +539,9 @@ func TestNotCalledArity_ABuildSelectingNoPackageIsAnEmptyWalk(t *testing.T) {
 // package of contributes nothing, and the modules beside it are still read and reported.
 func TestNotCalledArity_AModuleSelectingNoPackageDoesNotStopTheOthers(t *testing.T) {
 	root := t.TempDir()
-	writeFixture(t, root, "first/go.mod", "module example.com/first\n\ngo 1.24\n")
+	// No go line, as in the shared module: a go line here would be the tree's, and testify's modules
+	// declare a later one.
+	writeFixture(t, root, "first/go.mod", "module example.com/first\n")
 	writeFixture(t, root, "first/tests/rules_test.go", "//go:build customtag\n\npackage tests\n")
 	notCalledFixtureModule(t, root)
 	writeFixture(t, root, "mod/tests/rules_test.go", `package tests
