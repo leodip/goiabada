@@ -120,6 +120,27 @@ func TestLoad_AReleaseBuildSetsProductionAndTurnsCgoOff(t *testing.T) {
 	assert.Equal(t, []string{"common.go", "nocgo.go", "only_linux.go", "prod.go"}, fileNames(pkgs[0]))
 }
 
+// A release compiles at the go command's default architecture levels, since nothing that builds one
+// sets GOAMD64 or GOARM64, so a release build reads files as at those levels whatever the
+// environment the tests run in sets.
+func TestLoad_AReleaseBuildHoldsTheArchitectureLevelsAtTheirDefaults(t *testing.T) {
+	t.Setenv("GOAMD64", "v3")
+	t.Setenv("GOARM64", "v9.0")
+	root := loadable(t, map[string]string{
+		"mod/go.mod":     "module example.test/mod\n",
+		"mod/a/a.go":     "package a\n",
+		"mod/a/v3.go":    "//go:build amd64.v3\n\npackage a\n",
+		"mod/a/v9_0.go":  "//go:build arm64.v9.0\n\npackage a\n",
+		"mod/a/below.go": "//go:build !amd64.v3 && !arm64.v9.0\n\npackage a\n",
+	})
+	for _, platform := range []pkgload.Platform{{GOOS: "linux", GOARCH: "amd64"}, {GOOS: "linux", GOARCH: "arm64"}} {
+		pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{Platform: platform, Release: true})
+		require.NoError(t, err)
+		require.Len(t, pkgs, 1)
+		assert.Equal(t, []string{"a.go", "below.go"}, fileNames(pkgs[0]), platform.String())
+	}
+}
+
 func TestLoad_AReleaseBuildSelectsItsOwnPlatformsFiles(t *testing.T) {
 	root := loadable(t, constrainedTree)
 

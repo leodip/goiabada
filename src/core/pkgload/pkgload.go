@@ -60,8 +60,10 @@ type Build struct {
 	// Platform is the platform files are selected for. The zero value is the go command's own,
 	// the machine the tests run on unless the environment says otherwise.
 	Platform Platform
-	// Release sets the production tag and turns cgo off, as every release build does. Without it
-	// no tag is set and cgo is as the environment has it.
+	// Release sets the production tag and turns cgo off, as every release build does, and holds
+	// GOAMD64 and GOARM64 at the go command's defaults, v1 and v8.0, which a release compiles at
+	// because nothing that builds one sets them. Without it no tag is set, and cgo and those levels
+	// are as the environment has them.
 	Release bool
 	// Tests adds each package's test files: the package compiled with its internal tests, its
 	// external test package, and the test main, beside the package itself.
@@ -69,7 +71,7 @@ type Build struct {
 }
 
 // ReleaseBuilds returns the release build of every release platform: the production tag set, cgo
-// off and no test files, in the order of ReleasePlatforms.
+// off, the default architecture levels and no test files, in the order of ReleasePlatforms.
 func ReleaseBuilds() []Build {
 	builds := make([]Build, 0, len(releasePlatforms))
 	for _, p := range releasePlatforms {
@@ -193,7 +195,9 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 		env = append(env, "GOARCH="+build.Platform.GOARCH)
 	}
 	if build.Release {
-		env = append(env, "CGO_ENABLED=0")
+		// The levels explicitly rather than cleared: an empty variable falls through to a level
+		// go env -w wrote, which a release build would not see either.
+		env = append(env, "CGO_ENABLED=0", "GOAMD64=v1", "GOARM64=v8.0")
 		flags = append(flags, "-tags=production")
 	}
 

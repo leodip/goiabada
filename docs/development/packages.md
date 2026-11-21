@@ -218,12 +218,13 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `pkgload/` - The shared loader: `Load` returns a module's packages type-checked for one `Build`
   through `golang.org/x/tools/go/packages`, each build of a module at most once in a process, a
   package that does not load or type-check, or that imports a package of its module `./...` skips,
-  as an error naming it, and a build that selects no package as `ErrNoPackages`; `LoadBuilds` loads several modules for several builds, one slice per
-  build, where a module a build selects no package of adds nothing, and returns the first other error
-  in build order, so it never reports an empty walk; `Position` is where a loaded position is in the
-  file a developer edits, its physical position or, in a file cgo generated, the original's. It holds
-  the one declaration of the release platforms, `ReleasePlatforms`, and their release builds,
-  `ReleaseBuilds` (the `production` tag, cgo off), which rule 8 and the release-build test read too,
+  as an error naming it, and a build that selects no package as `ErrNoPackages`; `LoadBuilds` loads
+  several modules for several builds, one slice per build, where a module a build selects no package
+  of adds nothing, and returns the first other error in build order, so it never reports an empty
+  walk; `Position` is where a loaded position is in the file a developer edits, its physical
+  position or, in a file cgo generated, the original's. It holds the one declaration of the release
+  platforms, `ReleasePlatforms`, and their release builds, `ReleaseBuilds` (the `production` tag,
+  cgo off, the default `GOAMD64` and `GOARM64`), which rule 8 and the release-build test read too,
   and `MakeLoadable`, which gives a fixture tree's go.mod files a go line and each other module by
   its directory. It imports neither `testing` nor testify, and the refused-packages table keeps
   `golang.org/x/tools` out of every shipped binary (#420)
