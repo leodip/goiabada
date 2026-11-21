@@ -24,10 +24,12 @@
   until the slice gives it a `test-support` row with a note by hand. A `test-support`
   row fails the unit gate once no test and no code of its own package names the
   symbol, and regenerating keeps it (`src/core/OWNERSHIP.md`, "The justifications").
-  `mocks`: when the slice renames or changes a mocked interface; a rename also changes
-  the key that names it in its module's `.mockery.yaml`, in the same slice. `schema`:
-  in the slice that adds or changes a migration. The CSS: in the slice that adds
-  Tailwind classes.
+  `mocks`: when the slice changes a mocked interface or a module's `.mockery.yaml`; a
+  mocked interface's rename also changes the key that names it there, in the same
+  slice. `schema`: in the slice that adds or changes a migration. The CSS: in the
+  slice that adds or removes a template's Tailwind class or edits the UI CSS; a change
+  to `web/tailwindcss/ui.css` goes into both servers' copies and regenerates both
+  outputs.
 - **Documentation:** decide whether a change to reader-facing behavior, configuration,
   an API, deployment, or the admin console needs an update under
   `site/src/content/docs/`. Name the affected pages in the agreement and include
