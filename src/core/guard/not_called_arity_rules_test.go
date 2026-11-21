@@ -295,6 +295,10 @@ func TestRules(t *testing.T) {
 	// Row 18: the selector in parentheses, which is the same call. One matcher against a
 	// CreateUser of three is a finding.
 	(database.AssertNotCalled)(t, "CreateUser", mock.Anything)
+
+	// Row 19: the double's Mock field named, which testify reads as the double's, while the walk
+	// would look the method up on Mock. Refused, naming the form to write.
+	sender.Mock.AssertNotCalled(t, "Ping", mock.Anything)
 }
 `)
 	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
@@ -347,8 +351,8 @@ func TestSupport(t *testing.T) {
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 16, sites,
-		"every testify assertion is reached once, including the five the walk refuses, and "+
+	assert.Equal(t, 17, sites,
+		"every testify assertion is reached once, including the six the walk refuses, and "+
 			"neither call of a method merely spelled like it")
 
 	assert.Equal(t, []string{
@@ -362,12 +366,14 @@ func TestSupport(t *testing.T) {
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))
 
-	require.Len(t, blocked, 5)
+	require.Len(t, blocked, 6)
 	assert.Contains(t, blocked[0].why, "does not declare")
 	assert.Contains(t, blocked[1].why, "string literal")
 	assert.Contains(t, blocked[2].why, "variadic")
 	assert.Contains(t, blocked[3].why, "spreads its matchers")
 	assert.Contains(t, blocked[4].why, "spreads its matchers")
+	assert.Contains(t, blocked[5].why, `is called on the Mock field sender.Mock rather than on the double`)
+	assert.Contains(t, blocked[5].why, "call sender.AssertNotCalled instead")
 }
 
 // TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass pins the one way this guard stops

@@ -271,6 +271,18 @@ func notCalledSitesIn(
 		// A string literal in a package that type-checked always unquotes.
 		method, _ := strconv.Unquote(lit.Value)
 
+		// The double's Mock field named, d.Mock.AssertNotCalled: the method the name means is the
+		// double's, and the walk reads it on the type the call is written on, which here is Mock.
+		if field, isField := ast.Unparen(sel.X).(*ast.SelectorExpr); isField {
+			if s, isSel := info.Selections[field]; isSel && s.Kind() == types.FieldVal && isTestifyMock(s.Obj().Type()) {
+				refuse(notCalledSelector + "(t, \"" + method + "\", ...) is called on the Mock field " +
+					types.ExprString(field) + " rather than on the double, a form this walk does not read, " +
+					"since the method it names is the double's; call " + types.ExprString(field.X) + "." +
+					notCalledSelector + " instead")
+				return true
+			}
+		}
+
 		recvType := info.TypeOf(sel.X)
 		obj, _, _ := types.LookupFieldOrMethod(recvType, true, pkg, method)
 		fn, ok := obj.(*types.Func)
@@ -304,6 +316,16 @@ func notCalledSitesIn(
 	})
 
 	return findings, refused
+}
+
+// isTestifyMock reports whether t is testify's Mock or a pointer to it.
+func isTestifyMock(t types.Type) bool {
+	if ptr, ok := t.(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	named, ok := t.(*types.Named)
+	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == testifyMockImportPath &&
+		named.Obj().Name() == "Mock"
 }
 
 // typeName renders a type the way the file that named it reads, qualified by package name rather
