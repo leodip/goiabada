@@ -212,7 +212,7 @@ func discardedErrorsIn(
 			callee = fun
 		case *ast.SelectorExpr:
 			callee = fun.Sel
-			if sel, ok := info.Selections[fun]; ok {
+			if sel, hasSelection := info.Selections[fun]; hasSelection {
 				through = discardedErrorDispatchType(sel)
 			}
 		default:
