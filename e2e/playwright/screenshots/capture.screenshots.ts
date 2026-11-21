@@ -32,9 +32,14 @@ const cardMargin = 30;
 const consoleWidth = 1440;
 const cornerRadius = 12;
 
-// The images the command writes, by file name: the list e2e/screenshots.sh replaces the committed
-// files from.
+// The images the command writes, by file name. The capture reads the list and hands it to
+// e2e/screenshots.sh as images.txt beside the images, one name to a line, so the script replaces
+// the committed files this parse names rather than reading the JSON a second way. A name is a plain
+// file name, which a line can hold.
 const listed: string[] = JSON.parse(readFileSync(new URL("./images.json", import.meta.url), "utf8"));
+for (const name of listed) {
+  if (!/^screenshot[A-Za-z0-9._-]*$/.test(name)) throw new Error(`images.json lists ${JSON.stringify(name)}, which is not a screenshot's file name`);
+}
 
 function outDir(): string {
   const out = process.env.SCREENSHOTS_OUT;
@@ -232,4 +237,5 @@ test("the screenshots", async ({ browser }) => {
 
   expect([...images.keys()].sort(), "the images captured are not the ones images.json lists").toEqual([...listed].sort());
   for (const [name, png] of images) writeFileSync(path.join(outDir(), name), png);
+  writeFileSync(path.join(outDir(), "images.txt"), listed.map((name) => `${name}\n`).join(""));
 });
