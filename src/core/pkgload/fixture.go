@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/leodip/goiabada/core/errs"
+	"golang.org/x/mod/modfile"
 )
 
 // MakeLoadable makes a fixture tree under root a set of modules the go command can load. A guard's
@@ -25,8 +26,8 @@ import (
 // command refuses a module that requires one with a later go line, the go lines a fixture wrote must
 // agree, and a tree whose go lines differ is an error naming both. The go line added to the other
 // modules is the one the fixture wrote, or, where it wrote none, this binary's Go version, the
-// toolchain the tests run on. A tree holding no go.mod, or a go.mod with no module line, is an
-// error naming it.
+// toolchain the tests run on. A tree holding no go.mod, or a go.mod the go command would not parse
+// or that declares no module, is an error naming it.
 func MakeLoadable(root string) error {
 	modules, err := fixtureModules(root)
 	if err != nil {
@@ -159,13 +160,20 @@ func fixtureModules(root string) ([]fixtureModule, error) {
 		if err != nil {
 			return err
 		}
-		module, ok := modulePath(string(src))
-		if !ok {
+		// The go command's own parser, so the module directive reads as the go command reads it, on
+		// one line or as a block, its path quoted or not.
+		parsed, err := modfile.Parse(path, src, nil)
+		if err != nil {
+			return err
+		}
+		if parsed.Module == nil {
 			return errs.Errorf("%s declares no module", path)
 		}
-		modules = append(modules, fixtureModule{
-			file: path, src: string(src), path: module, goVersion: directiveValue(string(src), "go"),
-		})
+		m := fixtureModule{file: path, src: string(src), path: parsed.Module.Mod.Path}
+		if parsed.Go != nil {
+			m.goVersion = parsed.Go.Version
+		}
+		modules = append(modules, m)
 		return nil
 	})
 	if err != nil {
@@ -176,44 +184,6 @@ func fixtureModules(root string) ([]fixtureModule, error) {
 	}
 	sort.Slice(modules, func(i, j int) bool { return modules[i].file < modules[j].file })
 	return modules, nil
-}
-
-// directiveLines are the lines of a go.mod with their comments removed and their space trimmed.
-func directiveLines(src string) []string {
-	var lines []string
-	for _, line := range strings.Split(src, "\n") {
-		if i := strings.Index(line, "//"); i >= 0 {
-			line = line[:i]
-		}
-		lines = append(lines, strings.TrimSpace(line))
-	}
-	return lines
-}
-
-// modulePath reads the path of a go.mod's module line, quoted or not.
-func modulePath(src string) (string, bool) {
-	for _, line := range directiveLines(src) {
-		fields := strings.Fields(line)
-		if len(fields) != 2 || fields[0] != "module" {
-			continue
-		}
-		if unquoted, err := strconv.Unquote(fields[1]); err == nil {
-			return unquoted, true
-		}
-		return fields[1], true
-	}
-	return "", false
-}
-
-// directiveValue is the argument of a go.mod's one-line directive of that name, or empty when it
-// has none.
-func directiveValue(src, name string) string {
-	for _, line := range directiveLines(src) {
-		if fields := strings.Fields(line); len(fields) == 2 && fields[0] == name {
-			return fields[1]
-		}
-	}
-	return ""
 }
 
 // goVersion is this binary's Go version as a go line writes it, 1.27.4 for go1.27.4.

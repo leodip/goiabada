@@ -6,10 +6,10 @@
 //
 // It is an exported leaf rather than part of core/internal/refgraph because the auth server's
 // tests load through it, and Go's internal rule keeps them out of core/internal, as it did for
-// core/sourceroot (#480). It imports the standard library, core/errs and golang.org/x/tools, and
-// neither testing nor testify, so ownershipdump can load through it and still link no test
-// framework. ARCHITECTURE.md's refused-packages table keeps golang.org/x/tools out of every
-// shipped binary.
+// core/sourceroot (#480). It imports the standard library, core/errs, golang.org/x/tools and
+// golang.org/x/mod, whose go.mod parser reads a fixture's go.mod files, and neither testing nor
+// testify, so ownershipdump can load through it and still link no test framework.
+// ARCHITECTURE.md's refused-packages table keeps golang.org/x/tools out of every shipped binary.
 package pkgload
 
 import (

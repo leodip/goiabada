@@ -616,6 +616,27 @@ func TestMakeLoadable_RequiresAVersionedModuleAtItsMajorAndQuotesADirectoryWithA
 	assert.Equal(t, []string{"example.test/app"}, ids(app))
 }
 
+// The go command reads a module directive written as a block as it reads one on a line of its own,
+// so another module of the tree is required, and replaced, by the path the block declares.
+func TestMakeLoadable_ReadsAModuleDeclaredInABlock(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"app/go.mod":  "module example.test/app\n",
+		"app/main.go": "package main\n\nimport \"example.test/lib/l\"\n\nfunc main() { l.F() }\n",
+		"lib/go.mod":  "module (\n\texample.test/lib\n)\n",
+		"lib/l/l.go":  "package l\n\nfunc F() {}\n",
+	})
+	require.NoError(t, pkgload.MakeLoadable(root))
+
+	src, err := os.ReadFile(filepath.Join(root, "app", "go.mod"))
+	require.NoError(t, err)
+	assert.Contains(t, string(src), "require example.test/lib v0.0.0\n")
+	assert.Contains(t, string(src), "replace example.test/lib => ../lib\n")
+
+	app, err := pkgload.Load(filepath.Join(root, "app"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/app"}, ids(app))
+}
+
 func TestMakeLoadable_ATreeWithNoModuleIsAnError(t *testing.T) {
 	root := writeTree(t, map[string]string{"a/a.go": "package a\n"})
 	assert.Error(t, pkgload.MakeLoadable(root))
