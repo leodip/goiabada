@@ -8,8 +8,9 @@ checklist, and the same rule on standards.
   `integration postgres`, ...), not only on SQLite, and run it again after the fix.
 - **A failing e2e gate:** the gate's log has the Playwright output, and
   `e2e/playwright/test-results/` the traces and screenshots of each failure. When the
-  gate reran the failed tests, `test-results/` holds the rerun's, or the sweep's when
-  the sweep failed, and `test-results-first-run/` the first run's. Do not run `e2e`
+  gate reran the failed tests, `test-results-first-run/` holds the first run's, and
+  `test-results/` the last Playwright run's, the sweep's or the rerun's; the log shows
+  which ran, and any step that failed before Playwright started. Do not run `e2e`
   yourself: placido runs it on your result, and each run rebuilds the environment on
   the VPS and runs the suite, about twenty minutes. The gate left that environment
   running this branch, so to check a change to the specs alone, run `e2e/test.sh`
