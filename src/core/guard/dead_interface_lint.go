@@ -156,8 +156,8 @@ func findDeadInterfaces(root string, dirs []string) ([]deadInterface, int, error
 // declaringDirs expands dirs into every directory beneath them that holds at least one Go file.
 // No dirs means the whole source root, which is what lets a caller hold a module rather than a
 // package if it ever needs to. A directory holding Go files that ./... skips, one whose name or a
-// parent's below root begins with _ or ., is an error naming it: the guards load ./..., so they
-// would walk it and read none of it.
+// parent's below the root of the module that owns it begins with _ or ., is an error naming it: the
+// guards load ./... from that root, so they would walk it and read none of it.
 func declaringDirs(root string, dirs []string) ([]string, error) {
 	starts := []string{root}
 	if len(dirs) > 0 {
@@ -185,7 +185,12 @@ func declaringDirs(root string, dirs []string) ([]string, error) {
 			}
 			dir := filepath.Dir(path)
 			if !seen[dir] {
-				if elem := wildcardSkipped(root, dir); elem != "" {
+				// ./... runs from the module's root, so only the names below it count.
+				modRoot, _, mErr := moduleFor(root, dir)
+				if mErr != nil {
+					modRoot = root
+				}
+				if elem := wildcardSkipped(modRoot, dir); elem != "" {
 					return errs.Errorf("%s holds Go files, but ./... skips a directory named %s, as it skips any whose "+
 						"name begins with _ or ., so this guard would read none of them; move them to a directory it reads",
 						relativeTo(root, dir), elem)
@@ -227,10 +232,10 @@ func dirsByModule(root string, dirs []string) ([]string, map[string]map[string]b
 // skippedDir names the directories no Go package this repository builds can live under. They are
 // skipped rather than parsed because a vendored tree would otherwise be searched for references,
 // and a reference from vendored code is not a consumer of anything this repository declares.
-// wildcardSkipped returns the first name in dir's path below root that begins with _ or ., which
-// makes ./... skip the directory, or "" when there is none.
-func wildcardSkipped(root, dir string) string {
-	rel, err := filepath.Rel(root, dir)
+// wildcardSkipped returns the first name in dir's path below modRoot that begins with _ or ., which
+// makes ./... run there skip the directory, or "" when there is none.
+func wildcardSkipped(modRoot, dir string) string {
+	rel, err := filepath.Rel(modRoot, dir)
 	if err != nil {
 		return ""
 	}

@@ -345,6 +345,26 @@ type Dead interface{ B() }
 	assert.Contains(t, err.Error(), "mod/_tools holds Go files, but ./... skips a directory named _tools")
 }
 
+// ./... runs from the root of the module that owns a directory, so a name above that root, here a
+// module that itself sits in a directory beginning with _, skips nothing, and the walk reads it.
+func TestNoDeadInterfaces_ANameAboveTheModulesRootIsNotRefused(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "outer/_nested/go.mod", "module example.com/nested\n\ngo 1.24\n")
+	writeFixture(t, root, "outer/_nested/api/api.go", `package api
+
+type Live interface{ A() }
+
+func use(x Live) { _ = x }
+`)
+	makeLoadable(t, root)
+
+	dead, files, err := findDeadInterfaces(root, []string{"outer/_nested/api"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, files)
+	assert.Empty(t, deadNames(dead))
+}
+
 // Seam 2: the reporting half. Everything above asserts on what findDeadInterfaces returned, which
 // leaves the roughly ten lines that turn those findings into a failure untested -- and those are
 // the lines whose loss disables the guard in both modules at once. Blinding them is exactly what
