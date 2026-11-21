@@ -32,7 +32,7 @@ type settingsKeysDatabase interface {
 
 	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
-	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)
+	GetKeyPairByID(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)
 }
 
 // HandleSettingsKeysGet - GET /api/v1/admin/settings/keys
@@ -55,13 +55,13 @@ func HandleSettingsKeysGet(
 				createdAt = &t
 			}
 			mapped = append(mapped, api.SettingsSigningKeyResponse{
-				ID:               k.Id,
+				ID:               k.ID,
 				CreatedAt:        createdAt,
 				State:            k.State,
 				KeyIdentifier:    k.KeyIdentifier,
 				Type:             k.Type,
 				Algorithm:        k.Algorithm,
-				PublicKeyASN1DER: base64.StdEncoding.EncodeToString(k.PublicKeyASN1_DER),
+				PublicKeyASN1DER: base64.StdEncoding.EncodeToString(k.PublicKeyASN1DER),
 				PublicKeyPEM:     apimapping.ToPublicKeyPEM(k.PublicKeyPEM),
 				PublicKeyJWK:     string(k.PublicKeyJWK),
 			})
@@ -170,7 +170,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 
-		kp, err := database.GetKeyPairById(r.Context(), nil, id)
+		kp, err := database.GetKeyPairByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -190,7 +190,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 
-		if err := database.DeleteKeyPair(r.Context(), nil, kp.Id); err != nil {
+		if err := database.DeleteKeyPair(r.Context(), nil, kp.ID); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

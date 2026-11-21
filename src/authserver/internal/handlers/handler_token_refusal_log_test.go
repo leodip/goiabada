@@ -31,7 +31,7 @@ import (
 func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 	secretEncrypted, err := testDataCipher.Encrypt("the-right-secret")
 	require.NoError(t, err)
-	confidential := &record.Client{Id: 7, ClientIdentifier: "my-service", Enabled: true,
+	confidential := &record.Client{ID: 7, ClientIdentifier: "my-service", Enabled: true,
 		ClientCredentialsEnabled: true, ClientSecretEncrypted: secretEncrypted}
 	// Clients that registered themselves, each held to the method it registered (#708).
 	heldToBasic := *confidential
@@ -90,7 +90,7 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 				req.Header.Set("Authorization", tc.scheme+" "+
 					base64.StdEncoding.EncodeToString([]byte(tc.identifier+":"+tc.secret)))
 			}
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1}))
 
 			logged := logtest.CaptureSlog(t)
 			handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -120,7 +120,7 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 		form := url.Values{"grant_type": {"client_credentials"}, "client_id": {"app\nlevel=ERROR"}}
 		req := httptest.NewRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1}))
 
 		logged := logtest.CaptureSlog(t)
 		handler.ServeHTTP(httptest.NewRecorder(), req)

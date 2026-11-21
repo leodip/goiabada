@@ -95,13 +95,13 @@ func grantAuthServerPermissionsToUser(t *testing.T, user *record.User, identifie
 
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 	for _, identifier := range identifiers {
 		granted := false
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == identifier {
-				assignPermissionToUser(t, user.Id, permissions[i].Id)
+				assignPermissionToUser(t, user.ID, permissions[i].ID)
 				granted = true
 				break
 			}
@@ -175,14 +175,14 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 
 		for _, tc := range tokens {
 			t.Run(route.name+", "+tc.name, func(t *testing.T) {
-				before, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+				before, err := database.GetUserByID(context.Background(), nil, tc.user.ID)
 				require.NoError(t, err)
 
 				got := sendBearer(t, route, tc.token)
 
 				assert.Equal(t, unparseable, got, "answered exactly as a token that does not parse")
 
-				after, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+				after, err := database.GetUserByID(context.Background(), nil, tc.user.ID)
 				require.NoError(t, err)
 				assert.Equal(t, before.Email, after.Email, "the handler never ran")
 			})
@@ -196,12 +196,12 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 // signer and parser shows the aud check reads the shape it will be given.
 func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 	secondResource := createTestResource(t, "bearer-aud-"+strings.ToLower(fake.LetterN(8)), "A second audience")
-	require.NotZero(t, secondResource.Id)
+	require.NotZero(t, secondResource.ID)
 	t.Cleanup(func() {
-		assert.NoError(t, database.DeleteResource(context.Background(), nil, secondResource.Id))
+		assert.NoError(t, database.DeleteResource(context.Background(), nil, secondResource.ID))
 	})
-	secondPermission := createTestPermission(t, secondResource.Id, "read", "Read")
-	require.NotZero(t, secondPermission.Id)
+	secondPermission := createTestPermission(t, secondResource.ID, "read", "Read")
+	require.NotZero(t, secondPermission.ID)
 	secondScope := secondResource.ResourceIdentifier + ":" + secondPermission.PermissionIdentifier
 
 	requireAudienceArray := func(t *testing.T, token string) {
@@ -234,21 +234,21 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
 		t.Cleanup(func() {
-			assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+			assert.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 		})
 
 		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
-		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+		permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 		require.NoError(t, err)
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == builtin.ManagePermissionIdentifier {
 				require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-					&record.ClientPermission{ClientId: client.Id, PermissionId: permissions[i].Id}))
+					&record.ClientPermission{ClientID: client.ID, PermissionID: permissions[i].ID}))
 			}
 		}
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-			&record.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
+			&record.ClientPermission{ClientID: client.ID, PermissionID: secondPermission.ID}))
 
 		scope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " + secondScope
 		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{

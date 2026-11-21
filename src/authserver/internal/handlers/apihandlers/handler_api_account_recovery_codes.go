@@ -49,7 +49,7 @@ func HandleAccountRecoveryCodesGet(database accountRecoveryCodesDatabase) http.H
 			return
 		}
 
-		remaining, err := database.CountUnusedUserRecoveryCodes(r.Context(), nil, user.Id)
+		remaining, err := database.CountUnusedUserRecoveryCodes(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -131,7 +131,7 @@ func HandleAccountRecoveryCodesPost(
 
 		// After the commit, naming nothing of the codes (#257 decision 10).
 		auditLogger.Log(r.Context(), audit.EventRecoveryCodesCreated, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

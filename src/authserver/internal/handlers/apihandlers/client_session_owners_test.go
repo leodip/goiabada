@@ -36,11 +36,11 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	var asked []int64
-	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { asked = args.Get(2).([]int64) }).
 		Return(map[int64]record.User{
-			7: {Id: 7, Email: "jane@example.com", GivenName: "Jane"},
-			9: {Id: 9, Email: "sam@example.com", GivenName: "Sam"},
+			7: {ID: 7, Email: "jane@example.com", GivenName: "Jane"},
+			9: {ID: 9, Email: "sam@example.com", GivenName: "Sam"},
 		}, nil).
 		Once()
 
@@ -54,17 +54,17 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 	database.AssertExpectations(t)
 }
 
-// The order is the order the sessions first name each id, and not the order GetUsersByIds
+// The order is the order the sessions first name each id, and not the order GetUsersByIDs
 // answers in: that method returns a map, whose iteration order Go randomizes per run, so a
 // helper walking it would produce a different array on every request and nothing could pin the
 // bytes.
 func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]record.User{
-			7:  {Id: 7, GivenName: "Jane"},
-			9:  {Id: 9, GivenName: "Sam"},
-			11: {Id: 11, GivenName: "Alex"},
+			7:  {ID: 7, GivenName: "Jane"},
+			9:  {ID: 9, GivenName: "Sam"},
+			11: {ID: 11, GivenName: "Alex"},
 		}, nil).
 		Once()
 
@@ -92,7 +92,7 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "[]", string(marshalled))
 
-	database.AssertNotCalled(t, "GetUsersByIds", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUsersByIDs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A session naming a user with no row is a broken row: user_sessions.user_id is a non-null
@@ -101,8 +101,8 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 // loadSessionClients makes for a client id with no row.
 func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return(map[int64]record.User{7: {Id: 7}}, nil).Once()
+	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Return(map[int64]record.User{7: {ID: 7}}, nil).Once()
 
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{
 		ownerSession(1, 7), ownerSession(2, 9),
@@ -114,7 +114,7 @@ func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 
 func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]record.User(nil), errs.New("the database is down")).Once()
 
 	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{ownerSession(1, 7)})
@@ -130,12 +130,12 @@ func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T)
 
 	sessions := []record.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{Id: 7}, nil).Once()
-	database.On("GetUserSessionsByClientIdPaginated", mock.Anything, (*sql.Tx)(nil), int64(7), 1, 50).
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{ID: 7}, nil).Once()
+	database.On("GetUserSessionsByClientIDPaginated", mock.Anything, (*sql.Tx)(nil), int64(7), 1, 50).
 		Return(sessions, len(sessions), nil).Once()
 	expectSessionListReads(database, sessions)
 	expectSessionOwnerRead(database, record.User{
-		Id: 42, Email: "jane@example.com", GivenName: "Jane", FamilyName: "Doe",
+		ID: 42, Email: "jane@example.com", GivenName: "Jane", FamilyName: "Doe",
 	})
 
 	req := sessionListRequest("/api/v1/admin/clients/7/sessions", "", nil)

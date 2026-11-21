@@ -49,7 +49,7 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	code := parsed.Query().Get("code")
 	require.NotEmpty(t, code)
 
-	stored, err := database.GetUserById(context.Background(), nil, created.User.ID)
+	stored, err := database.GetUserByID(context.Background(), nil, created.User.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, hashutil.HashString(code), stored.ForgotPasswordCodeHash,
@@ -83,7 +83,7 @@ func createUserMembers(t *testing.T, req api.CreateUserAdminRequest) (int, map[s
 	defer func() { _ = resp.Body.Close() }()
 	t.Cleanup(func() {
 		if created, err := database.GetUserByEmail(context.Background(), nil, req.Email); err == nil && created != nil {
-			_ = database.DeleteUser(context.Background(), nil, created.Id)
+			_ = database.DeleteUser(context.Background(), nil, created.ID)
 		}
 	})
 
@@ -150,7 +150,7 @@ func TestAPIUserCreatePost_ASetupEmailThatCannotBeSentAnswersTheUser(t *testing.
 	stored, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, stored, "the user is created although its email was not sent")
-	assert.Equal(t, answered.ID, stored.Id)
+	assert.Equal(t, answered.ID, stored.ID)
 	assert.NotEmpty(t, stored.ForgotPasswordCodeHash, "the setup code is stored as when the email goes out")
 }
 

@@ -25,8 +25,8 @@ import (
 // save finds the browser no longer holding its sign-in, after the sign-in was read and its client
 // named (#812).
 func TestCeremonyBoundary_TheNoLongerActivePageTakesNoClientsBrand(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name          string

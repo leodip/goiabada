@@ -89,11 +89,11 @@ func createHeaderClient(t *testing.T) (*record.Client, string) {
 		ClientIdentifier:         "header-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    encrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client, secret
 }
 

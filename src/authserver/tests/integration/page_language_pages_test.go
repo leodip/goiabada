@@ -73,7 +73,7 @@ func newPageLanguageUser(t *testing.T, enabled bool, locale, pageLanguage string
 // setPageLanguage stores a new page language for a user, as a save in the console does.
 func setPageLanguage(t *testing.T, userId int64, pageLanguage string) {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	user.PageLanguage = pageLanguage
@@ -84,7 +84,7 @@ func setPageLanguage(t *testing.T, userId int64, pageLanguage string) {
 func withOTP(t *testing.T, user *record.User) string {
 	t.Helper()
 	secret := newOTPSecretForTest(t, user.Email)
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	stored.OTPSecretEncrypted = encryptOTPSecretForTest(t, secret)
@@ -94,14 +94,14 @@ func withOTP(t *testing.T, user *record.User) string {
 }
 
 // newPageLanguageClient is a client at the level given, asking for consent when consent is true.
-func newPageLanguageClient(t *testing.T, level record.AcrLevel, consent bool) (*record.Client, *record.RedirectURI) {
+func newPageLanguageClient(t *testing.T, level record.ACRLevel, consent bool) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-pagelang-" + fake.LetterN(8),
 		ConsentRequired:  consent,
 		DefaultAcrLevel:  level,
 	})
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 	return client, redirectUri
 }
@@ -176,7 +176,7 @@ func submitOtp(t *testing.T, browser *http.Client, otpPage *http.Response, code 
 // signedInBrowser is a browser asking for English, holding a level 1 session of user.
 func signedInBrowser(t *testing.T, user *record.User, password string) *http.Client {
 	t.Helper()
-	client, redirectUri := newPageLanguageClient(t, record.AcrLevel1, false)
+	client, redirectUri := newPageLanguageClient(t, record.ACRLevel1, false)
 	browser := browserAskingFor(t, "en")
 
 	pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri, nil))
@@ -223,7 +223,7 @@ func TestPageLanguage_TheSignInFollowsTheChoiceFromThePasswordOn(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			user, password := newPageLanguageUser(t, true, "", tc.pageLanguage)
 			otpSecret := withOTP(t, user)
-			client, redirectUri := newPageLanguageClient(t, record.AcrLevel2Mandatory, true)
+			client, redirectUri := newPageLanguageClient(t, record.ACRLevel2Mandatory, true)
 			browser := browserAskingFor(t, "en")
 
 			// No user is known before the password, so the address typed there can disclose no
@@ -258,7 +258,7 @@ func TestPageLanguage_TheAccountDisabledRefusalFollowsTheChoiceNotLanguageAndReg
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			user, password := newPageLanguageUser(t, false, "fr", tc.pageLanguage)
-			client, redirectUri := newPageLanguageClient(t, record.AcrLevel1, false)
+			client, redirectUri := newPageLanguageClient(t, record.ACRLevel1, false)
 			browser := browserAskingFor(t, "en")
 
 			pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri, nil))
@@ -291,7 +291,7 @@ func TestPageLanguage_TheSignInPageOfASignedInBrowserFollowsTheSessionsUser(t *t
 		t.Run(tc.name, func(t *testing.T) {
 			user, password := newPageLanguageUser(t, true, "", tc.pageLanguage)
 			browser := signedInBrowser(t, user, password)
-			client, redirectUri := newPageLanguageClient(t, record.AcrLevel1, false)
+			client, redirectUri := newPageLanguageClient(t, record.ACRLevel1, false)
 
 			pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri,
 				url.Values{"ui_locales": {"es"}, "prompt": {"login"}}))
@@ -311,7 +311,7 @@ func TestPageLanguage_TheSignInsUserWinsOverTheSessionsUser(t *testing.T) {
 	browser := signedInBrowser(t, sessionUser, sessionPassword)
 	signingIn, password := newPageLanguageUser(t, true, "", "de")
 	withOTP(t, signingIn)
-	client, redirectUri := newPageLanguageClient(t, record.AcrLevel2Mandatory, false)
+	client, redirectUri := newPageLanguageClient(t, record.ACRLevel2Mandatory, false)
 
 	pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri,
 		url.Values{"ui_locales": {"es"}, "prompt": {"login"}}))
@@ -340,7 +340,7 @@ func TestPageLanguage_TheSignOutFollowsTheChoice(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			user, password := newPageLanguageUser(t, true, "", "")
 			browser := signedInBrowser(t, user, password)
-			setPageLanguage(t, user.Id, tc.pageLanguage)
+			setPageLanguage(t, user.ID, tc.pageLanguage)
 
 			resp := loadPage(t, browser, appConfig.AuthServer.BaseURL+logoutPath+"?ui_locales=es")
 			assertPageIn(t, tc.confirmation, resp)
@@ -377,7 +377,7 @@ func TestPageLanguage_TheResetPageFollowsTheLinksUser(t *testing.T) {
 
 			email := plusAddress()
 			user, _ := createResetTestUser(t, email)
-			setPageLanguage(t, user.Id, tc.pageLanguage)
+			setPageLanguage(t, user.ID, tc.pageLanguage)
 
 			browser := browserAskingFor(t, "en")
 			requestPasswordReset(t, browser, email)
@@ -419,7 +419,7 @@ func TestPageLanguage_TheSignInsUserOnAutomaticReplacesTheSessionsUsersChoice(t 
 			sessionUser, sessionPassword := newPageLanguageUser(t, true, "", "pt-BR")
 			browser := signedInBrowser(t, sessionUser, sessionPassword)
 			user, password := newPageLanguageUser(t, false, "fr", tc.pageLanguage)
-			client, redirectUri := newPageLanguageClient(t, record.AcrLevel1, false)
+			client, redirectUri := newPageLanguageClient(t, record.ACRLevel1, false)
 
 			pwdPage := followToPage(t, browser, authorizeURL(client, redirectUri,
 				url.Values{"ui_locales": {"es"}, "prompt": {"login"}}))
@@ -461,7 +461,7 @@ func TestPageLanguage_TheResetLinksUserOnAutomaticReplacesTheSessionsUsersChoice
 			browser := signedInBrowser(t, sessionUser, sessionPassword)
 			email := plusAddress()
 			user, _ := createResetTestUser(t, email)
-			setPageLanguage(t, user.Id, tc.pageLanguage)
+			setPageLanguage(t, user.ID, tc.pageLanguage)
 
 			requestPasswordReset(t, browser, email)
 			cleanURL := followResetLink(t, browser, latestResetLink(t, email))

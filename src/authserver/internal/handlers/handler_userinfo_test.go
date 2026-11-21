@@ -126,11 +126,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		user := &record.User{Id: 1, Subject: sub, Enabled: false}
+		user := &record.User{ID: 1, Subject: sub, Enabled: false}
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		}).Return()
 
 		jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -165,16 +165,16 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		birthDate := time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		group1 := record.Group{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}
-		groupAttr := record.GroupAttribute{Key: "groupAttr", Value: "groupValue", IncludeInIdToken: true}
+		group1 := record.Group{ID: 1, GroupIdentifier: "group1", IncludeInIDToken: true}
+		groupAttr := record.GroupAttribute{Key: "groupAttr", Value: "groupValue", IncludeInIDToken: true}
 		group1.Attributes = []record.GroupAttribute{groupAttr}
 
-		group2 := record.Group{Id: 2, GroupIdentifier: "group2", IncludeInIdToken: true}
+		group2 := record.Group{ID: 2, GroupIdentifier: "group2", IncludeInIDToken: true}
 
-		userAttr := record.UserAttribute{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}
+		userAttr := record.UserAttribute{Key: "userAttr", Value: "userValue", IncludeInIDToken: true}
 
 		user := &record.User{
-			Id:                            1,
+			ID:                            1,
 			Subject:                       sub,
 			Enabled:                       true,
 			Username:                      "testuser",
@@ -190,7 +190,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			ZoneInfo:                      "Europe/London",
 			ZoneInfoCountryName:           "United Kingdom",
 			Locale:                        "en-GB",
-			PhoneNumberCountryUniqueId:    "PRT_0",
+			PhoneNumberCountryUniqueID:    "PRT_0",
 			PhoneNumberCountryCallingCode: "+351",
 			PhoneNumber:                   "912 345 678",
 			PhoneNumberVerified:           true,
@@ -209,7 +209,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
-		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(false, nil)
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
@@ -280,7 +280,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		user := &record.User{
-			Id:            1,
+			ID:            1,
 			Subject:       sub,
 			Enabled:       true,
 			Username:      "testuser",
@@ -290,8 +290,8 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			FamilyName:    "User",
 			AddressLine1:  "123 Test St",
 			UpdatedAt:     sql.NullTime{Time: time.Now(), Valid: true},
-			Groups:        []record.Group{{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}},
-			Attributes:    []record.UserAttribute{{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}},
+			Groups:        []record.Group{{ID: 1, GroupIdentifier: "group1", IncludeInIDToken: true}},
+			Attributes:    []record.UserAttribute{{Key: "userAttr", Value: "userValue", IncludeInIDToken: true}},
 		}
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
@@ -334,7 +334,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		updatedAt := time.Now()
 		user := &record.User{
-			Id:            1,
+			ID:            1,
 			Subject:       sub,
 			Enabled:       true,
 			Username:      "testuser",
@@ -349,7 +349,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
-		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(false, nil)
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
@@ -366,11 +366,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	// Divergence 3, userinfo's side: all three filter sites here read IncludeInIdToken, where
-	// issuance reads IncludeInAccessToken in the access token and IncludeInIdToken in the ID
+	// Divergence 3, userinfo's side: all three filter sites here read IncludeInIDToken, where
+	// issuance reads IncludeInAccessToken in the access token and IncludeInIDToken in the ID
 	// token. The success case above cannot show it, because every flag in its fixture is
-	// IncludeInIdToken: true.
-	t.Run("userinfo filters groups and attributes by IncludeInIdToken", func(t *testing.T) {
+	// IncludeInIDToken: true.
+	t.Run("userinfo filters groups and attributes by IncludeInIDToken", func(t *testing.T) {
 		jsonWriter := handlersmocks.NewJSONWriter(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
@@ -382,32 +382,32 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		idTokenGroup := record.Group{
-			Id: 1, GroupIdentifier: "id-token-group",
-			IncludeInIdToken: true, IncludeInAccessToken: false,
+			ID: 1, GroupIdentifier: "id-token-group",
+			IncludeInIDToken: true, IncludeInAccessToken: false,
 			Attributes: []record.GroupAttribute{
 				{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
-					IncludeInIdToken: true, IncludeInAccessToken: false},
+					IncludeInIDToken: true, IncludeInAccessToken: false},
 			},
 		}
 		accessTokenGroup := record.Group{
-			Id: 2, GroupIdentifier: "access-token-group",
-			IncludeInIdToken: false, IncludeInAccessToken: true,
+			ID: 2, GroupIdentifier: "access-token-group",
+			IncludeInIDToken: false, IncludeInAccessToken: true,
 			Attributes: []record.GroupAttribute{
 				{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
-					IncludeInIdToken: false, IncludeInAccessToken: true},
+					IncludeInIDToken: false, IncludeInAccessToken: true},
 			},
 		}
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Subject: sub,
 			Enabled: true,
 			Groups:  []record.Group{idTokenGroup, accessTokenGroup},
 			Attributes: []record.UserAttribute{
 				{Key: "idTokenAttr", Value: "idTokenValue",
-					IncludeInIdToken: true, IncludeInAccessToken: false},
+					IncludeInIDToken: true, IncludeInAccessToken: false},
 				{Key: "accessTokenAttr", Value: "accessTokenValue",
-					IncludeInIdToken: false, IncludeInAccessToken: true},
+					IncludeInIDToken: false, IncludeInAccessToken: true},
 			},
 		}
 
@@ -449,7 +449,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		user := &record.User{
-			Id:        1,
+			ID:        1,
 			Subject:   sub,
 			Enabled:   true,
 			GivenName: "Test",
@@ -460,7 +460,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
-		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(true, nil)
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, "https://admin.test/account/profile", claims["profile"])
@@ -535,7 +535,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 		},
 		{
 			name:        "the account is disabled",
-			user:        &record.User{Id: 1, Subject: "user123", Enabled: false},
+			user:        &record.User{ID: 1, Subject: "user123", Enabled: false},
 			description: "The user account is disabled.",
 		},
 	}
@@ -582,7 +582,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)
 				if test.user != nil {
 					auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
-						"user_id": test.user.Id,
+						"user_id": test.user.ID,
 					}).Return()
 				}
 

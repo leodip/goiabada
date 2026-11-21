@@ -22,7 +22,7 @@ func TestDecideCompletion(t *testing.T) {
 		// Reuse: the arrived-with session is valid and the ceremony's (#133).
 		{
 			name:  "a valid owned session is reused, with nothing else to do for an SSO pass",
-			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel1},
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.ACRLevel1},
 			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
@@ -44,13 +44,13 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name: "a captured OTP generation is promoted for level2_optional",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
+				otpConfigGenerationCaptured: true, target: record.ACRLevel2Optional},
 			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "a captured OTP generation is promoted for level2_mandatory",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
+				otpConfigGenerationCaptured: true, target: record.ACRLevel2Mandatory},
 			want: frozenCompletionPlan{arm: frozenArmReuse, promoteOtpConfigGeneration: true},
 		},
 		{
@@ -58,12 +58,12 @@ func TestDecideCompletion(t *testing.T) {
 			// decision 3).
 			name: "a captured OTP generation is not promoted for a level 1 target",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				otpConfigGenerationCaptured: true, target: record.AcrLevel1},
+				otpConfigGenerationCaptured: true, target: record.ACRLevel1},
 			want: frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
 			name:  "nothing is promoted without a capture, whatever the target",
-			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.AcrLevel2Mandatory},
+			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, target: record.ACRLevel2Mandatory},
 			want:  frozenCompletionPlan{arm: frozenArmReuse},
 		},
 		{
@@ -72,7 +72,7 @@ func TestDecideCompletion(t *testing.T) {
 			// left (#537).
 			name: "level 1 completed in this ceremony replaces the reused session's authentication",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, level1Completed: true,
-				credentialEntered: true, target: record.AcrLevel1},
+				credentialEntered: true, target: record.ACRLevel1},
 			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, replaceAuthentication: true},
 		},
 		{
@@ -80,13 +80,13 @@ func TestDecideCompletion(t *testing.T) {
 			// so it extends the session's authentication rather than replacing it.
 			name: "a code entered over a reused session refreshes AuthTime and replaces nothing",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true,
-				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
+				credentialEntered: true, otpConfigGenerationCaptured: true, target: record.ACRLevel2Mandatory},
 			want: frozenCompletionPlan{arm: frozenArmReuse, refreshAuthTime: true, promoteOtpConfigGeneration: true},
 		},
 		{
 			name: "every reuse flag at once",
 			facts: completionFacts{sessionPresent: true, sessionValid: true, sessionOwned: true, raisesPrivilege: true,
-				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
+				level1Completed: true, credentialEntered: true, otpConfigGenerationCaptured: true, target: record.ACRLevel2Optional},
 			want: frozenCompletionPlan{arm: frozenArmReuse, rotateIdentifier: true, refreshAuthTime: true,
 				replaceAuthentication: true, promoteOtpConfigGeneration: true},
 		},
@@ -100,7 +100,7 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			// AuthenticatedAt has two writers, and OTP alone is not level 1 (#129 decision 15).
 			name:  "a credential entered without level 1 still restarts",
-			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: record.AcrLevel2Optional},
+			facts: completionFacts{credentialEntered: true, otpConfigGenerationCaptured: true, target: record.ACRLevel2Optional},
 			want:  frozenCompletionPlan{arm: frozenArmRestart},
 		},
 		{
@@ -140,7 +140,7 @@ func TestDecideCompletion(t *testing.T) {
 		{
 			name: "the reuse flags stay off on the create arm",
 			facts: completionFacts{level1Completed: true, raisesPrivilege: true, credentialEntered: true,
-				otpConfigGenerationCaptured: true, target: record.AcrLevel2Mandatory},
+				otpConfigGenerationCaptured: true, target: record.ACRLevel2Mandatory},
 			want: frozenCompletionPlan{arm: frozenArmCreate},
 		},
 	}
@@ -208,13 +208,13 @@ func TestDecideBeforeBinding(t *testing.T) {
 			claimsOTP: true, want: beforeBindingAuthenticatorRemoved,
 		},
 		{name: "a ceremony naming a code for a user with the authenticator it came from is bound",
-			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OtpConfigGeneration: 2},
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OTPConfigGeneration: 2},
 			claimsOTP: true, claimGeneration: 2, want: beforeBindingBind},
 		{
 			// Removed and another set up while the ceremony was in flight: the code came from the
 			// one removed, and the new one never gave one (#542 review).
 			name:      "a ceremony naming a code from an authenticator replaced since restarts",
-			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OtpConfigGeneration: 4},
+			user:      &record.User{Enabled: true, AuthStateGeneration: 7, OTPEnabled: true, OTPConfigGeneration: 4},
 			claimsOTP: true, claimGeneration: 2, want: beforeBindingAuthenticatorRemoved,
 		},
 		{name: "a ceremony naming no code is bound whatever the user has",
@@ -275,7 +275,7 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 		case afterBindingFactConsent:
 			facts.ConsentLoaded = true
 			if world.consentScope != nil {
-				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
+				facts.Consent = &record.UserConsent{UserID: 7, Scope: *world.consentScope}
 			}
 		default:
 			require.FailNow(t, "an unknown fact", "%v", need)

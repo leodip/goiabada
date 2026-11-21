@@ -102,7 +102,7 @@ func HandleAccountEmailPut(
 		// verified flag read above, so of concurrent changes from that read exactly one is made:
 		// each of the others answers 409 and sends nothing, where every one of them used to
 		// notify a previous address one verification had made eligible once (#404).
-		changed, err := database.TrySetUserEmail(r.Context(), nil, user.Id, user.Email, user.EmailVerified, email)
+		changed, err := database.TrySetUserEmail(r.Context(), nil, user.ID, user.Email, user.EmailVerified, email)
 		if err != nil {
 			writeEmailTakenOrInternalServerError(w, r, err)
 			return
@@ -122,7 +122,7 @@ func HandleAccountEmailPut(
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnEmail, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 
@@ -137,7 +137,7 @@ func HandleAccountEmailPut(
 		// hold and then change away from it, so an unverified one would let them mail any address
 		// on demand, one password-checked request per message (#404).
 		notifier.Send(r, accountnotice.EmailAddressChanged, accountnotice.Recipient{
-			UserId:        user.Id,
+			UserId:        user.ID,
 			Email:         previousEmail,
 			EmailVerified: previousEmailVerified,
 			Name:          user.FullName(),

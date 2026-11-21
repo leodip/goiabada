@@ -36,7 +36,7 @@ func serveDCRBody(t *testing.T, body string, database *datamocks.Database, audit
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
 	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)

@@ -75,7 +75,7 @@ func confidentialClient(t *testing.T) *record.Client {
 	t.Helper()
 	encrypted, err := testDataCipher.Encrypt(theSecret)
 	require.NoError(t, err)
-	return &record.Client{Id: 7, ClientIdentifier: "the_client", Enabled: true, ClientSecretEncrypted: encrypted}
+	return &record.Client{ID: 7, ClientIdentifier: "the_client", Enabled: true, ClientSecretEncrypted: encrypted}
 }
 
 // inTheBody is the method of a request that sends secret in its body: client_secret_post, or none
@@ -88,7 +88,7 @@ func inTheBody(secret string) clientauth.Method {
 }
 
 func publicClient() *record.Client {
-	return &record.Client{Id: 8, ClientIdentifier: "the_client", Enabled: true, IsPublic: true}
+	return &record.Client{ID: 8, ClientIdentifier: "the_client", Enabled: true, IsPublic: true}
 }
 
 func TestFindClient(t *testing.T) {

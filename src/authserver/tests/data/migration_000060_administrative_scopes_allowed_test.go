@@ -97,7 +97,7 @@ func TestMigration000060_AdministrativeScopesAllowed(t *testing.T) {
 			AdministrativeScopesAllowed: c.storedAtHead,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(ctx, nil, client), "seed client %s on %s", c.identifier, dbType())
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeAdministrativeScopesAllowed000060), "roll back to 000059 on %s", dbType())
@@ -141,10 +141,10 @@ func assertAdministrativeScopesAllowedShape000060(t *testing.T, h *isolatedDB, b
 		"[%s] 000060 must add the one column and touch nothing else of clients on %s", phase, dbType())
 }
 
-func readAdministrativeScopesAllowed000060(t *testing.T, h *isolatedDB, clientId int64) bool {
+func readAdministrativeScopesAllowed000060(t *testing.T, h *isolatedDB, clientID int64) bool {
 	t.Helper()
 	var allowed bool
-	q := fmt.Sprintf("SELECT administrative_scopes_allowed FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT administrative_scopes_allowed FROM clients WHERE id = %d", clientID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&allowed), "read clients.administrative_scopes_allowed on %s", dbType())
 	return allowed
 }

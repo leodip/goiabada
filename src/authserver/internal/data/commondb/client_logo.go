@@ -20,10 +20,10 @@ var clientLogoColumns = columnList{
 // scanClientLogo reads one row selected with clientLogoColumns.
 func scanClientLogo(row rowScanner, clientLogo *record.ClientLogo) error {
 	return row.Scan(
-		&clientLogo.Id,
+		&clientLogo.ID,
 		&clientLogo.CreatedAt,
 		&clientLogo.UpdatedAt,
-		&clientLogo.ClientId,
+		&clientLogo.ClientID,
 		&clientLogo.Logo,
 		&clientLogo.ContentType,
 	)
@@ -44,7 +44,7 @@ var updateClientLogo = statement{
 	mssql:    "UPDATE client_logos SET updated_at = @p1, client_id = @p2, logo = @p3, content_type = @p4 WHERE id = @p5",
 }
 
-var selectClientLogoByClientId = statement{
+var selectClientLogoByClientID = statement{
 	sqlite:   "SELECT " + clientLogoColumns.sqlite + " FROM client_logos WHERE client_id = ?",
 	mysql:    "SELECT " + clientLogoColumns.mysql + " FROM client_logos WHERE client_id = ?",
 	postgres: "SELECT " + clientLogoColumns.postgres + " FROM client_logos WHERE client_id = $1",
@@ -69,7 +69,7 @@ var selectClientHasLogo = statement{
 
 func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 
-	if clientLogo.ClientId == 0 {
+	if clientLogo.ClientID == 0 {
 		return errs.New("can't create client logo with client_id 0")
 	}
 
@@ -81,20 +81,20 @@ func (d *Database) CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	clientLogo.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertClientLogo, "client logo",
-		clientLogo.CreatedAt, clientLogo.UpdatedAt, clientLogo.ClientId, clientLogo.Logo, clientLogo.ContentType)
+		clientLogo.CreatedAt, clientLogo.UpdatedAt, clientLogo.ClientID, clientLogo.Logo, clientLogo.ContentType)
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	clientLogo.Id = id
+	clientLogo.ID = id
 	return nil
 }
 
 func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error {
 
-	if clientLogo.Id == 0 {
+	if clientLogo.ID == 0 {
 		return errs.New("can't update client logo with id 0")
 	}
 
@@ -102,8 +102,8 @@ func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	clientLogo.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateClientLogo.text(d.Dialect),
-		clientLogo.UpdatedAt, clientLogo.ClientId, clientLogo.Logo, clientLogo.ContentType,
-		clientLogo.Id)
+		clientLogo.UpdatedAt, clientLogo.ClientID, clientLogo.Logo, clientLogo.ContentType,
+		clientLogo.ID)
 	if err != nil {
 		clientLogo.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client logo")
@@ -112,13 +112,13 @@ func (d *Database) UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo 
 	return nil
 }
 
-func (d *Database) GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error) {
-	return queryOne(ctx, d, tx, selectClientLogoByClientId.text(d.Dialect), []any{clientId}, scanClientLogo, "client logo")
+func (d *Database) GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.ClientLogo, error) {
+	return queryOne(ctx, d, tx, selectClientLogoByClientID.text(d.Dialect), []any{clientID}, scanClientLogo, "client logo")
 }
 
-func (d *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error {
+func (d *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteClientLogo.text(d.Dialect), clientId)
+	_, err := d.ExecSQL(ctx, tx, deleteClientLogo.text(d.Dialect), clientID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete client logo")
 	}
@@ -126,9 +126,9 @@ func (d *Database) DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId in
 	return nil
 }
 
-func (d *Database) ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
+func (d *Database) ClientHasLogo(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error) {
 
-	rows, err := d.QuerySQL(ctx, tx, selectClientHasLogo.text(d.Dialect), clientId)
+	rows, err := d.QuerySQL(ctx, tx, selectClientHasLogo.text(d.Dialect), clientID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

@@ -35,7 +35,7 @@ func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, 
 		// field after this call, as the two inline clients further down this file do.
 		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		AdministrativeScopesAllowed:             administrativeScopesAllowed,
 	}
 
@@ -49,7 +49,7 @@ func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, 
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -163,7 +163,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Follow global setting
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
@@ -200,7 +200,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
@@ -512,7 +512,7 @@ func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
 	user := createROPCUser(t, password)
 
 	client.AuthorizationCodeEnabled = true
-	client.DefaultAcrLevel = record.AcrLevel2Mandatory
+	client.DefaultACRLevel = record.ACRLevel2Mandatory
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
@@ -549,14 +549,14 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 
 	// Create resource and permission
 	resource := createResourceWithId(t, "testapi-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read")
+	permission := createPermissionWithId(t, resource.ID, "read")
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
 	// Assign permission to user
-	assignPermissionToUser(t, user.Id, permission.Id)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)

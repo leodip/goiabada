@@ -150,7 +150,7 @@ func TestAPIBrandAssets_EachKindIsStoredReadAndServed(t *testing.T) {
 			assert.Equal(t, tt.height, uploaded.Height)
 			assert.Regexp(t, `^`+regexp.QuoteMeta(base)+`/brand-assets/`+id+`\?v=[0-9a-f]{12}$`, uploaded.Url)
 
-			stored, err := database.GetBrandAssetById(context.Background(), nil, uploaded.Id)
+			stored, err := database.GetBrandAssetByID(context.Background(), nil, uploaded.Id)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			assert.Equal(t, tt.data, stored.Content)

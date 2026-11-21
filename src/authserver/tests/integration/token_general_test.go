@@ -49,7 +49,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)

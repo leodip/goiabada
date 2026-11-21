@@ -68,14 +68,14 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -271,14 +271,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -472,14 +472,14 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)

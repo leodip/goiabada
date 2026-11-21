@@ -42,8 +42,8 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	// whose Consent required is off today: the row the account consent endpoint lists and
 	// deletes.
 	consent := &record.UserConsent{
-		UserId:    code.User.Id,
-		ClientId:  code.Client.Id,
+		UserID:    code.User.ID,
+		ClientID:  code.Client.ID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -64,9 +64,9 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	// connected-clients DELETEs route it through revocation.DisconnectClientTx; calling it
 	// here runs the identical transaction those handlers do, without minting the Account
 	// API token the endpoint itself would ask for.
-	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId, nil,
+	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserID, consent.ClientID, nil,
 		func(tx *sql.Tx) (bool, error) {
-			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
+			return database.DeleteUserConsent(context.Background(), tx, consent.ID)
 		})
 	require.NoError(t, err)
 	assert.True(t, result.ConsentDeleted, "this call deleted the consent")
@@ -74,9 +74,9 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	assert.Equal(t, 1, result.RecordedFamilyCount, "the grant's one family is newly recorded")
 
 	// The same disconnect again finds nothing left to end, and says so.
-	again, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId, nil,
+	again, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserID, consent.ClientID, nil,
 		func(tx *sql.Tx) (bool, error) {
-			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
+			return database.DeleteUserConsent(context.Background(), tx, consent.ID)
 		})
 	require.NoError(t, err)
 	assert.False(t, again.Changed(), "a repeated disconnect changes nothing: %+v", again)
@@ -113,11 +113,11 @@ func newConsentWithdrawalFixture(t *testing.T, user *record.User, password strin
 
 	withdrawnClient, withdrawnCode := createAuthCode(t, f.withdrawnSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, withdrawnCode.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, withdrawnCode.ClientID) })
 	otherClient, otherCode := createAuthCode(t, f.otherSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
-	require.Equal(t, withdrawnCode.UserId, otherCode.UserId, "both grants must belong to one user")
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
+	require.Equal(t, withdrawnCode.UserID, otherCode.UserID, "both grants must belong to one user")
 	// Consent required off is the case the refresh arm never checks a stored consent for, so a
 	// refusal below is the withdrawal's revocation and nothing else.
 	require.False(t, withdrawnCode.Client.ConsentRequired)
@@ -130,8 +130,8 @@ func newConsentWithdrawalFixture(t *testing.T, user *record.User, password strin
 	require.True(t, ok, "the other grant must carry a refresh token: %v", otherTokens)
 
 	f.consent = &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  withdrawnCode.ClientId,
+		UserID:    user.ID,
+		ClientID:  withdrawnCode.ClientID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -156,7 +156,7 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 	deletionEvent string) {
 	t.Helper()
 
-	got, err := database.GetUserConsentById(context.Background(), nil, f.consent.Id)
+	got, err := database.GetUserConsentByID(context.Background(), nil, f.consent.ID)
 	require.NoError(t, err)
 	assert.Nil(t, got, "the consent row is deleted")
 
@@ -179,11 +179,11 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if int64(details["client_id"].(float64)) != f.withdrawnCode.ClientId {
+		if int64(details["client_id"].(float64)) != f.withdrawnCode.ClientID {
 			continue
 		}
 		found++
-		assert.Equal(t, f.withdrawnCode.UserId, int64(details["user_id"].(float64)))
+		assert.Equal(t, f.withdrawnCode.UserID, int64(details["user_id"].(float64)))
 		assert.Equal(t, loggedInUser, details["logged_in_user"])
 		// The initial token was already revoked by its rotation, so the rotated one is the only
 		// token this withdrawal moved, and its code was used, so the mark moved none.
@@ -201,7 +201,7 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if int64(details["consent_id"].(float64)) == f.consent.Id {
+		if int64(details["consent_id"].(float64)) == f.consent.ID {
 			foundDeletion++
 		}
 	}

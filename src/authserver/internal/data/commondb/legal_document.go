@@ -20,7 +20,7 @@ var legalDocumentColumns = columnList{
 // scanLegalDocument reads one row selected with legalDocumentColumns.
 func scanLegalDocument(row rowScanner, doc *record.LegalDocument) error {
 	return row.Scan(
-		&doc.Id,
+		&doc.ID,
 		&doc.CreatedAt,
 		&doc.UpdatedAt,
 		&doc.ShortName,
@@ -74,7 +74,7 @@ var acquireLegalDocumentRow = statement{
 	mssql:    "UPDATE legal_documents SET updated_at = @p1 WHERE id = @p2",
 }
 
-var selectLegalDocumentById = statement{
+var selectLegalDocumentByID = statement{
 	sqlite:   "SELECT " + legalDocumentColumns.sqlite + " FROM legal_documents WHERE id = ?",
 	mysql:    "SELECT " + legalDocumentColumns.mysql + " FROM legal_documents WHERE id = ?",
 	postgres: "SELECT " + legalDocumentColumns.postgres + " FROM legal_documents WHERE id = $1",
@@ -114,9 +114,9 @@ var legalDocumentVersionColumns = columnList{
 // scanLegalDocumentVersion reads one row selected with legalDocumentVersionColumns.
 func scanLegalDocumentVersion(row rowScanner, version *record.LegalDocumentVersion) error {
 	return row.Scan(
-		&version.Id,
+		&version.ID,
 		&version.PublishedAt,
-		&version.LegalDocumentId,
+		&version.LegalDocumentID,
 		&version.VersionNumber,
 		&version.Title,
 		&version.Markdown,
@@ -136,7 +136,7 @@ var insertLegalDocumentVersion = statement{
 		"OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5)",
 }
 
-var selectLegalDocumentVersionsByLegalDocumentId = statement{
+var selectLegalDocumentVersionsByLegalDocumentID = statement{
 	sqlite: "SELECT " + legalDocumentVersionColumns.sqlite + " FROM legal_document_versions " +
 		"WHERE legal_document_id = ? ORDER BY version_number",
 	mysql: "SELECT " + legalDocumentVersionColumns.mysql + " FROM legal_document_versions " +
@@ -176,13 +176,13 @@ func (d *Database) CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 		return err
 	}
 
-	legalDocument.Id = id
+	legalDocument.ID = id
 	return nil
 }
 
 func (d *Database) UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error {
 
-	if legalDocument.Id == 0 {
+	if legalDocument.ID == 0 {
 		return errs.New("can't update legal document with id 0")
 	}
 
@@ -191,7 +191,7 @@ func (d *Database) UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 
 	_, err := d.ExecSQL(ctx, tx, updateLegalDocument.text(d.Dialect),
 		legalDocument.UpdatedAt, legalDocument.ShortName, legalDocument.DraftTitle, legalDocument.DraftMarkdown,
-		legalDocument.RetiredAt, legalDocument.Id)
+		legalDocument.RetiredAt, legalDocument.ID)
 	if err != nil {
 		legalDocument.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update legal document")
@@ -219,32 +219,32 @@ func (d *Database) UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 //
 // The transaction is required. Without one the statement autocommits and releases the row before
 // the caller's read runs, which is the whole of what this buys.
-func (d *Database) AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error {
+func (d *Database) AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring a legal document row requires a transaction: an autocommitted statement releases the row before the caller can read it")
 	}
 
-	if legalDocumentId == 0 {
+	if legalDocumentID == 0 {
 		return errs.New("can't acquire a legal document row with an id of 0")
 	}
 
-	if _, err := d.ExecSQL(ctx, tx, acquireLegalDocumentRow.text(d.Dialect), time.Now().UTC(), legalDocumentId); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireLegalDocumentRow.text(d.Dialect), time.Now().UTC(), legalDocumentID); err != nil {
 		return errs.Wrap(err, "unable to acquire the legal document row")
 	}
 
 	return nil
 }
 
-func (d *Database) UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64,
+func (d *Database) UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentID int64,
 	appliesToAllApps bool) error {
 
-	if legalDocumentId == 0 {
+	if legalDocumentID == 0 {
 		return errs.New("can't update the applies to of legal document with id 0")
 	}
 
 	_, err := d.ExecSQL(ctx, tx, updateLegalDocumentAppliesToAllApps.text(d.Dialect),
-		sql.NullTime{Time: time.Now().UTC(), Valid: true}, appliesToAllApps, legalDocumentId)
+		sql.NullTime{Time: time.Now().UTC(), Valid: true}, appliesToAllApps, legalDocumentID)
 	if err != nil {
 		return errs.Wrap(err, "unable to update legal document applies to")
 	}
@@ -252,8 +252,8 @@ func (d *Database) UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *
 	return nil
 }
 
-func (d *Database) GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error) {
-	return queryOne(ctx, d, tx, selectLegalDocumentById.text(d.Dialect), []any{legalDocumentId},
+func (d *Database) GetLegalDocumentByID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) (*record.LegalDocument, error) {
+	return queryOne(ctx, d, tx, selectLegalDocumentByID.text(d.Dialect), []any{legalDocumentID},
 		scanLegalDocument, "legal document")
 }
 
@@ -278,9 +278,9 @@ func (d *Database) GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]reco
 	return queryAll(ctx, d, tx, nil, selectAllLegalDocuments.text(d.Dialect), nil, scanLegalDocument, "legal document")
 }
 
-func (d *Database) DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error {
+func (d *Database) DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteLegalDocument.text(d.Dialect), legalDocumentId)
+	_, err := d.ExecSQL(ctx, tx, deleteLegalDocument.text(d.Dialect), legalDocumentID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete legal document")
 	}
@@ -291,23 +291,23 @@ func (d *Database) DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDoc
 func (d *Database) CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error {
 
 	id, err := d.insert(ctx, tx, insertLegalDocumentVersion, "legal document version",
-		version.PublishedAt, version.LegalDocumentId, version.VersionNumber, version.Title, version.Markdown)
+		version.PublishedAt, version.LegalDocumentID, version.VersionNumber, version.Title, version.Markdown)
 	if err != nil {
 		return err
 	}
 
-	version.Id = id
+	version.ID = id
 	return nil
 }
 
-func (d *Database) GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx,
-	legalDocumentId int64) ([]record.LegalDocumentVersion, error) {
-	return queryAll(ctx, d, tx, nil, selectLegalDocumentVersionsByLegalDocumentId.text(d.Dialect),
-		[]any{legalDocumentId}, scanLegalDocumentVersion, "legal document version")
+func (d *Database) GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx,
+	legalDocumentID int64) ([]record.LegalDocumentVersion, error) {
+	return queryAll(ctx, d, tx, nil, selectLegalDocumentVersionsByLegalDocumentID.text(d.Dialect),
+		[]any{legalDocumentID}, scanLegalDocumentVersion, "legal document version")
 }
 
-func (d *Database) GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64,
+func (d *Database) GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentID int64,
 	versionNumber int) (*record.LegalDocumentVersion, error) {
-	return queryOne(ctx, d, tx, selectLegalDocumentVersion.text(d.Dialect), []any{legalDocumentId, versionNumber},
+	return queryOne(ctx, d, tx, selectLegalDocumentVersion.text(d.Dialect), []any{legalDocumentID, versionNumber},
 		scanLegalDocumentVersion, "legal document version")
 }

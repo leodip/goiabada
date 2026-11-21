@@ -70,7 +70,7 @@ type RefreshToken struct {
 // "none" from "not read". The audit events name no other person who acted on the user (decision
 // 2); a row that cannot be read well enough to strip them is an error, and no document.
 func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) (api.UserExportResponse, error) {
-	events, err := auditEvents(user.Id, parts.AuditEvents)
+	events, err := auditEvents(user.ID, parts.AuditEvents)
 	if err != nil {
 		return api.UserExportResponse{}, err
 	}
@@ -99,7 +99,7 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		ExportedAt:    exportedAt.UTC(),
 		Issuer:        issuer,
 		Identifiers: api.UserExportIdentifiersResponse{
-			ID:      user.Id,
+			ID:      user.ID,
 			Subject: user.Subject,
 			Email:   user.Email,
 			// The digest an audit entry about the address records: the address is stored in
@@ -129,7 +129,7 @@ func permissionId(p api.PermissionResponse) int64 { return p.ID }
 // address and browser are empty and its sign-in time is its own row's, which rotation copies from
 // the parent, the moment the password was checked.
 func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
-	sorted := inIdOrder(tokens, func(t RefreshToken) int64 { return t.Row.Id })
+	sorted := inIdOrder(tokens, func(t RefreshToken) int64 { return t.Row.ID })
 	entries := make([]api.UserExportRefreshTokenResponse, 0, len(sorted))
 	for _, token := range sorted {
 		row := token.Row
@@ -140,17 +140,17 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 			ExpiresAt:         nullTime(row.ExpiresAt),
 			MaxLifetime:       nullTime(row.MaxLifetime),
 			SessionIdentifier: row.SessionIdentifier,
-			JTI:               row.RefreshTokenJti,
+			JTI:               row.RefreshTokenJTI,
 			Revoked:           row.Revoked || token.FamilyRevoked,
 		}
 		if token.Client != nil {
 			entry.ClientIdentifier = token.Client.ClientIdentifier
 			entry.ClientName, entry.ClientNameUnverified = token.Client.NameForUsers()
 		}
-		if row.CodeId.Valid {
+		if row.CodeID.Valid {
 			if code := token.Code; code != nil {
 				entry.Revoked = entry.Revoked || code.Revoked
-				entry.IPAddress = code.IpAddress
+				entry.IPAddress = code.IPAddress
 				entry.UserAgent = code.UserAgent
 				if !code.AuthenticatedAt.IsZero() {
 					authenticatedAt := code.AuthenticatedAt
@@ -173,14 +173,14 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 // acted on; a row no user's token made keeps its actor, a client or the recover command, neither a
 // person. Every other byte of a row is as stored.
 func auditEvents(userId int64, rows []record.AuditLog) ([]api.UserExportAuditEventResponse, error) {
-	sorted := inIdOrder(rows, func(row record.AuditLog) int64 { return row.Id })
+	sorted := inIdOrder(rows, func(row record.AuditLog) int64 { return row.ID })
 	entries := make([]api.UserExportAuditEventResponse, 0, len(sorted))
 	for i := range sorted {
 		row := &sorted[i]
 		entry := api.UserExportAuditEventResponse{AuditLogResponse: apimapping.ToAuditLogResponse(row)}
 
 		var hidden []string
-		if row.LoggedInUserId.Valid && row.LoggedInUserId.Int64 != userId {
+		if row.LoggedInUserID.Valid && row.LoggedInUserID.Int64 != userId {
 			entry.ActedByAdministrator = true
 			entry.LoggedInUserID = nil
 			hidden = append(hidden, "logged_in_user")
@@ -191,7 +191,7 @@ func auditEvents(userId int64, rows []record.AuditLog) ([]api.UserExportAuditEve
 		if len(hidden) > 0 {
 			details, err := withoutKeys(row.Details, hidden)
 			if err != nil {
-				return nil, errs.Wrapf(err, "unable to strip audit log %d for the export", row.Id)
+				return nil, errs.Wrapf(err, "unable to strip audit log %d for the export", row.ID)
 			}
 			entry.Details = details
 		}

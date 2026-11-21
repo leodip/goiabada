@@ -84,7 +84,7 @@ func LogAdministrativeScopeRefused(ctx context.Context, auditLogger AuditLogger,
 	scopes []string, checkpoint string, userId int64) {
 
 	auditLogger.Log(ctx, audit.EventAdministrativeScopeRefused, map[string]interface{}{
-		"client_id":         client.Id,
+		"client_id":         client.ID,
 		"client_identifier": client.ClientIdentifier,
 		"scopes":            scopes,
 		"checkpoint":        checkpoint,

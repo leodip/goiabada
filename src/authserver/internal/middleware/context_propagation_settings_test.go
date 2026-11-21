@@ -39,8 +39,8 @@ func theSettingsRequestsContext() interface{} {
 // The accept arm: the settings read is issued on behalf of the request that triggered it.
 func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("GetSettingsById", theSettingsRequestsContext(), mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+	db.On("GetSettingsByID", theSettingsRequestsContext(), mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "TestApp"}, nil).Once()
 
 	reached := false
 	handler := Settings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -78,12 +78,12 @@ func HandleAccountPhonePut(
 
 		// Apply updates; always mark phone as unverified on change
 		if strings.TrimSpace(input.PhoneNumber) == "" {
-			user.PhoneNumberCountryUniqueId = ""
+			user.PhoneNumberCountryUniqueID = ""
 			user.PhoneNumberCountryCallingCode = ""
 			user.PhoneNumber = ""
 			user.PhoneNumberVerified = false
 		} else {
-			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
+			user.PhoneNumberCountryUniqueID = input.PhoneCountryUniqueId
 			user.PhoneNumberCountryCallingCode = callingCode
 			user.PhoneNumber = input.PhoneNumber
 			user.PhoneNumberVerified = false
@@ -98,7 +98,7 @@ func HandleAccountPhonePut(
 
 		// Audit (self-service)
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnPhone, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

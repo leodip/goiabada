@@ -21,14 +21,14 @@ var groupAttributeColumns = columnList{
 // scanGroupAttribute reads one row selected with groupAttributeColumns.
 func scanGroupAttribute(row rowScanner, groupAttribute *record.GroupAttribute) error {
 	return row.Scan(
-		&groupAttribute.Id,
+		&groupAttribute.ID,
 		&groupAttribute.CreatedAt,
 		&groupAttribute.UpdatedAt,
 		&groupAttribute.Key,
 		&groupAttribute.Value,
-		&groupAttribute.IncludeInIdToken,
+		&groupAttribute.IncludeInIDToken,
 		&groupAttribute.IncludeInAccessToken,
-		&groupAttribute.GroupId,
+		&groupAttribute.GroupID,
 	)
 }
 
@@ -55,14 +55,14 @@ var updateGroupAttribute = statement{
 		`include_in_access_token = @p5, group_id = @p6 WHERE id = @p7`,
 }
 
-var selectGroupAttributeById = statement{
+var selectGroupAttributeByID = statement{
 	sqlite:   "SELECT " + groupAttributeColumns.sqlite + " FROM group_attributes WHERE id = ?",
 	mysql:    "SELECT " + groupAttributeColumns.mysql + " FROM group_attributes WHERE id = ?",
 	postgres: "SELECT " + groupAttributeColumns.postgres + " FROM group_attributes WHERE id = $1",
 	mssql:    "SELECT " + groupAttributeColumns.mssql + " FROM group_attributes WHERE id = @p1",
 }
 
-var selectGroupAttributesByGroupId = statement{
+var selectGroupAttributesByGroupID = statement{
 	sqlite:   "SELECT " + groupAttributeColumns.sqlite + " FROM group_attributes WHERE group_id = ?",
 	mysql:    "SELECT " + groupAttributeColumns.mysql + " FROM group_attributes WHERE group_id = ?",
 	postgres: "SELECT " + groupAttributeColumns.postgres + " FROM group_attributes WHERE group_id = $1",
@@ -86,7 +86,7 @@ var deleteGroupAttribute = statement{
 
 func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error {
 
-	if groupAttribute.GroupId == 0 {
+	if groupAttribute.GroupID == 0 {
 		return errs.New("can't create groupAttribute with group_id 0")
 	}
 
@@ -99,20 +99,20 @@ func (d *Database) CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 
 	id, err := d.insert(ctx, tx, insertGroupAttribute, "groupAttribute",
 		groupAttribute.CreatedAt, groupAttribute.UpdatedAt, groupAttribute.Key, groupAttribute.Value,
-		groupAttribute.IncludeInIdToken, groupAttribute.IncludeInAccessToken, groupAttribute.GroupId)
+		groupAttribute.IncludeInIDToken, groupAttribute.IncludeInAccessToken, groupAttribute.GroupID)
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	groupAttribute.Id = id
+	groupAttribute.ID = id
 	return nil
 }
 
 func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error {
 
-	if groupAttribute.Id == 0 {
+	if groupAttribute.ID == 0 {
 		return errs.New("can't update groupAttribute with id 0")
 	}
 
@@ -120,9 +120,9 @@ func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 	groupAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateGroupAttribute.text(d.Dialect),
-		groupAttribute.UpdatedAt, groupAttribute.Key, groupAttribute.Value, groupAttribute.IncludeInIdToken,
-		groupAttribute.IncludeInAccessToken, groupAttribute.GroupId,
-		groupAttribute.Id)
+		groupAttribute.UpdatedAt, groupAttribute.Key, groupAttribute.Value, groupAttribute.IncludeInIDToken,
+		groupAttribute.IncludeInAccessToken, groupAttribute.GroupID,
+		groupAttribute.ID)
 	if err != nil {
 		groupAttribute.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update groupAttribute")
@@ -131,20 +131,20 @@ func (d *Database) UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAt
 	return nil
 }
 
-func (d *Database) GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error) {
-	return queryOne(ctx, d, tx, selectGroupAttributeById.text(d.Dialect), []any{groupAttributeId},
+func (d *Database) GetGroupAttributeByID(ctx context.Context, tx *sql.Tx, groupAttributeID int64) (*record.GroupAttribute, error) {
+	return queryOne(ctx, d, tx, selectGroupAttributeByID.text(d.Dialect), []any{groupAttributeID},
 		scanGroupAttribute, "groupAttribute")
 }
 
-func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupAttribute, error) {
+func (d *Database) GetGroupAttributesByGroupIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.GroupAttribute, error) {
 
-	if len(groupIds) == 0 {
+	if len(groupIDs) == 0 {
 		return nil, nil
 	}
 
 	var groupAttributes []record.GroupAttribute
 
-	err := forEachIdBatch(groupIds, func(batch []int64) error {
+	err := forEachIDBatch(groupIDs, func(batch []int64) error {
 		query := selectGroupAttributesWhere.text(d.Dialect) + inList(d.Dialect, "group_id", 1, len(batch))
 		var err error
 		groupAttributes, err = queryAll(ctx, d, tx, groupAttributes, query, int64Args(batch),
@@ -158,14 +158,14 @@ func (d *Database) GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx,
 	return groupAttributes, nil
 }
 
-func (d *Database) GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error) {
-	return queryAll(ctx, d, tx, nil, selectGroupAttributesByGroupId.text(d.Dialect), []any{groupId},
+func (d *Database) GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupAttribute, error) {
+	return queryAll(ctx, d, tx, nil, selectGroupAttributesByGroupID.text(d.Dialect), []any{groupID},
 		scanGroupAttribute, "groupAttribute")
 }
 
-func (d *Database) DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error {
+func (d *Database) DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteGroupAttribute.text(d.Dialect), groupAttributeId)
+	_, err := d.ExecSQL(ctx, tx, deleteGroupAttribute.text(d.Dialect), groupAttributeID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete groupAttribute")
 	}

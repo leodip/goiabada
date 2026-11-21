@@ -73,7 +73,7 @@ func (m otpStepMocks) armOtpCeremony(keyURL string) *ceremony.AuthContext {
 }
 
 func (m otpStepMocks) armUser(user *record.User) {
-	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+	m.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 }
 
 func (m otpStepMocks) armClient() {
@@ -137,7 +137,7 @@ func TestMissingSettings_TheOTPStepAnswersBeforeReadingItsCeremony(t *testing.T)
 			handler.ServeHTTP(rr, req)
 
 			m.ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
-			m.database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			m.database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 			m.otpSecretGenerator.AssertNotCalled(t, "GenerateKeyURL", mock.Anything, mock.Anything)
 			m.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			m.assertNothingSaved(t)
@@ -150,7 +150,7 @@ func TestHandleAuthOtpGet_AUserReadFailingAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
+	m.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -164,7 +164,7 @@ func TestHandleAuthOtpGet_AUserNotFoundAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	m.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("user not found")).Return().Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -178,7 +178,7 @@ func TestHandleAuthOtpGet_AClientReadFailingAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
@@ -194,7 +194,7 @@ func TestHandleAuthOtpGet_AClientNotFoundAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(nil, nil).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("client not found")).Return().Once()
@@ -212,7 +212,7 @@ func TestHandleAuthOtpGet_ACodeFormThatCannotRenderAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpTestKeyURL("STALESECRETSTALE"))
-	m.armUser(&record.User{Id: 1, OTPEnabled: true})
+	m.armUser(&record.User{ID: 1, OTPEnabled: true})
 	m.armClient()
 	m.ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 		return ac.OTPKeyURL == ""
@@ -238,7 +238,7 @@ func TestHandleAuthOtpGet_ASaveFailingAnswers500(t *testing.T) {
 			req := otpGetRequest()
 			rr := httptest.NewRecorder()
 			m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
-			m.armUser(&record.User{Id: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled})
+			m.armUser(&record.User{ID: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled})
 			m.armClient()
 			m.ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(assert.AnError).Once()
 			m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
@@ -258,7 +258,7 @@ func TestHandleAuthOtpGet_AKeyThatCannotBeGeneratedAnswers500(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.armClient()
 	m.otpSecretGenerator.On("GenerateKeyURL", "test@example.com", "TestApp").Return("", assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
@@ -273,7 +273,7 @@ func TestHandleAuthOtpGet_AGeneratedKeyThatDoesNotParseAnswers500(t *testing.T) 
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	authContext := m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.armClient()
 	m.otpSecretGenerator.On("GenerateKeyURL", "test@example.com", "TestApp").Return("not a key url", nil).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("otp key url is not a totp key")).Return().Once()
@@ -291,7 +291,7 @@ func TestHandleAuthOtpGet_AKeyThatCannotBeDrawnAnswers500AndSavesNothing(t *test
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpUndrawableKeyURL())
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.armClient()
 	m.pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "unable to generate otp png image")
@@ -310,7 +310,7 @@ func TestHandleAuthOtpGet_AStoredKeyThatDoesNotParseIsReplaced(t *testing.T) {
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	authContext := m.armOtpCeremony("not a key url")
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.armClient()
 	generated := otpTestKeyURL("JBSWY3DPEHPK3PXP")
 	m.otpSecretGenerator.On("GenerateKeyURL", "test@example.com", "TestApp").Return(generated, nil).Once()
@@ -334,7 +334,7 @@ func TestHandleAuthOtpGet_AnEnrolmentFormThatCannotRenderAnswers500(t *testing.T
 	req := otpGetRequest()
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
-	m.armUser(&record.User{Id: 1, Email: "test@example.com"})
+	m.armUser(&record.User{ID: 1, Email: "test@example.com"})
 	m.armClient()
 	m.ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp_enrollment.html",
@@ -355,7 +355,7 @@ func TestHandleAuthOtpPost_AnEnrolmentKeyThatDoesNotParseAnswers500BeforeAnyRead
 
 	m.post().ServeHTTP(rr, req)
 
-	m.database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+	m.database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 	m.database.AssertNotCalled(t, "TryConsumeUserOTPStep", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	m.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	m.assertNothingSaved(t)
@@ -366,7 +366,7 @@ func TestHandleAuthOtpPost_AUserReadFailingAnswers500(t *testing.T) {
 	req := otpPostRequest("123456")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
+	m.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheError(assert.AnError)).Return().Once()
 
 	m.post().ServeHTTP(rr, req)
@@ -387,11 +387,11 @@ func TestHandleAuthOtpPost_AClientReadFailingOnARefusalAnswers500AfterTheCodeIsC
 	req := otpPostRequest("123456")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true,
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true,
 		OTPSecretEncrypted: encryptOTPForTest(t, "test-secret")})
 	// A refused code against the enrolled authenticator advances the consecutive count (#489).
 	expectOTPWriteTransactions(m.database)
-	m.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{"user_id": int64(1)}).
 		Return().Once()
@@ -417,15 +417,15 @@ func TestHandleAuthOtpPost_AClaimOnAUserDeletedMeanwhileAnswersAsAMissingUser(t 
 	req := otpPostRequest(otptest.Code(t, secret, time.Now()))
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, secret),
-		OtpConfigGeneration: 3})
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, secret),
+		OTPConfigGeneration: 3})
 	m.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 		Return(false, nil).Once()
 	// The refused claim advances the consecutive count, which moves no row of a user who is gone.
 	expectOTPWriteTransactions(m.database)
-	m.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
+	m.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
 		Return(false, nil).Once()
-	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	m.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("user not found")).Return().Once()
 
 	handler.ServeHTTP(rr, req)
@@ -442,7 +442,7 @@ func TestHandleAuthOtpPost_AClientNotFoundOnARefusalAnswers500(t *testing.T) {
 	req := otpPostRequest("")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true})
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true})
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(nil, nil).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("client not found")).Return().Once()
@@ -462,7 +462,7 @@ func TestHandleAuthOtpPost_AnEnrolmentFormWhoseKeyCannotBeDrawnAnswers500(t *tes
 	req := otpPostRequest("123456")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpUndrawableKeyURL())
-	m.armUser(&record.User{Id: 1, Enabled: false})
+	m.armUser(&record.User{ID: 1, Enabled: false})
 	m.armClient()
 	m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(1)}).
 		Return().Once()
@@ -480,7 +480,7 @@ func TestHandleAuthOtpPost_AFormThatCannotRenderAnswers500(t *testing.T) {
 	req := otpPostRequest("")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true})
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true})
 	m.armClient()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
@@ -504,7 +504,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentWhoseClearFailsStillAnswersItsPage(t *t
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4})
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4})
 	m.ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(assert.AnError).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
@@ -533,7 +533,7 @@ func TestHandleAuthOtpPost_ALostEnrolmentWhosePageCannotRenderAnswers500(t *test
 	req := otpPostRequest("123456")
 	rr := httptest.NewRecorder()
 	m.armOtpCeremony(otpTestKeyURL("JBSWY3DPEHPK3PXP"))
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4})
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4})
 	m.ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(assert.AnError).Once()

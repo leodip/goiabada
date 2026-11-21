@@ -195,7 +195,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 	// never with one naming the account (#137). UserDisabledError is what still tells the handler
 	// to write EventUserDisabled.
 	if !codeEntity.User.Enabled {
-		return nil, userDisabled("Code is invalid.", codeEntity.User.Id)
+		return nil, userDisabled("Code is invalid.", codeEntity.User.ID)
 	}
 
 	// The generation boundary (#106). A code carries the generation its ceremony
@@ -252,7 +252,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		if getUserSessionErr != nil {
 			return nil, getUserSessionErr
 		}
-		if codeSession != nil && codeSession.UserId != codeEntity.UserId {
+		if codeSession != nil && codeSession.UserID != codeEntity.UserID {
 			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 				"Code is invalid.", http.StatusBadRequest)
 		}
@@ -276,7 +276,7 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 				AdministrativeScopeRefusal(refused).Description(), http.StatusBadRequest),
 			Client: client,
 			Scopes: refused,
-			UserId: codeEntity.UserId,
+			UserId: codeEntity.UserID,
 		}
 	}
 

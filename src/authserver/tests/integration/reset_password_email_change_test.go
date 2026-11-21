@@ -36,7 +36,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 				user, password := createResetTestUser(t, plusAddress())
 				adminToken, _ := createAdminClientWithToken(t)
 				return user, password, func(t *testing.T, toEmail string) {
-					target := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email"
+					target := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/email"
 					resp := makeAPIRequest(t, "PUT", target, adminToken, api.UpdateUserEmailRequest{Email: toEmail, EmailVerified: true})
 					_ = resp.Body.Close()
 					require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -47,7 +47,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			name: "the account's own change",
 			account: func(t *testing.T) (*record.User, string, func(t *testing.T, toEmail string)) {
 				accessToken, u := accountEmailUserWithPassword(t)
-				stored, err := database.GetUserById(context.Background(), nil, u.Id)
+				stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 				require.NoError(t, err)
 				stored.Email = plusAddress()
 				stored.EmailVerified = true
@@ -98,7 +98,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			assert.Contains(t, body, resetCodeInvalidText)
 
-			assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), password),
+			assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), password),
 				"a link mailed to the previous address must not set the account's password")
 		})
 	}

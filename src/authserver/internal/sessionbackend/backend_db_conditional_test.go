@@ -32,7 +32,7 @@ func TestDatabaseBackend_UpdateIfUnchanged(t *testing.T) {
 
 	t.Run("passes the contents read and computes the deadline as Update does", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().UpdateBrowserSessionDataIfUnchanged(mock.Anything, (*sql.Tx)(nil), owner, hash,
 			"what was read", "ciphertext", fixedNow, wantExpiry).Return(true, nil)
@@ -67,12 +67,12 @@ func TestDatabaseBackend_UpdateIfUnchanged(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, want, expiresAt)
-		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIdHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIDHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("absent pre-read is not found and writes nothing", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(nil, nil)
 
 		_, err := testBackend(database, owner).UpdateIfUnchanged(settingsContext(), id,

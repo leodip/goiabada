@@ -82,11 +82,11 @@ func TestAuthOtp_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
 		page = refused
 	}
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
-	assert.Zero(t, stored.OtpConsecutiveFailures, "a next-step code is not counted against the authenticator")
+	assert.Zero(t, stored.OTPConsecutiveFailures, "a next-step code is not counted against the authenticator")
 	assert.Zero(t, stored.LastOTPStep, "and claims no step")
-	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.Id))
+	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.ID))
 
 	// Past the budget, so this is accepted only because none of the refusals was charged.
 	resp := authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, otpSecret, time.Now()))
@@ -111,11 +111,11 @@ func TestAuthOtp_ANextStepCodeOnTheSetupFormIsRefusedAsAClockRunningAhead(t *tes
 		page = refused
 	}
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.False(t, stored.OTPEnabled, "nothing was set up")
 	assert.Zero(t, stored.LastOTPStep, "and no step was claimed")
-	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.Id))
+	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.ID))
 
 	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, secret, time.Now())))
 	_ = page.Body.Close()
@@ -143,7 +143,7 @@ func TestAPIAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *t
 	assert.Equal(t, clockAheadMessage, refusal.ErrorDescription)
 	assert.Equal(t, 1, clockAheadRefusalsFor(t, adminToken, userId))
 
-	stored, err := database.GetUserById(context.Background(), nil, userId)
+	stored, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	assert.False(t, stored.OTPEnabled)
 	assert.Zero(t, stored.LastOTPStep, "no step was claimed")

@@ -124,10 +124,10 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			// the log disagree on precisely the ids an attacker chose, which is the case the
 			// correlation has to survive (#328). An empty context yields "", which is what a row
 			// written off a request carries.
-			RequestId: logging.FieldForLog(requestid.FromContext(ctx)),
+			RequestID: logging.FieldForLog(requestid.FromContext(ctx)),
 			// The two user columns, filled here so no call site has to remember them (#780).
-			UserId:         userIdOf(details),
-			LoggedInUserId: al.loggedInUserId(ctx),
+			UserID:         userIdOf(details),
+			LoggedInUserID: al.loggedInUserId(ctx),
 			// CreatedAt set by CreateAuditLog
 		}
 

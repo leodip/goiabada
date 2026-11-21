@@ -64,7 +64,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*record.Clie
 		AuthorizationCodeEnabled: false, // Disable auth code to test implicit-only
 		ImplicitGrantEnabled:     implicitEnabled,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -73,7 +73,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*record.Clie
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 
@@ -524,13 +524,13 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -695,13 +695,13 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -711,8 +711,8 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 
 	// Create resource and permission to trigger consent
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	requestState := fake.LetterN(16)
 	// Include resource permission in scope
@@ -1176,13 +1176,13 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 		AuthorizationCodeEnabled: true, // Auth code enabled
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)

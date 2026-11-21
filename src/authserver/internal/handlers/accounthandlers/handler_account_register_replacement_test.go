@@ -41,7 +41,7 @@ const deadRegistrationCode = "dead-code-0123456789abcdefghijklm"
 // sent the given time ago.
 func pendingRegistrationIssuedAgo(age time.Duration) *record.PreRegistration {
 	return &record.PreRegistration{
-		Id:                       42,
+		ID:                       42,
 		Email:                    registerSomeoneEmail,
 		VerificationCodeHash:     hashutil.HashString(deadRegistrationCode),
 		VerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC().Add(-age), Valid: true},
@@ -262,7 +262,7 @@ func TestHandleRegisterPost_WithoutVerificationADeadPendingRegistrationIsAbsent(
 		var input *usercreation.Input
 		userCreator.On("CreateUser", mock.Anything, mock.AnythingOfType("*usercreation.Input")).
 			Run(func(args mock.Arguments) { input = args.Get(1).(*usercreation.Input) }).
-			Return(&record.User{Id: 9, Email: registerSomeoneEmail}, nil).Once()
+			Return(&record.User{ID: 9, Email: registerSomeoneEmail}, nil).Once()
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.Anything).
 			Return(nil).Once()

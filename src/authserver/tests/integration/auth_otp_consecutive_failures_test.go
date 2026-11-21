@@ -21,7 +21,7 @@ import (
 )
 
 // TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetUp is #489 end to end,
-// through /auth/otp: a user one refusal short of record.OtpConsecutiveFailureLimit sends a wrong
+// through /auth/otp: a user one refusal short of record.OTPConsecutiveFailureLimit sends a wrong
 // code, which disables the authenticator and is audited once as otp_authenticator_disabled. The
 // right code is then refused like any wrong one, and the admin API says the authenticator is
 // disabled. An administrator sets a new password and then turns two-factor authentication off, which
@@ -35,9 +35,9 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 
 	// Seeded one short of the limit through the count's own statement, since reaching it through
 	// the form would take 99 refusals behind the otp rate tier's 5 per 15 minutes.
-	for i := 0; i < record.OtpConsecutiveFailureLimit-1; i++ {
-		disabled, err := database.IncrementUserOtpConsecutiveFailures(context.Background(), nil, user.Id,
-			user.OtpConfigGeneration)
+	for i := 0; i < record.OTPConsecutiveFailureLimit-1; i++ {
+		disabled, err := database.IncrementUserOTPConsecutiveFailures(context.Background(), nil, user.ID,
+			user.OTPConfigGeneration)
 		require.NoError(t, err)
 		require.False(t, disabled)
 	}
@@ -56,27 +56,27 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	assertOtpRefused(t, refusedAgain)
 	_ = refusedAgain.Body.Close()
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
-	assert.EqualValues(t, record.OtpConsecutiveFailureLimit, stored.OtpConsecutiveFailures)
+	assert.EqualValues(t, record.OTPConsecutiveFailureLimit, stored.OTPConsecutiveFailures)
 	assert.Zero(t, stored.LastOTPStep, "the refused right code claimed no step")
 
-	assert.Equal(t, 1, disabledEventsFor(t, adminToken, user.Id),
+	assert.Equal(t, 1, disabledEventsFor(t, adminToken, user.ID),
 		"the disable is audited once: by the refusal that reached the limit, not by the one after it")
 
-	shown := adminUser(t, adminToken, user.Id)
+	shown := adminUser(t, adminToken, user.ID)
 	assert.True(t, shown.OTPEnabled, "the authenticator is still there")
 	assert.True(t, shown.OTPAuthenticatorDisabled, "and the admin API says it is disabled")
 
 	// The way back: an administrator sets a new password, since whoever sent the codes knew the old
 	// one, and then turns two-factor authentication off, as the console's one save does.
 	newPassword := fake.Password(16)
-	resp, _ := sendAdmin(t, adminToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", user.Id),
+	resp, _ := sendAdmin(t, adminToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", user.ID),
 		map[string]any{"newPassword": newPassword})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	removeAuthenticatorAsAdministrator(t, user.Id)
-	shown = adminUser(t, adminToken, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
+	shown = adminUser(t, adminToken, user.ID)
 	assert.False(t, shown.OTPEnabled)
 	assert.False(t, shown.OTPAuthenticatorDisabled, "with no authenticator, nothing is disabled")
 
@@ -94,11 +94,11 @@ func TestAuthOtp_TheHundredthWrongCodeDisablesTheAuthenticatorUntilANewOneIsSetU
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	stored, err = database.GetUserById(context.Background(), nil, user.Id)
+	stored, err = database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.True(t, stored.OTPEnabled)
-	assert.Zero(t, stored.OtpConsecutiveFailures, "the new authenticator starts with no failures against it")
-	assert.False(t, adminUser(t, adminToken, user.Id).OTPAuthenticatorDisabled)
+	assert.Zero(t, stored.OTPConsecutiveFailures, "the new authenticator starts with no failures against it")
+	assert.False(t, adminUser(t, adminToken, user.ID).OTPAuthenticatorDisabled)
 
 	// And the new authenticator's code verifies at the next sign-in.
 	httpClient, otpPage, otpUrl = startOtpCeremony(t, client, redirectUri, user, newPassword, "")

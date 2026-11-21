@@ -26,7 +26,7 @@ func initialSettings(appName string) *record.Settings {
 	}
 }
 
-func TestCreateInitialSettings_WritesIdOneAndTheCounterMovesPastIt(t *testing.T) {
+func TestCreateInitialSettings_WritesIDOneAndTheCounterMovesPastIt(t *testing.T) {
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
@@ -37,9 +37,9 @@ func TestCreateInitialSettings_WritesIdOneAndTheCounterMovesPastIt(t *testing.T)
 	require.NoError(t, h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		return h.DB.CreateInitialSettings(ctx, tx, settings)
 	}))
-	assert.Equal(t, int64(1), settings.Id)
+	assert.Equal(t, int64(1), settings.ID)
 
-	stored, err := h.DB.GetSettingsById(ctx, nil, 1)
+	stored, err := h.DB.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, "Initial", stored.AppName)
@@ -53,12 +53,12 @@ func TestCreateInitialSettings_WritesIdOneAndTheCounterMovesPastIt(t *testing.T)
 	next := initialSettings("Next")
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, next),
 		"an ordinary insert after the explicit id does not collide with it")
-	assert.Greater(t, next.Id, int64(1))
+	assert.Greater(t, next.ID, int64(1))
 }
 
 // The shape decision 14 exists for: an id drawn inside a rolled-back transaction, which three of
 // the four engines do not give back. The explicit insert still lands at 1.
-func TestCreateInitialSettings_AfterARolledBackInsertDrewAnId(t *testing.T) {
+func TestCreateInitialSettings_AfterARolledBackInsertDrewAnID(t *testing.T) {
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 	errRollBack := errors.New("roll back")
@@ -75,7 +75,7 @@ func TestCreateInitialSettings_AfterARolledBackInsertDrewAnId(t *testing.T) {
 	require.NoError(t, h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		return h.DB.CreateInitialSettings(ctx, tx, settings)
 	}))
-	assert.Equal(t, int64(1), settings.Id)
+	assert.Equal(t, int64(1), settings.ID)
 	isEmpty, err := h.DB.IsEmpty(ctx)
 	require.NoError(t, err)
 	assert.False(t, isEmpty, "the row IsEmpty reads is there, whatever the counter did")
@@ -94,8 +94,8 @@ func TestCreateInitialSettings_RefusesANilTransaction(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "inside a transaction")
-	assert.Zero(t, settings.Id, "the struct is left as it was given")
-	stored, err := h.DB.GetSettingsById(ctx, nil, 1)
+	assert.Zero(t, settings.ID, "the struct is left as it was given")
+	stored, err := h.DB.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	assert.Nil(t, stored)
 }
@@ -116,7 +116,7 @@ func TestCreateInitialSettings_AFailedInsertCanBeRetried(t *testing.T) {
 		return h.DB.CreateInitialSettings(ctx, tx, duplicate)
 	})
 	require.Error(t, err, "id 1 is taken")
-	assert.Zero(t, duplicate.Id)
+	assert.Zero(t, duplicate.ID)
 
 	for i := 0; i < 3; i++ {
 		require.NoError(t, h.DB.CreateSettings(ctx, nil, initialSettings("Ordinary")),

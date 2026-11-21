@@ -78,8 +78,8 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 	for i, c := range uiThemes000065 {
 		settings := settings000065()
 		require.NoErrorf(t, h.DB.CreateSettings(ctx, nil, settings), "seed a settings row for %q on %s", c.stored, dbType())
-		setUIThemeUnread(t, h, settings.Id, c.stored)
-		ids[i] = settings.Id
+		setUIThemeUnread(t, h, settings.ID, c.stored)
+		ids[i] = settings.ID
 	}
 
 	// 4. Down to 000064 changes nothing.
@@ -101,7 +101,7 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 	automatic := settings000065()
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, automatic))
 	migrateToHead000065(t, h)
-	assert.Emptyf(t, uiThemeOf000065(t, h, automatic.Id), "a later start leaves the automatic theme alone on %s", dbType())
+	assert.Emptyf(t, uiThemeOf000065(t, h, automatic.ID), "a later start leaves the automatic theme alone on %s", dbType())
 	for i, c := range uiThemes000065 {
 		assert.Equalf(t, c.want, uiThemeOf000065(t, h, ids[i]), "a later start leaves %q as %q on %s", c.stored, c.want, dbType())
 	}
@@ -147,10 +147,10 @@ func settings000065() *record.Settings {
 	}
 }
 
-func uiThemeOf000065(t *testing.T, h *isolatedDB, settingsId int64) string {
+func uiThemeOf000065(t *testing.T, h *isolatedDB, settingsID int64) string {
 	t.Helper()
 	var theme string
-	q := fmt.Sprintf("SELECT ui_theme FROM settings WHERE id = %d", settingsId)
+	q := fmt.Sprintf("SELECT ui_theme FROM settings WHERE id = %d", settingsID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&theme), "read settings.ui_theme on %s", dbType())
 	return theme
 }

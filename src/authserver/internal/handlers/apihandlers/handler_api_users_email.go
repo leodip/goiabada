@@ -20,7 +20,7 @@ import (
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type usersEmailDatabase interface {
 	userTargetPolicyDatabase
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
@@ -60,7 +60,7 @@ func HandleUserEmailPut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -81,7 +81,7 @@ func HandleUserEmailPut(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -112,7 +112,7 @@ func HandleUserEmailPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserEmail, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": loggedInUser,
 		})
 

@@ -31,7 +31,7 @@ const recordDir = "authserver/internal/record"
 // recordAllowedImports is every non-standard-library path a production file here may name.
 //
 // core/builtin carries the permission identifiers Client and Resource name, and core/errs is
-// this tree's one error constructor, which the four enumerations #385 moved in here -- AcrLevel,
+// this tree's one error constructor, which the four enumerations #385 moved in here -- ACRLevel,
 // KeyState, PasswordPolicy and ThreeStateSetting -- raise their refusals through, and which
 // docs/development/conventions.md's error-handling rule requires of every error this tree constructs. Both are declarations and
 // values rather than behaviour, which is the test for anything that would be added here: a path

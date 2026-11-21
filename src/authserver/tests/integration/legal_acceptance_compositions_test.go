@@ -93,7 +93,7 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.NotContains(t, early.Header.Get("Location"), "access_token", "no token before the step")
 		assert.NotContains(t, early.Header.Get("Location"), "id_token")
 		_ = early.Body.Close()
-		assert.Empty(t, acceptedVersionIds(t, f.user.Id))
+		assert.Empty(t, acceptedVersionIds(t, f.user.ID))
 
 		_, documents := readStep(t, page)
 		require.Len(t, documents, 1)
@@ -107,7 +107,7 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.NotEmpty(t, tokens.Get("access_token"), "the app gets its access token")
 		assert.NotEmpty(t, tokens.Get("id_token"), "and its ID token")
 		assert.Equal(t, legalAcceptanceState, tokens.Get("state"))
-		assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.Id))
+		assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID))
 	})
 
 	t.Run("Decline answers access_denied in the fragment", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.Equal(t, legalAcceptanceState, answer.Get("state"))
 		assert.Empty(t, answer.Get("access_token"))
 		assert.Empty(t, answer.Get("id_token"))
-		assert.Empty(t, acceptedVersionIds(t, user.Id))
+		assert.Empty(t, acceptedVersionIds(t, user.ID))
 	})
 }
 
@@ -138,7 +138,7 @@ func TestLegalAcceptance_AnAppThatAsksForConsentShowsItsConsentScreenAfterTheSte
 	_, documents := readStep(t, page)
 	resp := postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	_ = page.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.Id), "accepted before consent")
+	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID), "accepted before consent")
 
 	consentURL := assertRedirect(t, resp, "/auth/consent")
 	_ = resp.Body.Close()
@@ -146,7 +146,7 @@ func TestLegalAcceptance_AnAppThatAsksForConsentShowsItsConsentScreenAfterTheSte
 	require.Equal(t, http.StatusOK, consentPage.StatusCode, "the consent screen comes next")
 	ceremonyId := getCeremonyIdFromPage(t, consentPage)
 	_ = consentPage.Body.Close()
-	consents, err := database.GetConsentsByUserId(context.Background(), nil, f.user.Id)
+	consents, err := database.GetConsentsByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Empty(t, consents, "no consent before the user gives it")
 
@@ -167,7 +167,7 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	setRegSettings(t, true, false, false)
 	f, termsId := newRegistrationApp(t)
 	f.updateFixtureClient(t, func(client *record.Client) {
-		client.DefaultAcrLevel = record.AcrLevel2Mandatory
+		client.DefaultACRLevel = record.ACRLevel2Mandatory
 		client.ConsentRequired = true
 	})
 	browser := createHttpClient(t)
@@ -196,14 +196,14 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	otpPage := loadPage(t, browser, otpURL)
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
 	require.NotEmpty(t, secret, "the second factor is enrolled before the step")
-	assert.Empty(t, acceptedVersionIds(t, user.Id))
+	assert.Empty(t, acceptedVersionIds(t, user.ID))
 	resp = authenticateWithOtp(t, browser, otpURL, otpPage, otptest.Code(t, secret, time.Now()))
 	_ = otpPage.Body.Close()
 	// Setting up the authenticator shows its recovery codes before the sign-in goes on.
 	resp = passSetupRecoveryCodes(t, browser, resp)
 	location = assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
-	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
+	enrolled, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.True(t, enrolled.OTPEnabled, "the authenticator is enrolled")
 
@@ -212,7 +212,7 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	require.Len(t, documents, 1, "the step asks for the app's terms")
 	resp = postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	_ = page.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.Id), "the sign-in is the new user's")
+	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.ID), "the sign-in is the new user's")
 
 	consentURL := assertRedirect(t, resp, "/auth/consent")
 	_ = resp.Body.Close()
@@ -229,7 +229,7 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	codeValue := f.appRedirect(t, resp).Get("code")
 	require.NotEmpty(t, codeValue, "the app gets a code")
 	code := loadCodeFromDatabase(t, codeValue)
-	assert.Equal(t, user.Id, code.User.Id)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel, "issued at the level the app requires")
+	assert.Equal(t, user.ID, code.User.ID)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel, "issued at the level the app requires")
 	assert.Contains(t, code.AuthMethods, "otp", "with the second factor")
 }

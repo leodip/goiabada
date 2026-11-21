@@ -90,7 +90,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 			name: "the settings row cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
 				db := datamocks.NewDatabase(t)
-				db.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
+				db.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 				return Settings(db, faults)
 			},
 			pageSentence: "fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,

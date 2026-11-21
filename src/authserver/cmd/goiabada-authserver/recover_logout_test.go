@@ -108,7 +108,7 @@ func (rc *logoutReceiver) serve(w http.ResponseWriter, r *http.Request) {
 	if token != nil {
 		header = token.Header
 	}
-	sessions, err := rc.db.GetUserSessionsByUserId(context.Background(), nil, rc.userId)
+	sessions, err := rc.db.GetUserSessionsByUserID(context.Background(), nil, rc.userId)
 	assert.NoError(rc.t, err)
 
 	rc.mu.Lock()
@@ -159,7 +159,7 @@ func seedLogoutClient(t *testing.T, db *sqlitedb.Database, identifier, uri strin
 		Enabled:                          true,
 		AuthorizationCodeEnabled:         true,
 		TokenExpirationInSeconds:         300,
-		DefaultAcrLevel:                  record.AcrLevel1,
+		DefaultACRLevel:                  record.ACRLevel1,
 		BackchannelLogoutURI:             uri,
 		BackchannelLogoutSessionRequired: sessionRequired,
 	}
@@ -179,18 +179,18 @@ func seedLogoutSession(t *testing.T, db *sqlitedb.Database, userId int64, sid st
 		Started:           now.Add(-lastUsedAgo),
 		LastAccessed:      now.Add(-lastUsedAgo),
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-lastUsedAgo),
 		PasswordAuthTime:  now.Add(-lastUsedAgo),
-		IpAddress:         "192.0.2.10",
+		IPAddress:         "192.0.2.10",
 		DeviceType:        "desktop",
-		UserId:            userId,
+		UserID:            userId,
 	}
 	require.NoError(t, db.CreateUserSession(ctx, nil, session))
 	for _, client := range clients {
 		require.NoError(t, db.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{
-			UserSessionId: session.Id,
-			ClientId:      client.Id,
+			UserSessionID: session.ID,
+			ClientID:      client.ID,
 			Started:       session.Started,
 			LastAccessed:  session.LastAccessed,
 		}))
@@ -223,7 +223,7 @@ func lineIndex(lines []string, line string) int {
 func TestRecover_TellsEveryAppThatKnewTheUser(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	user := recoverUser(t, db)
-	rc := newLogoutReceiver(t, db, user.Id, map[string]int{"/refuses": http.StatusBadRequest})
+	rc := newLogoutReceiver(t, db, user.ID, map[string]int{"/refuses": http.StatusBadRequest})
 
 	subOnly := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
 	expiredOnly := seedLogoutClient(t, db, "app-expired-only", rc.server.URL+"/expired-only", false)
@@ -231,10 +231,10 @@ func TestRecover_TellsEveryAppThatKnewTheUser(t *testing.T) {
 	refuses := seedLogoutClient(t, db, "app-refuses", rc.server.URL+"/refuses", false)
 	withoutURI := seedLogoutClient(t, db, "app-without-uri", "", false)
 
-	seedLogoutSession(t, db, user.Id, "sid-valid-1", time.Minute, subOnly, requiresSid, refuses, withoutURI)
+	seedLogoutSession(t, db, user.ID, "sid-valid-1", time.Minute, subOnly, requiresSid, refuses, withoutURI)
 	// Past the seeded idle timeout of two hours.
-	seedLogoutSession(t, db, user.Id, "sid-expired", 3*time.Hour, subOnly, expiredOnly, requiresSid)
-	seedLogoutSession(t, db, user.Id, "sid-valid-2", 2*time.Minute, requiresSid)
+	seedLogoutSession(t, db, user.ID, "sid-expired", 3*time.Hour, subOnly, expiredOnly, requiresSid)
+	seedLogoutSession(t, db, user.ID, "sid-valid-2", 2*time.Minute, requiresSid)
 
 	recorder := &recoverAuditRecorder{}
 	code, stdout, stderr := runRecoverOn(t, db, recorder, recoverInvocation{
@@ -303,7 +303,7 @@ func TestRecover_TellsEveryAppThatKnewTheUser(t *testing.T) {
 		assert.Greater(t, i, revokedAt, "the deliveries are recorded after the recovery")
 		details := recorder.details[i]
 		assert.Equal(t, recovery.Actor, details["command"])
-		assert.Equal(t, user.Id, details["user_id"])
+		assert.Equal(t, user.ID, details["user_id"])
 		sent[details["outcome"].(string)]++
 	}
 	assert.NotEqual(t, -1, revokedAt)
@@ -316,7 +316,7 @@ func TestRecover_SaysSoInOneLineWhenNoAppIsToBeTold(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	user := recoverUser(t, db)
 	withoutURI := seedLogoutClient(t, db, "app-without-uri", "", false)
-	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, withoutURI)
+	seedLogoutSession(t, db, user.ID, "sid-valid", time.Minute, withoutURI)
 
 	code, stdout, stderr := runRecoverOn(t, db, &recoverAuditRecorder{}, recoverInvocation{
 		email: "admin@example.com", grantManage: true,
@@ -334,9 +334,9 @@ func TestRecover_SaysSoInOneLineWhenNoAppIsToBeTold(t *testing.T) {
 func TestRecover_TurningTurnstileOffAloneTellsNoApp(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	user := recoverUser(t, db)
-	rc := newLogoutReceiver(t, db, user.Id, nil)
+	rc := newLogoutReceiver(t, db, user.ID, nil)
 	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
-	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	seedLogoutSession(t, db, user.ID, "sid-valid", time.Minute, app)
 
 	code, stdout, stderr := runRecoverOn(t, db, &recoverAuditRecorder{}, recoverInvocation{disableTurnstile: true})
 
@@ -352,9 +352,9 @@ func TestRecover_TurningTurnstileOffAloneTellsNoApp(t *testing.T) {
 func TestRecover_AnUnusableDataKeyLeavesTheRecoveryAndSaysTheAppsWereNotTold(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	user := recoverUser(t, db)
-	rc := newLogoutReceiver(t, db, user.Id, nil)
+	rc := newLogoutReceiver(t, db, user.ID, nil)
 	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
-	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	seedLogoutSession(t, db, user.ID, "sid-valid", time.Minute, app)
 
 	m, err := db.NewMigrator(context.Background(), nil)
 	require.NoError(t, err)

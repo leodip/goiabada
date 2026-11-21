@@ -259,7 +259,7 @@ func TestDCR_Consent_APublicClientShowsTheScreenOnEverySignIn(t *testing.T) {
 
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 	require.NoError(t, err)
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, consent, "the approval is stored")
 	require.Equal(t, "openid profile email", consent.Scope)

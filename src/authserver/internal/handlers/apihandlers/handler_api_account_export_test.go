@@ -222,7 +222,7 @@ func TestHandleAccountExportGet_RefusalsAndFailuresAreUncompressedAndUnrecorded(
 			users: exportDatabase().users, failing: "GetUserBySubject", err: errs.New("the database is down")}},
 			http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
 		{"a failed read of a part", anaSubject, &accountExportStore{userExportStore: &userExportStore{
-			users: exportDatabase().users, failing: "GetAuditLogsByUserId", err: errs.New("the database is down")}},
+			users: exportDatabase().users, failing: "GetAuditLogsByUserID", err: errs.New("the database is down")}},
 			http.StatusInternalServerError, "INTERNAL_SERVER_ERROR"},
 	} {
 		t.Run(c.name, func(t *testing.T) {

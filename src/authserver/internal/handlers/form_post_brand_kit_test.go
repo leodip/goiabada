@@ -22,17 +22,17 @@ import (
 func TestFormPost_TheCardDrawsTheBrandsLogoAndFavicon(t *testing.T) {
 	const callback = "https://example.com/callback"
 	brand := record.NewBrand("Night", record.BrandAppearanceAuto, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.HideAppName = true
-	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
-	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
-	brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
+	brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
+	brand.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
+	brand.FaviconAssetID = sql.NullInt64{Int64: 13, Valid: true}
 	database := datamocks.NewDatabase(t)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&brand, nil).Once()
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{11, 12, 13}).Return([]record.BrandAsset{
-		{Id: 11, Kind: record.BrandAssetKindLogo, Fingerprint: "111111111111"},
-		{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "222222222222"},
-		{Id: 13, Kind: record.BrandAssetKindFavicon, Fingerprint: "333333333333"},
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{11, 12, 13}).Return([]record.BrandAsset{
+		{ID: 11, Kind: record.BrandAssetKindLogo, Fingerprint: "111111111111"},
+		{ID: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "222222222222"},
+		{ID: 13, Kind: record.BrandAssetKindFavicon, Fingerprint: "333333333333"},
 	}, nil).Once()
 	w := httptest.NewRecorder()
 	r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/issue", nil),
@@ -64,7 +64,7 @@ func TestFormPost_TheCardDrawsTheBrandsLogoAndFavicon(t *testing.T) {
 func TestFormPost_ABrandWithoutAKitIsDrawnAsBefore(t *testing.T) {
 	const callback = "https://example.com/callback"
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.HideAppName = true
 	database := datamocks.NewDatabase(t)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&brand, nil).Once()

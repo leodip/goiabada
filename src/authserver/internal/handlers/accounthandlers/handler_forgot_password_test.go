@@ -239,7 +239,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		user := &record.User{
-			Id:            1,
+			ID:            1,
 			Enabled:       true,
 			Email:         "existing@example.com",
 			EmailVerified: true,
@@ -363,7 +363,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").
-			Return(&record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}, nil)
+			Return(&record.User{ID: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}, nil)
 		expectLinkSentPage(pageRenderer, rr, req)
 		details := captureRequestedPasswordReset(auditLogger)
 
@@ -396,7 +396,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").
-			Return(&record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}, nil)
+			Return(&record.User{ID: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}, nil)
 		expectLinkSentPage(pageRenderer, rr, req)
 
 		handler.ServeHTTP(rr, req)
@@ -471,7 +471,7 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 			req = req.WithContext(ctx)
 			rr := httptest.NewRecorder()
 
-			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true,
+			user := &record.User{ID: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true,
 				PageLanguage: tc.pageLanguage, Locale: tc.locale}
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
 			expectLinkSentPage(pageRenderer, rr, req)
@@ -523,24 +523,24 @@ func TestHandleForgotPasswordPost_SendsNothingUnlessTheAccountIsVerifiedAndEnabl
 			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "outcome": "unknown_address"},
 		},
 		{
-			name: "an unverified address", user: &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: false},
+			name: "an unverified address", user: &record.User{ID: 7, Enabled: true, Email: email, EmailVerified: false},
 			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "unverified_address"},
 		},
 		{
-			name: "a disabled account", user: &record.User{Id: 7, Enabled: false, Email: email, EmailVerified: true},
+			name: "a disabled account", user: &record.User{ID: 7, Enabled: false, Email: email, EmailVerified: true},
 			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_disabled"},
 		},
 		{
 			// Disabled is what an administrator did, and the reason re-verifying would not help.
-			name: "a disabled account with an unverified address", user: &record.User{Id: 7, Enabled: false, Email: email},
+			name: "a disabled account with an unverified address", user: &record.User{ID: 7, Enabled: false, Email: email},
 			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_disabled"},
 		},
 		{
 			name:         "an account changed between the lookup and the store",
-			user:         &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: true},
+			user:         &record.User{ID: 7, Enabled: true, Email: email, EmailVerified: true},
 			storeRefused: true,
 			wantAudit: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest, "user_id": int64(7),
 				"outcome": "account_changed"},
@@ -601,9 +601,9 @@ func TestHandleForgotPasswordPost_AnswersAfterTheLookupAlone(t *testing.T) {
 		user *record.User
 	}{
 		{name: "an address with no account", user: nil},
-		{name: "an unverified address", user: &record.User{Id: 7, Enabled: true, Email: email}},
-		{name: "a disabled account", user: &record.User{Id: 7, Enabled: false, Email: email, EmailVerified: true}},
-		{name: "a verified, enabled account", user: &record.User{Id: 7, Enabled: true, Email: email, EmailVerified: true}},
+		{name: "an unverified address", user: &record.User{ID: 7, Enabled: true, Email: email}},
+		{name: "a disabled account", user: &record.User{ID: 7, Enabled: false, Email: email, EmailVerified: true}},
+		{name: "a verified, enabled account", user: &record.User{ID: 7, Enabled: true, Email: email, EmailVerified: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -714,7 +714,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 
 		var order []string
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "someone@example.com").
-			Return(&record.User{Id: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
+			Return(&record.User{ID: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
@@ -763,7 +763,7 @@ func TestHandleForgotPasswordPost_AuditsEveryRequestOnce(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "someone@example.com").
-			Return(&record.User{Id: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
+			Return(&record.User{ID: 7, Enabled: true, Email: "someone@example.com", EmailVerified: true}, nil).Once()
 		database.On("TryStoreForgotPasswordCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 			mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()
 		pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.PasswordResetLink, mock.Anything).
@@ -853,7 +853,7 @@ func TestHandleForgotPasswordPost_TheEmailSaysHowLongTheResetAcceptsTheLink(t *t
 			req := forgotPasswordRequest("existing@example.com")
 			rr := httptest.NewRecorder()
 
-			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true, PasswordHash: tc.passwordHash}
+			user := &record.User{ID: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true, PasswordHash: tc.passwordHash}
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
 			expectLinkSentPage(pageRenderer, rr, req)
 			handler.ServeHTTP(rr, req)
@@ -903,7 +903,7 @@ func TestHandleForgotPasswordPost_TheLinkNamesTheSignInThePageNamed(t *testing.T
 			req.URL.RawQuery = strings.TrimPrefix(tc.query, "?")
 			rr := httptest.NewRecorder()
 
-			user := &record.User{Id: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}
+			user := &record.User{ID: 1, Enabled: true, Email: "existing@example.com", EmailVerified: true}
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
 			expectLinkSentPage(pageRenderer, rr, req)
 			handler.ServeHTTP(rr, req)

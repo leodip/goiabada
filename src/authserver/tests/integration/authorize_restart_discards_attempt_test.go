@@ -53,12 +53,12 @@ func newRestartFixture(t *testing.T, consentRequired bool) *restartFixture {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	user, password, otpSecret := createRestartUser(t)
@@ -120,7 +120,7 @@ func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http
 	t.Helper()
 
 	resp := loadPage(t, httpClient, f.authorizeURL("openid", fake.LetterN(8), fake.LetterN(43),
-		record.AcrLevel2Mandatory.String()))
+		record.ACRLevel2Mandatory.String()))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/level1"))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
@@ -146,7 +146,7 @@ func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http
 	code, _ := getCodeAndStateFromUrl(t, resp)
 	require.NotEmpty(t, code)
 
-	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
+	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
 	require.Len(t, sessions, 1)
 	require.Equal(t, "pwd otp", sessions[0].AuthMethods, "the browser must hold a session carrying otp")
 }
@@ -229,13 +229,13 @@ func (f *restartFixture) assertOnlyPasswordWasEarned(t *testing.T, idClaims, acc
 		"the id token's amr names only what the second pass verified")
 	assert.Equal(t, []interface{}{"pwd"}, accessClaims["amr"],
 		"the access token's amr names only what the second pass verified")
-	assert.Equal(t, record.AcrLevel1.String(), idClaims["acr"])
+	assert.Equal(t, record.ACRLevel1.String(), idClaims["acr"])
 
-	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
+	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
 	require.Len(t, sessions, 1, "the second pass creates exactly one session")
 	assert.Equal(t, "pwd", sessions[0].AuthMethods,
 		"the session the second pass created carries only the password it verified")
-	assert.Equal(t, record.AcrLevel1.String(), sessions[0].ACRLevel)
+	assert.Equal(t, record.ACRLevel1.String(), sessions[0].ACRLevel)
 }
 
 // TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified carries otp into a ceremony by SSO and
@@ -255,7 +255,7 @@ func TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	completedURL := assertRedirect(t, resp, "/auth/completed")
 
-	endSessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
+	endSessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
 
 	resp = loadPage(t, httpClient, completedURL)
 	defer func() { _ = resp.Body.Close() }()
@@ -283,7 +283,7 @@ func TestRestartRoute2_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	issueURL := assertRedirect(t, resp, "/auth/issue")
 
-	endSessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
+	endSessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
 
 	resp = loadPage(t, httpClient, issueURL)
 	defer func() { _ = resp.Body.Close() }()
@@ -314,13 +314,13 @@ func consentScopes(t *testing.T, consentPage *http.Response) []string {
 func TestRestartRoute2_ADifferentPersonGetsTheirOwnScopeAndConsent(t *testing.T) {
 	f := newRestartFixture(t, true)
 	resource := createResource(t)
-	permissionA := createPermission(t, resource.Id)
-	permissionB := createPermission(t, resource.Id)
+	permissionA := createPermission(t, resource.ID)
+	permissionB := createPermission(t, resource.ID)
 	scopeA := resource.ResourceIdentifier + ":" + permissionA.PermissionIdentifier
 	scopeB := resource.ResourceIdentifier + ":" + permissionB.PermissionIdentifier
-	assignPermissionToUser(t, f.user.Id, permissionA.Id)
+	assignPermissionToUser(t, f.user.ID, permissionA.ID)
 	personB, passwordB, _ := createRestartUser(t)
-	assignPermissionToUser(t, personB.Id, permissionB.Id)
+	assignPermissionToUser(t, personB.ID, permissionB.ID)
 
 	httpClient := createHttpClient(t)
 	codeVerifier := fake.LetterN(43)
@@ -345,7 +345,7 @@ func TestRestartRoute2_ADifferentPersonGetsTheirOwnScopeAndConsent(t *testing.T)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	issueURL := assertRedirect(t, resp, "/auth/issue")
 
-	endSessionsThroughAdminAPI(t, f.adminToken, f.user.Id)
+	endSessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
 
 	resp = loadPage(t, httpClient, issueURL)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)

@@ -31,7 +31,7 @@ func paletteBrand(appearance record.BrandAppearance) *record.Brand {
 		"danger-soft": "#3a1714", "danger-ink": "#ffb4ab", "positive-soft": "#11291a", "positive-ink": "#8fd6a5",
 		"caution-soft": "#2e2410", "caution-ink": "#f0c96a", "note-soft": "#142340", "note-ink": "#a8c7ff", "focus": "#f5c400"}
 	brand := record.NewBrand("Sunny", appearance, record.BrandThemeCustom)
-	brand.Id = 9
+	brand.ID = 9
 	brand.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: light, Dark: dark}
 	return &brand
 }

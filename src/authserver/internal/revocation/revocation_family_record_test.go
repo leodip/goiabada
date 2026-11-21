@@ -37,13 +37,13 @@ func expectClientFamilyRecords(db *datamocks.Database, families ...string) {
 func TestRevokeClientGrants_RecordsEachFamilyOnceWhateverItsMembersState(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	tokens := []*record.RefreshToken{
-		{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
-		{Id: 2, RefreshTokenJti: "a-2", FirstRefreshTokenJti: "fam-all-revoked", Revoked: true},
-		{Id: 3, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-live"},
-		{Id: 4, RefreshTokenJti: "no-family"},
+		{ID: 1, RefreshTokenJTI: "a-1", FirstRefreshTokenJTI: "fam-all-revoked", Revoked: true},
+		{ID: 2, RefreshTokenJTI: "a-2", FirstRefreshTokenJTI: "fam-all-revoked", Revoked: true},
+		{ID: 3, RefreshTokenJTI: "b-1", FirstRefreshTokenJTI: "fam-live"},
+		{ID: 4, RefreshTokenJTI: "no-family"},
 	}
-	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+	db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
+	db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
 	expectClientFamilyRecords(db, "fam-all-revoked", "fam-live")
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[3]).Return(nil).Once()
@@ -63,11 +63,11 @@ func TestRevokeClientGrants_RecordsTheFamiliesUnderTheCallersReason(t *testing.T
 		t.Run(reason, func(t *testing.T) {
 			db := datamocks.NewDatabase(t)
 			tokens := []*record.RefreshToken{
-				{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-a"},
-				{Id: 2, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-b"},
+				{ID: 1, RefreshTokenJTI: "a-1", FirstRefreshTokenJTI: "fam-a"},
+				{ID: 2, RefreshTokenJTI: "b-1", FirstRefreshTokenJTI: "fam-b"},
 			}
-			db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
-			db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+			db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
+			db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
 			db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", reason).Return(true, nil).Once()
 			db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-b", reason).Return(true, nil).Once()
 			db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
@@ -85,9 +85,9 @@ func TestRevokeClientGrants_RecordsTheFamiliesUnderTheCallersReason(t *testing.T
 func TestRevokeClientGrantsTx_RecordsTheFamiliesUnderTheCallersReason(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
-	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
-	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(2), nil).Once()
-	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
+	token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
+	db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(2), nil).Once()
+	db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).
 		Return([]*record.RefreshToken{token}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", "client_identifier_changed").
 		Return(true, nil).Once()
@@ -107,8 +107,8 @@ func TestRevokeClientGrants_AFailedRecordSweepsNothing(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	tokens := clientGrantFixture()
 	boom := errs.New("connection refused")
-	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
-	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+	db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
+	db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-session", ReasonClientBecamePublic).
 		Return(false, boom).Once()
 
@@ -130,9 +130,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		first := datamocks.ExpectRunInTransaction(db, revokeTx)
 		second := datamocks.ExpectRunInTransaction(db, revokeTx)
-		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
-		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
-		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
+		db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
+		token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
+		db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).
 			Return([]*record.RefreshToken{token}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Once()
@@ -158,9 +158,9 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
-		db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
-		db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
-			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
+		db.On("RevokeCodesByClientID", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Twice()
+		db.On("GetRefreshTokensByClientID", mock.Anything, revokeTx, revokeClientId).
+			Return([]*record.RefreshToken{{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Twice()
 
@@ -185,17 +185,17 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		first := datamocks.ExpectRunInTransaction(db, revokeTx)
 		second := datamocks.ExpectRunInTransaction(db, revokeTx)
 		expectClientWithoutLogoutURI(db)
-		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
 		// The first attempt's mark rolled back with it, so the second makes it again and reports it.
-		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+		db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
 			Return(int64(1), nil).Twice()
-		db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+		db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
 			Return([]*record.RefreshToken{token}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientDisconnected).
 			Return(false, lostTheKey).Once()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientDisconnected).
 			Return(false, nil).Once()
-		db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.Id).Return(true, nil).Once()
+		db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.ID).Return(true, nil).Once()
 
 		deletions := 0
 		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
@@ -220,10 +220,10 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		expectClientWithoutLogoutURI(db)
-		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+		db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
 			Return(int64(1), nil).Twice()
-		db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
-			Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}}, nil).Twice()
+		db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+			Return([]*record.RefreshToken{{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}}, nil).Twice()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientDisconnected).
 			Return(false, lostTheKey).Twice()
 
@@ -256,7 +256,7 @@ func TestTerminateUserSessionTx_ALostKeyRunsTheTerminationOnceMore(t *testing.T)
 	db := datamocks.NewDatabase(t)
 	first := datamocks.ExpectRunInTransaction(db, revokeTx)
 	second := datamocks.ExpectRunInTransaction(db, revokeTx)
-	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+	token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
 	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Twice()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(1), nil).Twice()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
@@ -280,9 +280,9 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 	t.Run("each family once, a revoked member's included", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		tokens := []*record.RefreshToken{
-			{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-a", Revoked: true},
-			{Id: 2, RefreshTokenJti: "a-2", FirstRefreshTokenJti: "fam-a"},
-			{Id: 3, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-b", Revoked: true},
+			{ID: 1, RefreshTokenJTI: "a-1", FirstRefreshTokenJTI: "fam-a", Revoked: true},
+			{ID: 2, RefreshTokenJTI: "a-2", FirstRefreshTokenJTI: "fam-a"},
+			{ID: 3, RefreshTokenJTI: "b-1", FirstRefreshTokenJTI: "fam-b", Revoked: true},
 		}
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
@@ -294,7 +294,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{ID: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"a-2"}, result.RevokedRefreshTokenJtis)
@@ -304,7 +304,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 	t.Run("a failed record sweeps nothing", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		boom := errs.New("connection refused")
-		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
@@ -312,7 +312,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonAuthCodeReuse).
 			Return(false, boom).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{ID: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.ErrorIs(t, err, boom)
 		assert.Equal(t, AuthCodeReuseResult{}, result)
@@ -324,7 +324,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		first := datamocks.ExpectRunInTransaction(db, revokeTx)
 		second := datamocks.ExpectRunInTransaction(db, revokeTx)
-		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+		token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1", FirstRefreshTokenJTI: "fam-1"}
 		db.On("AcquireUserSessionRow", mock.Anything, revokeTx, reuseSid).Return(true, nil).Twice()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, reuseSid).
 			Return([]*record.RefreshToken{token}, nil).Twice()
@@ -335,7 +335,7 @@ func TestRevokeOnAuthCodeReuse_RecordsEveryFamilyItSweeps(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 		db.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, reuseSid).Return(nil, nil).Once()
 
-		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{Id: 42, SessionIdentifier: reuseSid}, nil)
+		result, err := RevokeOnAuthCodeReuseTx(context.Background(), db, &record.Code{ID: 42, SessionIdentifier: reuseSid}, nil)
 
 		require.NoError(t, err)
 		require.ErrorIs(t, first.BodyErr, data.ErrUniqueViolation)

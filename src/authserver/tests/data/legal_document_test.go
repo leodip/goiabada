@@ -35,11 +35,11 @@ func createLegalDocument(t *testing.T, kind string) *record.LegalDocument {
 }
 
 // publishVersion stores version number n of the document, as Publish does.
-func publishVersion(t *testing.T, documentId int64, n int, title, markdown string) *record.LegalDocumentVersion {
+func publishVersion(t *testing.T, documentID int64, n int, title, markdown string) *record.LegalDocumentVersion {
 	t.Helper()
 	version := &record.LegalDocumentVersion{
 		PublishedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		LegalDocumentId: documentId,
+		LegalDocumentID: documentID,
 		VersionNumber:   n,
 		Title:           title,
 		Markdown:        markdown,
@@ -53,11 +53,11 @@ func TestLegalDocument_CreateAndRead(t *testing.T) {
 	doc := newLegalDocument(record.LegalDocumentKindMustAccept)
 	require.NoError(t, database.CreateLegalDocument(ctx, nil, doc))
 
-	require.NotZero(t, doc.Id)
+	require.NotZero(t, doc.ID)
 	require.True(t, doc.CreatedAt.Valid, "created_at is stamped")
 	require.True(t, doc.UpdatedAt.Valid, "updated_at is stamped")
 
-	got, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	got, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, doc.ShortName, got.ShortName)
@@ -70,9 +70,9 @@ func TestLegalDocument_CreateAndRead(t *testing.T) {
 	byName, err := database.GetLegalDocumentByShortName(ctx, nil, doc.ShortName)
 	require.NoError(t, err)
 	require.NotNil(t, byName)
-	assert.Equal(t, doc.Id, byName.Id)
+	assert.Equal(t, doc.ID, byName.ID)
 
-	missing, err := database.GetLegalDocumentById(ctx, nil, doc.Id+1_000_000)
+	missing, err := database.GetLegalDocumentByID(ctx, nil, doc.ID+1_000_000)
 	require.NoError(t, err)
 	assert.Nil(t, missing, "an id naming no document answers nil")
 
@@ -105,7 +105,7 @@ func TestLegalDocument_ShortNameIsUnique(t *testing.T) {
 func TestLegalDocument_UpdateWritesEverythingButTheKind(t *testing.T) {
 	ctx := context.Background()
 	doc := createLegalDocument(t, record.LegalDocumentKindForInformation)
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	createdAt := stored.CreatedAt
 
@@ -118,7 +118,7 @@ func TestLegalDocument_UpdateWritesEverythingButTheKind(t *testing.T) {
 	doc.RetiredAt = sql.NullTime{Time: retiredAt, Valid: true}
 	require.NoError(t, database.UpdateLegalDocument(ctx, nil, doc))
 
-	got, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	got, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.Equal(t, doc.ShortName, got.ShortName)
 	assert.Equal(t, "for_information", got.Kind, "a document's kind is fixed at creation")
@@ -144,13 +144,13 @@ func TestLegalDocument_TextAtTheAPIBoundsReadsBack(t *testing.T) {
 	doc.DraftTitle = sql.NullString{String: title, Valid: true}
 	doc.DraftMarkdown = sql.NullString{String: markdown, Valid: true}
 	require.NoError(t, database.CreateLegalDocument(ctx, nil, doc))
-	got, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	got, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.Equal(t, title, got.DraftTitle.String)
 	assert.Equal(t, markdown, got.DraftMarkdown.String)
 
-	publishVersion(t, doc.Id, 1, title, markdown)
-	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 1)
+	publishVersion(t, doc.ID, 1, title, markdown)
+	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 1)
 	require.NoError(t, err)
 	require.NotNil(t, version)
 	assert.Equal(t, title, version.Title)
@@ -162,32 +162,32 @@ func TestLegalDocument_VersionsAreNumberedOncePerDocument(t *testing.T) {
 	doc := createLegalDocument(t, record.LegalDocumentKindMustAccept)
 	other := createLegalDocument(t, record.LegalDocumentKindMustAccept)
 
-	none, err := database.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, doc.Id)
+	none, err := database.GetLegalDocumentVersionsByLegalDocumentID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.Empty(t, none, "a never-published document has no version")
 
-	first := publishVersion(t, doc.Id, 1, "Terms", "First text.")
-	require.NotZero(t, first.Id)
-	second := publishVersion(t, doc.Id, 2, "Terms of use", "Second text.")
-	publishVersion(t, other.Id, 1, "Other", "Another document's first version.")
+	first := publishVersion(t, doc.ID, 1, "Terms", "First text.")
+	require.NotZero(t, first.ID)
+	second := publishVersion(t, doc.ID, 2, "Terms of use", "Second text.")
+	publishVersion(t, other.ID, 1, "Other", "Another document's first version.")
 
 	// The same number twice in one document is the engine's to refuse, so two publishes racing
 	// for one number cannot both win.
 	err = database.CreateLegalDocumentVersion(ctx, nil, &record.LegalDocumentVersion{
-		PublishedAt: time.Now().UTC(), LegalDocumentId: doc.Id, VersionNumber: 2, Title: "Racing", Markdown: "Racing.",
+		PublishedAt: time.Now().UTC(), LegalDocumentID: doc.ID, VersionNumber: 2, Title: "Racing", Markdown: "Racing.",
 	})
 	require.ErrorIs(t, err, data.ErrUniqueViolation)
 
-	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, doc.Id)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	require.Len(t, versions, 2, "the document's two versions and not the other document's")
 	assert.Equal(t, *first, versions[0], "the first version reads back exactly as it was published")
 	assert.Equal(t, *second, versions[1])
 
-	got, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 1)
+	got, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 1)
 	require.NoError(t, err)
 	assert.Equal(t, first, got)
-	missing, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 3)
+	missing, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 3)
 	require.NoError(t, err)
 	assert.Nil(t, missing, "a number never published answers nil")
 }
@@ -195,15 +195,15 @@ func TestLegalDocument_VersionsAreNumberedOncePerDocument(t *testing.T) {
 func TestLegalDocument_PublishingANewVersionLeavesTheEarlierOnesAsTheyWere(t *testing.T) {
 	ctx := context.Background()
 	doc := createLegalDocument(t, record.LegalDocumentKindMustAccept)
-	first := publishVersion(t, doc.Id, 1, "Terms", "What users accepted.")
+	first := publishVersion(t, doc.ID, 1, "Terms", "What users accepted.")
 
 	// The draft that follows is edited and published as version 2; nothing touches version 1.
 	doc.DraftTitle = sql.NullString{String: "Terms, revised", Valid: true}
 	doc.DraftMarkdown = sql.NullString{String: "What users will accept next.", Valid: true}
 	require.NoError(t, database.UpdateLegalDocument(ctx, nil, doc))
-	publishVersion(t, doc.Id, 2, "Terms, revised", "What users will accept next.")
+	publishVersion(t, doc.ID, 2, "Terms, revised", "What users will accept next.")
 
-	again, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 1)
+	again, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 1)
 	require.NoError(t, err)
 	assert.Equal(t, first, again)
 }
@@ -211,28 +211,28 @@ func TestLegalDocument_PublishingANewVersionLeavesTheEarlierOnesAsTheyWere(t *te
 func TestLegalDocument_OnlyANeverPublishedDocumentIsDeleted(t *testing.T) {
 	ctx := context.Background()
 	draftOnly := createLegalDocument(t, record.LegalDocumentKindForInformation)
-	require.NoError(t, database.DeleteLegalDocument(ctx, nil, draftOnly.Id))
-	gone, err := database.GetLegalDocumentById(ctx, nil, draftOnly.Id)
+	require.NoError(t, database.DeleteLegalDocument(ctx, nil, draftOnly.ID))
+	gone, err := database.GetLegalDocumentByID(ctx, nil, draftOnly.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone)
 
 	published := createLegalDocument(t, record.LegalDocumentKindMustAccept)
-	version := publishVersion(t, published.Id, 1, "Terms", "Accepted text.")
-	require.Error(t, database.DeleteLegalDocument(ctx, nil, published.Id),
+	version := publishVersion(t, published.ID, 1, "Terms", "Accepted text.")
+	require.Error(t, database.DeleteLegalDocument(ctx, nil, published.ID),
 		"the engine refuses to delete a document with a published version")
-	still, err := database.GetLegalDocumentById(ctx, nil, published.Id)
+	still, err := database.GetLegalDocumentByID(ctx, nil, published.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, still, "the document stays")
-	kept, err := database.GetLegalDocumentVersion(ctx, nil, published.Id, 1)
+	kept, err := database.GetLegalDocumentVersion(ctx, nil, published.ID, 1)
 	require.NoError(t, err)
 	assert.Equal(t, version, kept, "and so does its version")
 
 	require.Error(t, database.CreateLegalDocumentVersion(ctx, nil, &record.LegalDocumentVersion{
-		PublishedAt: time.Now().UTC(), LegalDocumentId: draftOnly.Id, VersionNumber: 1, Title: "x", Markdown: "x",
+		PublishedAt: time.Now().UTC(), LegalDocumentID: draftOnly.ID, VersionNumber: 1, Title: "x", Markdown: "x",
 	}), "a version naming no document is refused")
 }
 
-func TestLegalDocument_AllDocumentsInIdOrder(t *testing.T) {
+func TestLegalDocument_AllDocumentsInIDOrder(t *testing.T) {
 	ctx := context.Background()
 	a := createLegalDocument(t, record.LegalDocumentKindMustAccept)
 	b := createLegalDocument(t, record.LegalDocumentKindForInformation)
@@ -244,15 +244,15 @@ func TestLegalDocument_AllDocumentsInIdOrder(t *testing.T) {
 	var ids []int64
 	positions := map[int64]int{}
 	for i, doc := range all {
-		ids = append(ids, doc.Id)
-		positions[doc.Id] = i
+		ids = append(ids, doc.ID)
+		positions[doc.ID] = i
 	}
-	require.Contains(t, ids, a.Id)
-	require.Contains(t, ids, b.Id, "a retired document is listed too")
-	assert.Less(t, positions[a.Id], positions[b.Id])
+	require.Contains(t, ids, a.ID)
+	require.Contains(t, ids, b.ID, "a retired document is listed too")
+	assert.Less(t, positions[a.ID], positions[b.ID])
 	for i := 1; i < len(ids); i++ {
 		assert.Less(t, ids[i-1], ids[i], "in id order")
 	}
-	assert.Equal(t, b.ShortName, all[positions[b.Id]].ShortName)
-	assert.True(t, all[positions[b.Id]].IsRetired())
+	assert.Equal(t, b.ShortName, all[positions[b.ID]].ShortName)
+	assert.True(t, all[positions[b.ID]].IsRetired())
 }

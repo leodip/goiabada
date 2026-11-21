@@ -11,7 +11,7 @@ import (
 
 // brandAssetDatabase is what a brand asset's public answer needs: the asset with its bytes.
 type brandAssetDatabase interface {
-	GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)
+	GetBrandAssetByID(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)
 }
 
 // HandleBrandAssetGet answers a brand asset's bytes, at brandasset.Route, to anyone, as a static
@@ -34,7 +34,7 @@ func HandleBrandAssetGet(pageRenderer PageRenderer, database brandAssetDatabase,
 			return
 		}
 
-		asset, err := database.GetBrandAssetById(r.Context(), nil, assetId)
+		asset, err := database.GetBrandAssetByID(r.Context(), nil, assetId)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

@@ -34,11 +34,11 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 	t.Helper()
 
 	mockDB := datamocks.NewDatabase(t)
-	user := &record.User{Id: 1, Subject: fake.UUID(), Email: "user@example.com", Enabled: true}
-	client := &record.Client{Id: 1, ClientIdentifier: "ropc-client"}
+	user := &record.User{ID: 1, Subject: fake.UUID(), Email: "user@example.com", Enabled: true}
+	client := &record.Client{ID: 1, ClientIdentifier: "ropc-client"}
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 		PublicKeyPEM:  getTestPublicKey(t),
@@ -51,7 +51,7 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.RefreshToken) }).
 		Return(nil)
 
-	expectPasswordGrantClientRow(mockDB, client.Id, client)
+	expectPasswordGrantClientRow(mockDB, client.ID, client)
 
 	return ropcGrantFixture{
 		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil),
@@ -130,9 +130,9 @@ func TestMintROPCRefreshTokens_ATokenWithNoInstantIsRefused(t *testing.T) {
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 
 	response, err := issuer.mintROPCRefreshTokens(context.Background(), nil, &record.Settings{}, &record.RefreshToken{
-		RefreshTokenJti: "pre-000051-jti",
-		UserId:          sql.NullInt64{Int64: 1, Valid: true},
-		ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+		RefreshTokenJTI: "pre-000051-jti",
+		UserID:          sql.NullInt64{Int64: 1, Valid: true},
+		ClientID:        sql.NullInt64{Int64: 1, Valid: true},
 		Scope:           "openid",
 	}, "", "")
 

@@ -82,7 +82,7 @@ func HandleAccountAddressPut(
 
 		// Audit (self-service)
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnAddress, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

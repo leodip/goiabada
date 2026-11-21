@@ -183,7 +183,7 @@ func HandleSettingsTurnstilePut(
 		}
 
 		var oldVals map[string]interface{}
-		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.Id, func(stored *record.Settings) error {
+		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.ID, func(stored *record.Settings) error {
 			secret := secretKeyEncrypted
 			if keptUnreadable {
 				// The kept secret key opens under neither key, so it could not be sealed again, and the

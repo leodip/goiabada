@@ -46,7 +46,7 @@ func (r *passwordVerifierRecorder) verify(hashedPassword string, password string
 // expectNoLegalDocumentsOwed answers the password grant's question about the acceptance step: no
 // legal document is in effect, so nothing is owed.
 func expectNoLegalDocumentsOwed(mockDB *datamocks.Database) {
-	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	mockDB.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.LegalDocumentClient{}, nil).Once()
 	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Once()
 }
@@ -60,21 +60,21 @@ func TestValidateTokenRequest_ROPC_ALegalDocumentOwedIsRefused(t *testing.T) {
 		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	user := &record.User{ID: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 	ropcEnabled := true
-	client := &record.Client{Id: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
+	client := &record.Client{ID: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
-		Return([]record.LegalDocumentClient{{LegalDocumentId: 3, ClientId: 7}}, nil).Once()
+	mockDB.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, int64(7)).
+		Return([]record.LegalDocumentClient{{LegalDocumentID: 3, ClientID: 7}}, nil).Once()
 	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{
-		{Id: 3, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
+		{ID: 3, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
 	}, nil).Once()
-	mockDB.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(3)).
-		Return([]record.LegalDocumentVersion{{Id: 31, LegalDocumentId: 3, VersionNumber: 1}}, nil).Once()
-	mockDB.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, mock.Anything, int64(1)).
+	mockDB.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(3)).
+		Return([]record.LegalDocumentVersion{{ID: 31, LegalDocumentID: 3, VersionNumber: 1}}, nil).Once()
+	mockDB.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, mock.Anything, int64(1)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(context.Background(),
@@ -102,15 +102,15 @@ func TestValidateTokenRequest_ROPC_AFailedReadOfTheDocumentsOwedIsAnError(t *tes
 		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
-	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	user := &record.User{ID: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 	ropcEnabled := true
-	client := &record.Client{Id: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
+	client := &record.Client{ID: 7, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}
 	failure := errors.New("database down")
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
+	mockDB.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, int64(7)).
 		Return([]record.LegalDocumentClient{}, nil).Once()
 	mockDB.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(nil, failure).Once()
 
@@ -139,7 +139,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -148,7 +148,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 	ropcEnabled := true
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
@@ -231,7 +231,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -502,7 +502,7 @@ func TestValidateTokenRequest_ROPC_UserWithoutPassword(t *testing.T) {
 	ctx := context.Background()
 
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: "",
 		Enabled:      true,
@@ -653,7 +653,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	ctx := context.Background()
 
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: "$2a$10$abcdefghijklmnopqrstuuVkFBHFf8f6TBkO6PkS5Lg2Y4LZHn8a2",
 		Enabled:      true,
@@ -709,7 +709,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           47,
+		ID:           47,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      false, // Disabled
@@ -763,7 +763,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -826,13 +826,13 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryRefused(t *testing.T)
 
 			ropcEnabled := true
 			client := &record.Client{
-				Id:                                      1,
+				ID:                                      1,
 				ClientIdentifier:                        "ropc-client",
 				Enabled:                                 true,
 				IsPublic:                                true,
 				AuthorizationCodeEnabled:                true,
 				ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-				DefaultAcrLevel:                         record.AcrLevel2Mandatory,
+				DefaultACRLevel:                         record.ACRLevel2Mandatory,
 			}
 
 			input := &ValidateTokenRequestInput{
@@ -876,7 +876,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -885,13 +885,13 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2MandatoryWithCodeFlowOffStillV
 
 	ropcEnabled := true
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-		DefaultAcrLevel:                         record.AcrLevel2Mandatory,
+		DefaultACRLevel:                         record.ACRLevel2Mandatory,
 	}
 
 	input := &ValidateTokenRequestInput{
@@ -935,7 +935,7 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *test
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -944,13 +944,13 @@ func TestValidateTokenRequest_ROPC_ClientAcrLevel2OptionalStillValidates(t *test
 
 	ropcEnabled := true
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-		DefaultAcrLevel:                         record.AcrLevel2Optional,
+		DefaultACRLevel:                         record.ACRLevel2Optional,
 	}
 
 	input := &ValidateTokenRequestInput{
@@ -1123,7 +1123,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("userpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1132,7 +1132,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 	ropcEnabled := true
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "ropc-client",
 		Enabled:                                 true,
 		IsPublic:                                false, // Confidential client
@@ -1178,7 +1178,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1228,7 +1228,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1286,7 +1286,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			passwordHash, err := passwordhash.Hash("correctpassword")
 			require.NoError(t, err)
 			user := &record.User{
-				Id:           1,
+				ID:           1,
 				Email:        "user@example.com",
 				PasswordHash: passwordHash,
 				Enabled:      true,
@@ -1338,7 +1338,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1393,7 +1393,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1409,12 +1409,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	}
 
 	resource := &record.Resource{
-		Id:                 1,
+		ID:                 1,
 		ResourceIdentifier: "api",
 	}
 
 	permissions := []record.Permission{
-		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
+		{ID: 1, PermissionIdentifier: "read", ResourceID: 1},
 	}
 
 	input := &ValidateTokenRequestInput{
@@ -1431,7 +1431,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
 	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(true, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1455,7 +1455,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &record.User{
-		Id:           1,
+		ID:           1,
 		Email:        "user@example.com",
 		PasswordHash: passwordHash,
 		Enabled:      true,
@@ -1471,12 +1471,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	}
 
 	resource := &record.Resource{
-		Id:                 1,
+		ID:                 1,
 		ResourceIdentifier: "api",
 	}
 
 	permissions := []record.Permission{
-		{Id: 1, PermissionIdentifier: "read", ResourceId: 1},
+		{ID: 1, PermissionIdentifier: "read", ResourceID: 1},
 	}
 
 	input := &ValidateTokenRequestInput{
@@ -1493,7 +1493,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
 	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(false, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, settings, input)
@@ -1534,9 +1534,9 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			scope: "openid api:delete",
 			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "api").
-					Return(&record.Resource{Id: 1, ResourceIdentifier: "api"}, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
-					Return([]record.Permission{{Id: 1, PermissionIdentifier: "read", ResourceId: 1}}, nil).Once()
+					Return(&record.Resource{ID: 1, ResourceIdentifier: "api"}, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).
+					Return([]record.Permission{{ID: 1, PermissionIdentifier: "read", ResourceID: 1}}, nil).Once()
 			},
 			wantDesc: "Scope 'api:delete' is not recognized. The resource identified by 'api' doesn't grant the 'delete' permission.",
 		},
@@ -1548,11 +1548,11 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			setup: func(mockDB *datamocks.Database) {
 				builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-					builtIns = append(builtIns, record.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+					builtIns = append(builtIns, record.Permission{ID: int64(40 + i), PermissionIdentifier: identifier, ResourceID: 4})
 				}
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-					Return(&record.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
+					Return(&record.Resource{ID: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 			},
 			wantDesc: "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",
 		},
@@ -1566,7 +1566,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 
 			passwordHash, _ := passwordhash.Hash("correctpassword")
 			user := &record.User{
-				Id:           1,
+				ID:           1,
 				Email:        "user@example.com",
 				PasswordHash: passwordHash,
 				Enabled:      true,

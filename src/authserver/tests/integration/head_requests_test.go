@@ -44,13 +44,13 @@ func TestHead_TheReadOnlyResourcesAnswerAsGetDoes(t *testing.T) {
 	ctx := context.Background()
 	client := createTestClient(t, "head-check-"+fake.LetterN(8))
 	require.NoError(t, database.CreateClientLogo(ctx, nil, &record.ClientLogo{
-		ClientId:    client.Id,
+		ClientID:    client.ID,
 		Logo:        createTestPNGImage(32, 32),
 		ContentType: "image/png",
 	}))
 	user := createTestUserForProfilePicture(t)
 	require.NoError(t, database.CreateUserProfilePicture(ctx, nil, &record.UserProfilePicture{
-		UserId:      user.Id,
+		UserID:      user.ID,
 		Picture:     createTestPNGImage(64, 64),
 		ContentType: "image/png",
 	}))

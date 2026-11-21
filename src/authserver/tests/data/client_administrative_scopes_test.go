@@ -22,34 +22,34 @@ func TestClientAdministrativeScopesAllowed_RoundTrips(t *testing.T) {
 	unspecified := &record.Client{ClientIdentifier: "allowance_unset_" + fake.LetterN(6), Description: "Allowance test client"}
 	require.NoError(t, database.CreateClient(ctx, nil, unspecified))
 
-	want := map[int64]bool{allowed.Id: true, notAllowed.Id: false, unspecified.Id: false}
+	want := map[int64]bool{allowed.ID: true, notAllowed.ID: false, unspecified.ID: false}
 
 	for id, w := range want {
-		byId, err := database.GetClientById(ctx, nil, id)
+		byID, err := database.GetClientByID(ctx, nil, id)
 		require.NoError(t, err)
-		require.NotNil(t, byId)
-		assert.Equalf(t, w, byId.AdministrativeScopesAllowed, "GetClientById(%d)", id)
+		require.NotNil(t, byID)
+		assert.Equalf(t, w, byID.AdministrativeScopesAllowed, "GetClientByID(%d)", id)
 
-		byIdentifier, err := database.GetClientByClientIdentifier(ctx, nil, byId.ClientIdentifier)
+		byIdentifier, err := database.GetClientByClientIdentifier(ctx, nil, byID.ClientIdentifier)
 		require.NoError(t, err)
 		require.NotNil(t, byIdentifier)
-		assert.Equalf(t, w, byIdentifier.AdministrativeScopesAllowed, "GetClientByClientIdentifier(%q)", byId.ClientIdentifier)
+		assert.Equalf(t, w, byIdentifier.AdministrativeScopesAllowed, "GetClientByClientIdentifier(%q)", byID.ClientIdentifier)
 	}
 
-	byIds, err := database.GetClientsByIds(ctx, nil, []int64{allowed.Id, notAllowed.Id, unspecified.Id})
+	byIDs, err := database.GetClientsByIDs(ctx, nil, []int64{allowed.ID, notAllowed.ID, unspecified.ID})
 	require.NoError(t, err)
-	require.Len(t, byIds, 3)
-	for _, c := range byIds {
-		assert.Equalf(t, want[c.Id], c.AdministrativeScopesAllowed, "GetClientsByIds, client %d", c.Id)
+	require.Len(t, byIDs, 3)
+	for _, c := range byIDs {
+		assert.Equalf(t, want[c.ID], c.AdministrativeScopesAllowed, "GetClientsByIDs, client %d", c.ID)
 	}
 
 	all, err := database.GetAllClients(ctx, nil)
 	require.NoError(t, err)
 	seen := 0
 	for _, c := range all {
-		if w, ok := want[c.Id]; ok {
+		if w, ok := want[c.ID]; ok {
 			seen++
-			assert.Equalf(t, w, c.AdministrativeScopesAllowed, "GetAllClients, client %d", c.Id)
+			assert.Equalf(t, w, c.AdministrativeScopesAllowed, "GetAllClients, client %d", c.ID)
 		}
 	}
 	assert.Equal(t, 3, seen, "GetAllClients must answer the three clients this test created")
@@ -71,7 +71,7 @@ func TestUpdateClient_LeavesTheAdministrativeScopesAllowanceAlone(t *testing.T) 
 		client.Description = "rewritten_" + fake.LetterN(6)
 		require.NoError(t, database.UpdateClient(ctx, nil, client))
 
-		got, err := database.GetClientById(ctx, nil, client.Id)
+		got, err := database.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equalf(t, stored, got.AdministrativeScopesAllowed,
@@ -92,9 +92,9 @@ func TestSetClientAdministrativeScopesAllowed_SwitchesTheOneClient(t *testing.T)
 	allowedBystander := createAllowanceTestClient(t, true)
 
 	for _, allowed := range []bool{true, false, false, true} {
-		require.NoError(t, database.SetClientAdministrativeScopesAllowed(ctx, nil, target.Id, allowed))
+		require.NoError(t, database.SetClientAdministrativeScopesAllowed(ctx, nil, target.ID, allowed))
 
-		got, err := database.GetClientById(ctx, nil, target.Id)
+		got, err := database.GetClientByID(ctx, nil, target.ID)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equalf(t, allowed, got.AdministrativeScopesAllowed, "the target after switching to %v", allowed)
@@ -102,9 +102,9 @@ func TestSetClientAdministrativeScopesAllowed_SwitchesTheOneClient(t *testing.T)
 		assert.Equal(t, target.Description, got.Description)
 
 		for want, other := range map[bool]*record.Client{false: bystander, true: allowedBystander} {
-			stored, err := database.GetClientById(ctx, nil, other.Id)
+			stored, err := database.GetClientByID(ctx, nil, other.ID)
 			require.NoError(t, err)
-			assert.Equalf(t, want, stored.AdministrativeScopesAllowed, "client %d is not the one switched", other.Id)
+			assert.Equalf(t, want, stored.AdministrativeScopesAllowed, "client %d is not the one switched", other.ID)
 		}
 	}
 }

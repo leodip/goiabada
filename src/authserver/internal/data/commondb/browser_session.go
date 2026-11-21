@@ -29,11 +29,11 @@ var browserSessionColumns = columnList{
 // scanBrowserSession reads one row selected with browserSessionColumns.
 func scanBrowserSession(row rowScanner, browserSession *record.BrowserSession) error {
 	return row.Scan(
-		&browserSession.Id,
+		&browserSession.ID,
 		&browserSession.CreatedAt,
 		&browserSession.UpdatedAt,
 		&browserSession.Owner,
-		&browserSession.SessionIdHash,
+		&browserSession.SessionIDHash,
 		&browserSession.Data,
 		&browserSession.LastAccessed,
 		&browserSession.ExpiresAt,
@@ -133,7 +133,7 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 		return errs.New("can't create a browser session with an empty owner")
 	}
 
-	if browserSession.SessionIdHash == "" {
+	if browserSession.SessionIDHash == "" {
 		return errs.New("can't create a browser session with an empty session id hash")
 	}
 
@@ -145,7 +145,7 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 	browserSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertBrowserSession, "browser session",
-		browserSession.CreatedAt, browserSession.UpdatedAt, browserSession.Owner, browserSession.SessionIdHash,
+		browserSession.CreatedAt, browserSession.UpdatedAt, browserSession.Owner, browserSession.SessionIDHash,
 		browserSession.Data, browserSession.LastAccessed, browserSession.ExpiresAt)
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
@@ -153,11 +153,11 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 		return err
 	}
 
-	browserSession.Id = id
+	browserSession.ID = id
 	return nil
 }
 
-// GetBrowserSessionByOwnerAndSessionIdHash returns the live session, or nil if there is
+// GetBrowserSessionByOwnerAndSessionIDHash returns the live session, or nil if there is
 // none.
 //
 // `now` is an active-expiry predicate rather than a hint: the statement matches only
@@ -170,18 +170,18 @@ func (d *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browser
 // request. Every failure below therefore propagates instead of collapsing into a nil
 // session, including rows.Err(), which is where a driver reports a fault it deferred to
 // the result set rather than returning from the query.
-func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
+func (d *Database) GetBrowserSessionByOwnerAndSessionIDHash(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string,
 	now time.Time) (*record.BrowserSession, error) {
 
 	if owner == "" {
 		return nil, errs.New("can't get a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return nil, errs.New("can't get a browser session with an empty session id hash")
 	}
 
-	return queryOne(ctx, d, tx, selectLiveBrowserSession.text(d.Dialect), []any{owner, sessionIdHash, now},
+	return queryOne(ctx, d, tx, selectLiveBrowserSession.text(d.Dialect), []any{owner, sessionIDHash, now},
 		scanBrowserSession, "browser session")
 }
 
@@ -189,7 +189,7 @@ func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context,
 // reporting whether a row transitioned.
 //
 // Narrow rather than the house's full-row Update<Model> for the reason
-// PromoteUserSessionOtpConfigGeneration is narrow: it sits on a per-request path, and the
+// PromoteUserSessionOTPConfigGeneration is narrow: it sits on a per-request path, and the
 // caller holds no surrogate id to write a whole row back by.
 //
 // The expires_at > now term is in the WHERE for the same reason it is in the read above.
@@ -206,19 +206,19 @@ func (d *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context,
 // resolution on every engine, and each save takes its own reading of the clock. Two
 // saves of one session inside the same microsecond would have to carry identical
 // contents as well, and would then report false and cost that browser a fresh session.
-func (d *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string,
+func (d *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, data string,
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
 		return false, errs.New("can't update a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return false, errs.New("can't update a browser session with an empty session id hash")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, updateLiveBrowserSessionData.text(d.Dialect),
-		data, now, expiresAt, now, owner, sessionIdHash, now)
+		data, now, expiresAt, now, owner, sessionIDHash, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -242,19 +242,19 @@ func (d *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, own
 // UpdateBrowserSessionData above describes them. What RowsAffected counts is not: see
 // below, because the argument that discharges it for that statement is absent for this
 // one.
-func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string,
+func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string,
 	now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
 		return false, errs.New("can't touch a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return false, errs.New("can't touch a browser session with an empty session id hash")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, touchLiveBrowserSession.text(d.Dialect),
-		now, expiresAt, now, owner, sessionIdHash, now)
+		now, expiresAt, now, owner, sessionIDHash, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to touch browser session")
 	}
@@ -283,7 +283,7 @@ func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, s
 	// they could see. So absence is confirmed rather than inferred, under the same
 	// predicate the read uses, and the extra statement runs only where the caller was
 	// already about to throw the session away (#266).
-	browserSession, err := d.GetBrowserSessionByOwnerAndSessionIdHash(ctx, tx, owner, sessionIdHash, now)
+	browserSession, err := d.GetBrowserSessionByOwnerAndSessionIDHash(ctx, tx, owner, sessionIDHash, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to confirm the browser session after touching it")
 	}
@@ -294,17 +294,17 @@ func (d *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, s
 // DeleteBrowserSession removes one session, which is what logging out and rotating an
 // identifier both do. It carries no expiry term: an expired row is already unusable, and
 // deleting it is the intended outcome either way.
-func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error {
+func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string) error {
 
 	if owner == "" {
 		return errs.New("can't delete a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return errs.New("can't delete a browser session with an empty session id hash")
 	}
 
-	_, err := d.ExecSQL(ctx, tx, deleteBrowserSession.text(d.Dialect), owner, sessionIdHash)
+	_, err := d.ExecSQL(ctx, tx, deleteBrowserSession.text(d.Dialect), owner, sessionIDHash)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete browser session")
 	}
@@ -324,19 +324,19 @@ func (d *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, 
 //
 // RowsAffected counts as UpdateBrowserSessionData says, and for the same reason it cannot report
 // a matched row as unchanged on MySQL: the data written is freshly sealed.
-func (d *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash,
+func (d *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash,
 	expectedData, data string, now, expiresAt time.Time) (bool, error) {
 
 	if owner == "" {
 		return false, errs.New("can't update a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return false, errs.New("can't update a browser session with an empty session id hash")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, updateBrowserSessionDataIfUnchanged.text(d.Dialect),
-		data, now, expiresAt, now, owner, sessionIdHash, expectedData, now)
+		data, now, expiresAt, now, owner, sessionIDHash, expectedData, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -355,19 +355,19 @@ func (d *Database) UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *
 // (#579). Unlike DeleteBrowserSession it carries the expires_at > now term, because the caller
 // is asking whether the live session it read is the one removed, and an expired row is no such
 // session; the reaper removes it.
-func (d *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash,
+func (d *Database) DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash,
 	expectedData string, now time.Time) (bool, error) {
 
 	if owner == "" {
 		return false, errs.New("can't delete a browser session with an empty owner")
 	}
 
-	if sessionIdHash == "" {
+	if sessionIDHash == "" {
 		return false, errs.New("can't delete a browser session with an empty session id hash")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, deleteBrowserSessionIfUnchanged.text(d.Dialect),
-		owner, sessionIdHash, expectedData, now)
+		owner, sessionIDHash, expectedData, now)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to delete browser session")
 	}

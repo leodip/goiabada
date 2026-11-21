@@ -237,7 +237,7 @@ type resetPasswordDatabase interface {
 
 	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.User, error)
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
 }
 
@@ -281,7 +281,7 @@ func resolveResetPasswordMarker(pageRenderer PageRenderer, httpSession linkMarke
 		return nil, nil
 	}
 	if !user.Enabled {
-		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonAccountDisabled, httpStatus)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID, auditReasonAccountDisabled, httpStatus)
 		return nil, nil
 	}
 
@@ -388,21 +388,21 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession link
 	}
 
 	if isForgotPasswordCodeExpired(user) {
-		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonCodeExpired, 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID, auditReasonCodeExpired, 0)
 		return
 	}
 
 	// Enabled and not verified: a link issued by the administrator's setup email goes to an
 	// address nobody has verified yet, and must keep working (#404 decision 1).
 	if !user.Enabled {
-		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonAccountDisabled, 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID, auditReasonAccountDisabled, 0)
 		return
 	}
 
 	// The marker names the code hash, not only the user: see resolveResetPasswordMarker for
 	// why a marker naming a durable id alone would be weaker than the flow it replaces.
 	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r,
-		emaillinks.LinkMarkerFlowResetPassword, user.Id, codeHash)
+		emaillinks.LinkMarkerFlowResetPassword, user.ID, codeHash)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -419,7 +419,7 @@ func handleResetPasswordLinkFollowed(pageRenderer PageRenderer, httpSession link
 	// every other refusal. Status zero, like the other first-hop rejections: the page was
 	// served, it is the link that was refused.
 	if rejection != "" {
-		rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, string(rejection), 0)
+		rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID, string(rejection), 0)
 		return
 	}
 
@@ -544,7 +544,7 @@ func HandleResetPasswordPost(
 		// The user_id audited is the marker's, which resolved: it names the account this
 		// submission would have written into, which is the useful half of the entry.
 		if !continuationMatches(marker.ContinuationId, r.PostFormValue(continuationIdField)) {
-			rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id,
+			rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID,
 				auditReasonContinuationMismatch, http.StatusBadRequest)
 			return
 		}
@@ -582,7 +582,7 @@ func HandleResetPasswordPost(
 		var replaced *record.User
 		notice := revocation.LogoutNotice{Subject: user.Subject, UserWide: true,
 			Live: revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)}
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", notice, func(tx *sql.Tx) error {
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.ID, "", notice, func(tx *sql.Tx) error {
 			// The claim below also marks the address verified, and whether that verified it, the
 			// verified_email entry, is read here, under the user's row: taken first, as a
 			// credential change takes it, so an administrator's edit of the same address can't
@@ -590,17 +590,17 @@ func HandleResetPasswordPost(
 			// the transaction, it could: an unverify meanwhile left a verification with no entry,
 			// a verify meanwhile two entries. Assigned on every attempt, since a deadlock reruns
 			// the body.
-			if acquireErr := database.AcquireUserRow(r.Context(), tx, user.Id); acquireErr != nil {
+			if acquireErr := database.AcquireUserRow(r.Context(), tx, user.ID); acquireErr != nil {
 				return acquireErr
 			}
-			current, readErr := database.GetUserById(r.Context(), tx, user.Id)
+			current, readErr := database.GetUserByID(r.Context(), tx, user.ID)
 			if readErr != nil {
 				return readErr
 			}
 			wasVerified = current == nil || current.EmailVerified
 			replaced = current
 
-			claimed, consumeErr := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
+			claimed, consumeErr := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.ID, marker.CodeHash, passwordHash)
 			if consumeErr != nil {
 				return consumeErr
 			}
@@ -612,7 +612,7 @@ func HandleResetPasswordPost(
 			return nil
 		})
 		if errors.Is(err, errResetPasswordClaimLost) {
-			rejectResetPassword(pageRenderer, auditLogger, w, r, user.Id, auditReasonClaimLost,
+			rejectResetPassword(pageRenderer, auditLogger, w, r, user.ID, auditReasonClaimLost,
 				http.StatusBadRequest)
 			return
 		}
@@ -623,7 +623,7 @@ func HandleResetPasswordPost(
 
 		// After commit, per decision 5. This is also the first audit event this handler emits
 		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
-		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, revocation.ReasonPasswordReset, "", result)
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.ID, revocation.ReasonPasswordReset, "", result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// The claim also marked the address verified: the link went to it, and dies when it
@@ -633,7 +633,7 @@ func HandleResetPasswordPost(
 		// says when and how an address became verified, from the state the transaction read.
 		if !wasVerified {
 			auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id": user.ID,
 			})
 		}
 
@@ -643,7 +643,7 @@ func HandleResetPasswordPost(
 		// marker it leaves behind resolves to nothing on its next use.
 		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
-				"user_id", user.Id, "error", clearLinkMarkerErr)
+				"user_id", user.ID, "error", clearLinkMarkerErr)
 		}
 
 		ceremonyId := registrationCeremonyId(r)

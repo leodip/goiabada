@@ -68,7 +68,7 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 	codeHash := hashutil.HashString(code)
 
 	return &record.PreRegistration{
-		Id:                        id,
+		ID:                        id,
 		Email:                     email,
 		VerificationCodeEncrypted: encrypted,
 		VerificationCodeHash:      codeHash,
@@ -525,7 +525,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).
-			Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+			Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpired(pageRenderer)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
@@ -891,7 +891,7 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 			created = args.Get(2).(*usercreation.Input)
 			steps = append(steps, "create account")
 		}).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 
 	var createdDetails, activatedDetails map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Run(func(args mock.Arguments) {
@@ -990,7 +990,7 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 
 			tc.arrange(passwordValidator)
 			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-				Return(&record.PreRegistration{Id: 7, Email: activateTestEmail}, nil).Once()
+				Return(&record.PreRegistration{ID: 7, Email: activateTestEmail}, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 			expectRenderedActivationFormError(pageRenderer, continuationId)
 
@@ -1072,7 +1072,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 			},
 			arrange: func(database *datamocks.Database, passwordValidator *accounthandlersmocks.PasswordValidator) {
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.PreRegistration{Id: 7, Email: activateTestEmail}, nil).Once()
+					Return(&record.PreRegistration{ID: 7, Email: activateTestEmail}, nil).Once()
 				database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 			},
@@ -1130,7 +1130,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).
-			Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+			Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
@@ -1217,7 +1217,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 				codeHash string) *datamocks.RunInTransactionStub {
 				stub := datamocks.ExpectRunInTransaction(database, activationTx)
 				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+					Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).
 					Return(false, errs.New("connection reset")).Once()
 				return stub
@@ -1230,7 +1230,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 				codeHash string) *datamocks.RunInTransactionStub {
 				stub := datamocks.ExpectRunInTransactionThenFail(database, activationTx, errs.New("commit refused"))
 				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+					Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 				return stub
 			},
@@ -1296,7 +1296,7 @@ func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
 	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, activationTx)
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(false, nil).Once()
 	expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 	expectAuditFailedActivationCode(auditLogger, "code_no_longer_outstanding", 0)
@@ -1368,7 +1368,7 @@ func TestHandleActivatePost_LinkMarkerCleanupFailureNamesUserId(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, activationTx)
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.Anything).Return().Once()
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

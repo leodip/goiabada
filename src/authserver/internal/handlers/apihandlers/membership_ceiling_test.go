@@ -54,10 +54,10 @@ func expectGroupPermissionsOn(database *datamocks.Database, tx *sql.Tx, groupIds
 	var rows []record.GroupPermission
 	for _, groupId := range groupIds {
 		for _, permissionId := range groupPermissionRows[groupId] {
-			rows = append(rows, record.GroupPermission{GroupId: groupId, PermissionId: permissionId})
+			rows = append(rows, record.GroupPermission{GroupID: groupId, PermissionID: permissionId})
 		}
 	}
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, tx, groupIds).Return(rows, nil).Once()
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, tx, groupIds).Return(rows, nil).Once()
 }
 
 // membershipRequest builds a request for one of the routes, with its path values set and a
@@ -115,13 +115,13 @@ func (c membershipChange) targetId(group int64) int64 {
 
 // expectMember registers the member read every membership route makes before the ceiling.
 func expectMember(database *datamocks.Database) {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
-		Return(&record.User{Id: ceilingMemberId, Subject: "sub-42"}, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
+		Return(&record.User{ID: ceilingMemberId, Subject: "sub-42"}, nil).Once()
 }
 
 func expectGroup(database *datamocks.Database, group int64) {
-	database.On("GetGroupById", mock.Anything, (*sql.Tx)(nil), group).
-		Return(&record.Group{Id: group, GroupIdentifier: "g"}, nil).Once()
+	database.On("GetGroupByID", mock.Anything, (*sql.Tx)(nil), group).
+		Return(&record.Group{ID: group, GroupIdentifier: "g"}, nil).Once()
 }
 
 func expectAudit(auditLogger *handlersmocks.AuditLogger, event string) {
@@ -140,8 +140,8 @@ var membershipChanges = []membershipChange{
 		},
 		expectReads: func(database *datamocks.Database, group int64, _ bool) {
 			expectMember(database)
-			database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{group}).
-				Return([]record.Group{{Id: group, GroupIdentifier: "g"}}, nil).Once()
+			database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{group}).
+				Return([]record.Group{{ID: group, GroupIdentifier: "g"}}, nil).Once()
 		},
 		writes: []string{"RunInTransaction", "CreateUserGroup", "DeleteUserGroup"},
 		expectWrite: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, group int64) {
@@ -149,7 +149,7 @@ var membershipChanges = []membershipChange{
 			expectAdministratorsLock(database, userGroupsTx)
 			expectStoredMemberships(database)
 			database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.MatchedBy(func(ug *record.UserGroup) bool {
-				return ug.UserId == ceilingMemberId && ug.GroupId == group
+				return ug.UserID == ceilingMemberId && ug.GroupID == group
 			})).Return(nil).Once()
 			expectGroupPermissionsOn(database, userGroupsTx, group)
 			expectAuthServerPermissionsOn(database, userGroupsTx)
@@ -173,8 +173,8 @@ var membershipChanges = []membershipChange{
 			expectMember(database)
 			if granular {
 				// What the user belongs to, read to judge only the memberships the save can remove.
-				database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
-					Return([]record.UserGroup{{Id: ceilingMembershipRowId, UserId: ceilingMemberId, GroupId: group}}, nil).Once()
+				database.On("GetUserGroupsByUserID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
+					Return([]record.UserGroup{{ID: ceilingMembershipRowId, UserID: ceilingMemberId, GroupID: group}}, nil).Once()
 			}
 		},
 		writes: []string{"RunInTransaction", "CreateUserGroup", "DeleteUserGroup"},
@@ -205,13 +205,13 @@ var membershipChanges = []membershipChange{
 		expectReads: func(database *datamocks.Database, group int64, _ bool) {
 			expectGroup(database, group)
 			expectMember(database)
-			database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, group).
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, group).
 				Return((*record.UserGroup)(nil), nil).Once()
 		},
 		writes: []string{"CreateUserGroup"},
 		expectWrite: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, group int64) {
 			database.On("CreateUserGroup", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(ug *record.UserGroup) bool {
-				return ug.UserId == ceilingMemberId && ug.GroupId == group
+				return ug.UserID == ceilingMemberId && ug.GroupID == group
 			})).Return(nil).Once()
 			expectAudit(auditLogger, audit.EventUserAddedToGroup)
 		},
@@ -232,8 +232,8 @@ var membershipChanges = []membershipChange{
 		expectReads: func(database *datamocks.Database, group int64, _ bool) {
 			expectGroup(database, group)
 			expectMember(database)
-			database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, group).
-				Return(&record.UserGroup{Id: ceilingMembershipRowId, UserId: ceilingMemberId, GroupId: group}, nil).Once()
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, group).
+				Return(&record.UserGroup{ID: ceilingMembershipRowId, UserID: ceilingMemberId, GroupID: group}, nil).Once()
 		},
 		writes: []string{"RunInTransaction", "DeleteUserGroup"},
 		expectWrite: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, group int64) {
@@ -279,14 +279,14 @@ func itoa(id int64) string {
 // the administrative set, nor the user's memberships outside the save's transaction.
 func assertNoPolicyRead(t *testing.T, database *datamocks.Database) {
 	t.Helper()
-	assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+	assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 	for _, call := range database.Calls {
 		// What a group holds is read on a write's transaction by the last-administrator guard,
 		// which is no read for the policy (#402 decision 11); outside any transaction it is.
-		if call.Method == "GetGroupPermissionsByGroupIds" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
+		if call.Method == "GetGroupPermissionsByGroupIDs" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
 			t.Errorf("what the groups hold was read outside any transaction for the policy")
 		}
-		if call.Method == "GetUserGroupsByUserId" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
+		if call.Method == "GetUserGroupsByUserID" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
 			t.Errorf("the user's memberships were read outside the save's transaction for the policy")
 		}
 	}
@@ -405,7 +405,7 @@ func TestMembershipCeiling_AFailedPolicyReadIsOneFiveHundred(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			change.expectReads(database, administrativeGroupId, true)
-			database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
+			database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
 				Return(nil, errors.New("the read failed")).Once()
 
 			rr := change.serve(database, auditLogger, administrativeGroupId, "authserver:manage-users")
@@ -428,8 +428,8 @@ func TestMembershipCeiling_TheMembershipRoutesAnswerTheirOwnFourHundredFirst(t *
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectGroup(database, administrativeGroupId)
 		expectMember(database)
-		database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, administrativeGroupId).
-			Return(&record.UserGroup{Id: ceilingMembershipRowId}, nil).Once()
+		database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, administrativeGroupId).
+			Return(&record.UserGroup{ID: ceilingMembershipRowId}, nil).Once()
 
 		r := membershipRequest(http.MethodPost, "/api/v1/admin/groups/7/members", `{"userId":42}`, "authserver:manage-users", map[string]string{"id": "7"})
 		rr := httptest.NewRecorder()
@@ -446,7 +446,7 @@ func TestMembershipCeiling_TheMembershipRoutesAnswerTheirOwnFourHundredFirst(t *
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectGroup(database, administrativeGroupId)
 		expectMember(database)
-		database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, administrativeGroupId).
+		database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, administrativeGroupId).
 			Return((*record.UserGroup)(nil), nil).Once()
 
 		r := membershipRequest(http.MethodDelete, "/api/v1/admin/groups/7/members/42", "", "authserver:manage-users",
@@ -470,10 +470,10 @@ func TestMembershipCeiling_AUserGroupsSaveIsJudgedOnEveryGroupItChanges(t *testi
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
-		Return([]record.Group{{Id: ordinaryGroupId}, {Id: administrativeGroupId}}, nil).Once()
-	database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
-		Return([]record.UserGroup{{Id: ceilingMembershipRowId, UserId: ceilingMemberId, GroupId: adminReadGroupId}}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
+		Return([]record.Group{{ID: ordinaryGroupId}, {ID: administrativeGroupId}}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).
+		Return([]record.UserGroup{{ID: ceilingMembershipRowId, UserID: ceilingMemberId, GroupID: adminReadGroupId}}, nil).Once()
 	expectGroupPermissions(database, ordinaryGroupId, administrativeGroupId, adminReadGroupId)
 	expectAuthServerPermissions(database)
 	records := recordLoggedEvents(auditLogger)
@@ -500,7 +500,7 @@ func TestMembershipCeiling_ARemovalTheUserDoesNotHoldIsLeftToTheSavesConflict(t 
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).Return([]record.UserGroup{}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, (*sql.Tx)(nil), ceilingMemberId).Return([]record.UserGroup{}, nil).Once()
 	expectHoldsNothing(database, ceilingMemberId)
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
@@ -515,6 +515,6 @@ func TestMembershipCeiling_ARemovalTheUserDoesNotHoldIsLeftToTheSavesConflict(t 
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "CONCURRENT_UPDATE", code)
 	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "GetGroupPermissionsByGroupIds", "DeleteUserGroup", "CreateUserGroup")
+	assertNotAttemptedOnClientDatabase(t, database, "GetGroupPermissionsByGroupIDs", "DeleteUserGroup", "CreateUserGroup")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

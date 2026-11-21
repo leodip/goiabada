@@ -77,7 +77,7 @@ func eventRows(t *testing.T, readerToken, event, requestId string) int {
 
 func settingsRow(t *testing.T) *record.Settings {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	return settings
 }
@@ -96,7 +96,7 @@ func TestSettingsCeiling_ManageSettingsCannotChangeTheReservedSettings(t *testin
 	})
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, write := range settingsCeilingWrites {
 		t.Run(write.name, func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestSettingsCeiling_ManageSettingsStillChangesTheOtherSettings(t *testing.T
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	before := settingsRow(t)
 	resp, requestId := sendAdmin(t, granularToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{

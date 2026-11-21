@@ -23,7 +23,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Update group
@@ -34,7 +34,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -48,7 +48,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
-	assert.Equal(t, testGroup.Id, updateResponse.Group.ID)
+	assert.Equal(t, testGroup.ID, updateResponse.Group.ID)
 	assert.Equal(t, updateReq.GroupIdentifier, updateResponse.Group.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updateResponse.Group.Description)
 	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Group.IncludeInIDToken)
@@ -56,12 +56,12 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	assert.GreaterOrEqual(t, updateResponse.Group.MemberCount, 0, "MemberCount should be non-negative")
 
 	// Verify changes were persisted to database
-	updatedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
+	updatedGroup, err := database.GetGroupByID(context.Background(), nil, testGroup.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedGroup)
 	assert.Equal(t, updateReq.GroupIdentifier, updatedGroup.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updatedGroup.Description)
-	assert.Equal(t, updateReq.IncludeInIDToken, updatedGroup.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updatedGroup.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updatedGroup.IncludeInAccessToken)
 }
 
@@ -72,7 +72,7 @@ func TestAPIGroupUpdatePut_ValidationErrors(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	testCases := []struct {
@@ -108,7 +108,7 @@ func TestAPIGroupUpdatePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -124,12 +124,12 @@ func TestAPIGroupUpdatePut_DuplicateIdentifier(t *testing.T) {
 	// Setup: Create two test groups
 	testGroup1 := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup1.ID)
 	}()
 
 	testGroup2 := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup2.ID)
 	}()
 
 	// Test: Try to update group2 with group1's identifier
@@ -138,7 +138,7 @@ func TestAPIGroupUpdatePut_DuplicateIdentifier(t *testing.T) {
 		Description:     "Updated description",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup2.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup2.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -153,18 +153,18 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Update group with same identifier (should be allowed)
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier, // Same identifier
 		Description:          "Updated description",
-		IncludeInIDToken:     !testGroup.IncludeInIdToken,
+		IncludeInIDToken:     !testGroup.IncludeInIDToken,
 		IncludeInAccessToken: !testGroup.IncludeInAccessToken,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -236,11 +236,11 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -259,11 +259,11 @@ func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
@@ -283,7 +283,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Update with whitespace that should fail validation
@@ -294,7 +294,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -327,13 +327,13 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 	testGroup := &record.Group{
 		GroupIdentifier:      "test-bool-group-" + fake.LetterN(8),
 		Description:          "Test boolean flags",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	testCases := []struct {
@@ -356,7 +356,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 				IncludeInAccessToken: tc.includeInAccessToken,
 			}
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -382,7 +382,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test user and add to group
@@ -397,28 +397,28 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	userGroup := &record.UserGroup{
-		UserId:  testUser.Id,
-		GroupId: testGroup.Id,
+		UserID:  testUser.ID,
+		GroupID: testGroup.ID,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 	}()
 
 	// Test: Update group (member count should be preserved in response)
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier + "-updated",
 		Description:          "Updated description",
-		IncludeInIDToken:     !testGroup.IncludeInIdToken,
+		IncludeInIDToken:     !testGroup.IncludeInIDToken,
 		IncludeInAccessToken: !testGroup.IncludeInAccessToken,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -446,7 +446,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.ID) }()
 
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
@@ -455,7 +455,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -464,7 +464,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
-	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
+	stored, err := database.GetGroupByID(context.Background(), nil, testGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, testGroup.Description, stored.Description)
 }
@@ -474,7 +474,7 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.ID) }()
 
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
@@ -483,13 +483,13 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
+	stored, err := database.GetGroupByID(context.Background(), nil, testGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, stored.Description)
 }

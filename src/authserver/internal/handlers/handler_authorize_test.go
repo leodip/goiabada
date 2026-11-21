@@ -63,12 +63,12 @@ func stubRegisteredRedirectURI(database *datamocks.Database, registered ...strin
 	for _, uri := range registered {
 		uris = append(uris, record.RedirectURI{URI: uri})
 	}
-	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
+	database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 }
 
 func stubAuthenticatedBrowser(database *datamocks.Database, userSessionManager *handlersmocks.UserSessionManager) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&record.UserSession{Id: 1, UserId: 1}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1}, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 		Return(true)
 }
@@ -112,9 +112,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -123,15 +123,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &record.UserSession{
-			Id:     1,
-			UserId: 123,
+			ID:     1,
+			UserID: 123,
 			// Deliberately conflicting and nonzero: the SESSION is at 7 while the user it
 			// belongs to is at 9. The AuthContext must inherit 7, because reading the
 			// user's current value here would launder an old ceremony into the generation a
 			// later credential change established (#106 decision 11(d)).
 			AuthStateGeneration: 7,
 			User: record.User{
-				Id:                  123,
+				ID:                  123,
 				Enabled:             true,
 				AuthStateGeneration: 9,
 			},
@@ -144,7 +144,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		ceremonyStore.On("AddAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
-				ac.AcrLevel == userSession.AcrLevel &&
+				ac.AcrLevel == userSession.ACRLevel &&
 				ac.AuthMethods == userSession.AuthMethods &&
 				// From the session, not the user. Thin on purpose: the tables live in
 				// issuance/auth_state_generation_test.go.
@@ -202,9 +202,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -392,9 +392,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -444,7 +444,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		})
 
 		stubRegisteredRedirectURI(database, "https://example.com")
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+		client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -524,9 +524,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -582,9 +582,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -654,9 +654,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -710,9 +710,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -721,10 +721,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &record.UserSession{
-			Id:     1,
-			UserId: 123,
+			ID:     1,
+			UserID: 123,
 			User: record.User{
-				Id:      123,
+				ID:      123,
 				Enabled: false,
 			},
 		}
@@ -778,7 +778,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		stubRegisteredRedirectURI(database, "https://example.com")
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+		client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -803,7 +803,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		ceremonyStore.AssertExpectations(t)
 	})
 
-	t.Run("Valid request with AcrLevel2Optional", func(t *testing.T) {
+	t.Run("Valid request with ACRLevel2Optional", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		userSessionManager := handlersmocks.NewUserSessionManager(t)
@@ -841,9 +841,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Client is now fetched before ValidateRequest to determine PKCE requirement
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel2Optional,
+			DefaultACRLevel:  record.ACRLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -852,12 +852,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      123,
-			AcrLevel:    record.AcrLevel1, // Set this to the appropriate level
+			ID:          1,
+			UserID:      123,
+			ACRLevel:    record.ACRLevel1, // Set this to the appropriate level
 			AuthMethods: "pwd",            // Set this to the appropriate method(s)
 			User: record.User{
-				Id:      123,
+				ID:      123,
 				Enabled: true,
 			},
 		}
@@ -931,9 +931,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -1007,9 +1007,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -1075,7 +1075,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+		client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -1154,7 +1154,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+		client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -1183,7 +1183,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 // refusal case still asserts the redirect it was written to assert (#108).
 func stubClientProvenanceLookup(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
 }
 
@@ -1203,7 +1203,7 @@ func testRegisteredDatabase(t *testing.T, registered ...string) *datamocks.Datab
 	for _, uri := range registered {
 		uris = append(uris, record.RedirectURI{URI: uri})
 	}
-	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
+	database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
 	return database
 }
@@ -1245,7 +1245,7 @@ func TestRedirectErrorFromAuthContext(t *testing.T) {
 	}
 
 	t.Run("carries the client it was handed", func(t *testing.T) {
-		client := &record.Client{Id: 7, ClientIdentifier: "test-client"}
+		client := &record.Client{ID: 7, ClientIdentifier: "test-client"}
 
 		input := redirectErrorFromAuthContext(authContext, client, "access_denied", "Access denied")
 
@@ -1792,7 +1792,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		for _, uri := range registered {
 			uris = append(uris, record.RedirectURI{URI: uri})
 		}
-		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
+		database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
 		return database
 	}
@@ -1805,7 +1805,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 
 	failingDatabase := func(t *testing.T) *datamocks.Database {
 		database := datamocks.NewDatabase(t)
-		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+		database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errors.New("the database is unavailable"))
 		return database
 	}
@@ -2010,7 +2010,7 @@ func TestRedirToClientWithError_WithholdsAnErrorFromAPlainHTTPRedirectURI(t *tes
 
 	input := testRedirectError("access_denied", "The user did not consent.", "query",
 		"http://app.example.com/cb?marker=do-not-log", "abc123", "code")
-	input.client = &record.Client{Id: 7, ClientIdentifier: "legacy-client"}
+	input.client = &record.Client{ID: 7, ClientIdentifier: "legacy-client"}
 
 	logs := logtest.CaptureSlog(t)
 	err := testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil).redirToClientWithError(w, r, input)
@@ -2279,9 +2279,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		// Client with implicit flow enabled
 		client := &record.Client{
-			Id:                   1,
+			ID:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      record.AcrLevel1,
+			DefaultACRLevel:      record.ACRLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2353,9 +2353,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:                   1,
+			ID:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      record.AcrLevel1,
+			DefaultACRLevel:      record.ACRLevel1,
 			ImplicitGrantEnabled: nil,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2425,9 +2425,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:                   1,
+			ID:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      record.AcrLevel1,
+			DefaultACRLevel:      record.ACRLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting (disabled)
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2493,9 +2493,9 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		// Client explicitly enables implicit flow
 		implicitEnabled := true
 		client := &record.Client{
-			Id:                   1,
+			ID:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      record.AcrLevel1,
+			DefaultACRLevel:      record.ACRLevel1,
 			ImplicitGrantEnabled: &implicitEnabled, // Client override
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2569,9 +2569,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2634,9 +2634,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}, nil)
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
@@ -2699,9 +2699,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2775,9 +2775,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2852,9 +2852,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2926,9 +2926,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -2947,12 +2947,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", false).Return(expiredToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      123,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      123,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			User: record.User{
-				Id:      123,
+				ID:      123,
 				Enabled: true,
 				Subject: userSubject,
 			},
@@ -3020,9 +3020,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3041,12 +3041,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      123,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      123,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			User: record.User{
-				Id:      123,
+				ID:      123,
 				Enabled: true,
 				Subject: userSubject,
 			},
@@ -3116,9 +3116,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3137,12 +3137,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      456,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      456,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			User: record.User{
-				Id:      456,
+				ID:      456,
 				Enabled: true,
 				Subject: sessionSubject,
 			},
@@ -3214,9 +3214,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3235,9 +3235,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      789,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      789,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			AuthTime:    time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
@@ -3245,7 +3245,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			// silent re-issue would launder an old ceremony forward (#106 decision 11(d)).
 			AuthStateGeneration: 7,
 			User: record.User{
-				Id:                  789,
+				ID:                  789,
 				Enabled:             true,
 				Subject:             userSubject,
 				AuthStateGeneration: 9,
@@ -3257,10 +3257,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", mock.MatchedBy(func(u *record.User) bool {
-			return u.Id == 789
+			return u.ID == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.AcrLevel(""), "203.0.113.7").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.ACRLevel(""), "203.0.113.7").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
@@ -3342,9 +3342,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 			ConsentRequired:  false,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -3364,14 +3364,14 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
 		userSession := &record.UserSession{
-			Id:                  1,
-			UserId:              789,
-			AcrLevel:            record.AcrLevel1,
+			ID:                  1,
+			UserID:              789,
+			ACRLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			AuthTime:            time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
 			AuthStateGeneration: 7,
 			User: record.User{
-				Id:                  789,
+				ID:                  789,
 				Enabled:             true,
 				Subject:             userSubject,
 				AuthStateGeneration: 7,
@@ -3383,10 +3383,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, requestedScope, mock.MatchedBy(func(u *record.User) bool {
-			return u.Id == 789
+			return u.ID == 789
 		})).Return(requestedScope, nil)
 
-		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.AcrLevel(""), "").Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "", record.ACRLevel(""), "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["user_id"] == int64(789) && details["client_id"] == int64(1)
@@ -3405,7 +3405,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, savedCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/issue"),
 			"the silent path's redirect names the ceremony it just saved")
-		database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -3460,9 +3460,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3481,12 +3481,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      999,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      999,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			User: record.User{
-				Id:      999,
+				ID:      999,
 				Enabled: true,
 				Subject: sessionSubject,
 			},
@@ -3560,9 +3560,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
@@ -3581,12 +3581,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      999,
-			AcrLevel:    record.AcrLevel1,
+			ID:          1,
+			UserID:      999,
+			ACRLevel:    record.ACRLevel1,
 			AuthMethods: "pwd",
 			User: record.User{
-				Id:      999,
+				ID:      999,
 				Enabled: true,
 				Subject: sessionSubject,
 			},
@@ -3955,7 +3955,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
@@ -3969,14 +3969,14 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			// row are refused above it and never query. The rows that do reach it hold their own
 			// destination registered, which is what keeps them about the routing they are named
 			// for rather than about a deleted callback (#241 decision 11).
-			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+			database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 				Return([]record.RedirectURI{{URI: tc.redirectURI}}, nil).Maybe()
 
 			// Maybe, because whether the session is looked up at all is the point of half these
 			// rows: the clauses that read nothing are evaluated first, so a request that is
 			// silent, or whose redirect would be withheld anyway, never queries.
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&record.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+				Return(&record.UserSession{ID: 1, UserID: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
@@ -4081,7 +4081,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 			// Maybe on all three, because the predicate is computed above the validations: the
 			// row that answers 500 does so before any of them runs, which is the correct order
 			// (there is no answer to give a client until the server knows who is at the browser)
@@ -4179,7 +4179,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 	authorizeValidator.On("ValidateUnsupportedRequestParameters",
 		mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 	authorizeValidator.On("ValidateRequest",
@@ -4229,11 +4229,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			name:       "a refusal is never widened into a redirect",
 			hasSession: false,
 			firstRead: func(database *datamocks.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, errors.New("the database is unavailable")).Once()
 			},
 			secondRead: func(database *datamocks.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			},
 			wantReads: 1,
@@ -4245,11 +4245,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			name:       "a permission is still narrowed into a refusal",
 			hasSession: true,
 			firstRead: func(database *datamocks.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{{URI: redirectURI}}, nil).Once()
 			},
 			secondRead: func(database *datamocks.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 					Return([]record.RedirectURI{}, nil).Maybe()
 			},
 			wantReads: 2,
@@ -4288,7 +4288,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
@@ -4309,7 +4309,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			tc.secondRead(database)
 
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&record.UserSession{Id: 1, UserId: 1}, nil).Maybe()
+				Return(&record.UserSession{ID: 1, UserID: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
@@ -4325,7 +4325,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			// short-circuited on the floor instead of asking again; two means it asked and took
 			// the newer, stricter answer. Caching the first answer would make both rows read once
 			// and the second row would fail.
-			database.AssertNumberOfCalls(t, "GetRedirectURIsByClientId", tc.wantReads)
+			database.AssertNumberOfCalls(t, "GetRedirectURIsByClientID", tc.wantReads)
 
 			pageRenderer.AssertExpectations(t)
 			ceremonyStore.AssertExpectations(t)

@@ -13,7 +13,7 @@ import (
 // adds one, and the transaction they run in. data.Database satisfies it.
 type AcceptanceDatabase interface {
 	CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error
-	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -32,20 +32,20 @@ func RecordAcceptances(ctx context.Context, db AcceptanceDatabase, userId int64,
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		// Set by the attempt that commits, so a rerun's rows replace a first attempt's.
 		written = nil
-		acceptances, err := db.GetLegalDocumentAcceptancesByUserId(ctx, tx, userId)
+		acceptances, err := db.GetLegalDocumentAcceptancesByUserID(ctx, tx, userId)
 		if err != nil {
 			return err
 		}
 		accepted := make(map[int64]bool, len(acceptances))
 		for _, acceptance := range acceptances {
-			accepted[acceptance.LegalDocumentVersionId] = true
+			accepted[acceptance.LegalDocumentVersionID] = true
 		}
 		now := time.Now().UTC()
 		for _, versionId := range versionIds {
 			if accepted[versionId] {
 				continue
 			}
-			acceptance := record.LegalDocumentAcceptance{AcceptedAt: now, UserId: userId, LegalDocumentVersionId: versionId}
+			acceptance := record.LegalDocumentAcceptance{AcceptedAt: now, UserID: userId, LegalDocumentVersionID: versionId}
 			if err = db.CreateLegalDocumentAcceptance(ctx, tx, &acceptance); err != nil {
 				return err
 			}

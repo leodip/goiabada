@@ -40,11 +40,11 @@ func TestRefreshToken_DPoPJktRoundTrips(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			created := seedBoundRefreshToken(t, tc.binding)
 
-			byId, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+			byID, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 			require.NoError(t, err)
-			byJti, err := database.GetRefreshTokenByJti(context.Background(), nil, created.RefreshTokenJti)
+			byJTI, err := database.GetRefreshTokenByJTI(context.Background(), nil, created.RefreshTokenJTI)
 			require.NoError(t, err)
-			for _, read := range []*record.RefreshToken{byId, byJti} {
+			for _, read := range []*record.RefreshToken{byID, byJTI} {
 				require.NotNil(t, read)
 				assert.Equal(t, tc.binding, read.DPoPJkt)
 			}
@@ -67,22 +67,22 @@ func TestUpdateRefreshToken_NeitherChangesNorClearsTheDPoPBinding(t *testing.T) 
 			created := seedBoundRefreshToken(t, tc.binding)
 
 			for _, inHand := range []sql.NullString{{String: bindingOtherKey, Valid: true}, {}} {
-				reloaded, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+				reloaded, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 				require.NoError(t, err)
 				reloaded.DPoPJkt = inHand
 				reloaded.Scope = "openid " + fake.LetterN(6)
 				require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, reloaded))
 
-				after, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+				after, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 				require.NoError(t, err)
 				assert.Equal(t, tc.binding, after.DPoPJkt, "UpdateRefreshToken with %v in hand moved dpop_jkt (is the dont-update tag missing?)", inHand)
 				assert.Equal(t, reloaded.Scope, after.Scope, "the rest of the update still applies")
 			}
 
-			claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, created.Id)
+			claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, created.ID)
 			require.NoError(t, err)
 			require.True(t, claimed)
-			after, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+			after, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 			require.NoError(t, err)
 			assert.Equal(t, tc.binding, after.DPoPJkt, "the rotation's claim leaves the binding as it was")
 		})
@@ -97,10 +97,10 @@ func seedBoundRefreshToken(t *testing.T, binding sql.NullString) *record.Refresh
 	jti := fake.UUID()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := &record.RefreshToken{
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenJTI:      jti,
+		FirstRefreshTokenJTI: jti,
 		RefreshTokenType:     "Offline",
 		Scope:                "openid",
 		IssuedAt:             sql.NullTime{Time: now, Valid: true},
@@ -141,7 +141,7 @@ func TestRefreshRotation_ConcurrentRotationsKeepTheFamilysDPoPBinding(t *testing
 
 				inputs := make([]*issuance.RefreshTokenGrantInput, rotations)
 				for i := range inputs {
-					inputs[i] = f.presenting(t, database, f.live.RefreshTokenJti)
+					inputs[i] = f.presenting(t, database, f.live.RefreshTokenJTI)
 					inputs[i].DPoPThumbprint = proofs[i%len(proofs)]
 				}
 
@@ -181,7 +181,7 @@ func TestRefreshRotation_ConcurrentRotationsKeepTheFamilysDPoPBinding(t *testing
 					assert.Equal(t, bindingFamilyKey, winners[0].DPoPThumbprint, "the rotation that commits is one by the family's key")
 					for _, token := range f.tokens(t, database) {
 						assert.Equalf(t, sql.NullString{String: bindingFamilyKey, Valid: true}, token.DPoPJkt,
-							"every token of the bound family is bound to its key, %s", token.RefreshTokenJti)
+							"every token of the bound family is bound to its key, %s", token.RefreshTokenJTI)
 					}
 					return
 				}
@@ -198,7 +198,7 @@ func newBindingFamily(t *testing.T, db data.Database, ropc bool, bound bool) *fa
 	t.Helper()
 	f := newFamily(t, db, ropc)
 
-	client, err := db.GetClientById(context.Background(), nil, f.client.Id)
+	client, err := db.GetClientByID(context.Background(), nil, f.client.ID)
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.AuthorizationCodeEnabled = true
@@ -210,13 +210,13 @@ func newBindingFamily(t *testing.T, db data.Database, ropc bool, bound bool) *fa
 	}
 	// The live member was born unbound, and no update binds it: retire it and give the family a
 	// bound live member in its place.
-	claimed, err := db.MarkRefreshTokenAsRevoked(context.Background(), nil, f.live.Id)
+	claimed, err := db.MarkRefreshTokenAsRevoked(context.Background(), nil, f.live.ID)
 	require.NoError(t, err)
 	require.True(t, claimed)
 	live := *f.live
-	live.Id = 0
-	live.RefreshTokenJti = fake.UUID()
-	live.PreviousRefreshTokenJti = f.live.RefreshTokenJti
+	live.ID = 0
+	live.RefreshTokenJTI = fake.UUID()
+	live.PreviousRefreshTokenJTI = f.live.RefreshTokenJTI
 	live.Revoked = false
 	live.DPoPJkt = sql.NullString{String: bindingFamilyKey, Valid: true}
 	require.NoError(t, db.CreateRefreshToken(context.Background(), nil, &live))
@@ -231,15 +231,15 @@ func (f *family) tokens(t *testing.T, db data.Database) []*record.RefreshToken {
 	var all []*record.RefreshToken
 	var err error
 	if f.ropc {
-		all, err = db.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
+		all, err = db.GetRefreshTokensByUserID(context.Background(), nil, f.user.ID)
 	} else {
-		all, err = db.GetRefreshTokensByCodeId(context.Background(), nil, f.code.Id)
+		all, err = db.GetRefreshTokensByCodeID(context.Background(), nil, f.code.ID)
 	}
 	require.NoError(t, err)
 
 	var fromLive []*record.RefreshToken
 	for _, token := range all {
-		if token.RefreshTokenJti == f.live.RefreshTokenJti || token.PreviousRefreshTokenJti == f.live.RefreshTokenJti {
+		if token.RefreshTokenJTI == f.live.RefreshTokenJTI || token.PreviousRefreshTokenJTI == f.live.RefreshTokenJTI {
 			fromLive = append(fromLive, token)
 		}
 	}

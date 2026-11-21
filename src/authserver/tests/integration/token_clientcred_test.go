@@ -30,13 +30,13 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	resourceIdentifier := "backend-svc-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
 	permissionIdentifier := "read-data-" + fake.LetterN(8)
-	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
+	permission := createPermissionWithId(t, resource.ID, permissionIdentifier)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -45,8 +45,8 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 
 	// Assign permission to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	})
 	require.NoError(t, err)
 
@@ -75,21 +75,21 @@ func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T)
 	require.NoError(t, err)
 
 	resource := createResourceWithId(t, "backend-svc-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-data-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.ID, "read-data-"+fake.LetterN(8))
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	})
 	require.NoError(t, err)
 
@@ -123,7 +123,7 @@ func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T)
 // refused, whatever the case.
 func TestToken_ClientCred_ClientSecretBasic_SchemeInAnyCase(t *testing.T) {
 	_, client, clientSecret := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	credentials := base64.StdEncoding.EncodeToString([]byte(client.ClientIdentifier + ":" + clientSecret))
 
 	post := func(t *testing.T, authorization string, form url.Values) (int, map[string]interface{}) {
@@ -169,7 +169,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -199,7 +199,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false, // Client credentials flow is not enabled
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false, // Set to false to require a client secret
 	}
 	err := database.CreateClient(context.Background(), nil, client)
@@ -257,7 +257,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -289,7 +289,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -300,7 +300,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	resourceIdentifier := "backend-svcA-" + fake.LetterN(8)
 	permissionIdentifier := "read-product-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
-	createPermissionWithId(t, resource.Id, permissionIdentifier)
+	createPermissionWithId(t, resource.ID, permissionIdentifier)
 
 	testCases := []struct {
 		scope            string
@@ -377,7 +377,7 @@ func TestToken_ClientCred_NoScopeFromAClientHoldingNothing(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
@@ -409,7 +409,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -420,22 +420,22 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
 	permissionAIdentifier := "create-product-" + fake.LetterN(8)
-	permissionA := createPermissionWithId(t, resourceA.Id, permissionAIdentifier)
+	permissionA := createPermissionWithId(t, resourceA.ID, permissionAIdentifier)
 
 	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
 	permissionBIdentifier := "read-info-" + fake.LetterN(8)
-	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
+	permissionB := createPermissionWithId(t, resourceB.ID, permissionBIdentifier)
 
 	// Assign permissions to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissionA.Id,
+		ClientID:     client.ID,
+		PermissionID: permissionA.ID,
 	})
 	require.NoError(t, err)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissionB.Id,
+		ClientID:     client.ID,
+		PermissionID: permissionB.ID,
 	})
 	require.NoError(t, err)
 
@@ -475,7 +475,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -486,22 +486,22 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
 	permissionAIdentifier := "create-product-" + fake.LetterN(8)
-	permissionA := createPermissionWithId(t, resourceA.Id, permissionAIdentifier)
+	permissionA := createPermissionWithId(t, resourceA.ID, permissionAIdentifier)
 
 	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
 	permissionBIdentifier := "read-info-" + fake.LetterN(8)
-	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
+	permissionB := createPermissionWithId(t, resourceB.ID, permissionBIdentifier)
 
 	// Assign permissions to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissionA.Id,
+		ClientID:     client.ID,
+		PermissionID: permissionA.ID,
 	})
 	require.NoError(t, err)
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissionB.Id,
+		ClientID:     client.ID,
+		PermissionID: permissionB.ID,
 	})
 	require.NoError(t, err)
 
@@ -550,7 +550,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -562,16 +562,16 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 
 	resourceAIdentifier := "billing-api-" + fake.LetterN(8)
 	resourceA := createResourceWithId(t, resourceAIdentifier)
-	permissionA := createPermissionWithId(t, resourceA.Id, sharedPermissionIdentifier)
+	permissionA := createPermissionWithId(t, resourceA.ID, sharedPermissionIdentifier)
 
 	resourceBIdentifier := "reports-api-" + fake.LetterN(8)
 	resourceB := createResourceWithId(t, resourceBIdentifier)
-	createPermissionWithId(t, resourceB.Id, sharedPermissionIdentifier)
+	createPermissionWithId(t, resourceB.ID, sharedPermissionIdentifier)
 
 	// The client holds resource A's permission and nothing else.
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissionA.Id,
+		ClientID:     client.ID,
+		PermissionID: permissionA.ID,
 	})
 	require.NoError(t, err)
 
@@ -632,7 +632,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -642,11 +642,11 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	// A custom resource whose permission identifier collides with the built-in one.
 	customResourceIdentifier := "billing-api-" + fake.LetterN(8)
 	customResource := createResourceWithId(t, customResourceIdentifier)
-	customManage := createPermissionWithId(t, customResource.Id, builtin.ManagePermissionIdentifier)
+	customManage := createPermissionWithId(t, customResource.ID, builtin.ManagePermissionIdentifier)
 
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: customManage.Id,
+		ClientID:     client.ID,
+		PermissionID: customManage.ID,
 	})
 	require.NoError(t, err)
 
@@ -655,13 +655,13 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	assert.NotNil(t, authserverResource)
-	authserverPermissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+	authserverPermissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 	require.NoError(t, err)
 	foundBuiltInManage := false
 	for _, perm := range authserverPermissions {
 		if perm.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			foundBuiltInManage = true
-			assert.NotEqual(t, customManage.Id, perm.Id,
+			assert.NotEqual(t, customManage.ID, perm.ID,
 				"the fixture must be two distinct permission rows sharing one identifier")
 			break
 		}
@@ -717,7 +717,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -726,13 +726,13 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 
 	resourceIdentifier := "billing-api-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
-	readPermission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(6))
-	writePermission := createPermissionWithId(t, resource.Id, "write-"+fake.LetterN(6))
+	readPermission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(6))
+	writePermission := createPermissionWithId(t, resource.ID, "write-"+fake.LetterN(6))
 
 	for _, permission := range []*record.Permission{readPermission, writePermission} {
 		err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-			ClientId:     client.Id,
-			PermissionId: permission.Id,
+			ClientID:     client.ID,
+			PermissionID: permission.ID,
 		})
 		require.NoError(t, err)
 	}
@@ -810,7 +810,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -839,7 +839,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	serverLifetime := settings.TokenExpirationInSeconds
 
@@ -860,13 +860,13 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			require.NoError(t, err)
 
 			resource := createResourceWithId(t, "lifetime-svc-"+fake.LetterN(8))
-			permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+			permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
 
 			client := &record.Client{
 				ClientIdentifier:         "test-client-" + fake.LetterN(8),
 				Enabled:                  true,
 				ClientCredentialsEnabled: true,
-				DefaultAcrLevel:          record.AcrLevel2Optional,
+				DefaultACRLevel:          record.ACRLevel2Optional,
 				IsPublic:                 false,
 				ClientSecretEncrypted:    clientSecretEncrypted,
 				TokenExpirationInSeconds: tt.clientLifetime,
@@ -874,8 +874,8 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			err = database.CreateClient(context.Background(), nil, client)
 			require.NoError(t, err)
 			err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-				ClientId:     client.Id,
-				PermissionId: permission.Id,
+				ClientID:     client.ID,
+				PermissionID: permission.ID,
 			})
 			require.NoError(t, err)
 

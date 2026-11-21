@@ -65,8 +65,8 @@ func (d *Database) RecordAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti
 		return false, nil
 	}
 
-	revoked := &record.RevokedAccessToken{Jti: jti, ExpiresAt: expiresAt.UTC()}
-	_, err = d.ExecSQL(ctx, tx, insertRevokedAccessToken.text(d.Dialect), revoked.Jti, revoked.ExpiresAt)
+	revoked := &record.RevokedAccessToken{JTI: jti, ExpiresAt: expiresAt.UTC()}
+	_, err = d.ExecSQL(ctx, tx, insertRevokedAccessToken.text(d.Dialect), revoked.JTI, revoked.ExpiresAt)
 	if errors.Is(err, data.ErrUniqueViolation) {
 		return false, nil
 	}

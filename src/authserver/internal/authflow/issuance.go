@@ -22,7 +22,7 @@ import (
 type issuanceDatabase interface {
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
@@ -191,7 +191,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 			}
 
 		case issuanceFactUser:
-			user, err := o.database.GetUserById(ctx, nil, authContext.UserId)
+			user, err := o.database.GetUserByID(ctx, nil, authContext.UserId)
 			if err != nil {
 				return IssuanceResult{}, err
 			}
@@ -275,7 +275,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 	case issuanceRefuseUserDisabled:
 		// The event and the answer Completion gives the same condition.
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": facts.user.Id,
+			"user_id": facts.user.ID,
 		})
 		return answerClient(browser, authContext, client, "access_denied", userDisabledDescription), nil
 
@@ -296,7 +296,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 			"client_identifier", authContext.ClientId)
 		o.auditLogger.Log(ctx, audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
 			"user_id":           authContext.UserId,
-			"client_id":         client.Id,
+			"client_id":         client.ID,
 			"client_identifier": authContext.ClientId,
 		})
 		// Completion's wording and code for the same condition.
@@ -353,7 +353,7 @@ func (o *Issuance) refuseUnregisteredRedirect(ctx context.Context, browser cerem
 	}
 	// Absent rather than zero for a client that no longer exists: client 0 names no row.
 	if client != nil {
-		details["client_id"] = client.Id
+		details["client_id"] = client.ID
 	}
 	o.auditLogger.Log(ctx, audit.EventIssuanceRefusedRedirectURI, details)
 
@@ -397,7 +397,7 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 	if shape == sessionExpired {
 		o.auditLogger.Log(ctx, audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
 			"user_id":            authContext.UserId,
-			"client_id":          client.Id,
+			"client_id":          client.ID,
 			"client_identifier":  authContext.ClientId,
 			"session_identifier": sessionIdentifier,
 		})
@@ -408,12 +408,12 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 		case sessionForeign:
 			slog.WarnContext(ctx, "the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
 				"session_identifier", sessionIdentifier,
-				"session_user_id", ambientSession.UserId,
+				"session_user_id", ambientSession.UserID,
 				"ceremony_user_id", authContext.UserId)
 		case sessionExpired:
 			slog.WarnContext(ctx, "the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier,
-				"session_user_id", ambientSession.UserId)
+				"session_user_id", ambientSession.UserID)
 		case sessionGenerationStale:
 			slog.WarnContext(ctx, "the user's authentication generation has moved on since this silent ceremony authenticated, returning login_required instead of issuing anything",
 				"ceremony_user_id", authContext.UserId)
@@ -436,12 +436,12 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 	case sessionForeign:
 		slog.WarnContext(ctx, "the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
 			"session_identifier", sessionIdentifier,
-			"session_user_id", ambientSession.UserId,
+			"session_user_id", ambientSession.UserID,
 			"ceremony_user_id", authContext.UserId)
 	case sessionExpired:
 		slog.WarnContext(ctx, "the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier,
-			"session_user_id", ambientSession.UserId)
+			"session_user_id", ambientSession.UserID)
 	case sessionGenerationStale:
 		slog.WarnContext(ctx, "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of issuing anything",
 			"ceremony_user_id", authContext.UserId)
@@ -496,8 +496,8 @@ func (o *Issuance) issueCode(ctx context.Context, browser issuanceBrowser, authC
 
 	o.auditLogger.Log(ctx, audit.EventCreatedAuthCode, map[string]interface{}{
 		"user_id":   input.UserId,
-		"client_id": code.ClientId,
-		"code_id":   code.Id,
+		"client_id": code.ClientID,
+		"code_id":   code.ID,
 	})
 
 	return IssuanceResult{Code: code, ClearErr: browser.ClearAuthContext(authContext.CeremonyId)}, nil
@@ -582,8 +582,8 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 	}
 
 	o.auditLogger.Log(ctx, audit.EventTokenIssuedImplicitResponse, map[string]interface{}{
-		"user_id":            user.Id,
-		"client_id":          client.Id,
+		"user_id":            user.ID,
+		"client_id":          client.ID,
 		"scope":              scope,
 		"response_type":      authContext.ResponseType,
 		"issue_access_token": issueAccessToken,

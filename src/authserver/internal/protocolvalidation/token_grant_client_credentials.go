@@ -70,7 +70,7 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 		//
 		// That state IS reachable. The two loads above are separate non-transactional queries,
 		// so a resource deleted between them leaves this loop holding permission rows that the
-		// database has already cascade-deleted, and GetResourcesByIds finds nothing for them.
+		// database has already cascade-deleted, and GetResourcesByIDs finds nothing for them.
 		// ON DELETE CASCADE does not help: the cascade happens in the database while these rows
 		// are already in memory.
 		//
@@ -162,7 +162,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 		// API (#104).
 		clientHasPermission := false
 		for _, perm := range client.Permissions {
-			if perm.Id == resolution.Permission.Id {
+			if perm.ID == resolution.Permission.ID {
 				clientHasPermission = true
 				break
 			}

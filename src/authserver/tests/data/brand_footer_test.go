@@ -66,7 +66,7 @@ func TestBrand_TheContactAndFooterLinksReadBackWhatWasWritten(t *testing.T) {
 	brand.FooterLinks = threeFooterLinks()
 	require.NoError(t, database.CreateBrand(ctx, nil, &brand))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, longSupportEmail, stored.SupportEmail, "the support email at its 254 characters")
@@ -78,7 +78,7 @@ func TestBrand_TheContactAndFooterLinksReadBackWhatWasWritten(t *testing.T) {
 	require.NoError(t, err)
 	var listed *record.Brand
 	for i := range all {
-		if all[i].Id == brand.Id {
+		if all[i].ID == brand.ID {
 			listed = &all[i]
 		}
 	}
@@ -98,7 +98,7 @@ func TestBrand_TheContactAndFooterLinksReadBackWhatWasWritten(t *testing.T) {
 	}
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
 
-	updated, err := database.GetBrandById(ctx, nil, brand.Id)
+	updated, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	assert.Empty(t, updated.SupportEmail)
@@ -113,7 +113,7 @@ func TestBrand_TheContactAndFooterLinksReadBackWhatWasWritten(t *testing.T) {
 	edit = *updated
 	edit.FooterLinks = nil
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
-	cleared, err := database.GetBrandById(ctx, nil, brand.Id)
+	cleared, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	assert.Nil(t, cleared.FooterLinks, "a brand saved with no links reads with none")
@@ -132,7 +132,7 @@ func TestBrand_NoLinksAreStoredAsTheEmptyList(t *testing.T) {
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &brand))
 
 	var stored string
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT footer_links FROM brands WHERE id = %d", brand.Id)).Scan(&stored))
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT footer_links FROM brands WHERE id = %d", brand.ID)).Scan(&stored))
 	assert.Equalf(t, "[]", stored, "a brand with no links on %s", dbType())
 }
 
@@ -142,7 +142,7 @@ func TestBrand_NoLinksAreStoredAsTheEmptyList(t *testing.T) {
 func TestBrand_AStoredLinksValueThatDoesNotParseReadsAsNone(t *testing.T) {
 	ctx := context.Background()
 	h, def := brandsIsolatedDB(t)
-	_, setupErr := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET support_email = 'help@example.com' WHERE id = %d", def.Id))
+	_, setupErr := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET support_email = 'help@example.com' WHERE id = %d", def.ID))
 	require.NoError(t, setupErr)
 
 	for _, stored := range []string{
@@ -157,17 +157,17 @@ func TestBrand_AStoredLinksValueThatDoesNotParseReadsAsNone(t *testing.T) {
 		`[{"label":"Privacy"}]`,
 		`[{"url":"https://example.com/privacy","label":"Privacy"},{"url":"","label":"Status"}]`,
 	} {
-		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET footer_links = '%s' WHERE id = %d", stored, def.Id))
+		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET footer_links = '%s' WHERE id = %d", stored, def.ID))
 		require.NoErrorf(t, err, "store %q on %s", stored, dbType())
 
 		capture := logtest.CaptureSlog(t)
 
-		byId, err := h.DB.GetBrandById(ctx, nil, def.Id)
+		byID, err := h.DB.GetBrandByID(ctx, nil, def.ID)
 		require.NoErrorf(t, err, "%q: the brand is still read on %s", stored, dbType())
-		require.NotNil(t, byId)
-		assert.Nilf(t, byId.FooterLinks, "%q reads as no links on %s", stored, dbType())
-		assert.Equalf(t, "help@example.com", byId.SupportEmail, "%q: the rest of the brand is read on %s", stored, dbType())
-		assert.Equal(t, "Default", byId.Name)
+		require.NotNil(t, byID)
+		assert.Nilf(t, byID.FooterLinks, "%q reads as no links on %s", stored, dbType())
+		assert.Equalf(t, "help@example.com", byID.SupportEmail, "%q: the rest of the brand is read on %s", stored, dbType())
+		assert.Equal(t, "Default", byID.Name)
 
 		byDefault, err := h.DB.GetDefaultBrand(ctx, nil)
 		require.NoErrorf(t, err, "%q: the default brand is still read on %s", stored, dbType())
@@ -188,19 +188,19 @@ func TestBrand_AStoredLinksValueThatDoesNotParseReadsAsNone(t *testing.T) {
 		require.Lenf(t, logged, 3, "%q: each of the three reads logs it on %s", stored, dbType())
 		for _, r := range logged {
 			assert.Equal(t, slog.LevelWarn, r.Level)
-			assert.Equal(t, def.Id, r.Attrs["brand_id"], "the record names the brand")
+			assert.Equal(t, def.ID, r.Attrs["brand_id"], "the record names the brand")
 			assert.NotEmpty(t, r.Attrs["error"], "the record carries why")
 		}
 	}
 
 	// A well-formed list reads as itself again, and logs nothing.
-	_, err := h.SQL.Exec(fmt.Sprintf(`UPDATE brands SET footer_links = '[{"url":"https://example.com/privacy","label":"Privacy"}]' WHERE id = %d`, def.Id))
+	_, err := h.SQL.Exec(fmt.Sprintf(`UPDATE brands SET footer_links = '[{"url":"https://example.com/privacy","label":"Privacy"}]' WHERE id = %d`, def.ID))
 	require.NoError(t, err)
 	capture := logtest.CaptureSlog(t)
-	byId, err := h.DB.GetBrandById(ctx, nil, def.Id)
+	byID, err := h.DB.GetBrandByID(ctx, nil, def.ID)
 	require.NoError(t, err)
-	require.NotNil(t, byId)
-	assert.Equal(t, record.BrandFooterLinks{{URL: "https://example.com/privacy", Label: "Privacy"}}, byId.FooterLinks)
+	require.NotNil(t, byID)
+	assert.Equal(t, record.BrandFooterLinks{{URL: "https://example.com/privacy", Label: "Privacy"}}, byID.FooterLinks)
 	for _, r := range capture.Records() {
 		assert.NotEqual(t, "brand footer links do not parse and are read as none", r.Message)
 	}

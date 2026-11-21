@@ -30,13 +30,13 @@ const otherIntrospectedResourceId = int64(77)
 func expectIntrospectionResources(database *datamocks.Database, resourceIds ...int64) {
 	links := make([]record.ClientIntrospectionResource, 0, len(resourceIds))
 	for _, resourceId := range resourceIds {
-		links = append(links, record.ClientIntrospectionResource{ClientId: targetClientId, ResourceId: resourceId})
+		links = append(links, record.ClientIntrospectionResource{ClientID: targetClientId, ResourceID: resourceId})
 	}
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, (*sql.Tx)(nil), targetClientId).
 		Return(links, nil).Once()
 	if len(links) > 0 {
 		database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "authserver").
-			Return(&record.Resource{Id: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
+			Return(&record.Resource{ID: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
 	}
 }
 
@@ -139,7 +139,7 @@ func TestClientCredentialsCeiling_AManageTokenReadsNothingForIt(t *testing.T) {
 
 			assertReachedPastTheCeiling(t, write, rr, records)
 			database.AssertExpectations(t)
-			assertNotAttemptedOnClientDatabase(t, database, "GetClientIntrospectionResourcesByClientId")
+			assertNotAttemptedOnClientDatabase(t, database, "GetClientIntrospectionResourcesByClientID")
 		})
 	}
 }
@@ -153,7 +153,7 @@ func TestClientCredentialsCeiling_AFailedListReadIsOneFiveHundred(t *testing.T) 
 			client := targetClient(t, ordinaryClient)
 			expectTheTargetClient(client)(database)
 			expectClientHolding(database, ordinaryClient)
-			database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).
+			database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, (*sql.Tx)(nil), targetClientId).
 				Return(nil, errors.New("the read failed")).Once()
 
 			rr := write.serve(t, database, auditLogger, granularScopeOfClients, client)

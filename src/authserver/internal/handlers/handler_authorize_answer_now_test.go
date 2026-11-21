@@ -95,7 +95,7 @@ func TestHandleAuthorizeGet_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *te
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil)
 			tc.arrange(database, authorizeValidator, userSessionManager)
 
 			req := withCookies(httptest.NewRequest(http.MethodGet, "/auth/authorize?"+tc.query.Encode(), nil), cookies)

@@ -23,11 +23,11 @@ type groupMemberCounter interface {
 func countGroupMembers(ctx context.Context, database groupMemberCounter, groups []record.Group) (map[int64]int, error) {
 	counts := make(map[int64]int, len(groups))
 	for _, group := range groups {
-		count, err := database.CountGroupMembers(ctx, nil, group.Id)
+		count, err := database.CountGroupMembers(ctx, nil, group.ID)
 		if err != nil {
-			return nil, errs.Wrapf(err, "unable to count the members of group %d", group.Id)
+			return nil, errs.Wrapf(err, "unable to count the members of group %d", group.ID)
 		}
-		counts[group.Id] = count
+		counts[group.ID] = count
 	}
 	return counts, nil
 }

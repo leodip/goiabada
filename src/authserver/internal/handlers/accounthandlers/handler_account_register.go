@@ -510,7 +510,7 @@ func HandleRegisterPost(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"user_id":      user.Id,
+			"user_id":      user.ID,
 			"email_digest": hashutil.HashString(user.Email),
 		})
 
@@ -564,7 +564,7 @@ func sendWelcomeEmail(
 	emailReq := r.WithContext(i18n.WithLocale(ctx, true, i18n.CatalogTag(ctx), "en"))
 	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.Welcome, values)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to render the welcome email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to render the welcome email", "user_id", user.ID, "error", err)
 		return
 	}
 
@@ -575,7 +575,7 @@ func sendWelcomeEmail(
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to send the welcome email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to send the welcome email", "user_id", user.ID, "error", err)
 	}
 }
 
@@ -612,7 +612,7 @@ func registerWithVerification(
 	if err != nil {
 		var userId int64
 		if user != nil {
-			userId = user.Id
+			userId = user.ID
 		}
 		auditRequestedRegistration(r.Context(), auditLogger, clientIP, email, userId, 0, registrationOutcomeServerError)
 		pageRenderer.InternalServerError(w, r, err)
@@ -660,10 +660,10 @@ func finishRegistration(
 ) {
 	var userId, preRegistrationId int64
 	if user != nil {
-		userId = user.Id
+		userId = user.ID
 	}
 	if preRegistration != nil {
-		preRegistrationId = preRegistration.Id
+		preRegistrationId = preRegistration.ID
 	}
 
 	switch {
@@ -718,7 +718,7 @@ func issueActivationLink(
 ) {
 	var deadId int64
 	if dead != nil {
-		deadId = dead.Id
+		deadId = dead.ID
 	}
 
 	verificationCode := securerandom.String(32)
@@ -747,22 +747,22 @@ func issueActivationLink(
 		}
 	} else {
 		var replaced bool
-		replaced, err = database.TryReplacePreRegistrationCode(ctx, nil, dead.Id, dead.VerificationCodeHash,
+		replaced, err = database.TryReplacePreRegistrationCode(ctx, nil, dead.ID, dead.VerificationCodeHash,
 			preRegistration.VerificationCodeEncrypted, preRegistration.VerificationCodeHash,
 			preRegistration.VerificationCodeIssuedAt.Time)
 		if err != nil {
-			slog.ErrorContext(ctx, "unable to replace the dead pending registration", "pre_registration_id", dead.Id,
+			slog.ErrorContext(ctx, "unable to replace the dead pending registration", "pre_registration_id", dead.ID,
 				"error", err)
-			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.Id, registrationOutcomeServerError)
+			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.ID, registrationOutcomeServerError)
 			return
 		}
 		if !replaced {
-			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.Id, registrationOutcomeReplacementLost)
+			auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, dead.ID, registrationOutcomeReplacementLost)
 			return
 		}
-		preRegistration.Id = dead.Id
+		preRegistration.ID = dead.ID
 	}
-	auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistration.Id,
+	auditRequestedRegistration(ctx, auditLogger, clientIP, email, 0, preRegistration.ID,
 		registrationOutcomeLinkIssued)
 
 	values := emailtemplate.Values{
@@ -780,7 +780,7 @@ func issueActivationLink(
 	emailReq := r.WithContext(i18n.WithLocale(ctx, true, i18n.CatalogTag(ctx), "en"))
 	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.ActivationLink, values)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to render the activation email", "pre_registration_id", preRegistration.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to render the activation email", "pre_registration_id", preRegistration.ID, "error", err)
 		return
 	}
 
@@ -791,7 +791,7 @@ func issueActivationLink(
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to send the activation email", "pre_registration_id", preRegistration.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to send the activation email", "pre_registration_id", preRegistration.ID, "error", err)
 	}
 }
 
@@ -813,7 +813,7 @@ func sendExistingAccountNotice(
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.RegistrationExistingAccount, values)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to render the existing account notice", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to render the existing account notice", "user_id", user.ID, "error", err)
 		return
 	}
 
@@ -824,6 +824,6 @@ func sendExistingAccountNotice(
 	}
 	_, err = emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to send the existing account notice", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to send the existing account notice", "user_id", user.ID, "error", err)
 	}
 }

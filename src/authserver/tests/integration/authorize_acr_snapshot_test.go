@@ -45,12 +45,12 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
@@ -106,7 +106,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The administrator tightens the client's policy, mid-ceremony.
-	client.DefaultAcrLevel = record.AcrLevel2Mandatory
+	client.DefaultACRLevel = record.ACRLevel2Mandatory
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	resp = loadPage(t, httpClient, loc)
@@ -120,7 +120,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel,
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods,
@@ -129,9 +129,9 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	// The session the ceremony bound to carries the same level, so the next request on this browser
 	// is judged against what actually happened here too. A raise reaches that request through the
 	// client's row, where it now sits, and steps the user up properly.
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel1, sessions[0].AcrLevel,
+	assert.Equal(t, record.ACRLevel1, sessions[0].ACRLevel,
 		"the session records the level reached, so a later step-up is decided from the truth")
 }

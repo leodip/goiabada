@@ -62,12 +62,12 @@ func TestEmailTemplate_ASavedEditReadsBack(t *testing.T) {
 	}
 	before := time.Now().UTC().Add(-time.Second)
 	saveEmailTemplate(t, edit)
-	require.NotZero(t, edit.Id, "the save answers the row's id")
+	require.NotZero(t, edit.ID, "the save answers the row's id")
 
 	got, err := database.GetEmailTemplate(ctx, nil, email, "pt-BR")
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, edit.Id, got.Id)
+	assert.Equal(t, edit.ID, got.ID)
 	assert.Equal(t, email, got.EmailTemplate)
 	assert.Equal(t, "pt-BR", got.Language)
 	assert.Equal(t, templateText("Redefinir a senha"), got.Subject)
@@ -157,12 +157,12 @@ func TestEmailTemplate_ASecondSaveReplacesTheEdit(t *testing.T) {
 	// edit is replaced, so they are cleared, not kept from the first save.
 	second := &record.EmailTemplate{EmailTemplate: email, Language: "it", Body: templateText("Secondo testo.")}
 	saveEmailTemplate(t, second)
-	assert.Equal(t, first.Id, second.Id, "the save answers the id of the row it replaced")
+	assert.Equal(t, first.ID, second.ID, "the save answers the id of the row it replaced")
 
 	rows := storedEmailTemplates(t, email)
 	require.Len(t, rows, 1, "one row for an email and a language")
 	got := rows[0]
-	assert.Equal(t, stored.Id, got.Id, "the row is the same row")
+	assert.Equal(t, stored.ID, got.ID, "the row is the same row")
 	assert.False(t, got.Subject.Valid, "the subject the second save left as the built-in text is cleared")
 	assert.False(t, got.ButtonLabel.Valid, "and so is the button label")
 	assert.Equal(t, templateText("Secondo testo."), got.Body)

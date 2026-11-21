@@ -75,11 +75,11 @@ func TestAPIBrands_SlotsNameUploadedAssetsAndReadBackUnchanged(t *testing.T) {
 	}
 
 	// Stored on the brand's slots, the engine's foreign keys naming the uploaded assets.
-	stored, err := database.GetBrandById(context.Background(), nil, id)
+	stored, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
 	assert.Equal(t, []int64{kit.logo.Id, kit.darkLogo.Id, kit.favicon.Id, kit.background.Id, kit.regularFont.Id, kit.boldFont.Id},
-		[]int64{stored.LogoAssetId.Int64, stored.DarkLogoAssetId.Int64, stored.FaviconAssetId.Int64,
-			stored.BackgroundAssetId.Int64, stored.RegularFontAssetId.Int64, stored.BoldFontAssetId.Int64})
+		[]int64{stored.LogoAssetID.Int64, stored.DarkLogoAssetID.Int64, stored.FaviconAssetID.Int64,
+			stored.BackgroundAssetID.Int64, stored.RegularFontAssetID.Int64, stored.BoldFontAssetID.Int64})
 
 	// A brand read and sent back as its own update is unchanged.
 	status, read, _ := brandCall(t, accessToken, http.MethodGet, brandPath(id, ""), nil)
@@ -87,7 +87,7 @@ func TestAPIBrands_SlotsNameUploadedAssetsAndReadBackUnchanged(t *testing.T) {
 	assertBrandReadsAsCreated(t, brand, read["brand"].(map[string]any))
 	status, again, _ := brandCall(t, accessToken, http.MethodPut, brandPath(id, ""), read["brand"])
 	require.Equal(t, http.StatusOK, status, "%v", again)
-	rewritten, err := database.GetBrandById(context.Background(), nil, id)
+	rewritten, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
 	rewritten.UpdatedAt = stored.UpdatedAt
 	assert.Equal(t, stored, rewritten)
@@ -102,14 +102,14 @@ func TestAPIBrands_SlotsNameUploadedAssetsAndReadBackUnchanged(t *testing.T) {
 	for _, slot := range []string{"darkLogo", "favicon", "background", "regularFont", "boldFont"} {
 		assert.Nil(t, answer["brand"].(map[string]any)[slot], slot)
 	}
-	emptied, err := database.GetBrandById(context.Background(), nil, id)
+	emptied, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
-	assert.True(t, emptied.LogoAssetId.Valid)
-	assert.False(t, emptied.DarkLogoAssetId.Valid)
-	assert.False(t, emptied.FaviconAssetId.Valid)
-	assert.False(t, emptied.BackgroundAssetId.Valid)
-	assert.False(t, emptied.RegularFontAssetId.Valid)
-	assert.False(t, emptied.BoldFontAssetId.Valid)
+	assert.True(t, emptied.LogoAssetID.Valid)
+	assert.False(t, emptied.DarkLogoAssetID.Valid)
+	assert.False(t, emptied.FaviconAssetID.Valid)
+	assert.False(t, emptied.BackgroundAssetID.Valid)
+	assert.False(t, emptied.RegularFontAssetID.Valid)
+	assert.False(t, emptied.BoldFontAssetID.Valid)
 }
 
 func TestAPIBrands_SlotRefusals(t *testing.T) {
@@ -166,9 +166,9 @@ func TestAPIBrands_SlotRefusals(t *testing.T) {
 			assert.Equal(t, c.code, answer["error_code"])
 		})
 	}
-	unchanged, err := database.GetBrandById(context.Background(), nil, other)
+	unchanged, err := database.GetBrandByID(context.Background(), nil, other)
 	require.NoError(t, err)
-	assert.False(t, unchanged.LogoAssetId.Valid, "no refused update wrote a slot")
+	assert.False(t, unchanged.LogoAssetID.Valid, "no refused update wrote a slot")
 }
 
 // kitCard is what a page draws of its brand's kit: the card's logo images, their src and alt, the

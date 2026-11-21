@@ -24,7 +24,7 @@ type legalAcceptanceDatabase interface {
 	consentReader
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 // LegalAcceptanceDocument is one document the acceptance step lists.
@@ -106,7 +106,7 @@ func (o *LegalAcceptance) Prompt(ctx context.Context, browser legalAcceptanceBro
 	if err != nil {
 		return LegalAcceptanceResult{}, err
 	}
-	owed, err := o.legalDocuments.Owed(ctx, client, user.Id)
+	owed, err := o.legalDocuments.Owed(ctx, client, user.ID)
 	if err != nil {
 		return LegalAcceptanceResult{}, err
 	}
@@ -135,7 +135,7 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 		client := clientProvenance(ctx, o.database, authContext.ClientId)
 		details := map[string]interface{}{"user_id": authContext.UserId}
 		if client != nil {
-			details["client_id"] = client.Id
+			details["client_id"] = client.ID
 		}
 		o.auditLogger.Log(ctx, audit.EventDeclinedLegalDocuments, details)
 		return LegalAcceptanceResult{
@@ -149,13 +149,13 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 	if err != nil {
 		return LegalAcceptanceResult{}, err
 	}
-	owed, err := o.legalDocuments.Owed(ctx, client, user.Id)
+	owed, err := o.legalDocuments.Owed(ctx, client, user.ID)
 	if err != nil {
 		return LegalAcceptanceResult{}, err
 	}
 	owedVersions := make([]int64, 0, len(owed))
 	for _, doc := range owed {
-		owedVersions = append(owedVersions, doc.Current.Id)
+		owedVersions = append(owedVersions, doc.Current.ID)
 	}
 
 	ticked := submittedVersions(body, legalAcceptanceTickedField)
@@ -169,20 +169,20 @@ func (o *LegalAcceptance) Submit(ctx context.Context, browser legalAcceptanceBro
 		screen.Unticked = true
 		return LegalAcceptanceResult{Screen: screen}, nil
 	case legalAcceptanceRecorded:
-		written, recordErr := legaldocuments.RecordAcceptances(ctx, o.database, user.Id, owedVersions)
+		written, recordErr := legaldocuments.RecordAcceptances(ctx, o.database, user.ID, owedVersions)
 		if recordErr != nil {
 			return LegalAcceptanceResult{}, recordErr
 		}
 		byVersion := make(map[int64]legaldocuments.InEffect, len(owed))
 		for _, doc := range owed {
-			byVersion[doc.Current.Id] = doc
+			byVersion[doc.Current.ID] = doc
 		}
 		for _, acceptance := range written {
-			doc := byVersion[acceptance.LegalDocumentVersionId]
+			doc := byVersion[acceptance.LegalDocumentVersionID]
 			o.auditLogger.Log(ctx, audit.EventAcceptedLegalDocument, map[string]interface{}{
-				"user_id":           user.Id,
-				"client_id":         client.Id,
-				"legal_document_id": doc.Document.Id,
+				"user_id":           user.ID,
+				"client_id":         client.ID,
+				"legal_document_id": doc.Document.ID,
 				"short_name":        doc.Document.ShortName,
 				"version":           doc.Current.VersionNumber,
 			})
@@ -202,7 +202,7 @@ func (o *LegalAcceptance) load(ctx context.Context,
 	if client == nil {
 		return nil, nil, errs.New("client not found")
 	}
-	user, err := o.database.GetUserById(ctx, nil, authContext.UserId)
+	user, err := o.database.GetUserByID(ctx, nil, authContext.UserId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -238,9 +238,9 @@ func legalAcceptanceScreen(client *record.Client, owed []legaldocuments.InEffect
 		screen.Documents = append(screen.Documents, LegalAcceptanceDocument{
 			Title:         doc.Current.Title,
 			ShortName:     doc.Document.ShortName,
-			VersionId:     doc.Current.Id,
+			VersionId:     doc.Current.ID,
 			VersionNumber: doc.Current.VersionNumber,
-			Ticked:        ticked[doc.Current.Id],
+			Ticked:        ticked[doc.Current.ID],
 		})
 	}
 	return screen

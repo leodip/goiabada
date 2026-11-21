@@ -40,7 +40,7 @@ const (
 // UpdateLegalDocumentAppliesToAllApps writes it, so a draft saved from an older read cannot put back
 // an Applies to changed since.
 type LegalDocument struct {
-	Id            int64          `db:"id" fieldtag:"pk"`
+	ID            int64          `db:"id" fieldtag:"pk"`
 	CreatedAt     sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt     sql.NullTime   `db:"updated_at"`
 	ShortName     string         `db:"short_name"`
@@ -80,19 +80,19 @@ func (d *LegalDocument) AppliesTo() string {
 // document lists an app once, and the row goes with either side: deleting the app leaves the
 // document on its other apps. It is created and deleted, never rewritten.
 type LegalDocumentClient struct {
-	Id              int64        `db:"id" fieldtag:"pk"`
+	ID              int64        `db:"id" fieldtag:"pk"`
 	CreatedAt       sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	LegalDocumentId int64        `db:"legal_document_id"`
-	ClientId        int64        `db:"client_id"`
+	LegalDocumentID int64        `db:"legal_document_id"`
+	ClientID        int64        `db:"client_id"`
 }
 
 // LegalDocumentVersion is one published version of a legal document: its title and Markdown as
 // they were frozen by Publish, numbered from 1 within the document. A version is written once and
 // never rewritten, so what a user accepted is what the row still says (decision 1).
 type LegalDocumentVersion struct {
-	Id              int64     `db:"id" fieldtag:"pk"`
+	ID              int64     `db:"id" fieldtag:"pk"`
 	PublishedAt     time.Time `db:"published_at"`
-	LegalDocumentId int64     `db:"legal_document_id"`
+	LegalDocumentID int64     `db:"legal_document_id"`
 	VersionNumber   int       `db:"version_number"`
 	Title           string    `db:"title"`
 	Markdown        string    `db:"markdown"`
@@ -104,8 +104,8 @@ type LegalDocumentVersion struct {
 // same pair is a unique violation. The version names its document, so a newer version of the same
 // document is a new acceptance.
 type LegalDocumentAcceptance struct {
-	Id                     int64     `db:"id" fieldtag:"pk"`
+	ID                     int64     `db:"id" fieldtag:"pk"`
 	AcceptedAt             time.Time `db:"accepted_at"`
-	UserId                 int64     `db:"user_id"`
-	LegalDocumentVersionId int64     `db:"legal_document_version_id"`
+	UserID                 int64     `db:"user_id"`
+	LegalDocumentVersionID int64     `db:"legal_document_version_id"`
 }

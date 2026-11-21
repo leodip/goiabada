@@ -44,7 +44,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true})
 	ctx = requestid.NewContext(ctx, requestId)
 	req = req.WithContext(ctx)
 

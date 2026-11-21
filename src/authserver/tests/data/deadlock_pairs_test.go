@@ -121,9 +121,9 @@ type pausedBeforeSessionDelete struct {
 	b *barrier
 }
 
-func (d pausedBeforeSessionDelete) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
+func (d pausedBeforeSessionDelete) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error {
 	d.b.arriveBefore(tx)
-	return d.Database.DeleteUserSession(ctx, tx, userSessionId)
+	return d.Database.DeleteUserSession(ctx, tx, userSessionID)
 }
 
 // pausedBeforeTokenUpdate parks the termination after it has taken the session row and the codes
@@ -166,7 +166,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	client := createTestClient(t)
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	const newHash = "deadlock-pair-1-new-hash"
 
@@ -175,8 +175,8 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	sweepDone := make(chan error, 1)
 	go func() {
-		_, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
-			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
+		_, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.ID, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
+			return pDB.SetUserPasswordHash(context.Background(), tx, user.ID, newHash)
 		})
 		sweepDone <- err
 	}()
@@ -219,11 +219,11 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	// End state, deterministic on every engine: the password is the sweep's, and the session the
 	// sweep swept is gone.
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded, "the credential sweep does not delete the user")
 	assert.Equal(t, newHash, reloaded.PasswordHash, "the password hash is the one the sweep wrote")
-	assertSessionGoneOn(t, database, session.Id, "the session the credential sweep terminated")
+	assertSessionGoneOn(t, database, session.ID, "the session the credential sweep terminated")
 
 	// ISSUANCE HAS TWO VALID SHAPES AND THE THIRD IS IMPOSSIBLE. It either found the session
 	// live and minted a code, or found it gone and minted nothing. Which of the two depends on
@@ -233,13 +233,13 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	if out.live {
 		require.NotNil(t, out.code, "a ceremony that found the session live minted a code")
 
-		minted, err := database.GetCodeById(context.Background(), nil, out.code.Id)
+		minted, err := database.GetCodeByID(context.Background(), nil, out.code.ID)
 		require.NoError(t, err)
 		require.NotNil(t, minted, "the code issuance committed is in the catalog")
 		assert.Equal(t, session.SessionIdentifier, minted.SessionIdentifier,
 			"the code carries the session it was issued through")
-		assert.Equal(t, user.Id, minted.UserId)
-		assert.Equal(t, client.Id, minted.ClientId)
+		assert.Equal(t, user.ID, minted.UserID)
+		assert.Equal(t, client.ID, minted.ClientID)
 		assert.False(t, minted.Used, "the code was minted, not redeemed")
 
 		// The code outlives the session it was issued through, and what stops it being spent is
@@ -271,7 +271,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	user := createTestUser(t)
 	// A session must exist for both parties to contend on: the sweep's barrier trips on its
 	// first DeleteUserSession, and DeleteUser takes that same session row before the users row.
-	_ = createTestUserSession(t, user.Id)
+	_ = createTestUserSession(t, user.ID)
 
 	const newHash = "deadlock-pair-2-new-hash"
 
@@ -284,8 +284,8 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	}
 	sweepDone := make(chan sweepResult, 1)
 	go func() {
-		result, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
-			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
+		result, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.ID, "", revocation.LogoutNotice{}, func(tx *sql.Tx) error {
+			return pDB.SetUserPasswordHash(context.Background(), tx, user.ID, newHash)
 		})
 		sweepDone <- sweepResult{result: result, err: err}
 	}()
@@ -294,7 +294,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 	deleteUser := goBlocked(t, "DeleteUser", sweepTx, func(reached func()) error {
 		reached()
-		return other.DeleteUser(context.Background(), nil, user.Id)
+		return other.DeleteUser(context.Background(), nil, user.ID)
 	})
 
 	deleteUser.requireBlocked(t) // DeleteUser holds the session rows and waits for the users row
@@ -309,7 +309,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 	// The user is gone on every engine and either winner: DeleteUser removes it, and if the sweep
 	// won first, DeleteUser's rerun removes it after.
-	gone, err := database.GetUserById(context.Background(), nil, user.Id)
+	gone, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the user is gone: DeleteUser removed it whichever party the engine aborted")
 
@@ -342,9 +342,9 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	client := createTestClient(t)
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
-	code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
-	token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
+	session := createTestUserSession(t, user.ID)
+	code := createTestCodeInSession(t, client.ID, user.ID, session.SessionIdentifier)
+	token := createTokenOfCode(t, client.ID, user.ID, code.ID, session.SessionIdentifier)
 
 	b := newBarrier(t, "the termination")
 	pDB := pausedBeforeTokenUpdate{Database: database, b: b}
@@ -359,7 +359,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	deleteClient := goBlocked(t, "DeleteClient", terminationTx, func(reached func()) error {
 		reached()
-		return other.DeleteClient(context.Background(), nil, client.Id)
+		return other.DeleteClient(context.Background(), nil, client.ID)
 	})
 
 	deleteClient.requireBlocked(t) // DeleteClient holds the tokens and waits for the codes cascade
@@ -375,13 +375,13 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	// End state, deterministic: the client is gone, its cascade took the code and the token, and
 	// the termination deleted the session.
-	goneClient, err := database.GetClientById(context.Background(), nil, client.Id)
+	goneClient, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, goneClient, "the client is gone")
 
-	goneToken, err := database.GetRefreshTokenById(context.Background(), nil, token.Id)
+	goneToken, err := database.GetRefreshTokenByID(context.Background(), nil, token.ID)
 	require.NoError(t, err)
 	assert.Nil(t, goneToken, "the client's refresh token is gone")
 
-	assertSessionGoneOn(t, database, session.Id, "the terminated session")
+	assertSessionGoneOn(t, database, session.ID, "the terminated session")
 }

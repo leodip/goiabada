@@ -20,10 +20,10 @@ var webOriginColumns = columnList{
 // scanWebOrigin reads one row selected with webOriginColumns.
 func scanWebOrigin(row rowScanner, webOrigin *record.WebOrigin) error {
 	return row.Scan(
-		&webOrigin.Id,
+		&webOrigin.ID,
 		&webOrigin.CreatedAt,
 		&webOrigin.Origin,
-		&webOrigin.ClientId,
+		&webOrigin.ClientID,
 	)
 }
 
@@ -34,14 +34,14 @@ var insertWebOrigin = statement{
 	mssql:    "INSERT INTO web_origins (created_at, origin, client_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
 }
 
-var selectWebOriginById = statement{
+var selectWebOriginByID = statement{
 	sqlite:   "SELECT " + webOriginColumns.sqlite + " FROM web_origins WHERE id = ?",
 	mysql:    "SELECT " + webOriginColumns.mysql + " FROM web_origins WHERE id = ?",
 	postgres: "SELECT " + webOriginColumns.postgres + " FROM web_origins WHERE id = $1",
 	mssql:    "SELECT " + webOriginColumns.mssql + " FROM web_origins WHERE id = @p1",
 }
 
-var selectWebOriginsByClientId = statement{
+var selectWebOriginsByClientID = statement{
 	sqlite:   "SELECT " + webOriginColumns.sqlite + " FROM web_origins WHERE client_id = ?",
 	mysql:    "SELECT " + webOriginColumns.mysql + " FROM web_origins WHERE client_id = ?",
 	postgres: "SELECT " + webOriginColumns.postgres + " FROM web_origins WHERE client_id = $1",
@@ -71,7 +71,7 @@ var deleteWebOrigin = statement{
 
 func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error {
 
-	if webOrigin.ClientId == 0 {
+	if webOrigin.ClientID == 0 {
 		return errs.New("client id must be greater than 0")
 	}
 
@@ -81,22 +81,22 @@ func (d *Database) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *r
 	webOrigin.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertWebOrigin, "webOrigin",
-		webOrigin.CreatedAt, webOrigin.Origin, webOrigin.ClientId)
+		webOrigin.CreatedAt, webOrigin.Origin, webOrigin.ClientID)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return err
 	}
 
-	webOrigin.Id = id
+	webOrigin.ID = id
 	return nil
 }
 
-func (d *Database) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*record.WebOrigin, error) {
-	return queryOne(ctx, d, tx, selectWebOriginById.text(d.Dialect), []any{webOriginId}, scanWebOrigin, "webOrigin")
+func (d *Database) GetWebOriginByID(ctx context.Context, tx *sql.Tx, webOriginID int64) (*record.WebOrigin, error) {
+	return queryOne(ctx, d, tx, selectWebOriginByID.text(d.Dialect), []any{webOriginID}, scanWebOrigin, "webOrigin")
 }
 
-func (d *Database) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.WebOrigin, error) {
-	return queryAll(ctx, d, tx, nil, selectWebOriginsByClientId.text(d.Dialect), []any{clientId},
+func (d *Database) GetWebOriginsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.WebOrigin, error) {
+	return queryAll(ctx, d, tx, nil, selectWebOriginsByClientID.text(d.Dialect), []any{clientID},
 		scanWebOrigin, "webOrigin")
 }
 
@@ -137,9 +137,9 @@ func (d *Database) WebOriginExists(ctx context.Context, tx *sql.Tx, origin strin
 	return count > 0, nil
 }
 
-func (d *Database) DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error {
+func (d *Database) DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteWebOrigin.text(d.Dialect), webOriginId)
+	_, err := d.ExecSQL(ctx, tx, deleteWebOrigin.text(d.Dialect), webOriginID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete webOrigin")
 	}

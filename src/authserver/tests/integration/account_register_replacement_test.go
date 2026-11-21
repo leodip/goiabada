@@ -61,7 +61,7 @@ func TestSelfRegister_WithVerificationADeadRegistrationIsReplaced(t *testing.T) 
 	after, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
-	assert.Equal(t, dead.Id, after.Id, "the dead row is replaced in place")
+	assert.Equal(t, dead.ID, after.ID, "the dead row is replaced in place")
 	assert.NotEqual(t, dead.VerificationCodeHash, after.VerificationCodeHash)
 	assert.WithinDuration(t, time.Now().UTC(), after.VerificationCodeIssuedAt.Time, time.Minute,
 		"the fresh code is issued now")

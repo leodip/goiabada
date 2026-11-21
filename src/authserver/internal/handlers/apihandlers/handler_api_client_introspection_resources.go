@@ -28,10 +28,10 @@ type clientIntrospectionResourcesDatabase interface {
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error
 	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -50,7 +50,7 @@ func HandleClientIntrospectionResourcesGet(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for introspection resources"), "client_id", id)
 			return
@@ -60,18 +60,18 @@ func HandleClientIntrospectionResourcesGet(
 			return
 		}
 
-		links, err := database.GetClientIntrospectionResourcesByClientId(r.Context(), nil, client.Id)
+		links, err := database.GetClientIntrospectionResourcesByClientID(r.Context(), nil, client.ID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client introspection resources"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client introspection resources"), "client_id", client.ID)
 			return
 		}
 		resourceIds := make([]int64, 0, len(links))
 		for _, link := range links {
-			resourceIds = append(resourceIds, link.ResourceId)
+			resourceIds = append(resourceIds, link.ResourceID)
 		}
-		resources, err := database.GetResourcesByIds(r.Context(), nil, resourceIds)
+		resources, err := database.GetResourcesByIDs(r.Context(), nil, resourceIds)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading introspection resources"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading introspection resources"), "client_id", client.ID)
 			return
 		}
 
@@ -104,7 +104,7 @@ func HandleClientIntrospectionResourcesPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for introspection resources update"), "client_id", id)
 			return
@@ -136,9 +136,9 @@ func HandleClientIntrospectionResourcesPut(
 
 		resources := make([]record.Resource, 0, len(wanted))
 		for _, resourceId := range wanted {
-			resource, getErr := database.GetResourceById(r.Context(), nil, resourceId)
+			resource, getErr := database.GetResourceByID(r.Context(), nil, resourceId)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting resource by ID for validation"), "resource_id", resourceId, "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting resource by ID for validation"), "resource_id", resourceId, "client_id", client.ID)
 				return
 			}
 			if resource == nil {
@@ -157,8 +157,8 @@ func HandleClientIntrospectionResourcesPut(
 			return
 		}
 
-		listedKey := func(link record.ClientIntrospectionResource) int64 { return link.ResourceId }
-		listedId := func(link record.ClientIntrospectionResource) int64 { return link.Id }
+		listedKey := func(link record.ClientIntrospectionResource) int64 { return link.ResourceID }
+		listedId := func(link record.ClientIntrospectionResource) int64 { return link.ID }
 
 		// One transaction, rerun whole after a deadlock (#301), with nothing written to the response
 		// inside it. No row lock for the list itself, as for every list save: overlapping saves merge
@@ -171,7 +171,7 @@ func HandleClientIntrospectionResourcesPut(
 		// public client is left holding a list (#245, #676 decision 14).
 		added, removed := []int64{}, []int64{}
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			stored, loadErr := database.GetClientIntrospectionResourcesByClientId(r.Context(), tx, client.Id)
+			stored, loadErr := database.GetClientIntrospectionResourcesByClientID(r.Context(), tx, client.ID)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading client introspection resources before update")
 			}
@@ -181,10 +181,10 @@ func HandleClientIntrospectionResourcesPut(
 
 			insert, remove := replaceSet(stored, listedKey, listedId, wanted)
 			if len(insert) > 0 {
-				if acquireErr := database.AcquireClientRow(r.Context(), tx, client.Id); acquireErr != nil {
+				if acquireErr := database.AcquireClientRow(r.Context(), tx, client.ID); acquireErr != nil {
 					return acquireErr
 				}
-				current, getErr := database.GetClientById(r.Context(), tx, client.Id)
+				current, getErr := database.GetClientByID(r.Context(), tx, client.ID)
 				if getErr != nil {
 					return errs.Wrap(getErr, "database error reading the client under its row lock")
 				}
@@ -199,8 +199,8 @@ func HandleClientIntrospectionResourcesPut(
 			}
 			for _, resourceId := range insert {
 				if createErr := database.CreateClientIntrospectionResource(r.Context(), tx, &record.ClientIntrospectionResource{
-					ClientId:   client.Id,
-					ResourceId: resourceId,
+					ClientID:   client.ID,
+					ResourceID: resourceId,
 				}); createErr != nil {
 					return errs.Wrapf(createErr, "database error listing introspection resource %d", resourceId)
 				}
@@ -216,12 +216,12 @@ func HandleClientIntrospectionResourcesPut(
 			return
 		}
 		if err != nil {
-			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			writeListSaveFailure(w, r, err, "client_id", client.ID)
 			return
 		}
 
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientIntrospectionResources, map[string]interface{}{
-			"client_id":            client.Id,
+			"client_id":            client.ID,
 			"added_resource_ids":   added,
 			"removed_resource_ids": removed,
 			"logged_in_user":       callerSubject(r),

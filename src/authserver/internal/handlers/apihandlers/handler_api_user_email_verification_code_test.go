@@ -36,8 +36,8 @@ func codeGenRequest() *http.Request {
 }
 
 func expectCodeGenRead(database *datamocks.Database) {
-	database.On("GetUserById", mock.Anything, mock.Anything, codeGenUserId).
-		Return(&record.User{Id: codeGenUserId, Subject: "sub-73", Email: codeGenAddress, EmailVerified: true, Enabled: true}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, codeGenUserId).
+		Return(&record.User{ID: codeGenUserId, Subject: "sub-73", Email: codeGenAddress, EmailVerified: true, Enabled: true}, nil).Once()
 }
 
 func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t *testing.T) {

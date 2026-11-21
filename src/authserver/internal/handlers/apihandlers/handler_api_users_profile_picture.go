@@ -20,8 +20,8 @@ type usersProfilePictureDatabase interface {
 	userTargetPolicyDatabase
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
 	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 }
@@ -49,7 +49,7 @@ func HandleUserProfilePicturePost(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -72,12 +72,12 @@ func HandleUserProfilePicturePost(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
 		// Check if user already has a profile picture
-		existingPicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, userId)
+		existingPicture, err := database.GetUserProfilePictureByUserID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -91,7 +91,7 @@ func HandleUserProfilePicturePost(
 		} else {
 			// Create new picture
 			profilePicture := &record.UserProfilePicture{
-				UserId:      userId,
+				UserID:      userId,
 				Picture:     data,
 				ContentType: result.ContentType,
 			}
@@ -112,7 +112,7 @@ func HandleUserProfilePicturePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserProfilePicture, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": loggedInUser,
 		})
 
@@ -145,7 +145,7 @@ func HandleUserProfilePictureDelete(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -157,7 +157,7 @@ func HandleUserProfilePictureDelete(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -177,7 +177,7 @@ func HandleUserProfilePictureDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedUserProfilePicture, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": loggedInUser,
 		})
 
@@ -207,7 +207,7 @@ func HandleUserProfilePictureGet(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

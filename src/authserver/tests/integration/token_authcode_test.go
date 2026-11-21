@@ -135,7 +135,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, wrongClient)
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.NotNil(t, data["id_token"])
 
 	// Verify that the code has been marked as used
-	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
+	usedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }
@@ -288,7 +288,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 	assert.Equal(t, "Code is invalid.", second["error_description"])
 
 	// Code remains marked as used.
-	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+	stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.Used)
 }

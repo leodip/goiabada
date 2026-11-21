@@ -88,9 +88,9 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
 		},
-		client: &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+		client: &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed},
-		user: &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
+		user: &record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
 			AuthStateGeneration: recheckGeneration},
 		authContext: &ceremony.AuthContext{
 			CeremonyId:          testCeremonyId,
@@ -103,7 +103,7 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 			RequestedScope:      "openid",
 			State:               "test-state",
 			Nonce:               "test-nonce",
-			AcrLevel:            record.AcrLevel1,
+			AcrLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			Prompt:              prompt,
 			AuthStateGeneration: recheckGeneration,
@@ -127,11 +127,11 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: callback}}
 		}).Return(nil).Maybe()
-	f.database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	f.database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.RedirectURI{{URI: callback}}, nil).Maybe()
-	f.database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(f.user, nil).Maybe()
+	f.database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(f.user, nil).Maybe()
 	f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+		Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil).Maybe()
 
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	// As the real manager answers: a row that does not resolve is not valid.
@@ -209,7 +209,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			f.assertNothingIssued(t)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			// Nothing after the check that refused was read: not the user, not the session.
-			f.database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			f.database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 			f.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 			f.pageRenderer.AssertExpectations(t)
 			f.ceremonyStore.AssertExpectations(t)
@@ -325,7 +325,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.client.ImplicitGrantEnabled = &off
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
@@ -400,7 +400,7 @@ func TestHandleIssueGet_AClientRequiringDPoPIsRefusedAnImplicitAccessToken(t *te
 		f.client.DPoPBoundAccessTokens = true
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
@@ -597,7 +597,7 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 	} {
 		t.Run(tc.name+", interactive, restarts at level 1 and writes nothing to the client", func(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "")
-			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.AcrLevel = record.ACRLevel2Mandatory
 			f.authContext.AuthMethods = "pwd"
 			logs := logtest.CaptureSlog(t)
 
@@ -628,7 +628,7 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 
 		t.Run(tc.name+", silent, is answered login_required", func(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "none")
-			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.AcrLevel = record.ACRLevel2Mandatory
 			f.authContext.AuthMethods = "pwd"
 			logs := logtest.CaptureSlog(t)
 
@@ -661,7 +661,7 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 	// posts it, and the client reads login_required from its fields.
 	t.Run("code, silent, form_post, is answered login_required in the posted form", func(t *testing.T) {
 		f := newRecheckFixture(t, "code", "none")
-		f.authContext.AcrLevel = record.AcrLevel2Mandatory
+		f.authContext.AcrLevel = record.ACRLevel2Mandatory
 		f.authContext.AuthMethods = ""
 		f.authContext.ResponseMode = "form_post"
 		f.templateFS = web.TemplateFS()
@@ -688,21 +688,21 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 		for _, responseType := range []string{"code", "id_token token"} {
 			t.Run(responseType+" at level 3 naming "+methods+" is issued", func(t *testing.T) {
 				f := newRecheckFixture(t, responseType, "")
-				f.authContext.AcrLevel = record.AcrLevel2Mandatory
+				f.authContext.AcrLevel = record.ACRLevel2Mandatory
 				f.authContext.AuthMethods = methods
 				generation := int64(2)
 				f.authContext.OtpClaimGeneration = &generation
 				f.user.OTPEnabled = true
-				f.user.OtpConfigGeneration = generation
+				f.user.OTPConfigGeneration = generation
 
 				if responseType == "code" {
 					f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
-					})).Return(&record.Code{Id: 9, Code: "c0de", ClientId: 1, RedirectURI: "https://example.com/callback",
+						return input.AcrLevel == record.ACRLevel2Mandatory && input.AuthMethods == methods
+					})).Return(&record.Code{ID: 9, Code: "c0de", ClientID: 1, RedirectURI: "https://example.com/callback",
 						State: "test-state"}, nil).Once()
 				} else {
 					f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
+						return input.AcrLevel == record.ACRLevel2Mandatory && input.AuthMethods == methods
 					}), true, true).Return(&issuance.ImplicitGrantResponse{AccessToken: "access", IdToken: "id"}, nil).Once()
 				}
 				f.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
@@ -736,7 +736,7 @@ func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(
 			f.authContext.AuthMethods = "pwd otp"
 			f.authContext.OtpClaimGeneration = &generation
 			f.user.OTPEnabled = true
-			f.user.OtpConfigGeneration = generation
+			f.user.OTPConfigGeneration = generation
 			refused := func(mock.Arguments) { *order = append(*order, "issuer") }
 			if tc.responseType == "code" {
 				f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {

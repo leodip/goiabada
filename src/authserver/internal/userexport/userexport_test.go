@@ -33,7 +33,7 @@ func exportedUser() *record.User {
 		return sql.NullTime{Time: t, Valid: true}
 	}
 	return &record.User{
-		Id:                             42,
+		ID:                             42,
 		CreatedAt:                      at("2025-01-02T03:04:05Z"),
 		UpdatedAt:                      at("2026-10-01T12:00:00Z"),
 		Enabled:                        true,
@@ -54,7 +54,7 @@ func exportedUser() *record.User {
 		Locale:                         "pt-BR",
 		PageLanguage:                   "pt",
 		BirthDate:                      at("1990-05-17T00:00:00Z"),
-		PhoneNumberCountryUniqueId:     "BRA_0",
+		PhoneNumberCountryUniqueID:     "BRA_0",
 		PhoneNumberCountryCallingCode:  "+55",
 		PhoneNumber:                    "11 91234-5678",
 		PhoneNumberVerified:            true,
@@ -162,7 +162,7 @@ func TestBuild_ExportedAtIsWrittenInUTC(t *testing.T) {
 // answers them, and an empty list is [] rather than null, so a reader never tells "none" from
 // "not read".
 func TestBuild_AnEmptyListIsNeverNull(t *testing.T) {
-	document, err := Build(&record.User{Id: 7, Subject: "s", Email: "e@example.com"}, Parts{}, "https://auth.example.com",
+	document, err := Build(&record.User{ID: 7, Subject: "s", Email: "e@example.com"}, Parts{}, "https://auth.example.com",
 		time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 

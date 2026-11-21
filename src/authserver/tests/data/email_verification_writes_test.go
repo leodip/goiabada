@@ -31,7 +31,7 @@ func seedEmailState(t *testing.T, verified bool, code []byte, issuedAt sql.NullT
 	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
 		t.Fatalf("Failed to seed the user's verification state: %v", err)
 	}
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload the seeded user: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestTrySetUserEmail_RefusesARowThatMovedSinceItWasRead(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			user := seedEmailState(t, true, []byte("pending"), issuedAgo(time.Minute))
 
-			changed, err := database.TrySetUserEmail(context.Background(), nil, user.Id, tc.fromEmail(user), tc.fromVerified,
+			changed, err := database.TrySetUserEmail(context.Background(), nil, user.ID, tc.fromEmail(user), tc.fromVerified,
 				"changed_"+fake.Email())
 			if err != nil {
 				t.Fatalf("TrySetUserEmail failed: %v", err)
@@ -115,7 +115,7 @@ func TestTrySetUserEmail_RefusesARowThatMovedSinceItWasRead(t *testing.T) {
 				t.Error("TrySetUserEmail changed a row that no longer holds what the caller read")
 			}
 
-			after, err := database.GetUserById(context.Background(), nil, user.Id)
+			after, err := database.GetUserByID(context.Background(), nil, user.ID)
 			if err != nil {
 				t.Fatalf("Failed to reload user: %v", err)
 			}
@@ -134,7 +134,7 @@ func TestTrySetUserEmail_ConcurrentChangesFromOneReadProduceOneWinner(t *testing
 		user := seedEmailState(t, true, nil, sql.NullTime{})
 
 		won := raceOnce(t, raceCallers, func(i int) (bool, error) {
-			return database.TrySetUserEmail(context.Background(), nil, user.Id, user.Email, true,
+			return database.TrySetUserEmail(context.Background(), nil, user.ID, user.Email, true,
 				fmt.Sprintf("race_%d_%d_%s", round, i, fake.Email()))
 		})
 		if won != 1 {
@@ -172,7 +172,7 @@ func TestTryStoreEmailVerificationCode(t *testing.T) {
 
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			code := []byte("fresh-ciphertext-" + fake.LetterN(16))
-			stored, err := database.TryStoreEmailVerificationCode(context.Background(), nil, user.Id, email, code,
+			stored, err := database.TryStoreEmailVerificationCode(context.Background(), nil, user.ID, email, code,
 				now, now.Add(-cooldown))
 			if err != nil {
 				t.Fatalf("TryStoreEmailVerificationCode failed: %v", err)
@@ -181,7 +181,7 @@ func TestTryStoreEmailVerificationCode(t *testing.T) {
 				t.Fatalf("stored = %v, want %v", stored, tc.want)
 			}
 
-			after, err := database.GetUserById(context.Background(), nil, user.Id)
+			after, err := database.GetUserByID(context.Background(), nil, user.ID)
 			if err != nil {
 				t.Fatalf("Failed to reload user: %v", err)
 			}
@@ -219,7 +219,7 @@ func TestTryStoreEmailVerificationCode_ConcurrentSendsProduceOneWinner(t *testin
 
 		won := raceOnce(t, raceCallers, func(i int) (bool, error) {
 			now := time.Now().UTC()
-			return database.TryStoreEmailVerificationCode(context.Background(), nil, user.Id, user.Email,
+			return database.TryStoreEmailVerificationCode(context.Background(), nil, user.ID, user.Email,
 				[]byte(fmt.Sprintf("ciphertext-%d-%d", round, i)), now, now.Add(-5*time.Minute))
 		})
 		if won != 1 {
@@ -237,12 +237,12 @@ func TestTryVerifyUserEmail(t *testing.T) {
 	t.Run("the code compared is still pending", func(t *testing.T) {
 		user := seedEmailState(t, false, pending, issuedAgo(time.Minute))
 
-		verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.Id, user.Email, pending)
+		verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.ID, user.Email, pending)
 		if err != nil || !verified {
 			t.Fatalf("TryVerifyUserEmail: verified=%v err=%v, want true and no error", verified, err)
 		}
 
-		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		after, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -272,7 +272,7 @@ func TestTryVerifyUserEmail(t *testing.T) {
 				email = "elsewhere_" + fake.Email()
 			}
 
-			verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.Id, email, tc.compared)
+			verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.ID, email, tc.compared)
 			if err != nil {
 				t.Fatalf("TryVerifyUserEmail failed: %v", err)
 			}
@@ -280,7 +280,7 @@ func TestTryVerifyUserEmail(t *testing.T) {
 				t.Error("TryVerifyUserEmail verified a row whose pending code is not the one compared")
 			}
 
-			after, err := database.GetUserById(context.Background(), nil, user.Id)
+			after, err := database.GetUserByID(context.Background(), nil, user.ID)
 			if err != nil {
 				t.Fatalf("Failed to reload user: %v", err)
 			}
@@ -305,23 +305,23 @@ func TestTryVerifyUserEmail_AConcurrentDisableSurvives(t *testing.T) {
 	pending := []byte("the-pending-ciphertext")
 	user := seedEmailState(t, false, pending, issuedAgo(time.Minute))
 	if !user.Enabled {
-		enabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, false, true)
+		enabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, false, true)
 		if err != nil || !enabled {
 			t.Fatalf("the fixture must start enabled: enabled=%v err=%v", enabled, err)
 		}
 	}
 
-	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	if err != nil || !disabled {
 		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 	}
 
-	verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.Id, user.Email, pending)
+	verified, err := database.TryVerifyUserEmail(context.Background(), nil, user.ID, user.Email, pending)
 	if err != nil || !verified {
 		t.Fatalf("TryVerifyUserEmail: verified=%v err=%v, want true and no error", verified, err)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestTryVerifyUserEmail_ConcurrentSubmissionsProduceOneWinner(t *testing.T) 
 		user := seedEmailState(t, false, pending, issuedAgo(time.Minute))
 
 		won := raceOnce(t, raceCallers, func(int) (bool, error) {
-			return database.TryVerifyUserEmail(context.Background(), nil, user.Id, user.Email, pending)
+			return database.TryVerifyUserEmail(context.Background(), nil, user.ID, user.Email, pending)
 		})
 		if won != 1 {
 			t.Fatalf("round %d: %d of %d concurrent submissions of one code verified, want exactly 1",

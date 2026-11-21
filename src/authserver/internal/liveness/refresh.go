@@ -54,7 +54,7 @@ const (
 // client, the family's revocation record, and the session the grant is bound to.
 type RefreshDatabase interface {
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
-	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	GetRefreshTokenByJTI(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
@@ -92,7 +92,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 		return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
 	}
 
-	row, err := database.GetRefreshTokenByJti(ctx, nil, jti)
+	row, err := database.GetRefreshTokenByJTI(ctx, nil, jti)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 		return nil, nil
 	}
 
-	if !row.CodeId.Valid {
+	if !row.CodeID.Valid {
 		if err := database.RefreshTokenLoadUser(ctx, nil, row); err != nil {
 			return nil, err
 		}
@@ -113,8 +113,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 		return &StoredRefreshToken{
 			Row:      row,
 			IsROPC:   true,
-			ClientId: row.ClientId.Int64,
-			UserId:   row.UserId.Int64,
+			ClientId: row.ClientID.Int64,
+			UserId:   row.UserID.Int64,
 			User:     &row.User,
 			Scope:    row.Scope,
 		}, nil
@@ -128,8 +128,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 	}
 	return &StoredRefreshToken{
 		Row:      row,
-		ClientId: row.Code.ClientId,
-		UserId:   row.Code.UserId,
+		ClientId: row.Code.ClientID,
+		UserId:   row.Code.UserID,
 		User:     &row.Code.User,
 		Scope:    row.Code.Scope,
 	}, nil
@@ -237,7 +237,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 	//
 	// Skipped for a token whose own row is revoked: the row answers for that one, last.
 	if !row.Revoked {
-		familyRevoked, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, row.FirstRefreshTokenJti)
+		familyRevoked, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, row.FirstRefreshTokenJTI)
 		if err != nil {
 			return 0, err
 		}
@@ -263,7 +263,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 		// unconditionally, because there is no browser session to bind to.
 		//
 		// Placed before the settings are needed: this comparison needs none.
-		if session.UserId != stored.UserId {
+		if session.UserID != stored.UserId {
 			return RefreshSessionOfAnotherUser, nil
 		}
 
@@ -308,7 +308,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 			if err != nil {
 				return 0, err
 			}
-			if codeSession != nil && codeSession.UserId != stored.UserId {
+			if codeSession != nil && codeSession.UserID != stored.UserId {
 				return RefreshSessionOfAnotherUser, nil
 			}
 		}

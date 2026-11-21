@@ -60,7 +60,7 @@ var clientColumns = columnList{
 // scanClient reads one row selected with clientColumns.
 func scanClient(row rowScanner, client *record.Client) error {
 	return row.Scan(
-		&client.Id,
+		&client.ID,
 		&client.CreatedAt,
 		&client.UpdatedAt,
 		&client.ClientIdentifier,
@@ -92,9 +92,9 @@ func scanClient(row rowScanner, client *record.Client) error {
 		&client.RefreshTokenOfflineIdleTimeoutInSeconds,
 		&client.RefreshTokenOfflineMaxLifetimeInSeconds,
 		&client.IncludeOpenIDConnectClaimsInAccessToken,
-		&client.IncludeOpenIDConnectClaimsInIdToken,
-		&client.DefaultAcrLevel,
-		&client.BrandId,
+		&client.IncludeOpenIDConnectClaimsInIDToken,
+		&client.DefaultACRLevel,
+		&client.BrandID,
 		&client.TokenEndpointAuthMethod,
 	)
 }
@@ -278,30 +278,30 @@ var makeClientPublic = statement{
 	mssql:    "UPDATE clients SET is_public = @p1, remember_consent = @p2, token_endpoint_auth_method = @p3, updated_at = @p4 WHERE id = @p5 AND is_public = @p6",
 }
 
-var selectClientById = statement{
+var selectClientByID = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ?",
 	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1",
 	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE id = @p1",
 }
 
-// selectClientByIdForUpdate is the locking read GetClientByIdForUpdate runs, the lock in each
-// engine's own grammar, as selectUserByIdForUpdate spells it.
-var selectClientByIdForUpdate = statement{
+// selectClientByIDForUpdate is the locking read GetClientByIDForUpdate runs, the lock in each
+// engine's own grammar, as selectUserByIDForUpdate spells it.
+var selectClientByIDForUpdate = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR UPDATE",
 	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR UPDATE",
 	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (UPDLOCK, ROWLOCK) WHERE id = @p1",
 }
 
-// selectClientByIdForShare is the shared locking read GetClientByIdForShare runs. PostgreSQL's is
+// selectClientByIDForShare is the shared locking read GetClientByIDForShare runs. PostgreSQL's is
 // FOR KEY SHARE, the lock the codes table's foreign key takes on the row at the insert anyway: a
 // rename's and a deletion's FOR UPDATE conflict with it, a save that changes none of the row's
 // keys does not. SQL Server's REPEATABLEREAD hint holds the shared lock to the end of the
 // transaction, where READ COMMITTED would release it at the end of the statement, and reads by
 // locking even with READ_COMMITTED_SNAPSHOT on. SQLite's is a plain read: its pool has one
 // connection, so no other transaction runs while the reader's is open.
-var selectClientByIdForShare = statement{
+var selectClientByIDForShare = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
 	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR KEY SHARE",
@@ -356,21 +356,21 @@ func (d *Database) CreateClient(ctx context.Context, tx *sql.Tx, client *record.
 		client.ClientCredentialsEnabled, client.PKCERequired, client.ImplicitGrantEnabled,
 		client.ResourceOwnerPasswordCredentialsEnabled, client.TokenExpirationInSeconds,
 		client.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineMaxLifetimeInSeconds,
-		client.IncludeOpenIDConnectClaimsInAccessToken, client.IncludeOpenIDConnectClaimsInIdToken,
-		client.DefaultAcrLevel, client.BrandId, client.TokenEndpointAuthMethod)
+		client.IncludeOpenIDConnectClaimsInAccessToken, client.IncludeOpenIDConnectClaimsInIDToken,
+		client.DefaultACRLevel, client.BrandID, client.TokenEndpointAuthMethod)
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	client.Id = id
+	client.ID = id
 	return nil
 }
 
 func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error {
 
-	if client.Id == 0 {
+	if client.ID == 0 {
 		return errs.New("can't update client with id 0")
 	}
 
@@ -386,8 +386,8 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 		client.PKCERequired, client.ImplicitGrantEnabled, client.ResourceOwnerPasswordCredentialsEnabled,
 		client.TokenExpirationInSeconds, client.RefreshTokenOfflineIdleTimeoutInSeconds,
 		client.RefreshTokenOfflineMaxLifetimeInSeconds, client.IncludeOpenIDConnectClaimsInAccessToken,
-		client.IncludeOpenIDConnectClaimsInIdToken, client.DefaultAcrLevel,
-		client.Id)
+		client.IncludeOpenIDConnectClaimsInIDToken, client.DefaultACRLevel,
+		client.ID)
 	if err != nil {
 		client.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client")
@@ -402,7 +402,7 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 // from a copy loaded earlier in their request, cannot write back an identifier renamed since
 // (#710 decision 4).
 //
-// It takes the client's row with a locking read, GetClientByIdForUpdate, which waits out a
+// It takes the client's row with a locking read, GetClientByIDForUpdate, which waits out a
 // writer in flight and writes nothing, so an identifier the row already holds leaves the row
 // untouched, updated_at included. It writes only when the one given differs, compared byte for
 // byte in Go rather than by the engine, whose collation may fold case: RFC 6749 section 1.9 makes
@@ -413,20 +413,20 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 // means this call wrote a different identifier; false means the row already held it, or there is
 // no such client, which the caller's own read under the lock answers.
 //
-// A transaction is required, for the reason GetClientByIdForUpdate gives.
-func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error) {
+// A transaction is required, for the reason GetClientByIDForUpdate gives.
+func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientID int64, clientIdentifier string) (bool, error) {
 
 	if tx == nil {
 		return false, errs.New("setting a client's identifier requires a transaction: the row must be held between reading the identifier and writing it")
 	}
-	if clientId == 0 {
+	if clientID == 0 {
 		return false, errs.New("can't set the identifier of a client with an id of 0")
 	}
 	if clientIdentifier == "" {
 		return false, errs.New("can't set a client's identifier to an empty value")
 	}
 
-	current, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
+	current, err := d.GetClientByIDForUpdate(ctx, tx, clientID)
 	if err != nil {
 		return false, err
 	}
@@ -435,7 +435,7 @@ func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, setClientIdentifier.text(d.Dialect),
-		clientIdentifier, time.Now().UTC(), clientId); err != nil {
+		clientIdentifier, time.Now().UTC(), clientID); err != nil {
 		return false, errs.Wrap(err, "unable to set the client's identifier")
 	}
 	return true, nil
@@ -449,14 +449,14 @@ func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId
 // A client that is not there affects no rows and is not reported here, for the reason
 // AcquireClientRow gives: its caller reads the row back to answer, and that read is the one place
 // that decides whether the client still exists.
-func (d *Database) SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error {
+func (d *Database) SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientID int64, allowed bool) error {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return errs.New("can't set the administrative scopes allowance of a client with an id of 0")
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, setClientAdministrativeScopesAllowed.text(d.Dialect),
-		allowed, time.Now().UTC(), clientId); err != nil {
+		allowed, time.Now().UTC(), clientID); err != nil {
 		return errs.Wrap(err, "unable to set the client's administrative scopes allowance")
 	}
 	return nil
@@ -469,14 +469,14 @@ func (d *Database) SetClientAdministrativeScopesAllowed(ctx context.Context, tx 
 //
 // A client that is not there affects no rows and is not reported here, for the reason
 // AcquireClientRow gives.
-func (d *Database) SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error {
+func (d *Database) SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientID int64, remember bool) error {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return errs.New("can't set Remember consent on a client with an id of 0")
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, setClientRememberConsent.text(d.Dialect),
-		remember, time.Now().UTC(), clientId); err != nil {
+		remember, time.Now().UTC(), clientID); err != nil {
 		return errs.Wrap(err, "unable to set the client's Remember consent")
 	}
 	return nil
@@ -489,14 +489,14 @@ func (d *Database) SetClientRememberConsent(ctx context.Context, tx *sql.Tx, cli
 //
 // A client that is not there affects no rows and is not reported here, for the reason
 // AcquireClientRow gives.
-func (d *Database) SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error {
+func (d *Database) SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientID int64, uri string, sessionRequired bool) error {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return errs.New("can't set the back-channel logout of a client with an id of 0")
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, setClientBackchannelLogout.text(d.Dialect),
-		uri, sessionRequired, time.Now().UTC(), clientId); err != nil {
+		uri, sessionRequired, time.Now().UTC(), clientID); err != nil {
 		return errs.Wrap(err, "unable to set the client's back-channel logout")
 	}
 	return nil
@@ -509,14 +509,14 @@ func (d *Database) SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, c
 //
 // A client that is not there affects no rows and is not reported here, for the reason
 // AcquireClientRow gives.
-func (d *Database) SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error {
+func (d *Database) SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientID int64, required bool) error {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return errs.New("can't set the DPoP requirement of a client with an id of 0")
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, setClientDPoPBoundAccessTokens.text(d.Dialect),
-		required, time.Now().UTC(), clientId); err != nil {
+		required, time.Now().UTC(), clientID); err != nil {
 		return errs.Wrap(err, "unable to set the client's DPoP requirement")
 	}
 	return nil
@@ -546,17 +546,17 @@ func (d *Database) SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.T
 //
 // The transaction is required rather than optional. Without one the statement autocommits and
 // drops the row before the caller's read runs, which is the whole of what this buys.
-func (d *Database) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error {
+func (d *Database) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring a client row requires a transaction: an autocommitted statement releases the row before the caller can read it")
 	}
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return errs.New("can't acquire a client row with an id of 0")
 	}
 
-	if _, err := d.ExecSQL(ctx, tx, acquireClientRow.text(d.Dialect), time.Now().UTC(), clientId); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireClientRow.text(d.Dialect), time.Now().UTC(), clientID); err != nil {
 		return errs.Wrap(err, "unable to acquire client row")
 	}
 
@@ -606,21 +606,21 @@ func (d *Database) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId in
 // The transaction is required rather than optional, for the reason revocation.RevokeClientGrants states
 // about its own: without one, each statement autocommits and the acquisition drops its lock
 // before the classification runs, which is the whole mechanism.
-func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
+func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error) {
 
 	if tx == nil {
 		return false, errs.New("making a client public requires a transaction: the row must be held between acquiring it and classifying the write")
 	}
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return false, errs.New("can't make a client public with an id of 0")
 	}
 
-	if err := d.AcquireClientRow(ctx, tx, clientId); err != nil {
+	if err := d.AcquireClientRow(ctx, tx, clientID); err != nil {
 		return false, err
 	}
 
-	result, err := d.ExecSQL(ctx, tx, makeClientPublic.text(d.Dialect), true, false, "", time.Now().UTC(), clientId, false)
+	result, err := d.ExecSQL(ctx, tx, makeClientPublic.text(d.Dialect), true, false, "", time.Now().UTC(), clientID, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to make client public")
 	}
@@ -637,7 +637,7 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 	// rather than reported as the same thing. This read DECIDES NOTHING about the transition:
 	// that answer is already in hand above, and the row is held by the acquisition, so all this
 	// can observe is whether there is a client to have saved at all.
-	client, err := d.GetClientById(ctx, tx, clientId)
+	client, err := d.GetClientByID(ctx, tx, clientID)
 	if err != nil {
 		return false, err
 	}
@@ -647,12 +647,12 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 	return false, nil
 }
 
-func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
-	return queryOne(ctx, d, tx, selectClientById.text(d.Dialect), []any{clientId}, scanClient, "client")
+func (d *Database) GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error) {
+	return queryOne(ctx, d, tx, selectClientByID.text(d.Dialect), []any{clientID}, scanClient, "client")
 }
 
-// GetClientByIdForUpdate reads the client as last committed and takes its row for the rest of the
-// caller's transaction, without writing it: a locking read, as GetUserByIdForUpdate is a user's. A
+// GetClientByIDForUpdate reads the client as last committed and takes its row for the rest of the
+// caller's transaction, without writing it: a locking read, as GetUserByIDForUpdate is a user's. A
 // writer of the row, AcquireClientRow among them, and another locking read, SetClientIdentifier's
 // among them, wait for this transaction to end, and this read waits for a writer's transaction to
 // end and answers what it committed.
@@ -665,16 +665,16 @@ func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64
 //
 // tx is required: without one the statement autocommits and the row is released before the caller
 // can decide on what it read.
-func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+func (d *Database) GetClientByIDForUpdate(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error) {
 
 	if tx == nil {
 		return nil, errs.New("a locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
 	}
 
-	return queryOne(ctx, d, tx, selectClientByIdForUpdate.text(d.Dialect), []any{clientId}, scanClient, "client")
+	return queryOne(ctx, d, tx, selectClientByIDForUpdate.text(d.Dialect), []any{clientID}, scanClient, "client")
 }
 
-// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row for
+// GetClientByIDForShare reads the client as last committed and holds a shared lock on its row for
 // the rest of the caller's transaction, without writing it. A rename (SetClientIdentifier) and a
 // deletion (DeleteClient), which take the row exclusively to change it, wait for this transaction
 // to end, and this read waits for theirs and answers what they committed. On MySQL, PostgreSQL and
@@ -685,14 +685,14 @@ func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clien
 // against it: either the code commits first and the rename's sweep revokes it, or the rename
 // commits first and issuance reads the identifier it gave the client and issues nothing (#866).
 //
-// tx is required, for the reason GetClientByIdForUpdate gives.
-func (d *Database) GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+// tx is required, for the reason GetClientByIDForUpdate gives.
+func (d *Database) GetClientByIDForShare(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error) {
 
 	if tx == nil {
 		return nil, errs.New("a shared locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
 	}
 
-	return queryOne(ctx, d, tx, selectClientByIdForShare.text(d.Dialect), []any{clientId}, scanClient, "client")
+	return queryOne(ctx, d, tx, selectClientByIDForShare.text(d.Dialect), []any{clientID}, scanClient, "client")
 }
 
 func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {
@@ -718,7 +718,7 @@ func (d *Database) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, clien
 	}
 
 	var err error
-	client.RedirectURIs, err = d.GetRedirectURIsByClientId(ctx, tx, client.Id)
+	client.RedirectURIs, err = d.GetRedirectURIsByClientID(ctx, tx, client.ID)
 	if err != nil {
 		return errs.Wrap(err, "unable to get redirect URIs")
 	}
@@ -735,7 +735,7 @@ func (d *Database) ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql
 	}
 
 	var err error
-	client.PostLogoutRedirectURIs, err = d.GetPostLogoutRedirectURIsByClientId(ctx, tx, client.Id)
+	client.PostLogoutRedirectURIs, err = d.GetPostLogoutRedirectURIsByClientID(ctx, tx, client.ID)
 	if err != nil {
 		return errs.Wrap(err, "unable to get sign-out redirect URIs")
 	}
@@ -750,7 +750,7 @@ func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client 
 	}
 
 	var err error
-	client.WebOrigins, err = d.GetWebOriginsByClientId(ctx, tx, client.Id)
+	client.WebOrigins, err = d.GetWebOriginsByClientID(ctx, tx, client.ID)
 	if err != nil {
 		return errs.Wrap(err, "unable to get web origins")
 	}
@@ -758,15 +758,15 @@ func (d *Database) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client 
 	return nil
 }
 
-func (d *Database) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error) {
+func (d *Database) GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error) {
 
-	if len(clientIds) == 0 {
+	if len(clientIDs) == 0 {
 		return []record.Client{}, nil
 	}
 
-	clients := make([]record.Client, 0, len(clientIds))
+	clients := make([]record.Client, 0, len(clientIDs))
 
-	err := forEachIdBatch(clientIds, func(batch []int64) error {
+	err := forEachIDBatch(clientIDs, func(batch []int64) error {
 		query := selectClientsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		clients, err = queryAll(ctx, d, tx, clients, query, int64Args(batch), scanClient, "client")
@@ -785,17 +785,17 @@ func (d *Database) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client
 		return nil
 	}
 
-	clientPermissions, err := d.GetClientPermissionsByClientId(ctx, tx, client.Id)
+	clientPermissions, err := d.GetClientPermissionsByClientID(ctx, tx, client.ID)
 	if err != nil {
 		return err
 	}
 
-	permissionIds := make([]int64, 0)
+	permissionIDs := make([]int64, 0)
 	for _, clientPermission := range clientPermissions {
-		permissionIds = append(permissionIds, clientPermission.PermissionId)
+		permissionIDs = append(permissionIDs, clientPermission.PermissionID)
 	}
 
-	client.Permissions, err = d.GetPermissionsByIds(ctx, tx, permissionIds)
+	client.Permissions, err = d.GetPermissionsByIDs(ctx, tx, permissionIDs)
 	if err != nil {
 		return err
 	}
@@ -832,27 +832,27 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Clie
 // for and read rather than missed by a read that does not wait for a writer, which would record
 // the identifier the client had before and leave the one it gave up unrecorded. A client that is
 // not there records nothing.
-func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
+func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientID int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
+		err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientID)
 		if err != nil {
 			return err
 		}
 
-		client, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
+		client, err := d.GetClientByIDForUpdate(ctx, tx, clientID)
 		if err != nil {
 			return err
 		}
 
 		// Again, now that the row is held: an initial password grant the read above waited for
 		// has committed its first refresh token, which the first sweep could not see.
-		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
+		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientID)
 		if err != nil {
 			return err
 		}
 
-		_, err = d.ExecSQL(ctx, tx, deleteClient.text(d.Dialect), clientId)
+		_, err = d.ExecSQL(ctx, tx, deleteClient.text(d.Dialect), clientID)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete client")
 		}

@@ -16,7 +16,7 @@ import (
 type userSessionsDatabase interface {
 	sessionDetailsDatabase
 
-	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
+	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -47,7 +47,7 @@ func HandleUserSessionGet(
 		}
 
 		// Get user session from database
-		userSession, err := database.GetUserSessionById(r.Context(), nil, sessionId)
+		userSession, err := database.GetUserSessionByID(r.Context(), nil, sessionId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

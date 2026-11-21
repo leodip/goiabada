@@ -19,9 +19,9 @@ import (
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 
-// newAccessTokenJti is a jti of the shape the auth server signs, a UUID, with a lower-case letter in
+// newAccessTokenJTI is a jti of the shape the auth server signs, a UUID, with a lower-case letter in
 // front so its upper-case spelling is another string.
-func newAccessTokenJti() string {
+func newAccessTokenJTI() string {
 	return "at-" + fake.UUID()
 }
 
@@ -63,7 +63,7 @@ func storedAccessTokenExpiry(t *testing.T, jti string) (time.Time, int) {
 // A jti is stored once, with the token's expiry, and the lookup then finds it. Revoking the same
 // token again stores nothing, reports so, and leaves the first expiry as it was.
 func TestRecordAccessTokenRevoked(t *testing.T) {
-	jti := newAccessTokenJti()
+	jti := newAccessTokenJTI()
 	expiresAt := time.Date(2031, 4, 5, 6, 7, 8, 0, time.UTC)
 	require.False(t, accessTokenIsRevoked(t, jti), "a jti nobody revoked is not stored")
 
@@ -83,8 +83,8 @@ func TestRecordAccessTokenRevoked(t *testing.T) {
 
 // One token's revocation answers for no other token.
 func TestIsAccessTokenRevoked_OneTokenDoesNotAnswerForAnother(t *testing.T) {
-	revoked := newAccessTokenJti()
-	bystander := newAccessTokenJti()
+	revoked := newAccessTokenJTI()
+	bystander := newAccessTokenJTI()
 	recordAccessTokenRevoked(t, revoked, time.Now().UTC().Add(time.Hour))
 
 	assert.True(t, accessTokenIsRevoked(t, revoked))
@@ -96,7 +96,7 @@ func TestIsAccessTokenRevoked_OneTokenDoesNotAnswerForAnother(t *testing.T) {
 // collation that folds case would find the other case (#283). Each spelling is then stored as a
 // token of its own.
 func TestIsAccessTokenRevoked_ComparesTheIdentifierExactly(t *testing.T) {
-	jti := newAccessTokenJti()
+	jti := newAccessTokenJTI()
 	recordAccessTokenRevoked(t, jti, time.Now().UTC().Add(time.Hour))
 
 	for name, asked := range map[string]string{
@@ -119,7 +119,7 @@ func TestIsAccessTokenRevoked_ComparesTheIdentifierExactly(t *testing.T) {
 
 // An empty jti is an error, never an answer: the auth server signs none, so it can only be a caller
 // bug, and answering "not revoked" would let a token through that no row could ever refuse.
-func TestRevokedAccessToken_RefusesAnEmptyJti(t *testing.T) {
+func TestRevokedAccessToken_RefusesAnEmptyJTI(t *testing.T) {
 	_, err := database.IsAccessTokenRevoked(context.Background(), nil, "")
 	require.Error(t, err)
 
@@ -132,9 +132,9 @@ func TestRevokedAccessToken_RefusesAnEmptyJti(t *testing.T) {
 // expiry is the sweep's moment is kept for the next sweep, and an unexpired token stays revoked.
 func TestDeleteExpiredRevokedAccessTokens(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	expired := newAccessTokenJti()
-	atTheBoundary := newAccessTokenJti()
-	live := newAccessTokenJti()
+	expired := newAccessTokenJTI()
+	atTheBoundary := newAccessTokenJTI()
+	live := newAccessTokenJTI()
 	recordAccessTokenRevoked(t, expired, now.Add(-time.Minute))
 	recordAccessTokenRevoked(t, atTheBoundary, now)
 	recordAccessTokenRevoked(t, live, now.Add(time.Hour))
@@ -156,7 +156,7 @@ func TestDeleteExpiredRevokedAccessTokens(t *testing.T) {
 // The methods run on the transaction they are handed: a jti stored in a transaction that rolls back
 // is not stored.
 func TestRevokedAccessToken_EnlistsInTheCallersTransaction(t *testing.T) {
-	jti := newAccessTokenJti()
+	jti := newAccessTokenJTI()
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
 	// A failing assertion must not leave the transaction open: SQLite has one connection, and every

@@ -163,10 +163,10 @@ func TestMain_RecoverRunsThroughTheRealMain(t *testing.T) {
 		assert.NoFileExists(t, decoy)
 		user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
 		require.NoError(t, err)
-		grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+		grants, err := db.GetUserPermissionsByUserID(context.Background(), nil, user.ID)
 		require.NoError(t, err)
 		require.Len(t, grants, 1)
-		assert.Equal(t, manage.Id, grants[0].PermissionId)
+		assert.Equal(t, manage.ID, grants[0].PermissionID)
 		assert.Equal(t, int64(1), user.AuthStateGeneration, "the recovery advanced the generation")
 	})
 
@@ -361,7 +361,7 @@ func TestMain_ReportsAStoredIssuerTheRuleRefusesAndContinues(t *testing.T) {
 	ctx := context.Background()
 	db, err := sqlitedb.New(ctx, "file:"+path, false)
 	require.NoError(t, err)
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	settings.Issuer = "goiabada"

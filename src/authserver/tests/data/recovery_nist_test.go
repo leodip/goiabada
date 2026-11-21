@@ -16,7 +16,7 @@ import (
 func storeNistPolicy(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
-	snapshot, err := database.GetSettingsById(ctx, nil, 1)
+	snapshot, err := database.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, snapshot)
 	t.Cleanup(func() {
@@ -28,7 +28,7 @@ func storeNistPolicy(t *testing.T) {
 	changed.AppName = "Goiabada"
 	require.NoError(t, database.UpdateSettings(ctx, nil, &changed))
 
-	stored, err := database.GetSettingsById(ctx, nil, 1)
+	stored, err := database.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, 4, int(stored.PasswordPolicy), "nist is stored as 4")
 	assert.Equal(t, "nist", stored.PasswordPolicy.String())
@@ -63,7 +63,7 @@ func TestRecovery_HoldsThePasswordToAStoredNistPolicy(t *testing.T) {
 			require.ErrorAs(t, err, &refusal)
 			assert.Contains(t, refusal.Reason, "the password is refused by the stored password policy: "+tc.reason)
 			assert.Empty(t, recorder.events)
-			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			after, err := database.GetUserByID(ctx, nil, f.user.ID)
 			require.NoError(t, err)
 			assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "a refused password is not set")
 			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration)

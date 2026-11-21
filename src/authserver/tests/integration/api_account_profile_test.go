@@ -34,7 +34,7 @@ func TestAPIAccountProfileGet_Success(t *testing.T) {
 	var getResp api.GetUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, getResp.User.ID)
+	assert.Equal(t, u.ID, getResp.User.ID)
 	assert.Equal(t, u.Email, getResp.User.Email)
 }
 
@@ -135,7 +135,7 @@ func TestAPIAccountProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	require.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
 	assert.Equal(t, "other", updated.User.Gender)
 
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "other", stored.Gender)
 }
@@ -194,7 +194,7 @@ func TestAPIAccountProfilePut_NicknameFreeText(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&updated))
 	assert.Equal(t, "Amazing Grace", updated.User.Nickname)
 
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Amazing Grace", stored.Nickname)
 
@@ -206,7 +206,7 @@ func TestAPIAccountProfilePut_NicknameFreeText(t *testing.T) {
 	assert.Equal(t, "validator.profile.nickname_angle_brackets", errResp.ErrorCode)
 	assert.Equal(t, "The nickname cannot contain the characters < or >.", errResp.ErrorDescription)
 
-	stored, err = database.GetUserById(context.Background(), nil, u.Id)
+	stored, err = database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Amazing Grace", stored.Nickname)
 }
@@ -235,7 +235,7 @@ func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "Unknown time zone.", errResp.ErrorDescription)
 
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	if assert.NotNil(t, stored) {
 		assert.Equal(t, "United States", stored.ZoneInfoCountryName)

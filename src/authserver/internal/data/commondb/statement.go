@@ -64,11 +64,11 @@ type rowScanner interface {
 // inList writes the predicate `column IN (…)` with n placeholders in the dialect's style, the
 // first of them numbered first on the two engines that number theirs, so the IN list can follow
 // other arguments in the same statement. It is how every statement in this package spells an IN
-// list, and the id-list lint holds each function calling it to forEachIdBatch, so no list grows
+// list, and the id-list lint holds each function calling it to forEachIDBatch, so no list grows
 // past the parameters one statement may carry (#373).
 //
 // An empty list is `0 = 1`, which matches nothing on every engine, where `IN ()` is a syntax
-// error on all four. forEachIdBatch never hands over an empty batch; this is what such a list
+// error on all four. forEachIDBatch never hands over an empty batch; this is what such a list
 // would mean, and what the query builder this replaced wrote for one.
 func inList(dialect data.Dialect, column string, first, n int) string {
 	if n == 0 {

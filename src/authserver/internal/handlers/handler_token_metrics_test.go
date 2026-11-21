@@ -55,17 +55,17 @@ func TestHandleTokenPost_CountsEachTokenResponseUnderItsGrant(t *testing.T) {
 		form  string
 	}{
 		{"authorization_code", func(e *tokenEndpoint) {
-			code := &record.Code{Id: 1}
+			code := &record.Code{ID: 1}
 			e.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 			e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code, "").Return(tokenResponse, nil).Once()
 		}, "grant_type=authorization_code&code=c&redirect_uri=http://example.com&client_id=test_client"},
 		{"client_credentials", func(e *tokenEndpoint) {
-			client := &record.Client{Id: 1}
+			client := &record.Client{ID: 1}
 			e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 			e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", "").Return(tokenResponse, nil).Once()
 		}, "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=r:p"},
 		{"password", func(e *tokenEndpoint) {
-			e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{Id: 1}, User: &record.User{Id: 42}, Scope: "openid"})
+			e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{ID: 1}, User: &record.User{ID: 42}, Scope: "openid"})
 			e.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).Return(tokenResponse, nil).Once()
 		}, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"},
 		{"refresh_token", func(e *tokenEndpoint) {
@@ -131,7 +131,7 @@ func TestHandleTokenPost_CountsEachRefusalUnderItsGrantAndErrorCode(t *testing.T
 		{
 			name: "an issuer fault is the server_error it is answered as",
 			arm: func(e *tokenEndpoint) {
-				e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{Id: 1}, User: &record.User{Id: 42}, Scope: "openid"})
+				e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{ID: 1}, User: &record.User{ID: 42}, Scope: "openid"})
 				e.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, errs.New("signing key unavailable")).Once()
 			},
@@ -151,7 +151,7 @@ func TestHandleTokenPost_CountsEachRefusalUnderItsGrantAndErrorCode(t *testing.T
 		{
 			name: "a code whose claim was lost",
 			arm: func(e *tokenEndpoint) {
-				code := &record.Code{Id: 1}
+				code := &record.Code{ID: 1}
 				e.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 				e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code, "").
 					Return(nil, issuance.ErrCodeNotClaimed).Once()

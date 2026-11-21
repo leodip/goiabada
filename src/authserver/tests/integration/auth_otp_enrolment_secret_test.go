@@ -51,7 +51,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
+	enrolled, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

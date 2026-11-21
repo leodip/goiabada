@@ -96,14 +96,14 @@ func New(ctx context.Context, dsn string, logSQL bool) (*Database, error) {
 	}
 
 	slog.InfoContext(ctx, "connected to sqlite database with required PRAGMA settings")
-	commonDb := commondb.New(db, data.SQLite, logSQL)
-	commonDb.IsDeadlock = isDeadlock
-	commonDb.IsUniqueViolation = isUniqueViolation
-	sqliteDb := Database{
-		Database: commonDb,
+	commonDB := commondb.New(db, data.SQLite, logSQL)
+	commonDB.IsDeadlock = isDeadlock
+	commonDB.IsUniqueViolation = isUniqueViolation
+	sqliteDB := Database{
+		Database: commonDB,
 	}
 
-	return &sqliteDb, nil
+	return &sqliteDB, nil
 }
 
 // codeName is SQLite's name for a result code as the driver spells it, e.g. "Unable to open the

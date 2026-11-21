@@ -52,7 +52,7 @@ func TestEmailTemplateEdits_AreSentInTheRecipientsLanguage(t *testing.T) {
 		saveEmailTemplateEdit(t, "password_reset_link", "en", "Choose a new password for {{app_name}}", "Choose a password",
 			"Hi {{name}}, someone asked to reset your password.\n\n{{button}}\n\nOr open {{link}} within {{expiry}}.")
 		user := resetLinkUser(t, "Ana", "en-GB")
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 
 		subject, button, text := resetLinkEmailSent(t, user)

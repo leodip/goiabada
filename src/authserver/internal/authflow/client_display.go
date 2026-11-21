@@ -65,7 +65,7 @@ func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, c
 	}
 
 	if client.ShowLogo {
-		hasLogo, err := database.ClientHasLogo(ctx, nil, client.Id)
+		hasLogo, err := database.ClientHasLogo(ctx, nil, client.ID)
 		if err != nil {
 			slog.WarnContext(ctx, "unable to check whether the client has a logo, defaulting to false",
 				"client_identifier", client.ClientIdentifier, "error", err)

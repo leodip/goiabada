@@ -1,6 +1,6 @@
 package postgresdb
 
-// explicitIdInsertSQL is PostgreSQL's answer to "what does an INSERT naming its own id need around
+// explicitIDInsertSQL is PostgreSQL's answer to "what does an INSERT naming its own id need around
 // it". Nothing before it: a serial column takes an explicit value. One statement after it: the
 // serial sequence moves only when nextval is called, so after an explicit id it would hand the
 // same id out again and the next ordinary insert on the table would collide. setval puts it at the
@@ -13,7 +13,7 @@ package postgresdb
 // It is wired onto commondb.Database in the constructor, beside the deadlock and unique-violation
 // classifiers, and commondb.CreateInitialSettings is its one caller. table is always a literal
 // from that code, never input.
-func explicitIdInsertSQL(table string) (before []string, after []string) {
+func explicitIDInsertSQL(table string) (before []string, after []string) {
 	return nil, []string{
 		"SELECT setval(pg_get_serial_sequence('" + table + "', 'id'), (SELECT MAX(id) FROM " + table + "))",
 	}

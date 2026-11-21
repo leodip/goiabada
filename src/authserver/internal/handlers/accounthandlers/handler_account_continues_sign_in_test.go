@@ -133,7 +133,7 @@ func newRegistration(t *testing.T, signIns *signInsHeld) *registration {
 	passwordValidator.On("ValidatePassword", mock.Anything, newAccountPassword, mock.Anything).Return(nil).Once()
 	userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 		return input.Email == newAccountEmail
-	})).Return(&record.User{Id: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
+	})).Return(&record.User{ID: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
 	r.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r.audited = append(r.audited, args.String(1))
 	}).Return()
@@ -325,7 +325,7 @@ func newActivation(t *testing.T, signIns *signInsHeld) *activation {
 	datamocks.ExpectRunInTransaction(database, activationTx, func(string) {})
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: newAccountId, Email: activateTestEmail, Enabled: true, EmailVerified: true}, nil).Once()
+		Return(&record.User{ID: newAccountId, Email: activateTestEmail, Enabled: true, EmailVerified: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		a.audited = append(a.audited, args.String(1))
 	}).Return()

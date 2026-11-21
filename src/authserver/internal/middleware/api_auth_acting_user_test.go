@@ -37,11 +37,11 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 			arm: func(mockDB *datamocks.Database) {
 				now := time.Now().UTC()
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-42").
-					Return(&record.User{Id: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
+					Return(&record.User{ID: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-42").
 					Return(&record.UserSession{
 						SessionIdentifier: "sid-42",
-						UserId:            actingUserId,
+						UserID:            actingUserId,
 						Started:           now.Add(-time.Hour),
 						LastAccessed:      now.Add(-time.Minute),
 					}, nil).Once()
@@ -53,7 +53,7 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 			label: "a user's token of a live grant, with no session",
 			arm: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-42").
-					Return(&record.User{Id: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
+					Return(&record.User{ID: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
 				mockDB.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), "grant-42").Return(true, nil).Once()
 			},
 			token:    map[string]interface{}{"auth_time": float64(1), "sub": "user-42", "grant_id": "grant-42"},

@@ -13,7 +13,7 @@ import (
 type settingsSaveDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
@@ -49,7 +49,7 @@ func saveSettingsSectionOrRefuse(ctx context.Context, database settingsSaveDatab
 		if acquireErr := database.AcquireSettingsRow(ctx, tx, settingsId); acquireErr != nil {
 			return errs.Wrap(acquireErr, "unable to acquire the settings row")
 		}
-		stored, readErr := database.GetSettingsById(ctx, tx, settingsId)
+		stored, readErr := database.GetSettingsByID(ctx, tx, settingsId)
 		if readErr != nil {
 			return errs.Wrap(readErr, "unable to read the settings row")
 		}

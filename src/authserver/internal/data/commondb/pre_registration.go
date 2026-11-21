@@ -24,7 +24,7 @@ var preRegistrationColumns = columnList{
 // scanPreRegistration reads one row selected with preRegistrationColumns.
 func scanPreRegistration(row rowScanner, preRegistration *record.PreRegistration) error {
 	return row.Scan(
-		&preRegistration.Id,
+		&preRegistration.ID,
 		&preRegistration.CreatedAt,
 		&preRegistration.UpdatedAt,
 		&preRegistration.Email,
@@ -57,7 +57,7 @@ var updatePreRegistration = statement{
 		"verification_code_issued_at = @p4, verification_code_hash = @p5 WHERE id = @p6",
 }
 
-var selectPreRegistrationById = statement{
+var selectPreRegistrationByID = statement{
 	sqlite:   "SELECT " + preRegistrationColumns.sqlite + " FROM pre_registrations WHERE id = ?",
 	mysql:    "SELECT " + preRegistrationColumns.mysql + " FROM pre_registrations WHERE id = ?",
 	postgres: "SELECT " + preRegistrationColumns.postgres + " FROM pre_registrations WHERE id = $1",
@@ -131,13 +131,13 @@ func (d *Database) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 		return err
 	}
 
-	preRegistration.Id = id
+	preRegistration.ID = id
 	return nil
 }
 
 func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error {
 
-	if preRegistration.Id == 0 {
+	if preRegistration.ID == 0 {
 		return errs.New("can't update preRegistration with id 0")
 	}
 
@@ -146,7 +146,7 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 
 	_, err := d.ExecSQL(ctx, tx, updatePreRegistration.text(d.Dialect),
 		preRegistration.UpdatedAt, preRegistration.Email, preRegistration.VerificationCodeEncrypted,
-		preRegistration.VerificationCodeIssuedAt, preRegistration.VerificationCodeHash, preRegistration.Id)
+		preRegistration.VerificationCodeIssuedAt, preRegistration.VerificationCodeHash, preRegistration.ID)
 	if err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update preRegistration")
@@ -155,14 +155,14 @@ func (d *Database) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 	return nil
 }
 
-func (d *Database) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*record.PreRegistration, error) {
-	return queryOne(ctx, d, tx, selectPreRegistrationById.text(d.Dialect), []any{preRegistrationId},
+func (d *Database) GetPreRegistrationByID(ctx context.Context, tx *sql.Tx, preRegistrationID int64) (*record.PreRegistration, error) {
+	return queryOne(ctx, d, tx, selectPreRegistrationByID.text(d.Dialect), []any{preRegistrationID},
 		scanPreRegistration, "preRegistration")
 }
 
-func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error {
+func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deletePreRegistration.text(d.Dialect), preRegistrationId)
+	_, err := d.ExecSQL(ctx, tx, deletePreRegistration.text(d.Dialect), preRegistrationID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete preRegistration")
 	}
@@ -178,7 +178,7 @@ func (d *Database) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preReg
 // and deletes by id alone would delete the fresh link with it. Naming the code the caller read
 // makes that caller's delete decline instead, as it does for a row consumed or swept meanwhile
 // (#207 decision 6).
-func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64,
+func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64,
 	codeHash string) (bool, error) {
 
 	// '' is the dormant value, which would match a row nobody issued a code for.
@@ -186,7 +186,7 @@ func (d *Database) DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql
 		return false, errs.New("can't delete a preRegistration by an empty code hash")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, deletePreRegistrationHoldingCode.text(d.Dialect), preRegistrationId, codeHash)
+	result, err := d.ExecSQL(ctx, tx, deletePreRegistrationHoldingCode.text(d.Dialect), preRegistrationID, codeHash)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to delete preRegistration")
 	}
@@ -242,10 +242,10 @@ func (d *Database) GetPreRegistrationByVerificationCodeHash(ctx context.Context,
 // was consumed or swept meanwhile, and each is told false and sends nothing (#207 decision 6).
 // The row keeps its id, its address and its created_at, so it is the same pending registration
 // with a new link.
-func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64,
+func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64,
 	deadCodeHash string, codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error) {
 
-	if preRegistrationId == 0 {
+	if preRegistrationID == 0 {
 		return false, errs.New("can't replace the code of preRegistration with id 0")
 	}
 	// '' is the dormant value, which no link can find, so a code stored with it could never be
@@ -255,7 +255,7 @@ func (d *Database) TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx
 	}
 
 	result, err := d.ExecSQL(ctx, tx, replacePreRegistrationCode.text(d.Dialect),
-		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), preRegistrationId, deadCodeHash)
+		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), preRegistrationID, deadCodeHash)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to replace preRegistration code")
 	}

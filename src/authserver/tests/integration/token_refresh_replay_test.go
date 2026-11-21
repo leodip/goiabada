@@ -79,7 +79,7 @@ func assertRefusedAsInvalidGrant(t *testing.T, status int, body map[string]inter
 func refreshTokenRowByJti(t *testing.T, refreshToken string) *record.RefreshToken {
 	t.Helper()
 
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, row, "the refresh token row must exist")
 	return row
@@ -106,12 +106,12 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	const codeVerifier = testCodeVerifier + "-second-client"
@@ -183,7 +183,7 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 	secretB := fake.Password(32)
 	clientB, redirectB, rawCodeB := codeOnSameSessionForNewClient(t, httpClient, secretB, "openid profile")
 
-	storedCodeA, err := database.GetCodeById(context.Background(), nil, codeA.Id)
+	storedCodeA, err := database.GetCodeByID(context.Background(), nil, codeA.ID)
 	require.NoError(t, err)
 	storedCodeB := loadCodeFromDatabase(t, rawCodeB)
 	require.Equal(t, storedCodeA.SessionIdentifier, storedCodeB.SessionIdentifier,
@@ -244,8 +244,8 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 
 	// The shape that makes this case distinct: no code row behind the family.
 	row1 := refreshTokenRowByJti(t, rt1)
-	require.False(t, row1.CodeId.Valid, "a ROPC refresh token must have no code_id")
-	require.NotEmpty(t, row1.FirstRefreshTokenJti, "the family identifier must still be stamped")
+	require.False(t, row1.CodeID.Valid, "a ROPC refresh token must have no code_id")
+	require.NotEmpty(t, row1.FirstRefreshTokenJTI, "the family identifier must still be stamped")
 
 	rt2 := rotateRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt1)
 	require.False(t, refreshTokenRowByJti(t, rt2).Revoked, "the ROPC successor must start out live")
@@ -281,13 +281,13 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
 	assertRefusedAsInvalidGrant(t, status, body, "the first replay")
 
-	before, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	before, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, before)
 	snapshot := make(map[int64]record.RefreshToken, len(before))
 	for _, rt := range before {
-		require.Truef(t, rt.Revoked, "every family member must be revoked after the first replay (id %d)", rt.Id)
-		snapshot[rt.Id] = *rt
+		require.Truef(t, rt.Revoked, "every family member must be revoked after the first replay (id %d)", rt.ID)
+		snapshot[rt.ID] = *rt
 	}
 
 	// Second replay of the same token, and a replay of the already-contained successor.
@@ -296,16 +296,16 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	status, body = replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt2)
 	assertRefusedAsInvalidGrant(t, status, body, "a replay of the contained successor")
 
-	after, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	after, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	require.Len(t, after, len(before), "no row may be added or removed by a repeated replay")
 
 	for _, rt := range after {
-		was, ok := snapshot[rt.Id]
-		require.Truef(t, ok, "unexpected new refresh token row %d", rt.Id)
-		assert.Equalf(t, was.Revoked, rt.Revoked, "row %d changed its revoked state", rt.Id)
+		was, ok := snapshot[rt.ID]
+		require.Truef(t, ok, "unexpected new refresh token row %d", rt.ID)
+		assert.Equalf(t, was.Revoked, rt.Revoked, "row %d changed its revoked state", rt.ID)
 		assert.Truef(t, was.UpdatedAt.Time.Equal(rt.UpdatedAt.Time),
 			"row %d was written again by a no-op containment (updated_at %v -> %v)",
-			rt.Id, was.UpdatedAt.Time, rt.UpdatedAt.Time)
+			rt.ID, was.UpdatedAt.Time, rt.UpdatedAt.Time)
 	}
 }

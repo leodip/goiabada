@@ -74,7 +74,7 @@ func assertSignOutPagesDrawnIn(t *testing.T, query url.Values, brand *record.Bra
 
 func TestSignOutPages_ASignOutNamingItsClientByClientIdIsDrawnInTheClientsBrand(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, _ := brandSignInClient(t, record.AcrLevel1)
+	client, _ := brandSignInClient(t, record.ACRLevel1)
 	clientBrand := giveClientBrand(t, client, record.BrandAppearanceLight, "avocado")
 
 	assertSignOutPagesDrawnIn(t, url.Values{"client_id": {client.ClientIdentifier}}, clientBrand, "light")
@@ -84,7 +84,7 @@ func TestSignOutPages_ASignOutNamingItsClientByClientIdIsDrawnInTheClientsBrand(
 // the request: a decline is not a sign-out and hands the app nothing.
 func TestSignOutPages_TheDecliningLinkCarriesTheClientForItsBrand(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, _ := brandSignInClient(t, record.AcrLevel1)
+	client, _ := brandSignInClient(t, record.ACRLevel1)
 	giveClientBrand(t, client, record.BrandAppearanceLight, "avocado")
 
 	page, query := signOutDeclinedPage(t, url.Values{
@@ -120,9 +120,9 @@ func TestSignOutPages_ASignOutWithAValidHintIsDrawnInTheClientsBrand(t *testing.
 // client with no brand of its own.
 func TestSignOutPages_StayInTheDefaultBrandWhenNoClientIsNamed(t *testing.T) {
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	branded, _ := brandSignInClient(t, record.AcrLevel1)
+	branded, _ := brandSignInClient(t, record.ACRLevel1)
 	giveClientBrand(t, branded, record.BrandAppearanceLight, "avocado")
-	plain, _ := brandSignInClient(t, record.AcrLevel1)
+	plain, _ := brandSignInClient(t, record.ACRLevel1)
 
 	for _, tc := range []struct {
 		name  string

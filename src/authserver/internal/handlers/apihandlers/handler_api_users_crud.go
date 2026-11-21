@@ -51,8 +51,8 @@ type usersCrudDatabase interface {
 
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 }
@@ -78,7 +78,7 @@ func HandleUserGet(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -137,7 +137,7 @@ func HandleUserPasswordPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -161,7 +161,7 @@ func HandleUserPasswordPut(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -190,8 +190,8 @@ func HandleUserPasswordPut(
 		// (#784 decision 3).
 		var replaced *record.User
 		notice := userWideNotice(settings, user)
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", notice, func(tx *sql.Tx) error {
-			current, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.ID, "", notice, func(tx *sql.Tx) error {
+			current, readErr := database.GetUserByIDForUpdate(r.Context(), tx, user.ID)
 			if readErr != nil {
 				return readErr
 			}
@@ -199,7 +199,7 @@ func HandleUserPasswordPut(
 			if current == nil {
 				return errAccountGone
 			}
-			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
+			return database.SetUserPasswordHash(r.Context(), tx, user.ID, passwordHash)
 		})
 		if errors.Is(err, errAccountGone) {
 			// Another request deleted the user after this one read them: this one wrote nothing.
@@ -230,15 +230,15 @@ func HandleUserPasswordPut(
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserAuthentication, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": loggedInUser,
 		})
-		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.ID,
 			revocation.ReasonAdminPasswordSet, loggedInUser, result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -296,7 +296,7 @@ func HandleUserOTPPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -313,7 +313,7 @@ func HandleUserOTPPut(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -328,7 +328,7 @@ func HandleUserOTPPut(
 		if !removed {
 			// The authenticator is no longer as this request read it, or the user is gone: answered
 			// from a re-read, with nothing written and nothing audited (#471 decision 2).
-			writeLostOTPChange(w, r, database, user.Id, false)
+			writeLostOTPChange(w, r, database, user.ID, false)
 			return
 		}
 
@@ -341,12 +341,12 @@ func HandleUserOTPPut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -573,7 +573,7 @@ func HandleUserCreatePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"user_id":        createdUser.Id,
+			"user_id":        createdUser.ID,
 			"email_digest":   hashutil.HashString(createdUser.Email),
 			"logged_in_user": loggedInUser,
 		})
@@ -592,7 +592,7 @@ func HandleUserCreatePost(
 			if err != nil {
 				sent = false
 				slog.ErrorContext(r.Context(), "unable to send the setup email of a new user",
-					"user_id", createdUser.Id, "error", err)
+					"user_id", createdUser.ID, "error", err)
 			}
 			response.SetupEmailSent = &sent
 		}
@@ -673,7 +673,7 @@ func HandleUserEnabledPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -684,7 +684,7 @@ func HandleUserEnabledPut(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -737,7 +737,7 @@ func HandleUserEnabledPut(
 				if lockErr != nil {
 					return lockErr
 				}
-				locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
 				if lockedErr != nil {
 					return errs.Wrap(lockedErr, "unable to read the user under its lock")
 				}
@@ -782,7 +782,7 @@ func HandleUserEnabledPut(
 			// enabled, whose request keeps its answer and event (#796 decision 3). Safe to rerun:
 			// the compare-and-set asks the row again.
 			err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-				locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+				locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
 				if lockedErr != nil {
 					return errs.Wrap(lockedErr, "unable to read the user under its lock")
 				}
@@ -824,7 +824,7 @@ func HandleUserEnabledPut(
 		}
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
+		updatedUser, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -871,7 +871,7 @@ func HandleUserDelete(
 		}
 
 		// Check if user exists before deleting
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -883,7 +883,7 @@ func HandleUserDelete(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -914,7 +914,7 @@ func HandleUserDelete(
 			if lockErr != nil {
 				return lockErr
 			}
-			locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+			locked, lockedErr := database.GetUserByIDForUpdate(r.Context(), tx, userId)
 			if lockedErr != nil {
 				return errs.Wrap(lockedErr, "unable to read the user under its lock")
 			}

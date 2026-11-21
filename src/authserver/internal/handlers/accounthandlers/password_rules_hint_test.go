@@ -75,7 +75,7 @@ func TestPasswordForms_ShowTheNistHint(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		store := newMarkerTestStore()
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), "the-code-hash").
-			Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 		rendered := captureRendered(pageRenderer, "/reset_password.html")
 
 		sent := withMarker(t, store, withNistPolicy(resetCleanGetRequest()), emaillinks.LinkMarkerFlowResetPassword, 1, "the-code-hash")

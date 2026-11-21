@@ -26,7 +26,7 @@ func createTestClientWithRedirect(t *testing.T) (*record.Client, *record.Redirec
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {

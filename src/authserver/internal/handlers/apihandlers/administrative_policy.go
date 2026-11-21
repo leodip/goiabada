@@ -73,7 +73,7 @@ const (
 // permissions.AdministrativePermissions's port. Every handler a ceiling guards names it in its own
 // port.
 type administrativePolicyDatabase interface {
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 }
 
@@ -81,22 +81,22 @@ type administrativePolicyDatabase interface {
 // or a group's deletion: the administrative set, and what the groups hold.
 type administrativeGroupPolicyDatabase interface {
 	administrativePolicyDatabase
-	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
+	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
 }
 
 // userGroupsPolicyDatabase is what the policy reads to judge a save of a user's groups: beside
 // what the groups hold, the memberships the user has.
 type userGroupsPolicyDatabase interface {
 	administrativeGroupPolicyDatabase
-	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
 }
 
 // userTargetPolicyDatabase is what the policy reads to judge a write on a user: the administrative
 // set, the permissions the user holds directly, and those its groups hold.
 type userTargetPolicyDatabase interface {
 	administrativeGroupPolicyDatabase
-	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
-	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 }
 
 // callerHoldsManage reports whether the request's validated token carries authserver:manage.
@@ -297,7 +297,7 @@ type administrativeGroup struct {
 // each with what it holds of the administrative set. Read on tx, or outside any transaction when tx
 // is nil; a set of groups holding no grant at all reads nothing more.
 func administrativeGroups(ctx context.Context, database administrativeGroupPolicyDatabase, tx *sql.Tx, groupIds []int64) ([]administrativeGroup, error) {
-	grants, err := database.GetGroupPermissionsByGroupIds(ctx, tx, groupIds)
+	grants, err := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIds)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the groups' permissions for the administrative policy")
 	}
@@ -311,17 +311,17 @@ func administrativeGroups(ctx context.Context, database administrativeGroupPolic
 
 	held := make(map[int64]*administrativeGroup)
 	for _, grant := range grants {
-		identifier := administrative[grant.PermissionId]
+		identifier := administrative[grant.PermissionID]
 		if identifier == "" {
 			continue
 		}
-		group := held[grant.GroupId]
+		group := held[grant.GroupID]
 		if group == nil {
-			group = &administrativeGroup{id: grant.GroupId}
-			held[grant.GroupId] = group
+			group = &administrativeGroup{id: grant.GroupID}
+			held[grant.GroupID] = group
 		}
-		if !slices.Contains(group.permissionIds, grant.PermissionId) {
-			group.permissionIds = append(group.permissionIds, grant.PermissionId)
+		if !slices.Contains(group.permissionIds, grant.PermissionID) {
+			group.permissionIds = append(group.permissionIds, grant.PermissionID)
 			group.identifiers = append(group.identifiers, identifier)
 		}
 	}
@@ -413,14 +413,14 @@ func userGroupsCeilingAllows(w http.ResponseWriter, r *http.Request, database us
 
 	judged, left := grantedAndRevoked(wanted, expected)
 	if len(left) > 0 {
-		stored, err := database.GetUserGroupsByUserId(r.Context(), nil, userId)
+		stored, err := database.GetUserGroupsByUserID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "unable to read the user's groups for the administrative policy"), "user_id", userId)
 			return false
 		}
 		belongs := make(map[int64]bool, len(stored))
 		for _, membership := range stored {
-			belongs[membership.GroupId] = true
+			belongs[membership.GroupID] = true
 		}
 		for _, groupId := range left {
 			if belongs[groupId] {
@@ -502,7 +502,7 @@ func backchannelLogoutURICeilingAllows(w http.ResponseWriter, r *http.Request, a
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingBackchannelLogoutURI,
 		targetKind: targetKindClient,
-		targetId:   client.Id,
+		targetId:   client.ID,
 	})
 	return false
 }
@@ -511,29 +511,29 @@ func backchannelLogoutURICeilingAllows(w http.ResponseWriter, r *http.Request, a
 // through any of its groups. Read on tx, or outside any transaction when tx is nil; a user holding
 // no grant at all, directly or through a group, reads nothing more.
 func userIsAdministrator(ctx context.Context, database userTargetPolicyDatabase, tx *sql.Tx, userId int64) (bool, error) {
-	direct, err := database.GetUserPermissionsByUserId(ctx, tx, userId)
+	direct, err := database.GetUserPermissionsByUserID(ctx, tx, userId)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's permissions for the administrative policy")
 	}
-	memberships, err := database.GetUserGroupsByUserId(ctx, tx, userId)
+	memberships, err := database.GetUserGroupsByUserID(ctx, tx, userId)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's groups for the administrative policy")
 	}
 	held := make([]int64, 0, len(direct))
 	for _, grant := range direct {
-		held = append(held, grant.PermissionId)
+		held = append(held, grant.PermissionID)
 	}
 	if len(memberships) > 0 {
 		groupIds := make([]int64, 0, len(memberships))
 		for _, membership := range memberships {
-			groupIds = append(groupIds, membership.GroupId)
+			groupIds = append(groupIds, membership.GroupID)
 		}
-		grants, groupErr := database.GetGroupPermissionsByGroupIds(ctx, tx, groupIds)
+		grants, groupErr := database.GetGroupPermissionsByGroupIDs(ctx, tx, groupIds)
 		if groupErr != nil {
 			return false, errs.Wrap(groupErr, "unable to read the user's groups' permissions for the administrative policy")
 		}
 		for _, grant := range grants {
-			held = append(held, grant.PermissionId)
+			held = append(held, grant.PermissionID)
 		}
 	}
 	if len(held) == 0 {
@@ -622,7 +622,7 @@ func groupTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database a
 // administrative set and the permissions the client holds.
 type clientTargetPolicyDatabase interface {
 	administrativePolicyDatabase
-	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
+	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
 }
 
 // clientIsAdministrator reports whether the client is an administrator: the admin console's own
@@ -638,7 +638,7 @@ func clientIsAdministrator(ctx context.Context, database clientTargetPolicyDatab
 	if client.IsSystemLevelClient() || client.MayRequestAdministrativeScopes() {
 		return true, nil
 	}
-	grants, err := database.GetClientPermissionsByClientId(ctx, nil, client.Id)
+	grants, err := database.GetClientPermissionsByClientID(ctx, nil, client.ID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the client's permissions for the administrative policy")
 	}
@@ -651,7 +651,7 @@ func clientIsAdministrator(ctx context.Context, database clientTargetPolicyDatab
 		return false, err
 	}
 	for _, grant := range grants {
-		if administrative[grant.PermissionId] != "" {
+		if administrative[grant.PermissionID] != "" {
 			return true, nil
 		}
 	}
@@ -677,7 +677,7 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 
 	administrator, err := clientIsAdministrator(r.Context(), database, client)
 	if err != nil {
-		writeInternalServerError(w, r, err, "client_id", client.Id)
+		writeInternalServerError(w, r, err, "client_id", client.ID)
 		return false
 	}
 	if !administrator {
@@ -687,7 +687,7 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.Id,
+		targetId:   client.ID,
 	})
 	return false
 }
@@ -697,14 +697,14 @@ func clientTargetCeilingAllows(w http.ResponseWriter, r *http.Request, database 
 // resource's tokens.
 type clientCredentialsPolicyDatabase interface {
 	clientTargetPolicyDatabase
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 }
 
 // clientIntrospectsAuthServer reports whether the authserver resource is among the client's
 // introspection resources. Read outside any transaction; a client with no list reads nothing more.
 func clientIntrospectsAuthServer(ctx context.Context, database clientCredentialsPolicyDatabase, client *record.Client) (bool, error) {
-	links, err := database.GetClientIntrospectionResourcesByClientId(ctx, nil, client.Id)
+	links, err := database.GetClientIntrospectionResourcesByClientID(ctx, nil, client.ID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the client's introspection resources for the administrative policy")
 	}
@@ -719,7 +719,7 @@ func clientIntrospectsAuthServer(ctx context.Context, database clientCredentials
 		return false, errs.New("the authserver resource is missing")
 	}
 	for _, link := range links {
-		if link.ResourceId == authServer.Id {
+		if link.ResourceID == authServer.ID {
 			return true, nil
 		}
 	}
@@ -748,7 +748,7 @@ func clientCredentialsCeilingAllows(w http.ResponseWriter, r *http.Request, data
 
 	introspects, err := clientIntrospectsAuthServer(r.Context(), database, client)
 	if err != nil {
-		writeInternalServerError(w, r, err, "client_id", client.Id)
+		writeInternalServerError(w, r, err, "client_id", client.ID)
 		return false
 	}
 	if !introspects {
@@ -758,7 +758,7 @@ func clientCredentialsCeilingAllows(w http.ResponseWriter, r *http.Request, data
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.Id,
+		targetId:   client.ID,
 	})
 	return false
 }
@@ -783,8 +783,8 @@ func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	}
 	var causes []int64
 	for _, resource := range wanted {
-		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier && !listed[resource.Id] {
-			causes = append(causes, resource.Id)
+		if resource.ResourceIdentifier == builtin.AuthServerResourceIdentifier && !listed[resource.ID] {
+			causes = append(causes, resource.ID)
 		}
 	}
 	if len(causes) == 0 || callerHoldsManage(r) {
@@ -794,7 +794,7 @@ func introspectionResourceCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:     ceilingGrant,
 		targetKind:  targetKindClient,
-		targetId:    client.Id,
+		targetId:    client.ID,
 		resourceIds: causes,
 	})
 	return false
@@ -812,7 +812,7 @@ func allowanceCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:    ceilingTarget,
 		targetKind: targetKindClient,
-		targetId:   client.Id,
+		targetId:   client.ID,
 	})
 	return false
 }
@@ -840,7 +840,7 @@ func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	administrative := make(map[int64]bool)
 	for _, permission := range stored {
 		if permissions.IsAdministrativeScope(resource.ResourceIdentifier + ":" + permission.PermissionIdentifier) {
-			administrative[permission.Id] = true
+			administrative[permission.ID] = true
 		}
 	}
 	loaded := make(map[int64]string, len(expected))
@@ -864,7 +864,7 @@ func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	refuseAdministratorChange(w, r, auditLogger, administratorChangeRefusal{
 		ceiling:       ceilingTarget,
 		targetKind:    targetKindResource,
-		targetId:      resource.Id,
+		targetId:      resource.ID,
 		permissionIds: causes,
 	})
 	return false

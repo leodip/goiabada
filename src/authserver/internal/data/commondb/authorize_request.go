@@ -20,7 +20,7 @@ var authorizeRequestColumns = columnList{
 // scanAuthorizeRequest reads one row selected with authorizeRequestColumns.
 func scanAuthorizeRequest(row rowScanner, authorizeRequest *record.AuthorizeRequest) error {
 	return row.Scan(
-		&authorizeRequest.Id,
+		&authorizeRequest.ID,
 		&authorizeRequest.CreatedAt,
 		&authorizeRequest.UpdatedAt,
 		&authorizeRequest.HandleHash,
@@ -98,7 +98,7 @@ func (d *Database) CreateAuthorizeRequest(ctx context.Context, tx *sql.Tx, autho
 		return err
 	}
 
-	authorizeRequest.Id = id
+	authorizeRequest.ID = id
 	return nil
 }
 
@@ -148,13 +148,13 @@ func (d *Database) GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.
 // The count is exact on all four engines: a DELETE reports the rows it removed, not the rows it
 // matched, so MySQL's changed-rows quirk does not reach it. Two overlapping claims of one row are
 // serialised by the engine's row lock on the DELETE, and the second finds no row to remove.
-func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error) {
+func (d *Database) ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestID int64) (bool, error) {
 
-	if authorizeRequestId == 0 {
+	if authorizeRequestID == 0 {
 		return false, errs.New("can't claim the authorize request with id 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, claimAuthorizeRequest.text(d.Dialect), authorizeRequestId)
+	result, err := d.ExecSQL(ctx, tx, claimAuthorizeRequest.text(d.Dialect), authorizeRequestID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim authorize request")
 	}

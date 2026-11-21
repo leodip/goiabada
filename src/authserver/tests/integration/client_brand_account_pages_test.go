@@ -85,7 +85,7 @@ func withCeremonyParameter(t *testing.T, target string, id string) string {
 func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *testing.T) {
 	useMailpitSMTP(t)
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, clientBrand, redirectURI := brandedSignInClient(t, record.AcrLevel1)
+	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 	browser := createHttpClient(t)
 	forgotURL, ceremonyId := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
 	wantBack := signInLink{"Back to sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()}
@@ -280,7 +280,7 @@ func TestActivationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *tes
 func TestResetPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *testing.T) {
 	useMailpitSMTP(t)
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, clientBrand, redirectURI := brandedSignInClient(t, record.AcrLevel1)
+	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 	user, _ := resetFromTheAppUser(t)
 	browser := createHttpClient(t)
 	ceremonyId, link := requestResetFromTheApp(t, browser, brandAuthorizeURL(client, redirectURI, ""), user.Email)

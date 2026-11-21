@@ -34,7 +34,7 @@ var columns000078 = []string{"privacy_policy_url", "terms_of_service_url"}
 //     clients that moved: each NOT NULL, defaulting to the empty string, with the type, nullability,
 //     default and collation website_url has on the same engine, the URL they are validated like.
 //  2. A client written without them reads back empty, and one written with them reads them back
-//     byte for byte through CreateClient, GetClientById and UpdateClient, at the 256 characters the
+//     byte for byte through CreateClient, GetClientByID and UpdateClient, at the 256 characters the
 //     admin API allows.
 //  3. The down migration restores clients to exactly the shape 000077 built, and 000078 applies
 //     again after it.
@@ -66,9 +66,9 @@ func TestMigration000078_ClientPrivacyAndTermsURLs(t *testing.T) {
 		require.NoError(t, err, "migrate to head for the round trips")
 	}
 
-	without := &record.Client{ClientIdentifier: "no-documents-" + fake.LetterN(6), DefaultAcrLevel: record.AcrLevel1}
+	without := &record.Client{ClientIdentifier: "no-documents-" + fake.LetterN(6), DefaultACRLevel: record.ACRLevel1}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, without))
-	read, err := h.DB.GetClientById(ctx, nil, without.Id)
+	read, err := h.DB.GetClientByID(ctx, nil, without.ID)
 	require.NoError(t, err)
 	require.NotNil(t, read)
 	assert.Empty(t, read.PrivacyPolicyURL, "a client written without a privacy policy URL reads back none")
@@ -80,12 +80,12 @@ func TestMigration000078_ClientPrivacyAndTermsURLs(t *testing.T) {
 	terms := "https://app.example.com/terms?lang=pt-BR&v=2"
 	with := &record.Client{
 		ClientIdentifier:  "with-documents-" + fake.LetterN(6),
-		DefaultAcrLevel:   record.AcrLevel1,
+		DefaultACRLevel:   record.ACRLevel1,
 		PrivacyPolicyURL:  privacy,
 		TermsOfServiceURL: terms,
 	}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, with))
-	read, err = h.DB.GetClientById(ctx, nil, with.Id)
+	read, err = h.DB.GetClientByID(ctx, nil, with.ID)
 	require.NoError(t, err)
 	assert.Equal(t, privacy, read.PrivacyPolicyURL)
 	assert.Equal(t, terms, read.TermsOfServiceURL)
@@ -93,7 +93,7 @@ func TestMigration000078_ClientPrivacyAndTermsURLs(t *testing.T) {
 	read.PrivacyPolicyURL = "https://app.example.com/privacy-v2"
 	read.TermsOfServiceURL = ""
 	require.NoError(t, h.DB.UpdateClient(ctx, nil, read))
-	updated, err := h.DB.GetClientById(ctx, nil, with.Id)
+	updated, err := h.DB.GetClientByID(ctx, nil, with.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "https://app.example.com/privacy-v2", updated.PrivacyPolicyURL, "UpdateClient writes the privacy policy URL")
 	assert.Empty(t, updated.TermsOfServiceURL, "UpdateClient clears the terms of service URL")

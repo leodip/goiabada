@@ -110,7 +110,7 @@ func TestHandleIssueGet_AnAnswerThatCannotBeWrittenIs500(t *testing.T) {
 
 		var order []string
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: f.authContext.RedirectURI}, nil).Once()
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: f.authContext.RedirectURI}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
 			Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()

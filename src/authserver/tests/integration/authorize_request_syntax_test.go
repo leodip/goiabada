@@ -271,7 +271,7 @@ func TestToken_AuthCode_MalformedCodeVerifierIsRefusedAndTheCodeStaysRedeemable(
 
 			assertTokenRefusal(t, status, body, http.StatusBadRequest, "invalid_grant", description)
 
-			stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+			stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 			require.NoError(t, err)
 			assert.False(t, stored.Used, "a verifier that is not one must not consume the code")
 		})

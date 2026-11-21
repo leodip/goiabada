@@ -112,7 +112,7 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	assert.Equal(t, 1, successes, "exactly one concurrent redemption may succeed")
 
 	// The code must be durably consumed.
-	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+	stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.Used, "the code must be marked used after the race")
 }

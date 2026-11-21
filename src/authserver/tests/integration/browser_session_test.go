@@ -232,7 +232,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	level1Id := decodeSessionIdentifier(t, level1Cookie)
 
 	// A second client, wanting level 2 from the same browser.
-	level2Client, level2RedirectUri := newClientAndRedirectUri(t, record.AcrLevel2Mandatory)
+	level2Client, level2RedirectUri := newClientAndRedirectUri(t, record.ACRLevel2Mandatory)
 
 	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectUri)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
@@ -419,7 +419,7 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 func newLevel1Actors(t *testing.T) (*record.Client, *record.RedirectURI, *record.User, string) {
 	t.Helper()
 
-	client, redirectUri := newClientAndRedirectUri(t, record.AcrLevel1)
+	client, redirectUri := newClientAndRedirectUri(t, record.ACRLevel1)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -436,7 +436,7 @@ func newLevel1Actors(t *testing.T) (*record.Client, *record.RedirectURI, *record
 	return client, redirectUri, user, password
 }
 
-func newClientAndRedirectUri(t *testing.T, acrLevel record.AcrLevel) (*record.Client, *record.RedirectURI) {
+func newClientAndRedirectUri(t *testing.T, acrLevel record.ACRLevel) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 
 	client := &record.Client{
@@ -444,11 +444,11 @@ func newClientAndRedirectUri(t *testing.T, acrLevel record.AcrLevel) (*record.Cl
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          acrLevel,
+		DefaultACRLevel:          acrLevel,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	return client, redirectUri

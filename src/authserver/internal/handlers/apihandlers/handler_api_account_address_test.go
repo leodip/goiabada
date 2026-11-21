@@ -81,7 +81,7 @@ func TestHandleAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	user := &record.User{Id: 42, Subject: "the-subject"}
+	user := &record.User{ID: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
 	database.On("SetUserAddress", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnAddress, mock.Anything).Return().Once()

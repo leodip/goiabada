@@ -51,7 +51,7 @@ func stored(email, lang string, subject, buttonLabel, body *string) *record.Emai
 		return sql.NullString{String: *s, Valid: true}
 	}
 	return &record.EmailTemplate{
-		Id: 1, EmailTemplate: email, Language: lang,
+		ID: 1, EmailTemplate: email, Language: lang,
 		Subject: field(subject), ButtonLabel: field(buttonLabel), Body: field(body),
 	}
 }

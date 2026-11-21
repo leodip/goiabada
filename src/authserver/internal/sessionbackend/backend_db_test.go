@@ -57,9 +57,9 @@ func TestDatabaseBackend_Load(t *testing.T) {
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow.Add(-time.Minute),
 			ExpiresAt:     fixedNow.Add(time.Hour),
-			SessionIdHash: hashutil.HashString(id),
+			SessionIDHash: hashutil.HashString(id),
 		}
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(row, nil)
 
 		stored, err := testBackend(database, owner).Load(context.Background(), id)
@@ -72,7 +72,7 @@ func TestDatabaseBackend_Load(t *testing.T) {
 
 	t.Run("maps an absent row to not found", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, nil)
 
 		stored, err := testBackend(database, owner).Load(context.Background(), id)
@@ -84,7 +84,7 @@ func TestDatabaseBackend_Load(t *testing.T) {
 	t.Run("wraps a failed read", func(t *testing.T) {
 		cause := errors.New("read failed")
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hashutil.HashString(id), fixedNow).
 			Return(nil, cause)
 
 		stored, err := testBackend(database, owner).Load(context.Background(), id)
@@ -112,8 +112,8 @@ func TestDatabaseBackend_Create(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *record.BrowserSession) bool {
 				return row.Owner == owner &&
-					row.SessionId == id &&
-					row.SessionIdHash == hashutil.HashString(id) &&
+					row.SessionID == id &&
+					row.SessionIDHash == hashutil.HashString(id) &&
 					row.Data == "ciphertext" &&
 					row.LastAccessed.Equal(fixedNow) &&
 					row.ExpiresAt.Equal(tc.wantExpiry)
@@ -149,7 +149,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 
 	t.Run("authenticated reads created at", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().UpdateBrowserSessionData(mock.Anything, (*sql.Tx)(nil), owner, hash, "ciphertext", fixedNow, wantExpiry).
 			Return(true, nil)
@@ -162,7 +162,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 
 	t.Run("absent write is not found", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().UpdateBrowserSessionData(mock.Anything, (*sql.Tx)(nil), owner, hash, "ciphertext", fixedNow, wantExpiry).
 			Return(false, nil)
@@ -175,7 +175,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 	t.Run("failed pre-read wraps", func(t *testing.T) {
 		cause := errors.New("pre-read failed")
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(nil, cause)
 
 		_, err := testBackend(database, owner).Update(settingsContext(), id, []byte("ciphertext"), true)
@@ -186,7 +186,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 
 	t.Run("absent pre-read is not found", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(nil, nil)
 
 		_, err := testBackend(database, owner).Update(settingsContext(), id, []byte("ciphertext"), true)
@@ -205,8 +205,8 @@ func TestDatabaseBackend_Update(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, want, expiresAt)
-		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIdHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIDHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("write failure wraps its cause", func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 
 	t.Run("authenticated reads created at", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().TouchBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow, wantExpiry).Return(true, nil)
 
@@ -245,7 +245,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 
 	t.Run("absent write is not found", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(&record.BrowserSession{CreatedAt: sql.NullTime{Time: createdAt, Valid: true}}, nil)
 		database.EXPECT().TouchBrowserSession(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow, wantExpiry).Return(false, nil)
 
@@ -257,7 +257,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 	t.Run("failed pre-read wraps", func(t *testing.T) {
 		cause := errors.New("pre-read failed")
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(nil, cause)
 
 		_, err := testBackend(database, owner).Touch(settingsContext(), id, true)
@@ -268,7 +268,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 
 	t.Run("absent pre-read is not found", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 			Return(nil, nil)
 
 		_, err := testBackend(database, owner).Touch(settingsContext(), id, true)
@@ -286,8 +286,8 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, want, expiresAt)
-		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIdHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIDHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("write failure wraps its cause", func(t *testing.T) {
@@ -336,7 +336,7 @@ func TestDatabaseBackend_InvalidCreatedAtFallsBackToNow(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
+			database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, hash, fixedNow).
 				Return(&record.BrowserSession{CreatedAt: sql.NullTime{Valid: false}}, nil)
 			tc.write(database)
 
@@ -357,12 +357,12 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 2*time.Hour, idle)
 		assert.Equal(t, 90*time.Minute, maximum)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("reads settings without a request value", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(testSettings(), nil)
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(testSettings(), nil)
 
 		idle, maximum, err := testBackend(database, "owner").lifetimes(context.Background())
 
@@ -373,7 +373,7 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 
 	t.Run("missing settings is an error", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil)
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil)
 
 		_, _, err := testBackend(database, "owner").lifetimes(context.Background())
 
@@ -384,7 +384,7 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 	t.Run("failed settings read wraps", func(t *testing.T) {
 		cause := errors.New("settings failed")
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, cause)
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, cause)
 
 		_, _, err := testBackend(database, "owner").lifetimes(context.Background())
 
@@ -435,7 +435,7 @@ func TestDatabaseBackend_DigestVectorsReachTheDatabase(t *testing.T) {
 	} {
 		t.Run(tc.id, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), "owner", tc.digest, fixedNow).
+			database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), "owner", tc.digest, fixedNow).
 				Return(nil, nil)
 
 			_, err := testBackend(database, "owner").Load(context.Background(), tc.id)
@@ -454,7 +454,7 @@ func TestDatabaseBackend_OnlyDigestsReachStringArguments(t *testing.T) {
 
 	t.Run("load", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), owner, digest, fixedNow).Return(nil, nil)
+		database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), owner, digest, fixedNow).Return(nil, nil)
 		_, _ = testBackend(database, owner).Load(context.Background(), id)
 	})
 	t.Run("update", func(t *testing.T) {
@@ -477,7 +477,7 @@ func TestDatabaseBackend_OnlyDigestsReachStringArguments(t *testing.T) {
 	t.Run("create carries the digest in the model", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.EXPECT().CreateBrowserSession(mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(row *record.BrowserSession) bool {
-			return row.SessionId == id && row.SessionIdHash == digest
+			return row.SessionID == id && row.SessionIDHash == digest
 		})).Return(nil)
 		_, _ = testBackend(database, owner).Create(settingsContext(), id, []byte("data"), false)
 	})
@@ -503,7 +503,7 @@ func TestDatabaseBackend_ConstructorsFixEveryOperationOwner(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Run("load", func(t *testing.T) {
 				database := datamocks.NewDatabase(t)
-				database.EXPECT().GetBrowserSessionByOwnerAndSessionIdHash(mock.Anything, (*sql.Tx)(nil), tc.owner, mock.Anything, mock.Anything).Return(nil, nil)
+				database.EXPECT().GetBrowserSessionByOwnerAndSessionIDHash(mock.Anything, (*sql.Tx)(nil), tc.owner, mock.Anything, mock.Anything).Return(nil, nil)
 				_, _ = tc.new(database).Load(context.Background(), "id")
 			})
 			t.Run("create", func(t *testing.T) {

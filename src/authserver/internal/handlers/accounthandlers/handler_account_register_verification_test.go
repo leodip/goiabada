@@ -157,11 +157,11 @@ func registrationAddressCases() []struct {
 	}{
 		{name: "an address with no account and nothing pending"},
 		{name: "a verified, enabled account",
-			user: &record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}},
+			user: &record.User{ID: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}},
 		{name: "an unverified account",
-			user: &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail}},
+			user: &record.User{ID: 7, Enabled: true, Email: registerSomeoneEmail}},
 		{name: "a disabled account",
-			user: &record.User{Id: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail}},
+			user: &record.User{ID: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail}},
 		{name: "a pending registration",
 			preRegistration: pendingRegistrationIssuedAgo(time.Minute)},
 	}
@@ -210,19 +210,19 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 	}{
 		{
 			name: "an unverified account",
-			user: &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail},
+			user: &record.User{ID: 7, Enabled: true, Email: registerSomeoneEmail},
 			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
 				"user_id": int64(7), "outcome": "unverified_address"},
 		},
 		{
 			name: "a disabled account with a verified address",
-			user: &record.User{Id: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail},
+			user: &record.User{ID: 7, Enabled: false, EmailVerified: true, Email: registerSomeoneEmail},
 			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
 				"user_id": int64(7), "outcome": "account_disabled"},
 		},
 		{
 			name: "a disabled account with an unverified address",
-			user: &record.User{Id: 7, Enabled: false, Email: registerSomeoneEmail},
+			user: &record.User{ID: 7, Enabled: false, Email: registerSomeoneEmail},
 			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
 				"user_id": int64(7), "outcome": "account_disabled"},
 		},
@@ -235,7 +235,7 @@ func TestHandleRegisterPost_WithVerificationTheJobSendsNothingButALinkOrANotice(
 		{
 			// The account decides, and the pending registration found beside it is named.
 			name:            "an unverified account with a pending registration beside it",
-			user:            &record.User{Id: 7, Enabled: true, Email: registerSomeoneEmail},
+			user:            &record.User{ID: 7, Enabled: true, Email: registerSomeoneEmail},
 			preRegistration: pendingRegistrationIssuedAgo(time.Minute),
 			wantDetails: map[string]interface{}{"ip": testClientIP, "email_digest": someoneDigest,
 				"user_id": int64(7), "pre_registration_id": int64(42), "outcome": "unverified_address"},
@@ -277,7 +277,7 @@ func TestHandleRegisterPost_WithVerificationANewAddressIsGivenAPendingRegistrati
 	h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.PreRegistration")).
 		Run(func(args mock.Arguments) {
 			created = args.Get(2).(*record.PreRegistration)
-			created.Id = 42
+			created.ID = 42
 			order = append(order, "create")
 		}).Return(nil).Once()
 	details, _ := captureRequestedRegistration(h.auditLogger, &order)
@@ -371,7 +371,7 @@ func TestHandleRegisterPost_WithVerificationTheActivationMailTakesThePageLanguag
 			h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil),
 				mock.AnythingOfType("*record.PreRegistration")).
 				Run(func(args mock.Arguments) {
-					args.Get(2).(*record.PreRegistration).Id = 42
+					args.Get(2).(*record.PreRegistration).ID = 42
 				}).Return(nil).Once()
 			captureRequestedRegistration(h.auditLogger, nil)
 
@@ -431,7 +431,7 @@ func TestHandleRegisterPost_WithVerificationAVerifiedEnabledAccountIsSentTheNoti
 			req = req.WithContext(ctx)
 			rr := httptest.NewRecorder()
 
-			user := &record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail,
+			user := &record.User{ID: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail,
 				PageLanguage: tc.pageLanguage, Locale: tc.locale}
 			h.expectLookups(registerSomeoneEmail, user, nil)
 			h.expectCheckEmailPage(rr, req)
@@ -563,7 +563,7 @@ func TestHandleRegisterPost_WithVerificationAFailedLookupIsAServerError(t *testi
 
 		h.emailValidator.On("ValidateEmailAddress", registerSomeoneEmail).Return(nil).Once()
 		h.database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), registerSomeoneEmail).
-			Return(&record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}, nil).Once()
+			Return(&record.User{ID: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}, nil).Once()
 		h.database.On("GetPreRegistrationByEmail", mock.Anything, (*sql.Tx)(nil), registerSomeoneEmail).
 			Return(nil, assert.AnError).Once()
 		h.pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
@@ -620,7 +620,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		h.expectLookups(registerSomeoneEmail, nil, nil)
 		h.expectCheckEmailPage(rr, req)
 		h.database.On("CreatePreRegistration", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-			Run(func(args mock.Arguments) { args.Get(2).(*record.PreRegistration).Id = 42 }).Return(nil).Once()
+			Run(func(args mock.Arguments) { args.Get(2).(*record.PreRegistration).ID = 42 }).Return(nil).Once()
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
 		h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.ActivationLink, mock.Anything).
 			Return(emailtemplate.Message{Subject: "Activate your account", HTML: "<p>x</p>"}, nil).Once()
@@ -642,7 +642,7 @@ func TestHandleRegisterPost_WithVerificationTheJobsFaultsAreErrorRecords(t *test
 		rr := httptest.NewRecorder()
 
 		h.expectLookups(registerSomeoneEmail,
-			&record.User{Id: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}, nil)
+			&record.User{ID: 7, Enabled: true, EmailVerified: true, Email: registerSomeoneEmail}, nil)
 		h.expectCheckEmailPage(rr, req)
 		details, _ := captureRequestedRegistration(h.auditLogger, nil)
 		h.pageRenderer.On("RenderEmail", mock.Anything, emailtemplate.RegistrationExistingAccount, mock.Anything).
@@ -678,7 +678,7 @@ func TestHandleRegisterPost_WithoutVerificationRecordsNoRequestedRegistration(t 
 	rr := httptest.NewRecorder()
 
 	h.emailValidator.On("ValidateEmailAddress", "existing@example.com").Return(nil).Once()
-	h.database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&record.User{Id: 7}, nil).Once()
+	h.database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&record.User{ID: 7}, nil).Once()
 	var bound map[string]interface{}
 	h.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).
 		Run(func(args mock.Arguments) { bound = args.Get(4).(map[string]interface{}) }).Return(nil).Once()

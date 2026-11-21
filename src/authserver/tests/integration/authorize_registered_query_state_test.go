@@ -153,13 +153,13 @@ func newRegisteredQueryClient(t *testing.T) (*record.Client, *record.User, strin
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      registeredQueryRedirectURI,
 	})
 	require.NoError(t, err)

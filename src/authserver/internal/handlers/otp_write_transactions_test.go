@@ -24,5 +24,5 @@ func expectOTPWriteTransactions(database *datamocks.Database) {
 
 // expectUserRowLocked answers the locking read of user's row inside otpWriteTx with held.
 func expectUserRowLocked(database *datamocks.Database, held *record.User) {
-	database.On("GetUserByIdForUpdate", mock.Anything, otpWriteTx, held.Id).Return(held, nil).Maybe()
+	database.On("GetUserByIDForUpdate", mock.Anything, otpWriteTx, held.ID).Return(held, nil).Maybe()
 }

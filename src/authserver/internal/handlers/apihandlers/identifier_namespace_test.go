@@ -49,12 +49,12 @@ func TestIdentifierNamespaces_AFailedLookupInTheOtherNamespaceWritesNothing(t *t
 			serve: func(t *testing.T, database *datamocks.Database) *httptest.ResponseRecorder {
 				// The settings save checks a changed identifier under the client's row, on its
 				// transaction (#710 decision 4).
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-					Return(&record.Client{Id: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}, nil).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+					Return(&record.Client{ID: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}, nil).Once()
 				datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 				database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-				database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-					Return(&record.Client{Id: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}, nil).Once()
+				database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+					Return(&record.Client{ID: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "renamed").Return(nil, nil).Once()
 				database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "renamed").Return(nil, boom).Once()
 				rr := httptest.NewRecorder()
@@ -78,8 +78,8 @@ func TestIdentifierNamespaces_AFailedLookupInTheOtherNamespaceWritesNothing(t *t
 		{
 			name: "resource update with a changed identifier",
 			serve: func(t *testing.T, database *datamocks.Database) *httptest.ResponseRecorder {
-				database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(5)).
-					Return(&record.Resource{Id: 5, ResourceIdentifier: "a-resource", Description: "A resource"}, nil).Once()
+				database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), int64(5)).
+					Return(&record.Resource{ID: 5, ResourceIdentifier: "a-resource", Description: "A resource"}, nil).Once()
 				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "renamed").Return(nil, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "renamed").Return(nil, boom).Once()
 				r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/5",

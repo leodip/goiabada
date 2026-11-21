@@ -61,22 +61,22 @@ func newManageAccountConsentFixture(t *testing.T, administrativeScopesAllowed bo
 		AuthorizationCodeEnabled:    true,
 		ImplicitGrantEnabled:        &implicit,
 		ConsentRequired:             false,
-		DefaultAcrLevel:             record.AcrLevel1,
+		DefaultACRLevel:             record.ACRLevel1,
 		ClientSecretEncrypted:       clientSecretEncrypted,
 		AdministrativeScopesAllowed: administrativeScopesAllowed,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{ClientId: client.Id, URI: manageAccountRedirectURI}))
+		&record.RedirectURI{ClientID: client.ID, URI: manageAccountRedirectURI}))
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 
 	return &manageAccountConsentFixture{
 		client: client, clientSecret: clientSecret, user: user, password: password, browser: createHttpClient(t),
@@ -131,7 +131,7 @@ func (f *manageAccountConsentFixture) signIn(t *testing.T) {
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	require.Contains(t, resp.Header.Get("Location"), "code=", "the sign-in completes with a code")
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, f.user.ID, f.client.ID)
 	require.NoError(t, err)
 	require.Nil(t, consent, "the sign-in leaves no stored consent")
 }
@@ -195,7 +195,7 @@ func scopesOnScreen(t *testing.T, page *http.Response) []string {
 // storedConsentScope is the scope of the user's stored consent to the client, or "" for none.
 func (f *manageAccountConsentFixture) storedConsentScope(t *testing.T) string {
 	t.Helper()
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, f.user.ID, f.client.ID)
 	require.NoError(t, err)
 	if consent == nil {
 		return ""
@@ -232,7 +232,7 @@ func (f *manageAccountConsentFixture) assertTheAccountAPIAccepts(t *testing.T, a
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var profile api.GetUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&profile))
-	assert.Equal(t, f.user.Id, profile.User.ID)
+	assert.Equal(t, f.user.ID, profile.User.ID)
 }
 
 // assertAnswered holds /auth/issue's or /auth/authorize's response to the client's callback with

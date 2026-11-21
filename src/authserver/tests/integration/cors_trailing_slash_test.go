@@ -31,9 +31,9 @@ func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 			Enabled:          true,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
-		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+		defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 		require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
-			ClientId: client.Id,
+			ClientID: client.ID,
 			Origin:   origin,
 		}))
 

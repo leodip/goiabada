@@ -95,10 +95,10 @@ func HandleAccountEmailVerificationSendPost(
 		// and mails it. The check alone let all of them through, and the account chooses the
 		// address the mail goes to (#404).
 		issuedAt := time.Now().UTC()
-		claimed, err := database.TryStoreEmailVerificationCode(r.Context(), nil, user.Id, user.Email, encrypted,
+		claimed, err := database.TryStoreEmailVerificationCode(r.Context(), nil, user.ID, user.Email, encrypted,
 			issuedAt, issuedAt.Add(-emailVerificationCodeLifetime))
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to store the verification code"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to store the verification code"), "user_id", user.ID)
 			return
 		}
 		if !claimed {
@@ -129,7 +129,7 @@ func HandleAccountEmailVerificationSendPost(
 		emailReq := r.WithContext(i18n.WithRecipientLanguage(r.Context(), user.PageLanguage, user.Locale))
 		message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.VerificationCode, values)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render the verification email"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to render the verification email"), "user_id", user.ID)
 			return
 		}
 
@@ -139,13 +139,13 @@ func HandleAccountEmailVerificationSendPost(
 			HtmlBody: message.HTML,
 		}
 		if _, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "Failed to send verification email"), "user_id", user.ID)
 			return
 		}
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventSentEmailVerificationMessage, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"email_digest":   hashutil.HashString(user.Email),
 			"logged_in_user": subject,
 		})
@@ -259,7 +259,7 @@ func HandleAccountEmailVerificationPost(
 			credentialFailures.RecordCredentialFailure(r)
 
 			auditLogger.Log(r.Context(), audit.EventFailedEmailVerificationCode, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"logged_in_user": subject,
 			})
 
@@ -281,7 +281,7 @@ func HandleAccountEmailVerificationPost(
 		// pending code that opens to the code just compared (#492 decision 11).
 		codeEncrypted := user.EmailVerificationCodeEncrypted
 		for attempt := 1; ; attempt++ {
-			verified, err := database.TryVerifyUserEmail(r.Context(), nil, user.Id, user.Email, codeEncrypted)
+			verified, err := database.TryVerifyUserEmail(r.Context(), nil, user.ID, user.Email, codeEncrypted)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -315,7 +315,7 @@ func HandleAccountEmailVerificationPost(
 		user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 		auditLogger.Log(r.Context(), audit.EventVerifiedEmail, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

@@ -50,20 +50,20 @@ func newReauthFixture(t *testing.T) *reauthFixture {
 	ctx := context.Background()
 	fx := &reauthFixture{password: fake.Password(12)}
 
-	newClient := func(level record.AcrLevel) (*record.Client, *record.RedirectURI) {
+	newClient := func(level record.ACRLevel) (*record.Client, *record.RedirectURI) {
 		client := &record.Client{
 			ClientIdentifier:         "reauth-" + fake.LetterN(8),
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
-			DefaultAcrLevel:          level,
+			DefaultACRLevel:          level,
 		}
 		require.NoError(t, database.CreateClient(ctx, nil, client))
-		redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+		redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 		require.NoError(t, database.CreateRedirectURI(ctx, nil, redirectURI))
 		return client, redirectURI
 	}
-	fx.level3Client, fx.level3URI = newClient(record.AcrLevel2Mandatory)
-	fx.level1Client, fx.level1URI = newClient(record.AcrLevel1)
+	fx.level3Client, fx.level3URI = newClient(record.ACRLevel2Mandatory)
+	fx.level1Client, fx.level1URI = newClient(record.ACRLevel1)
 
 	email := fake.Email()
 	fx.otpSecret = newOTPSecretForTest(t, email)
@@ -160,20 +160,20 @@ func TestPromptLogin_AtLevel3OverALevel3SessionAsksForTheCodeAgain(t *testing.T)
 
 	first, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "")
 	require.Equal(t, []string{"pwd", "otp"}, steps)
-	require.Equal(t, record.AcrLevel2Mandatory, first.AcrLevel)
+	require.Equal(t, record.ACRLevel2Mandatory, first.ACRLevel)
 
 	second, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "login")
 
 	assert.Equal(t, []string{"pwd", "otp"}, steps,
 		"prompt=login is a new authentication: the session's earlier code does not count (#537)")
-	assert.Equal(t, record.AcrLevel2Mandatory, second.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, second.ACRLevel)
 	assert.Equal(t, "pwd otp", second.AuthMethods)
 	assert.False(t, second.AuthenticatedAt.Before(first.AuthenticatedAt), "auth_time is this sign-in's")
 
 	assert.Equal(t, first.SessionIdentifier, second.SessionIdentifier,
 		"the session is kept, so other clients' session-bound grants are not cut off")
 	session := reauthSession(t, second)
-	assert.Equal(t, record.AcrLevel2Mandatory, session.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, session.ACRLevel)
 	assert.Equal(t, "pwd otp", session.AuthMethods)
 	assert.True(t, session.AuthTime.Equal(second.AuthenticatedAt), "the session's auth time is this sign-in's")
 }
@@ -193,21 +193,21 @@ func TestPromptLogin_AtALowerLevelReplacesTheSessionsAuthentication(t *testing.T
 	lower, steps := fx.signIn(t, browser, fx.level1Client, fx.level1URI, "login")
 
 	assert.Equal(t, []string{"pwd"}, steps)
-	assert.Equal(t, record.AcrLevel1, lower.AcrLevel, "acr is the level this authentication reached")
+	assert.Equal(t, record.ACRLevel1, lower.ACRLevel, "acr is the level this authentication reached")
 	assert.Equal(t, "pwd", lower.AuthMethods)
 	assert.Equal(t, first.SessionIdentifier, lower.SessionIdentifier)
 	session := reauthSession(t, lower)
-	assert.Equal(t, record.AcrLevel1, session.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, session.ACRLevel)
 	assert.Equal(t, "pwd", session.AuthMethods)
 	assert.True(t, session.AuthTime.Equal(lower.AuthenticatedAt))
 
 	stepUp, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "")
 
 	assert.Equal(t, []string{"otp"}, steps, "SSO keeps the password, and level 3 steps up for the code")
-	assert.Equal(t, record.AcrLevel2Mandatory, stepUp.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, stepUp.ACRLevel)
 	assert.Equal(t, "pwd otp", stepUp.AuthMethods)
 	session = reauthSession(t, stepUp)
-	assert.Equal(t, record.AcrLevel2Mandatory, session.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, session.ACRLevel)
 	assert.Equal(t, "pwd otp", session.AuthMethods)
 }
 
@@ -224,10 +224,10 @@ func TestSSO_AtALowerLevelLeavesTheSessionAsItWas(t *testing.T) {
 	sso, steps := fx.signIn(t, browser, fx.level1Client, fx.level1URI, "")
 
 	assert.Empty(t, steps)
-	assert.Equal(t, record.AcrLevel2Mandatory, sso.AcrLevel, "acr is the session's, which is higher than the target")
+	assert.Equal(t, record.ACRLevel2Mandatory, sso.ACRLevel, "acr is the session's, which is higher than the target")
 	assert.Equal(t, "pwd otp", sso.AuthMethods)
 	assert.True(t, sso.AuthenticatedAt.Equal(first.AuthenticatedAt), "auth_time is the sign-in that earned the session")
 	session := reauthSession(t, sso)
-	assert.Equal(t, record.AcrLevel2Mandatory, session.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, session.ACRLevel)
 	assert.Equal(t, "pwd otp", session.AuthMethods)
 }

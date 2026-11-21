@@ -431,9 +431,9 @@ func seedAuditLogsWithUsers(t *testing.T, rows []seededRow) string {
 			CreatedAt:      base.Add(time.Duration(i) * time.Second),
 			AuditEvent:     auditEvent,
 			Details:        fmt.Sprintf(`{"seq":%d}`, i),
-			RequestId:      row.requestId,
-			UserId:         sql.NullInt64{Int64: row.userId, Valid: row.userId != 0},
-			LoggedInUserId: sql.NullInt64{Int64: row.loggedInUserId, Valid: row.loggedInUserId != 0},
+			RequestID:      row.requestId,
+			UserID:         sql.NullInt64{Int64: row.userId, Valid: row.userId != 0},
+			LoggedInUserID: sql.NullInt64{Int64: row.loggedInUserId, Valid: row.loggedInUserId != 0},
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
 	}
@@ -578,14 +578,14 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 	adminToken, administrator := createUserAccessTokenWithScope(t,
 		builtin.AuthServerResourceIdentifier+":"+builtin.ManageUsersPermissionIdentifier)
 	changed := createUserToChange(t)
-	require.NotEqual(t, administrator.Id, changed.Id)
+	require.NotEqual(t, administrator.ID, changed.ID)
 
 	requestId := disableUserUnderRequestId(t, adminToken, changed)
 
 	for _, who := range []struct {
 		name string
 		id   int64
-	}{{"under the user changed", changed.Id}, {"under the administrator", administrator.Id}} {
+	}{{"under the user changed", changed.ID}, {"under the administrator", administrator.ID}} {
 		t.Run(who.name, func(t *testing.T) {
 			body, resp := getAuditLogs(t, readToken,
 				fmt.Sprintf("userId=%d&requestId=%s", who.id, url.QueryEscape(requestId)))
@@ -596,9 +596,9 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 			events := []string{}
 			for _, entry := range body.AuditLogs {
 				events = append(events, entry.AuditEvent)
-				assert.Equal(t, int64Ptr(changed.Id), entry.UserID,
+				assert.Equal(t, int64Ptr(changed.ID), entry.UserID,
 					"%s: userId is the user the change was made to", entry.AuditEvent)
-				assert.Equal(t, int64Ptr(administrator.Id), entry.LoggedInUserID,
+				assert.Equal(t, int64Ptr(administrator.ID), entry.LoggedInUserID,
 					"%s: loggedInUserId is the administrator whose token made the change", entry.AuditEvent)
 			}
 			assert.Equal(t, []string{"revoked_user_auth_state", "updated_user_details"}, events)
@@ -621,20 +621,20 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 func TestAPIAuditLogsGet_AChangeMadeWithAClientCredentialsTokenNamesNoActingUser(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	clientToken, client := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	changed := createUserToChange(t)
 
 	requestId := disableUserUnderRequestId(t, clientToken, changed)
 
 	// All three filters together: the change's own entry, on its request, about the user.
-	query := fmt.Sprintf("userId=%d&requestId=%s&auditEvent=updated_user_details", changed.Id,
+	query := fmt.Sprintf("userId=%d&requestId=%s&auditEvent=updated_user_details", changed.ID,
 		url.QueryEscape(requestId))
 	body, resp := getAuditLogs(t, clientToken, query)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, 1, body.Total)
-	assert.Equal(t, int64Ptr(changed.Id), body.AuditLogs[0].UserID)
+	assert.Equal(t, int64Ptr(changed.ID), body.AuditLogs[0].UserID)
 	assert.Nil(t, body.AuditLogs[0].LoggedInUserID, "a client credentials token names no acting user")
 
 	raw := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+auditLogsURL+"?"+query, clientToken, nil)

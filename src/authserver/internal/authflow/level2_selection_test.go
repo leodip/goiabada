@@ -16,17 +16,17 @@ import (
 func TestDecideLevel2Arm(t *testing.T) {
 	testCases := []struct {
 		name       string
-		target     record.AcrLevel
+		target     record.ACRLevel
 		userHasOTP bool
 		wantState  ceremony.AuthState
 		wantPath   string
 		wantErr    string
 	}{
-		{"optional with OTP asks for it", record.AcrLevel2Optional, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"optional without OTP skips it", record.AcrLevel2Optional, false, ceremony.AuthStateAuthenticationCompleted, "/auth/completed", ""},
-		{"mandatory with OTP asks for it", record.AcrLevel2Mandatory, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"mandatory without OTP enrols", record.AcrLevel2Mandatory, false, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
-		{"level1 never reaches this hop", record.AcrLevel1, true, "", "", "invalid targetAcrLevel: urn:goiabada:level1"},
+		{"optional with OTP asks for it", record.ACRLevel2Optional, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"optional without OTP skips it", record.ACRLevel2Optional, false, ceremony.AuthStateAuthenticationCompleted, "/auth/completed", ""},
+		{"mandatory with OTP asks for it", record.ACRLevel2Mandatory, true, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"mandatory without OTP enrols", record.ACRLevel2Mandatory, false, ceremony.AuthStateLevel2OTP, "/auth/otp", ""},
+		{"level1 never reaches this hop", record.ACRLevel1, true, "", "", "invalid targetAcrLevel: urn:goiabada:level1"},
 		{"an unknown level is refused", "urn:goiabada:level3", false, "", "", "invalid targetAcrLevel: urn:goiabada:level3"},
 	}
 

@@ -116,7 +116,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("AcrLevel2Optional with OTP enabled", func(t *testing.T) {
+	t.Run("ACRLevel2Optional with OTP enabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		database := datamocks.NewDatabase(t)
@@ -142,18 +142,18 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel2Optional,
+			DefaultACRLevel:  record.ACRLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &record.User{
-			Id:                  1,
+			ID:                  1,
 			OTPEnabled:          true,
-			OtpConfigGeneration: 4,
+			OTPConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel2OTP &&
@@ -170,7 +170,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("AcrLevel2Optional with OTP disabled", func(t *testing.T) {
+	t.Run("ACRLevel2Optional with OTP disabled", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		database := datamocks.NewDatabase(t)
@@ -196,18 +196,18 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel2Optional,
+			DefaultACRLevel:  record.ACRLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &record.User{
-			Id:                  1,
+			ID:                  1,
 			OTPEnabled:          false,
-			OtpConfigGeneration: 4,
+			OTPConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		// **The skip arm captures too**, and that is the case worth pinning: a user who has
 		// removed their authenticator answers the level 2 question by having nothing to
@@ -229,7 +229,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("AcrLevel2Mandatory", func(t *testing.T) {
+	t.Run("ACRLevel2Mandatory", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		database := datamocks.NewDatabase(t)
@@ -255,17 +255,17 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel2Mandatory,
+			DefaultACRLevel:  record.ACRLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &record.User{
-			Id:                  1,
-			OtpConfigGeneration: 4,
+			ID:                  1,
+			OTPConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel2OTP &&
@@ -282,7 +282,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	// Part 4. GetUserById answers (nil, nil) for a row that is not there, so a user deleted
+	// Part 4. GetUserByID answers (nil, nil) for a row that is not there, so a user deleted
 	// mid-ceremony used to reach `if user.OTPEnabled` and panic with a nil pointer
 	// dereference, logged at status 0 (#203) because the panic escapes before the status is
 	// written. Every sibling ceremony handler already checks this; this one did not, and
@@ -313,13 +313,13 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel2Mandatory,
+			DefaultACRLevel:  record.ACRLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "user not found"
@@ -363,16 +363,16 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  record.AcrLevel1,
+			DefaultACRLevel:  record.ACRLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &record.User{
-			Id: 1,
+			ID: 1,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid targetAcrLevel: urn:goiabada:level1"
@@ -400,8 +400,8 @@ func TestHandleAuthLevel2Get_AFailedReadAnswers500AndSavesNothing(t *testing.T) 
 		}},
 		{"the user", func(database *datamocks.Database) {
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil).Once()
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, readFailure).Once()
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil).Once()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, readFailure).Once()
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

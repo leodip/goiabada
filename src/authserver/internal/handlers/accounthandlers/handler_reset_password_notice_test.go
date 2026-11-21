@@ -76,7 +76,7 @@ func heldResetNotifier(t *testing.T, pageRenderer *handlersmocks.PageRenderer) *
 // setup link is pending) and the verified flag given.
 func resetNoticeRow(passwordHash string, verified bool) *record.User {
 	return &record.User{
-		Id:            resetNoticeUserId,
+		ID:            resetNoticeUserId,
 		Enabled:       true,
 		GivenName:     "Carla",
 		FamilyName:    "Dias",
@@ -145,7 +145,7 @@ func (rt *resetNoticeTest) serve(t *testing.T, settings *record.Settings) {
 func (rt *resetNoticeTest) stubReset(before *record.User, replaced *record.User) {
 	rt.database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), resetNoticeCodeHash).Return(before, nil).Once()
 	rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-	rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).Return(replaced, nil).Once()
+	rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserId).Return(replaced, nil).Once()
 	rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
 		Return(true, nil).Once()
 	stubRevocationSweepTx(rt.database, resetNoticeUserId, 6)
@@ -283,7 +283,7 @@ func TestHandleResetPasswordPost_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			datamocks.ExpectRunInTransaction(rt.database, revokeTx)
 			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-			rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).
+			rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserId).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
 				Return(false, nil).Once()
@@ -295,7 +295,7 @@ func TestHandleResetPasswordPost_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			datamocks.ExpectRunInTransaction(rt.database, revokeTx)
 			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-			rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).
+			rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserId).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
 				Return(true, nil).Once()

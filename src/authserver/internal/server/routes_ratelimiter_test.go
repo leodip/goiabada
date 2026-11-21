@@ -144,7 +144,7 @@ const (
 // this test's business.
 func routesTestSettings() *record.Settings {
 	return &record.Settings{
-		Id:                         1,
+		ID:                         1,
 		AppName:                    "Goiabada",
 		Issuer:                     routesTestIssuer,
 		SelfRegistrationEnabled:    true,
@@ -202,9 +202,9 @@ func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), se
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(defaultBrand, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-		Id:           1,
+		ID:           1,
 		Enabled:      true,
 		Subject:      routesTestSubject,
 		Email:        "victim@example.com",
@@ -223,19 +223,19 @@ func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), se
 	// The registration form links the legal documents in effect where it collects the data (#622):
 	// none here, so the form draws without them.
 	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Maybe()
-	database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	database.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.LegalDocumentClient{}, nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
-		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
+		Return(&record.Client{ID: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
 	armRoutesTestAPIClient(database)
 	ropcEnabled := true
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientId).
-		Return(&record.Client{Id: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
+		Return(&record.Client{ID: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}, nil).Maybe()
 
 	// The limiter on, which initRoutes reads when it builds the limiter.
@@ -323,7 +323,7 @@ func routesTestAccessToken(claims jwt.MapClaims) oauth.JWTToken {
 // routesTestAccessJti not revoked, which it reads of a token without grant_id (#676).
 func armRoutesTestAPIClient(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
-		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+		Return(&record.Client{ID: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
 	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, routesTestAccessJti).Return(false, nil).Maybe()
 }
 

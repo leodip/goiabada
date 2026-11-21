@@ -43,24 +43,24 @@ func TestGenerateAccessToken(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
@@ -73,7 +73,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
 	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
@@ -132,22 +132,22 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                2,
-		ClientId:          2,
-		UserId:            2,
+		ID:                2,
+		ClientID:          2,
+		UserID:            2,
 		Scope:             "resource1:read resource2:write",
 		Nonce:             "custom-nonce",
 		AuthenticatedAt:   now.Add(-10 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd:otp_mandatory",
+		ACRLevel:          "urn:goiabada:pwd:otp_mandatory",
 		AuthMethods:       "pwd otp",
 	}
 	client := &record.Client{
-		Id:               2,
+		ID:               2,
 		ClientIdentifier: "custom-client",
 	}
 	user := &record.User{
-		Id:      2,
+		ID:      2,
 		Subject: sub,
 	}
 
@@ -164,7 +164,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, claims["aud"])
 	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
@@ -207,24 +207,24 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                3,
-		ClientId:          3,
-		UserId:            3,
+		ID:                3,
+		ClientID:          3,
+		UserID:            3,
 		Scope:             "openid profile email groups attributes",
 		Nonce:             "groups-attributes-nonce",
 		AuthenticatedAt:   now.Add(-15 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                                      3,
+		ID:                                      3,
 		ClientIdentifier:                        "groups-attributes-client",
 		TokenExpirationInSeconds:                1200,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 	}
 	user := &record.User{
-		Id:            3,
+		ID:            3,
 		Subject:       sub,
 		Email:         "groups.attributes@example.com",
 		EmailVerified: true,
@@ -247,7 +247,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil, "", "")
 	require.NoError(t, err)
@@ -259,7 +259,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
 	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 	assert.Equal(t, "Bearer", claims["typ"])
@@ -304,7 +304,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true,
+		IncludeOpenIDConnectClaimsInIDToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -317,22 +317,22 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                4,
-		ClientId:          4,
-		UserId:            4,
+		ID:                4,
+		ClientID:          4,
+		UserID:            4,
 		Scope:             "invalid-scope",
 		Nonce:             "invalid-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:               4,
+		ID:               4,
 		ClientIdentifier: "invalid-client",
 	}
 	user := &record.User{
-		Id:      4,
+		ID:      4,
 		Subject: sub,
 	}
 
@@ -352,7 +352,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true,
+		IncludeOpenIDConnectClaimsInIDToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -366,23 +366,23 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid profile email address phone groups attributes",
 		Nonce:             "test-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd:otp_mandatory",
+		ACRLevel:          "urn:goiabada:pwd:otp_mandatory",
 		AuthMethods:       "pwd otp",
 	}
 	client := &record.Client{
-		Id:                                  1,
+		ID:                                  1,
 		ClientIdentifier:                    "test-client",
-		IncludeOpenIDConnectClaimsInIdToken: "on",
+		IncludeOpenIDConnectClaimsInIDToken: "on",
 	}
 	user := &record.User{
-		Id:                            1,
+		ID:                            1,
 		Subject:                       sub,
 		Email:                         "test@example.com",
 		EmailVerified:                 true,
@@ -396,7 +396,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		ZoneInfo:                      "Europe/London",
 		Locale:                        "en-GB",
-		PhoneNumberCountryUniqueId:    "PRT_0",
+		PhoneNumberCountryUniqueID:    "PRT_0",
 		PhoneNumberCountryCallingCode: "+351",
 		PhoneNumber:                   "912 345 678",
 		PhoneNumberVerified:           true,
@@ -408,19 +408,19 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 		AddressCountry:                "Testland",
 		UpdatedAt:                     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 		Groups: []record.Group{
-			{GroupIdentifier: "group1", IncludeInIdToken: true},
-			{GroupIdentifier: "group2", IncludeInIdToken: false},
+			{GroupIdentifier: "group1", IncludeInIDToken: true},
+			{GroupIdentifier: "group2", IncludeInIDToken: false},
 		},
 		Attributes: []record.UserAttribute{
-			{Key: "attr1", Value: "value1", IncludeInIdToken: true},
-			{Key: "attr2", Value: "value2", IncludeInIdToken: false},
+			{Key: "attr1", Value: "value1", IncludeInIDToken: true},
+			{Key: "attr2", Value: "value2", IncludeInIDToken: false},
 		},
 	}
 
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	require.NoError(t, err)
@@ -432,7 +432,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
@@ -500,22 +500,22 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                2,
-		ClientId:          2,
-		UserId:            2,
+		ID:                2,
+		ClientID:          2,
+		UserID:            2,
 		Scope:             "openid",
 		Nonce:             "minimal-nonce",
 		AuthenticatedAt:   now.Add(-1 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:               2,
+		ID:               2,
 		ClientIdentifier: "minimal-client",
 	}
 	user := &record.User{
-		Id:      2,
+		ID:      2,
 		Subject: sub,
 	}
 
@@ -532,7 +532,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
@@ -560,7 +560,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true,
+		IncludeOpenIDConnectClaimsInIDToken: true,
 	}
 
 	now := time.Now().UTC()
@@ -574,23 +574,23 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                3,
-		ClientId:          3,
-		UserId:            3,
+		ID:                3,
+		ClientID:          3,
+		UserID:            3,
 		Scope:             "openid profile email",
 		Nonce:             "override-nonce",
 		AuthenticatedAt:   now.Add(-2 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd:otp_ifpossible",
+		ACRLevel:          "urn:goiabada:pwd:otp_ifpossible",
 		AuthMethods:       "pwd otp",
 	}
 	client := &record.Client{
-		Id:                       3,
+		ID:                       3,
 		ClientIdentifier:         "override-client",
 		TokenExpirationInSeconds: 1200,
 	}
 	user := &record.User{
-		Id:            3,
+		ID:            3,
 		Subject:       sub,
 		Email:         "override@example.com",
 		EmailVerified: true,
@@ -603,7 +603,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	require.NoError(t, err)
@@ -615,7 +615,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, client.ClientIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
-	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
 
@@ -835,18 +835,18 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 	sessionIdentifier := "test-session-123"
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -854,14 +854,14 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 	t.Run("AuthCode flow - single method (pwd)", func(t *testing.T) {
 		code := &record.Code{
-			Id:                1,
-			ClientId:          1,
-			UserId:            1,
+			ID:                1,
+			ClientID:          1,
+			UserID:            1,
 			Scope:             "openid",
 			Nonce:             "test-nonce",
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          "urn:goiabada:level1",
+			ACRLevel:          "urn:goiabada:level1",
 			AuthMethods:       "pwd",
 			Client:            *client,
 			User:              *user,
@@ -898,14 +898,14 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 	t.Run("AuthCode flow - multiple methods (pwd otp)", func(t *testing.T) {
 		code := &record.Code{
-			Id:                2,
-			ClientId:          1,
-			UserId:            1,
+			ID:                2,
+			ClientID:          1,
+			UserID:            1,
 			Scope:             "openid",
 			Nonce:             "test-nonce-2",
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          "urn:goiabada:level2_mandatory",
+			ACRLevel:          "urn:goiabada:level2_mandatory",
 			AuthMethods:       "pwd otp",
 			Client:            *client,
 			User:              *user,
@@ -953,7 +953,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			Scope:  "openid",
 		}
 
-		expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+		expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 		require.NoError(t, err)
 
@@ -1043,18 +1043,18 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	sessionIdentifier := "test-session-amr-absent"
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -1087,14 +1087,14 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		expectAuthCodeCalls()
 
 		code := &record.Code{
-			Id:                10,
-			ClientId:          1,
-			UserId:            1,
+			ID:                10,
+			ClientID:          1,
+			UserID:            1,
 			Scope:             "openid",
 			Nonce:             "test-nonce-amr-absent",
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          "urn:goiabada:level1",
+			ACRLevel:          "urn:goiabada:level1",
 			AuthMethods:       "",
 			Client:            *client,
 			User:              *user,
@@ -1118,14 +1118,14 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		expectAuthCodeCalls()
 
 		code := &record.Code{
-			Id:                11,
-			ClientId:          1,
-			UserId:            1,
+			ID:                11,
+			ClientID:          1,
+			UserID:            1,
 			Scope:             "openid",
 			Nonce:             "test-nonce-amr-present",
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          "urn:goiabada:level1",
+			ACRLevel:          "urn:goiabada:level1",
 			AuthMethods:       "pwd",
 			Client:            *client,
 			User:              *user,
@@ -1245,7 +1245,7 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 
 	code := &record.Code{
 		Scope:             "openid profile email",
-		AcrLevel:          "urn:goiabada:level2",
+		ACRLevel:          "urn:goiabada:level2",
 		AuthMethods:       "pwd otp",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: "session-123",
@@ -1264,7 +1264,7 @@ func TestCreateTokenInputFromCode(t *testing.T) {
 	assert.Equal(t, &code.User, input.User)
 	assert.Equal(t, &code.Client, input.Client)
 	assert.Equal(t, code.Scope, input.Scope)
-	assert.Equal(t, code.AcrLevel, input.AcrLevel)
+	assert.Equal(t, code.ACRLevel, input.AcrLevel)
 	assert.Equal(t, []string{"pwd", "otp"}, input.AuthMethods)
 	assert.Equal(t, code.AuthenticatedAt, input.AuthenticatedAt)
 	assert.Equal(t, code.SessionIdentifier, input.SessionIdentifier)
@@ -1334,7 +1334,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	assert.Equal(t, ropcInput.Client, input.Client)
 	assert.Equal(t, ropcInput.Scope, input.Scope)
 	// ROPC-specific hardcoded values
-	assert.Equal(t, record.AcrLevel1, input.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, input.AcrLevel)
 	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
 	assert.Equal(t, now, input.AuthenticatedAt)
 	// Reversed deliberately. This used to assert the session identifier was forwarded from
@@ -1586,7 +1586,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	})
 }
 
-// TestGenerateIdTokenCore_GroupsAndAttributes tests groups/attributes with IncludeInIdToken
+// TestGenerateIdTokenCore_GroupsAndAttributes tests groups/attributes with IncludeInIDToken
 func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
@@ -1610,13 +1610,13 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 		Subject:   userSubject,
 		UpdatedAt: sql.NullTime{Time: now, Valid: true},
 		Groups: []record.Group{
-			{GroupIdentifier: "group1", IncludeInIdToken: true, IncludeInAccessToken: false},
-			{GroupIdentifier: "group2", IncludeInIdToken: false, IncludeInAccessToken: true},
-			{GroupIdentifier: "group3", IncludeInIdToken: true, IncludeInAccessToken: true},
+			{GroupIdentifier: "group1", IncludeInIDToken: true, IncludeInAccessToken: false},
+			{GroupIdentifier: "group2", IncludeInIDToken: false, IncludeInAccessToken: true},
+			{GroupIdentifier: "group3", IncludeInIDToken: true, IncludeInAccessToken: true},
 		},
 		Attributes: []record.UserAttribute{
-			{Key: "attr1", Value: "value1", IncludeInIdToken: true, IncludeInAccessToken: false},
-			{Key: "attr2", Value: "value2", IncludeInIdToken: false, IncludeInAccessToken: true},
+			{Key: "attr1", Value: "value1", IncludeInIDToken: true, IncludeInAccessToken: false},
+			{Key: "attr2", Value: "value2", IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 	}
 
@@ -1636,14 +1636,14 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 
-	// Check groups - only IncludeInIdToken=true
+	// Check groups - only IncludeInIDToken=true
 	groups := claims["groups"].([]interface{})
 	assert.Len(t, groups, 2)
 	assert.Contains(t, groups, "group1")
 	assert.Contains(t, groups, "group3")
 	assert.NotContains(t, groups, "group2")
 
-	// Check attributes - only IncludeInIdToken=true
+	// Check attributes - only IncludeInIDToken=true
 	attrs := claims["attributes"].(map[string]interface{})
 	assert.Equal(t, "value1", attrs["attr1"])
 	_, hasAttr2 := attrs["attr2"]
@@ -1662,17 +1662,17 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 	// Test with Code - ensure all fields transferred
 	code := &record.Code{
 		Scope:             "openid profile email groups attributes",
-		AcrLevel:          "urn:goiabada:level2_mandatory",
+		ACRLevel:          "urn:goiabada:level2_mandatory",
 		AuthMethods:       "pwd otp",
 		AuthenticatedAt:   authTime,
 		SessionIdentifier: "session-xyz",
 		Nonce:             "nonce-123",
 		User: record.User{
-			Id:      42,
+			ID:      42,
 			Subject: userSubject,
 		},
 		Client: record.Client{
-			Id:               99,
+			ID:               99,
 			ClientIdentifier: "full-test-client",
 		},
 	}
@@ -1683,7 +1683,7 @@ func TestTokenGenerationInput_AllFieldsCopied(t *testing.T) {
 	assert.Same(t, &code.User, input.User, "User pointer should be same")
 	assert.Same(t, &code.Client, input.Client, "Client pointer should be same")
 	assert.Equal(t, code.Scope, input.Scope)
-	assert.Equal(t, code.AcrLevel, input.AcrLevel)
+	assert.Equal(t, code.ACRLevel, input.AcrLevel)
 	assert.Equal(t, []string{"pwd", "otp"}, input.AuthMethods)
 	assert.Equal(t, code.AuthenticatedAt, input.AuthenticatedAt)
 	assert.Equal(t, code.SessionIdentifier, input.SessionIdentifier)
@@ -1913,7 +1913,7 @@ func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
+	user := &record.User{ID: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
@@ -1969,7 +1969,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, adm
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
 	ctx := context.Background()
@@ -1978,16 +1978,16 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, adm
 	sessionIdentifier := "test-session-characterization"
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            user.Id,
+		ID:                1,
+		ClientID:          1,
+		UserID:            user.ID,
 		Scope:             scope,
 		AuthenticatedAt:   now.Add(-1 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
-	client := &record.Client{Id: 1, ClientIdentifier: "characterization-client"}
+	client := &record.Client{ID: 1, ClientIdentifier: "characterization-client"}
 
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
@@ -1997,13 +1997,13 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, adm
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	if slices.Contains(strings.Split(scope, " "), "profile") {
-		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).
+		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).
 			Return(hasProfilePicture, nil)
 	}
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 		Return(&record.UserSession{
-			Id:           1,
-			UserId:       user.Id,
+			ID:           1,
+			UserID:       user.ID,
 			Started:      now.Add(-30 * time.Minute),
 			LastAccessed: now.Add(-5 * time.Minute),
 		}, nil)
@@ -2054,7 +2054,7 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 		},
 		{
 			// Was true/true: a profile claim with no profile scope granted, on the default path,
-			// since IncludeOpenIDConnectClaimsInIdToken is seeded on.
+			// since IncludeOpenIDConnectClaimsInIDToken is seeded on.
 			name:                    "openid email",
 			scope:                   "openid email",
 			idTokenHasUpdatedAt:     false,
@@ -2072,7 +2072,7 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			updatedAt := time.Now().UTC().Add(-1 * time.Minute)
 			user := &record.User{
-				Id:            1,
+				ID:            1,
 				Subject:       fake.UUID(),
 				Email:         "characterization@example.com",
 				EmailVerified: true,
@@ -2100,37 +2100,37 @@ func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 }
 
 // Divergence 3, issuance's side: the include predicate is per token type here, where /userinfo
-// reads IncludeInIdToken at all three of its filter sites. A mapper taking one predicate would
+// reads IncludeInIDToken at all three of its filter sites. A mapper taking one predicate would
 // have to pick a token type, which is why #387 makes the predicate an input.
 func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *testing.T) {
 	idTokenGroup := record.Group{
-		Id:               1,
+		ID:               1,
 		GroupIdentifier:  "id-token-group",
-		IncludeInIdToken: true, IncludeInAccessToken: false,
+		IncludeInIDToken: true, IncludeInAccessToken: false,
 		Attributes: []record.GroupAttribute{
 			{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
-				IncludeInIdToken: true, IncludeInAccessToken: false},
+				IncludeInIDToken: true, IncludeInAccessToken: false},
 		},
 	}
 	accessTokenGroup := record.Group{
-		Id:               2,
+		ID:               2,
 		GroupIdentifier:  "access-token-group",
-		IncludeInIdToken: false, IncludeInAccessToken: true,
+		IncludeInIDToken: false, IncludeInAccessToken: true,
 		Attributes: []record.GroupAttribute{
 			{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
-				IncludeInIdToken: false, IncludeInAccessToken: true},
+				IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 	}
 
 	user := &record.User{
-		Id:      1,
+		ID:      1,
 		Subject: fake.UUID(),
 		Groups:  []record.Group{idTokenGroup, accessTokenGroup},
 		Attributes: []record.UserAttribute{
 			{Key: "idTokenAttr", Value: "idTokenValue",
-				IncludeInIdToken: true, IncludeInAccessToken: false},
+				IncludeInIDToken: true, IncludeInAccessToken: false},
 			{Key: "accessTokenAttr", Value: "accessTokenValue",
-				IncludeInIdToken: false, IncludeInAccessToken: true},
+				IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 	}
 
@@ -2163,7 +2163,7 @@ func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *t
 func TestClaimCharacterization_ProfileAndPictureComeFromTheInjectedBaseURLs(t *testing.T) {
 	sub := fake.UUID()
 	user := &record.User{
-		Id:         1,
+		ID:         1,
 		Subject:    sub,
 		GivenName:  "Test",
 		FamilyName: "User",
@@ -2202,7 +2202,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -2212,12 +2212,12 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	sessionIdentifier := "scope-is-the-grant-session"
 
 	user := record.User{
-		Id:      1,
+		ID:      1,
 		Subject: fake.UUID(),
 		Email:   "grant@example.com",
-		Groups:  []record.Group{{GroupIdentifier: "grant-group", IncludeInIdToken: true, IncludeInAccessToken: true}},
+		Groups:  []record.Group{{GroupIdentifier: "grant-group", IncludeInIDToken: true, IncludeInAccessToken: true}},
 	}
-	client := record.Client{Id: 1, ClientIdentifier: "grant-client"}
+	client := record.Client{ID: 1, ClientIdentifier: "grant-client"}
 
 	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
@@ -2228,10 +2228,10 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	// Only a grant with the profile scope asks for the picture, and only a session-bound refresh
 	// token asks for the session: both depend on the grant, not the flow.
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil).Maybe()
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
-		Id:      1,
-		UserId:  user.Id,
+		ID:      1,
+		UserID:  user.ID,
 		Started: now.Add(-5 * time.Minute),
 	}, nil).Maybe()
 
@@ -2245,23 +2245,23 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	}
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          client.Id,
-		UserId:            user.Id,
+		ID:                1,
+		ClientID:          client.ID,
+		UserID:            user.ID,
 		Scope:             grant,
 		AuthenticatedAt:   now.Add(-time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:level1",
+		ACRLevel:          "urn:goiabada:level1",
 		AuthMethods:       "pwd",
 		Client:            client,
 		User:              user,
 	}
 	parent := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "first-jti",
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		ID:                   1,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "first-jti",
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
 		AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		Scope:                storedRefreshScope,
 		RefreshTokenType:     TokenTypeOffline.String(),
@@ -2305,7 +2305,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":
 		captureRefresh()
-		expectPasswordGrantClientRow(mockDB, client.Id, &client)
+		expectPasswordGrantClientRow(mockDB, client.ID, &client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =

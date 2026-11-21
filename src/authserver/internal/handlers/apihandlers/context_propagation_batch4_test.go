@@ -36,7 +36,7 @@ func TestHandleGroupsGet_ListsGroupsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllGroups", theApiRequestsContext(), mock.Anything).
-		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
+		Return([]record.Group{{ID: 5, GroupIdentifier: "admins"}}, nil).Once()
 	database.On("CountGroupMembers", theApiRequestsContext(), mock.Anything, int64(5)).
 		Return(2, nil).Once()
 
@@ -56,7 +56,7 @@ func TestHandleGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
 	HandleGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number", "not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetGroupById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetGroupByID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "CountGroupMembers", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -67,8 +67,8 @@ func TestHandleGroupGet_MalformedIdReachesNoGroupPort(t *testing.T) {
 func TestHandleGroupPermissionsGet_LoadsPermissionsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetGroupById", theApiRequestsContext(), mock.Anything, int64(5)).
-		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
+	database.On("GetGroupByID", theApiRequestsContext(), mock.Anything, int64(5)).
+		Return(&record.Group{ID: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("GroupLoadPermissions", theApiRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 	database.On("CountGroupMembers", theApiRequestsContext(), mock.Anything, int64(5)).
@@ -90,7 +90,7 @@ func TestHandleGroupPermissionsGet_MalformedIdReachesNoPermissionPort(t *testing
 	HandleGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/not-a-number/permissions", "not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetGroupById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetGroupByID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "GroupLoadPermissions", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -100,7 +100,7 @@ func TestHandleSettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theApiRequestsContext(), mock.Anything).
-		Return([]record.KeyPair{{Id: 9, KeyIdentifier: "kid-9", State: record.KeyStateCurrent.String()}}, nil).Once()
+		Return([]record.KeyPair{{ID: 9, KeyIdentifier: "kid-9", State: record.KeyStateCurrent.String()}}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleSettingsKeysGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/settings/keys"))
@@ -122,7 +122,7 @@ func TestHandleSettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 	HandleSettingsKeyDelete(database, auditLogger).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetKeyPairById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetKeyPairByID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -133,7 +133,7 @@ func TestHandleAuditLogsGet_ReadsLogsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	database.On("GetAuditLogsPaginated", theApiRequestsContext(), mock.Anything, 1, 20, record.AuditLogFilter{}).
-		Return([]record.AuditLog{{Id: 1, AuditEvent: "login"}}, 1, nil).Once()
+		Return([]record.AuditLog{{ID: 1, AuditEvent: "login"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAuditLogsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/audit-logs"))

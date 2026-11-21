@@ -46,7 +46,7 @@ func confidentialClient(t *testing.T) (*record.Client, string) {
 		ClientSecretEncrypted:    enc,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client, clientSecret
 }
 
@@ -70,7 +70,7 @@ func TestAPIClientGet_NeitherTheDetailNorTheListCarriesTheSecret(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client, clientSecret := confidentialClient(t)
 
-	detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10)
 	resp := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -78,7 +78,7 @@ func TestAPIClientGet_NeitherTheDetailNorTheListCarriesTheSecret(t *testing.T) {
 		Client map[string]any `json:"client"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&detail))
-	assert.InDelta(t, float64(client.Id), detail.Client["id"], 0, "the detail is this client's")
+	assert.InDelta(t, float64(client.ID), detail.Client["id"], 0, "the detail is this client's")
 	assert.NotContains(t, detail.Client, "clientSecret")
 	encoded, err := json.Marshal(detail)
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestAPIClientGet_NeitherTheDetailNorTheListCarriesTheSecret(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp2.Body).Decode(&list))
 	found := false
 	for _, c := range list.Clients {
-		if c["id"] == float64(client.Id) {
+		if c["id"] == float64(client.ID) {
 			found = true
 			assert.NotContains(t, c, "clientSecret")
 		}
@@ -112,10 +112,10 @@ func TestAPIClientGet_NeitherTheDetailNorTheListCarriesTheSecret(t *testing.T) {
 func TestAPIClientSecretGet_ReturnsTheDecryptedSecretAndRecordsTheRead(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 	client, clientSecret := confidentialClient(t)
 
-	resp, body, requestId := readClientSecret(t, manageToken, client.Id)
+	resp, body, requestId := readClientSecret(t, manageToken, client.ID)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, map[string]any{"clientSecret": clientSecret}, body)
@@ -127,7 +127,7 @@ func TestAPIClientSecretGet_ReturnsTheDecryptedSecretAndRecordsTheRead(t *testin
 	rows := auditRows(t, manageToken, "viewed_client_secret", requestId)
 	require.Len(t, rows, 1, "one viewed_client_secret row for the read")
 	assert.Equal(t, map[string]any{
-		"client_id":         float64(client.Id),
+		"client_id":         float64(client.ID),
 		"client_identifier": client.ClientIdentifier,
 		"logged_in_user":    manageClient.ClientIdentifier,
 	}, rows[0])
@@ -153,9 +153,9 @@ func TestAPIClientSecretGet_AdmitsManageClientsAndManageOnly(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.permission, func(t *testing.T) {
 			token, caller := createClientWithGranularScope(t, tc.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
-			resp, body, requestId := readClientSecret(t, token, client.Id)
+			resp, body, requestId := readClientSecret(t, token, client.ID)
 			defer func() { _ = resp.Body.Close() }()
 
 			viewed := auditRows(t, manageToken, "viewed_client_secret", requestId)
@@ -182,9 +182,9 @@ func TestAPIClientSecretGet_APublicClientAnswersAnEmptySecret(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	client := createPublicClient(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	resp, body, requestId := readClientSecret(t, manageToken, client.Id)
+	resp, body, requestId := readClientSecret(t, manageToken, client.ID)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, map[string]any{"clientSecret": ""}, body)

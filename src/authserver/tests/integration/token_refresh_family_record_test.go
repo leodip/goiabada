@@ -44,7 +44,7 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveChild(t *testing.T) {
 
 	// The control: before the record exists the live child rotates, which is what makes the refusal
 	// below the record's and not something the child trips anyway.
-	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJti, "test_family_record")
+	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 
@@ -53,7 +53,7 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveChild(t *testing.T) {
 
 	assert.False(t, refreshTokenRowByJti(t, rt2).Revoked,
 		"the refusal came before any claim, so the child was not spent")
-	rows, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	rows, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.Len(t, rows, 2, "no row was inserted by the refused refresh")
 }
@@ -81,9 +81,9 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveROPCChild(t *testing.T) {
 	rt1 := data["refresh_token"].(string)
 	rt2 := rotateRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt1)
 	child := refreshTokenRowByJti(t, rt2)
-	require.False(t, child.CodeId.Valid, "a ROPC child has no code behind it")
+	require.False(t, child.CodeID.Valid, "a ROPC child has no code behind it")
 
-	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJti, "test_family_record")
+	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 
@@ -105,7 +105,7 @@ func TestToken_Refresh_AReplayRecordsTheFamilyAndARepeatStillAnswersAsRevoked(t 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
-	first := refreshTokenRowByJti(t, rt1).FirstRefreshTokenJti
+	first := refreshTokenRowByJti(t, rt1).FirstRefreshTokenJTI
 
 	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, first)
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestToken_Refresh_ARecordedFamilyLeavesOtherFamiliesRotating(t *testing.T) 
 		rawCodeB, redirectB, testCodeVerifier+"-second-client")
 
 	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil,
-		refreshTokenRowByJti(t, rtA1).FirstRefreshTokenJti, "test_family_record")
+		refreshTokenRowByJti(t, rtA1).FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 

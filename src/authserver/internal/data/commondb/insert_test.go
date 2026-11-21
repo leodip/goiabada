@@ -38,7 +38,7 @@ func TestInsert_EachEngineRunsItsOwnTextUnchanged(t *testing.T) {
 	for _, dialect := range allDialects {
 		t.Run(string(dialect), func(t *testing.T) {
 			script := &scriptedDriver{
-				execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: 77}},
+				execs: []*scriptedExec{{rowsAffected: 1, lastInsertID: 77}},
 				rows:  []*scriptedRows{{cols: []string{"id"}, values: [][]driver.Value{{int64(77)}}}},
 			}
 			d := scriptedDBFor(t, script, dialect)
@@ -64,12 +64,12 @@ func TestInsert_EachEngineRunsItsOwnTextUnchanged(t *testing.T) {
 	}
 }
 
-// TestInsert_LastInsertIdArmReportsARefusingDriver is the #283 shape, made visible. pgx and
+// TestInsert_LastInsertIDArmReportsARefusingDriver is the #283 shape, made visible. pgx and
 // go-mssqldb both answer LastInsertId with an error, so a Create* that reaches this arm on those
 // engines fails loudly rather than storing id 0 -- which is why no lint is owed for a future
 // Create* written without this helper: the data tier goes red on two of four engines.
-func TestInsert_LastInsertIdArmReportsARefusingDriver(t *testing.T) {
-	// No lastInsertId scripted, so the statement answers with driver.RowsAffected, whose
+func TestInsert_LastInsertIDArmReportsARefusingDriver(t *testing.T) {
+	// No lastInsertID scripted, so the statement answers with driver.RowsAffected, whose
 	// LastInsertId returns an error.
 	d := scriptedDBFor(t, &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1}}}, data.SQLite)
 
@@ -82,10 +82,10 @@ func TestInsert_LastInsertIdArmReportsARefusingDriver(t *testing.T) {
 	}
 }
 
-// TestInsert_LastInsertIdArmWrapsTheInsertFailure pins the message and the sentinel on the arm
+// TestInsert_LastInsertIDArmWrapsTheInsertFailure pins the message and the sentinel on the arm
 // SQLite and MySQL take. The wrapping matters because the handler above asks errors.Is for
 // data.ErrUniqueViolation to answer 409 rather than 500.
-func TestInsert_LastInsertIdArmWrapsTheInsertFailure(t *testing.T) {
+func TestInsert_LastInsertIDArmWrapsTheInsertFailure(t *testing.T) {
 	driverErr := &driverUniqueError{msg: "UNIQUE constraint failed: widgets.name"}
 	d := scriptedDBFor(t, &scriptedDriver{execs: []*scriptedExec{{err: driverErr}}}, data.MySQL)
 	d.IsUniqueViolation = func(err error) bool {

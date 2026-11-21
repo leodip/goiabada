@@ -59,26 +59,26 @@ func TestMigration000081_SettingsKeepSignedIn(t *testing.T) {
 	assertColumn000081(t, h, "after apply")
 
 	// 2.
-	assert.Equalf(t, "ask", keepSignedInOf000081(t, h, settings.Id),
+	assert.Equalf(t, "ask", keepSignedInOf000081(t, h, settings.ID),
 		"2. an existing installation lets each user choose on %s", dbType())
 
 	// 3.
-	_, err := h.SQL.Exec("UPDATE settings SET keep_signed_in = 'always' WHERE id = " + fmt.Sprint(settings.Id))
+	_, err := h.SQL.Exec("UPDATE settings SET keep_signed_in = 'always' WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "store always on %s", dbType())
-	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.Id))
+	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "save the settings as the previous release does on %s", dbType())
-	assert.Equalf(t, "always", keepSignedInOf000081(t, h, settings.Id),
+	assert.Equalf(t, "always", keepSignedInOf000081(t, h, settings.ID),
 		"3. a save naming no keep_signed_in leaves it as stored on %s", dbType())
 
 	// 4.
 	migrateToHead000063(t, h)
-	stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+	stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	for _, mode := range []record.KeepSignedIn{record.KeepSignedInNever, record.KeepSignedInAsk, record.KeepSignedInAlways} {
 		stored.KeepSignedIn = mode
 		require.NoError(t, h.DB.UpdateSettings(ctx, nil, stored))
-		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		read, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		require.NotNil(t, read)
 		assert.Equalf(t, mode, read.KeepSignedIn, "4. %s round-trips on %s", mode, dbType())
@@ -91,7 +91,7 @@ func TestMigration000081_SettingsKeepSignedIn(t *testing.T) {
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, settingsKeepSignedIn000081), "re-apply 000081 on %s", dbType())
 	assertColumn000081(t, h, "after down/up round trip")
-	assert.Equalf(t, "ask", keepSignedInOf000081(t, h, settings.Id),
+	assert.Equalf(t, "ask", keepSignedInOf000081(t, h, settings.ID),
 		"5. the value dropped with the column reads ask once it is back on %s", dbType())
 }
 
@@ -128,10 +128,10 @@ func keepSignedInType000081() string {
 }
 
 // keepSignedInOf000081 reads the column with raw SQL, since the data layer can read it only at head.
-func keepSignedInOf000081(t *testing.T, h *isolatedDB, settingsId int64) string {
+func keepSignedInOf000081(t *testing.T, h *isolatedDB, settingsID int64) string {
 	t.Helper()
 	var mode string
-	q := fmt.Sprintf("SELECT keep_signed_in FROM settings WHERE id = %d", settingsId)
+	q := fmt.Sprintf("SELECT keep_signed_in FROM settings WHERE id = %d", settingsID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&mode), "read keep_signed_in on %s", dbType())
 	return mode
 }

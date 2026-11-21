@@ -83,7 +83,7 @@ func assertAPIAdmitsToken(t *testing.T, target, accessToken string) {
 
 func setClientEnabled(t *testing.T, clientId int64, enabled bool) {
 	t.Helper()
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	client.Enabled = enabled
@@ -105,10 +105,10 @@ func TestRFC9068_AuthorizationCodeGrantAndItsRefreshes(t *testing.T) {
 	assert.Equal(t, code.Client.ClientIdentifier, claims["client_id"])
 	firstJti := decodeJWTPayload(t, refreshToken)["jti"].(string)
 	assert.Equal(t, firstJti, claims["grant_id"], "the grant is its first refresh token's jti")
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, firstJti)
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, firstJti)
 	require.NoError(t, err)
 	require.NotNil(t, row)
-	assert.Equal(t, firstJti, row.FirstRefreshTokenJti, "the row records the same family")
+	assert.Equal(t, firstJti, row.FirstRefreshTokenJTI, "the row records the same family")
 
 	for i := 1; i <= 2; i++ {
 		status, refreshed := refreshAuthCodeGrant(t, httpClient, code, clientSecret, refreshToken, "")
@@ -196,10 +196,10 @@ func TestRFC9068_OfflineAccessNamesTheAuthServer(t *testing.T) {
 
 	t.Run("beside a resource", func(t *testing.T) {
 		resource := "rfc9068-" + strings.ToLower(fake.LetterN(8))
-		permission := createPermissionWithId(t, createResourceWithId(t, resource).Id, "read")
+		permission := createPermissionWithId(t, createResourceWithId(t, resource).ID, "read")
 		scope := "offline_access " + resource + ":read"
 
-		data := passwordGrant(t, scope, func(user *record.User) { assignPermissionToUser(t, user.Id, permission.Id) })
+		data := passwordGrant(t, scope, func(user *record.User) { assignPermissionToUser(t, user.ID, permission.ID) })
 
 		assert.Equal(t, scope, data["scope"])
 		claims := decodeJWTPayload(t, data["access_token"].(string))
@@ -274,10 +274,10 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken := data["access_token"].(string)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 
-		setClientEnabled(t, code.Client.Id, false)
+		setClientEnabled(t, code.Client.ID, false)
 		assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 
-		setClientEnabled(t, code.Client.Id, true)
+		setClientEnabled(t, code.Client.ID, true)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 	})
 
@@ -285,7 +285,7 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 		assertAPIAdmitsToken(t, "/api/v1/account/profile", accessToken)
 
-		setClientEnabled(t, code.Client.Id, false)
+		setClientEnabled(t, code.Client.ID, false)
 		assertAPIRefusesToken(t, "/api/v1/account/profile", accessToken)
 	})
 
@@ -293,10 +293,10 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken, client := createAdminClientWithToken(t)
 		assertAPIAdmitsToken(t, "/api/v1/admin/resources", accessToken)
 
-		setClientEnabled(t, client.Id, false)
+		setClientEnabled(t, client.ID, false)
 		assertAPIRefusesToken(t, "/api/v1/admin/resources", accessToken)
 
-		setClientEnabled(t, client.Id, true)
+		setClientEnabled(t, client.ID, true)
 		assertAPIAdmitsToken(t, "/api/v1/admin/resources", accessToken)
 	})
 
@@ -305,7 +305,7 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken := data["access_token"].(string)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 
-		require.NoError(t, database.DeleteClient(context.Background(), nil, code.Client.Id))
+		require.NoError(t, database.DeleteClient(context.Background(), nil, code.Client.ID))
 		assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 	})
 }

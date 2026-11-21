@@ -8,7 +8,7 @@ import (
 // now, and the column stays unread for the previous release until #823 drops it. Only the inserts
 // name it, with the empty value (#810 decision 2).
 type Settings struct {
-	Id int64 `db:"id" fieldtag:"pk"`
+	ID int64 `db:"id" fieldtag:"pk"`
 	// CreatedAt is when the row was inserted. It is tagged dont-update so UpdateSettings never
 	// writes it (#407): the insert writes it once, and a save written from any copy of the row,
 	// a zero one included, must not move it.
@@ -25,7 +25,7 @@ type Settings struct {
 	UserSessionIdleTimeoutInSeconds           int            `db:"user_session_idle_timeout_in_seconds"`
 	UserSessionMaxLifetimeInSeconds           int            `db:"user_session_max_lifetime_in_seconds"`
 	IncludeOpenIDConnectClaimsInAccessToken   bool           `db:"include_open_id_connect_claims_in_access_token"`
-	IncludeOpenIDConnectClaimsInIdToken       bool           `db:"include_open_id_connect_claims_in_id_token"`
+	IncludeOpenIDConnectClaimsInIDToken       bool           `db:"include_open_id_connect_claims_in_id_token"`
 	// MaxUserSessionsPerUser is how many sessions one user may hold, from 0 to 1000, 0 meaning no
 	// limit (#564). Migration 000063 gives an existing installation 20, the seed's value.
 	MaxUserSessionsPerUser int `db:"max_user_sessions_per_user"`
@@ -122,7 +122,7 @@ type Settings struct {
 	// carries above.
 	LastCleanupAt sql.NullTime `db:"last_cleanup_at" fieldtag:"dont-update"`
 
-	// DefaultBrandId is the default brand's id, a foreign key to brands, so the engine refuses
+	// DefaultBrandID is the default brand's id, a foreign key to brands, so the engine refuses
 	// deleting the brand it points at (#810 decision 1). It is nullable only because SQLite cannot
 	// add a foreign-key column otherwise: migration 000089 and the first start's seed fill it, and
 	// nothing clears it.
@@ -132,7 +132,7 @@ type Settings struct {
 	// named, and SQL Server re-checks a foreign key whose column an UPDATE names, taking a shared
 	// lock on the brand on every settings save. The one writer after the insert is MakeBrandDefault,
 	// under the settings row's lock.
-	DefaultBrandId sql.NullInt64 `db:"default_brand_id" fieldtag:"dont-update"`
+	DefaultBrandID sql.NullInt64 `db:"default_brand_id" fieldtag:"dont-update"`
 }
 
 // IsSelfRegistrationAvailable says whether a visitor may register: self-registration on, and either

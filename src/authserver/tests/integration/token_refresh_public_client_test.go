@@ -47,14 +47,14 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 	require.Nil(t, data["error"], "unexpected refusal at redemption: %v", data["error_description"])
 	require.NotEmpty(t, data["refresh_token"])
 
-	return data["refresh_token"].(string), code.ClientId, code.Client.ClientIdentifier, destUrl
+	return data["refresh_token"].(string), code.ClientID, code.Client.ClientIdentifier, destUrl
 }
 
 // C1. The grant outlives the configuration it was issued under, and this is what catches it.
 func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testing.T) {
 	refreshToken, clientId, clientIdentifier, destUrl := challengelessRefreshToken(t, fake.LetterN(32))
 
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil

@@ -20,11 +20,11 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  record.ACRLevel2Mandatory, // Requires OTP
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -77,11 +77,11 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.ACRLevel2Mandatory,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -135,11 +135,11 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.ACRLevel2Mandatory,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -189,11 +189,11 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  record.ACRLevel2Mandatory, // Requires OTP
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -242,11 +242,11 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.ACRLevel2Mandatory,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -296,11 +296,11 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultAcrLevel:  record.ACRLevel2Mandatory,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)

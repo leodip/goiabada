@@ -19,8 +19,8 @@ import (
 // reads the grants once, on its transaction, and deletes by the ids that read returned (#406, #428).
 func TestHandleGroupPermissionsGet_AFailedCountAnswers500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(5)).
-		Return(&record.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
+	database.On("GetGroupByID", mock.Anything, mock.Anything, int64(5)).
+		Return(&record.Group{ID: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("GroupLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 

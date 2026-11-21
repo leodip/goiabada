@@ -110,9 +110,9 @@ func TestLegalDocumentPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 // the default (#812).
 func TestSignInPages_TheRecoveryCodesStepIsDrawnInTheClientsBrand(t *testing.T) {
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	branded, brandedRedirectURI := createPublicClientAt(t, record.AcrLevel2Mandatory)
+	branded, brandedRedirectURI := createPublicClientAt(t, record.ACRLevel2Mandatory)
 	clientBrand := giveClientBrand(t, branded, record.BrandAppearanceLight, "avocado")
-	plain, plainRedirectURI := createPublicClientAt(t, record.AcrLevel2Mandatory)
+	plain, plainRedirectURI := createPublicClientAt(t, record.ACRLevel2Mandatory)
 
 	for _, tc := range []struct {
 		name        string
@@ -153,7 +153,7 @@ func TestDCR_ABrandInTheRequestIsIgnored(t *testing.T) {
 	require.NoError(t, database.CreateBrand(ctx, nil, brand))
 	t.Cleanup(func() {
 		assert.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.ID)
 			return err
 		}), "unable to delete the brand")
 	})
@@ -161,9 +161,9 @@ func TestDCR_ABrandInTheRequestIsIgnored(t *testing.T) {
 	body, err := json.Marshal(map[string]any{
 		"redirect_uris": []string{"https://brand-dcr.example.com/callback"},
 		"client_name":   "Brand DCR " + fake.LetterN(6),
-		"brandId":       brand.Id,
-		"brand_id":      brand.Id,
-		"brand":         strconv.FormatInt(brand.Id, 10),
+		"brandId":       brand.ID,
+		"brand_id":      brand.ID,
+		"brand":         strconv.FormatInt(brand.ID, 10),
 	})
 	require.NoError(t, err)
 	request, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/connect/register", bytes.NewReader(body))
@@ -180,6 +180,6 @@ func TestDCR_ABrandInTheRequestIsIgnored(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, response.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
-	assert.False(t, client.BrandId.Valid, "the client follows the default brand, whatever the request named")
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
+	assert.False(t, client.BrandID.Valid, "the client follows the default brand, whatever the request named")
 }

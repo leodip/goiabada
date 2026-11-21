@@ -67,7 +67,7 @@ func TestHandleIssueGet_TheConsentedScopeIsWhatIsJudged(t *testing.T) {
 	f.authContext.ConsentedScope = "openid"
 
 	f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-		Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+		Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 			State: "test-state"}, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
@@ -86,7 +86,7 @@ func TestHandleIssueGet_AnAllowedClientIsIssuedTheAdministrativeScope(t *testing
 		f.authContext.Scope = "openid authserver:manage"
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()

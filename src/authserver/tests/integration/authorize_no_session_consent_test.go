@@ -25,7 +25,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -34,7 +34,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -62,13 +62,13 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -135,21 +135,21 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
@@ -161,7 +161,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -170,7 +170,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -198,13 +198,13 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -274,21 +274,21 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
@@ -300,7 +300,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -309,7 +309,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -338,13 +338,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -415,21 +415,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
@@ -441,7 +441,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -450,7 +450,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -479,13 +479,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -560,21 +560,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
@@ -586,7 +586,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -595,7 +595,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -628,13 +628,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -713,21 +713,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
@@ -739,7 +739,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -748,7 +748,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -781,13 +781,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -870,21 +870,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
@@ -896,7 +896,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -905,7 +905,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -935,13 +935,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1021,21 +1021,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
@@ -1047,7 +1047,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1056,7 +1056,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1086,13 +1086,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1176,21 +1176,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
@@ -1202,7 +1202,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1211,7 +1211,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1244,13 +1244,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1329,21 +1329,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, requestScope, consent.Scope)
 }
@@ -1355,7 +1355,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1364,7 +1364,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1397,13 +1397,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1486,21 +1486,21 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assertStampedSince(t, consent.GrantedAt.Time, started)
 	assert.Equal(t, expectedScope, consent.Scope)
 }
@@ -1511,7 +1511,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1520,7 +1520,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1548,13 +1548,13 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1641,7 +1641,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1650,7 +1650,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1679,13 +1679,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1759,7 +1759,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1768,7 +1768,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1801,13 +1801,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -1889,7 +1889,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1898,7 +1898,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -1928,13 +1928,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -2017,7 +2017,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -2026,7 +2026,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -2059,13 +2059,13 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	resource1 := createResource(t)
-	permission1 := createPermission(t, resource1.Id)
+	permission1 := createPermission(t, resource1.ID)
 
 	resource2 := createResource(t)
-	permission2 := createPermission(t, resource2.Id)
+	permission2 := createPermission(t, resource2.ID)
 
-	assignPermissionToUser(t, user.Id, permission1.Id)
-	assignPermissionToUser(t, user.Id, permission2.Id)
+	assignPermissionToUser(t, user.ID, permission1.ID)
+	assignPermissionToUser(t, user.ID, permission2.ID)
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
@@ -2152,7 +2152,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -2161,7 +2161,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -2193,8 +2193,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	permissionScopes := make([]string, 0, 8)
 	for i := 0; i < 8; i++ {
 		resource := createResource(t)
-		permission := createPermission(t, resource.Id)
-		assignPermissionToUser(t, user.Id, permission.Id)
+		permission := createPermission(t, resource.ID)
+		assignPermissionToUser(t, user.ID, permission.ID)
 		permissionScopes = append(permissionScopes,
 			resource.ResourceIdentifier+":"+permission.PermissionIdentifier)
 	}
@@ -2268,17 +2268,17 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	assert.NotContains(t, strings.Split(code.Scope, " "), "profile")
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.False(t, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.NotNil(t, consent)
-	assert.Equal(t, user.Id, consent.UserId)
-	assert.Equal(t, client.Id, consent.ClientId)
+	assert.Equal(t, user.ID, consent.UserID)
+	assert.Equal(t, client.ID, consent.ClientID)
 	assert.Equal(t, expectedScope, consent.Scope)
 	assert.NotContains(t, strings.Split(consent.Scope, " "), "profile")
 }

@@ -316,7 +316,7 @@ func run() int {
 	// The stored issuer is checked once, here, against the rule a save applies to a changed one.
 	// A read that fails stops nothing: the check only reports, and the settings middleware answers
 	// every request without settings with its own fault.
-	if settings, settingsErr := database.GetSettingsById(startupCtx, nil, 1); settingsErr != nil {
+	if settings, settingsErr := database.GetSettingsByID(startupCtx, nil, 1); settingsErr != nil {
 		slog.Warn("unable to read the settings, so the stored issuer is not checked", "error", settingsErr)
 	} else if settings != nil {
 		logStoredIssuer(settings.Issuer, cfg.AuthServer.BaseURL)

@@ -73,7 +73,7 @@ func HandleSettingsAuditLogsPut(
 		// context stay the ones it started with. The change is then recorded under those, the audit
 		// logger's switches, so switching logging off is recorded too, and a save the database
 		// refuses records nothing.
-		updated, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		updated, err := saveSettingsSection(r.Context(), database, currentSettings.ID, func(stored *record.Settings) {
 			stored.AuditLogsInConsoleEnabled = req.AuditLogsInConsoleEnabled
 			stored.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
 			stored.AuditLogRetentionDays = req.AuditLogRetentionDays

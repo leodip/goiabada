@@ -45,7 +45,7 @@ func createTestBrandAsset(t *testing.T, db data.Database, kind record.BrandAsset
 		Content:     brandAssetBytes(fake.LetterN(8)),
 	}
 	require.NoError(t, db.CreateBrandAsset(context.Background(), nil, asset))
-	require.Positive(t, asset.Id, "the create answers the asset's id")
+	require.Positive(t, asset.ID, "the create answers the asset's id")
 	return asset
 }
 
@@ -73,12 +73,12 @@ func TestCreateBrandAsset_ReadsBackWithItsBytes(t *testing.T) {
 			Content:     content,
 		}
 		require.NoError(t, database.CreateBrandAsset(ctx, nil, asset))
-		require.Positivef(t, asset.Id, "the create answers the %s's id", c.kind)
+		require.Positivef(t, asset.ID, "the create answers the %s's id", c.kind)
 
-		stored, err := database.GetBrandAssetById(ctx, nil, asset.Id)
+		stored, err := database.GetBrandAssetByID(ctx, nil, asset.ID)
 		require.NoError(t, err)
-		require.NotNilf(t, stored, "the %s %d reads back", c.kind, asset.Id)
-		assert.Equal(t, asset.Id, stored.Id)
+		require.NotNilf(t, stored, "the %s %d reads back", c.kind, asset.ID)
+		assert.Equal(t, asset.ID, stored.ID)
 		assert.Equal(t, c.kind, stored.Kind)
 		assert.Equal(t, c.contentType, stored.ContentType)
 		assert.Equal(t, "a1b2c3d4e5f6", stored.Fingerprint)
@@ -98,37 +98,37 @@ func TestCreateBrandAsset_HoldsTwoMebibytes(t *testing.T) {
 		Width: 3840, Height: 3840, Content: content}
 	require.NoError(t, database.CreateBrandAsset(ctx, nil, asset))
 
-	stored, err := database.GetBrandAssetById(ctx, nil, asset.Id)
+	stored, err := database.GetBrandAssetByID(ctx, nil, asset.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Len(t, stored.Content, 2*1024*1024)
 	assert.True(t, bytes.Equal(content, stored.Content), "a 2 MiB asset reads back unchanged")
 }
 
-func TestGetBrandAssetById_AnUnknownIdIsNil(t *testing.T) {
-	stored, err := database.GetBrandAssetById(context.Background(), nil, 987_654_321)
+func TestGetBrandAssetByID_AnUnknownIDIsNil(t *testing.T) {
+	stored, err := database.GetBrandAssetByID(context.Background(), nil, 987_654_321)
 	require.NoError(t, err)
 	assert.Nil(t, stored)
 }
 
-// GetBrandAssetsByIds answers what GetBrandAssetById does but the bytes, which it leaves out: a
+// GetBrandAssetsByIDs answers what GetBrandAssetByID does but the bytes, which it leaves out: a
 // brand's answer and its pages read their assets through it (decision 2).
-func TestGetBrandAssetsByIds_AnswersEveryAssetNamedWithoutItsBytes(t *testing.T) {
+func TestGetBrandAssetsByIDs_AnswersEveryAssetNamedWithoutItsBytes(t *testing.T) {
 	ctx := context.Background()
 	logo := createTestBrandAsset(t, database, "logo")
 	font := &record.BrandAsset{Kind: "font", ContentType: "font/woff2", Fingerprint: "0123456789ab",
 		Content: []byte("wOF2" + fake.LetterN(8))}
 	require.NoError(t, database.CreateBrandAsset(ctx, nil, font))
 
-	assets, err := database.GetBrandAssetsByIds(ctx, nil, []int64{font.Id, 987_654_321, logo.Id, font.Id})
+	assets, err := database.GetBrandAssetsByIDs(ctx, nil, []int64{font.ID, 987_654_321, logo.ID, font.ID})
 	require.NoError(t, err)
 	require.Len(t, assets, 2, "each asset named once, and none for the id naming none")
-	byId := map[int64]record.BrandAsset{}
+	byID := map[int64]record.BrandAsset{}
 	for _, a := range assets {
-		byId[a.Id] = a
+		byID[a.ID] = a
 	}
 
-	gotLogo, ok := byId[logo.Id]
+	gotLogo, ok := byID[logo.ID]
 	require.True(t, ok, "the logo is answered")
 	assert.Equal(t, record.BrandAssetKind("logo"), gotLogo.Kind)
 	assert.Equal(t, "image/png", gotLogo.ContentType)
@@ -139,7 +139,7 @@ func TestGetBrandAssetsByIds_AnswersEveryAssetNamedWithoutItsBytes(t *testing.T)
 		"created_at reads back: wrote %v, read %v", logo.CreatedAt, gotLogo.CreatedAt)
 	assert.Nil(t, gotLogo.Content, "the bytes are left out")
 
-	gotFont, ok := byId[font.Id]
+	gotFont, ok := byID[font.ID]
 	require.True(t, ok, "the font is answered")
 	assert.Equal(t, record.BrandAssetKind("font"), gotFont.Kind)
 	assert.Equal(t, "font/woff2", gotFont.ContentType)
@@ -148,7 +148,7 @@ func TestGetBrandAssetsByIds_AnswersEveryAssetNamedWithoutItsBytes(t *testing.T)
 	assert.Equal(t, 0, gotFont.Height)
 	assert.Nil(t, gotFont.Content, "the bytes are left out")
 
-	none, err := database.GetBrandAssetsByIds(ctx, nil, nil)
+	none, err := database.GetBrandAssetsByIDs(ctx, nil, nil)
 	require.NoError(t, err)
 	assert.Empty(t, none, "no ids, no assets")
 }
@@ -171,7 +171,7 @@ func createBrandKitAssets(t *testing.T, db data.Database) brandKitAssets {
 }
 
 func brandSlot(asset *record.BrandAsset) sql.NullInt64 {
-	return sql.NullInt64{Int64: asset.Id, Valid: true}
+	return sql.NullInt64{Int64: asset.ID, Valid: true}
 }
 
 // assertBrandKit holds a brand read back to the kit written, field by field.
@@ -181,12 +181,12 @@ func assertBrandKit(t *testing.T, want, got *record.Brand, phase string) {
 	assert.Equalf(t, want.Font, got.Font, "[%s] font", phase)
 	assert.Equalf(t, want.BackgroundFit, got.BackgroundFit, "[%s] background fit", phase)
 	assert.Equalf(t, want.HideAppName, got.HideAppName, "[%s] hide app name", phase)
-	assert.Equalf(t, want.LogoAssetId, got.LogoAssetId, "[%s] logo slot", phase)
-	assert.Equalf(t, want.DarkLogoAssetId, got.DarkLogoAssetId, "[%s] dark logo slot", phase)
-	assert.Equalf(t, want.FaviconAssetId, got.FaviconAssetId, "[%s] favicon slot", phase)
-	assert.Equalf(t, want.BackgroundAssetId, got.BackgroundAssetId, "[%s] background slot", phase)
-	assert.Equalf(t, want.RegularFontAssetId, got.RegularFontAssetId, "[%s] regular font slot", phase)
-	assert.Equalf(t, want.BoldFontAssetId, got.BoldFontAssetId, "[%s] bold font slot", phase)
+	assert.Equalf(t, want.LogoAssetID, got.LogoAssetID, "[%s] logo slot", phase)
+	assert.Equalf(t, want.DarkLogoAssetID, got.DarkLogoAssetID, "[%s] dark logo slot", phase)
+	assert.Equalf(t, want.FaviconAssetID, got.FaviconAssetID, "[%s] favicon slot", phase)
+	assert.Equalf(t, want.BackgroundAssetID, got.BackgroundAssetID, "[%s] background slot", phase)
+	assert.Equalf(t, want.RegularFontAssetID, got.RegularFontAssetID, "[%s] regular font slot", phase)
+	assert.Equalf(t, want.BoldFontAssetID, got.BoldFontAssetID, "[%s] bold font slot", phase)
 }
 
 // A brand is written and read with its four choices and its six slots, each slot its own column:
@@ -198,13 +198,13 @@ func TestBrand_ReadsAndWritesItsKit(t *testing.T) {
 	brand := &record.Brand{
 		Name: "Kit " + fake.LetterN(16), Appearance: "light", Theme: "plum",
 		Corners: "pill", Font: "uploaded", BackgroundFit: "tile", HideAppName: true,
-		LogoAssetId: brandSlot(assets.logo), DarkLogoAssetId: brandSlot(assets.darkLogo),
-		FaviconAssetId: brandSlot(assets.favicon), BackgroundAssetId: brandSlot(assets.background),
-		RegularFontAssetId: brandSlot(assets.regularFont), BoldFontAssetId: brandSlot(assets.boldFont),
+		LogoAssetID: brandSlot(assets.logo), DarkLogoAssetID: brandSlot(assets.darkLogo),
+		FaviconAssetID: brandSlot(assets.favicon), BackgroundAssetID: brandSlot(assets.background),
+		RegularFontAssetID: brandSlot(assets.regularFont), BoldFontAssetID: brandSlot(assets.boldFont),
 	}
 	require.NoError(t, database.CreateBrand(ctx, nil, brand))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assertBrandKit(t, brand, stored, "created, by id")
@@ -213,7 +213,7 @@ func TestBrand_ReadsAndWritesItsKit(t *testing.T) {
 	require.NoError(t, err)
 	var listed *record.Brand
 	for i := range all {
-		if all[i].Id == brand.Id {
+		if all[i].ID == brand.ID {
 			listed = &all[i]
 		}
 	}
@@ -225,17 +225,17 @@ func TestBrand_ReadsAndWritesItsKit(t *testing.T) {
 	newBackground := createTestBrandAsset(t, database, "background")
 	edit := *stored
 	edit.Corners, edit.Font, edit.BackgroundFit, edit.HideAppName = "square", "neo-grotesque", "contain", false
-	edit.LogoAssetId = brandSlot(newLogo)
-	edit.DarkLogoAssetId = sql.NullInt64{}
-	edit.BackgroundAssetId = brandSlot(newBackground)
-	edit.BoldFontAssetId = sql.NullInt64{}
+	edit.LogoAssetID = brandSlot(newLogo)
+	edit.DarkLogoAssetID = sql.NullInt64{}
+	edit.BackgroundAssetID = brandSlot(newBackground)
+	edit.BoldFontAssetID = sql.NullInt64{}
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
 
-	updated, err := database.GetBrandById(ctx, nil, brand.Id)
+	updated, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	assertBrandKit(t, &edit, updated, "updated")
-	assert.Equal(t, sql.NullInt64{Int64: assets.favicon.Id, Valid: true}, updated.FaviconAssetId, "a kept slot is kept")
+	assert.Equal(t, sql.NullInt64{Int64: assets.favicon.ID, Valid: true}, updated.FaviconAssetID, "a kept slot is kept")
 	assert.Equal(t, brand.Name, updated.Name)
 	assert.Equal(t, record.BrandAppearance("light"), updated.Appearance)
 	assert.Equal(t, "plum", updated.Theme)
@@ -260,7 +260,7 @@ func TestBrand_EveryChoiceReadsBack(t *testing.T) {
 		brand := &record.Brand{Name: "Choice " + fake.LetterN(16), Appearance: "auto", Theme: "blueberry",
 			Corners: c.corners, Font: c.font, BackgroundFit: c.fit}
 		require.NoError(t, database.CreateBrand(ctx, nil, brand))
-		stored, err := database.GetBrandById(ctx, nil, brand.Id)
+		stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
 		assertBrandKit(t, brand, stored, fmt.Sprintf("%s, %s, %s", c.corners, c.font, c.fit))
@@ -277,12 +277,12 @@ func TestBrand_ASlotNamingNoAssetIsRefused(t *testing.T) {
 		name string
 		fill func(*record.Brand)
 	}{
-		{"logo", func(b *record.Brand) { b.LogoAssetId = missing }},
-		{"dark logo", func(b *record.Brand) { b.DarkLogoAssetId = missing }},
-		{"favicon", func(b *record.Brand) { b.FaviconAssetId = missing }},
-		{"background", func(b *record.Brand) { b.BackgroundAssetId = missing }},
-		{"regular font", func(b *record.Brand) { b.RegularFontAssetId = missing }},
-		{"bold font", func(b *record.Brand) { b.BoldFontAssetId = missing }},
+		{"logo", func(b *record.Brand) { b.LogoAssetID = missing }},
+		{"dark logo", func(b *record.Brand) { b.DarkLogoAssetID = missing }},
+		{"favicon", func(b *record.Brand) { b.FaviconAssetID = missing }},
+		{"background", func(b *record.Brand) { b.BackgroundAssetID = missing }},
+		{"regular font", func(b *record.Brand) { b.RegularFontAssetID = missing }},
+		{"bold font", func(b *record.Brand) { b.BoldFontAssetID = missing }},
 	} {
 		created := record.NewBrand("Missing "+fake.LetterN(16), "auto", "blueberry")
 		set.fill(&created)
@@ -293,7 +293,7 @@ func TestBrand_ASlotNamingNoAssetIsRefused(t *testing.T) {
 		edit := existing
 		set.fill(&edit)
 		require.Errorf(t, database.UpdateBrand(ctx, nil, &edit), "an update whose %s slot names no asset", set.name)
-		stored, err := database.GetBrandById(ctx, nil, existing.Id)
+		stored, err := database.GetBrandByID(ctx, nil, existing.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
 		assertBrandKit(t, &existing, stored, "after the refused "+set.name+" update")
@@ -307,7 +307,7 @@ func TestNewBrand_IsDrawnAsBeforeTheKit(t *testing.T) {
 	brand := record.NewBrand("New "+fake.LetterN(16), "dark", "avocado")
 	require.NoError(t, database.CreateBrand(ctx, nil, &brand))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, record.BrandAppearance("dark"), stored.Appearance)
@@ -322,9 +322,9 @@ func TestGetDefaultBrand_ReadsTheKit(t *testing.T) {
 	assets := createBrandKitAssets(t, h.DB)
 
 	def.Corners, def.Font, def.BackgroundFit, def.HideAppName = "pill", "serif", "contain", true
-	def.LogoAssetId, def.DarkLogoAssetId = brandSlot(assets.logo), brandSlot(assets.darkLogo)
-	def.FaviconAssetId, def.BackgroundAssetId = brandSlot(assets.favicon), brandSlot(assets.background)
-	def.RegularFontAssetId, def.BoldFontAssetId = brandSlot(assets.regularFont), brandSlot(assets.boldFont)
+	def.LogoAssetID, def.DarkLogoAssetID = brandSlot(assets.logo), brandSlot(assets.darkLogo)
+	def.FaviconAssetID, def.BackgroundAssetID = brandSlot(assets.favicon), brandSlot(assets.background)
+	def.RegularFontAssetID, def.BoldFontAssetID = brandSlot(assets.regularFont), brandSlot(assets.boldFont)
 	require.NoError(t, h.DB.UpdateBrand(ctx, nil, def))
 
 	got, err := h.DB.GetDefaultBrand(ctx, nil)
@@ -349,17 +349,17 @@ func TestDeleteUnattachedBrandAssets_DeletesOnlyOldUnattachedAssets(t *testing.T
 	ofDeletedBrand := createTestBrandAsset(t, h.DB, "font")
 
 	keeper := record.NewBrand("Keeper", "auto", "blueberry")
-	keeper.LogoAssetId, keeper.DarkLogoAssetId = brandSlot(attached.logo), brandSlot(attached.darkLogo)
-	keeper.FaviconAssetId, keeper.BackgroundAssetId = brandSlot(attached.favicon), brandSlot(attached.background)
-	keeper.RegularFontAssetId, keeper.BoldFontAssetId = brandSlot(attached.regularFont), brandSlot(attached.boldFont)
+	keeper.LogoAssetID, keeper.DarkLogoAssetID = brandSlot(attached.logo), brandSlot(attached.darkLogo)
+	keeper.FaviconAssetID, keeper.BackgroundAssetID = brandSlot(attached.favicon), brandSlot(attached.background)
+	keeper.RegularFontAssetID, keeper.BoldFontAssetID = brandSlot(attached.regularFont), brandSlot(attached.boldFont)
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &keeper))
 
 	editor := record.NewBrand("Editor", "auto", "blueberry")
-	editor.LogoAssetId, editor.FaviconAssetId = brandSlot(replaced), brandSlot(removed)
+	editor.LogoAssetID, editor.FaviconAssetID = brandSlot(replaced), brandSlot(removed)
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &editor))
 
 	doomed := record.NewBrand("Doomed", "auto", "blueberry")
-	doomed.RegularFontAssetId = brandSlot(ofDeletedBrand)
+	doomed.RegularFontAssetID = brandSlot(ofDeletedBrand)
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &doomed))
 
 	time.Sleep(20 * time.Millisecond)
@@ -377,11 +377,11 @@ func TestDeleteUnattachedBrandAssets_DeletesOnlyOldUnattachedAssets(t *testing.T
 	assertBrandAssetStored(t, h, unattached, false, "an old asset never attached")
 
 	// The editor replaces its logo and removes its favicon; the doomed brand is deleted.
-	editor.LogoAssetId = brandSlot(replacement)
-	editor.FaviconAssetId = sql.NullInt64{}
+	editor.LogoAssetID = brandSlot(replacement)
+	editor.FaviconAssetID = sql.NullInt64{}
 	require.NoError(t, h.DB.UpdateBrand(ctx, nil, &editor))
 	require.NoError(t, h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		_, deleteErr := h.DB.DeleteBrand(ctx, tx, doomed.Id)
+		_, deleteErr := h.DB.DeleteBrand(ctx, tx, doomed.ID)
 		return deleteErr
 	}))
 
@@ -409,7 +409,7 @@ func TestDeleteUnattachedBrandAssets_DeletesOnlyOldUnattachedAssets(t *testing.T
 
 func assertBrandAssetStored(t *testing.T, h *isolatedDB, asset *record.BrandAsset, want bool, what string) {
 	t.Helper()
-	stored, err := h.DB.GetBrandAssetById(context.Background(), nil, asset.Id)
+	stored, err := h.DB.GetBrandAssetByID(context.Background(), nil, asset.ID)
 	require.NoError(t, err)
 	if want {
 		assert.NotNilf(t, stored, "%s is kept on %s", what, dbType())

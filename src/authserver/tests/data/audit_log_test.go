@@ -26,7 +26,7 @@ func TestCreateAuditLog(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify ID was assigned
-		assert.Positive(t, auditLog.Id)
+		assert.Positive(t, auditLog.ID)
 
 		// Verify CreatedAt was set, from a reading taken during the call
 		assert.WithinRange(t, auditLog.CreatedAt, before, after)
@@ -69,7 +69,7 @@ func TestCreateAuditLog(t *testing.T) {
 
 		err := database.CreateAuditLog(context.Background(), nil, auditLog)
 		require.NoError(t, err)
-		assert.Positive(t, auditLog.Id)
+		assert.Positive(t, auditLog.ID)
 	})
 
 	// #328: the request id written is the request id read back, on every engine, and a row
@@ -77,7 +77,7 @@ func TestCreateAuditLog(t *testing.T) {
 	// actually receives: chi's own, a proxy's uuid adopted from the header, and the clipped
 	// rendering of an oversized one, which is the longest string that can reach the column.
 	t.Run("Success - the request id round-trips", func(t *testing.T) {
-		requestIds := []struct {
+		requestIDs := []struct {
 			name string
 			id   string
 		}{
@@ -90,20 +90,20 @@ func TestCreateAuditLog(t *testing.T) {
 			},
 		}
 
-		for _, tc := range requestIds {
+		for _, tc := range requestIDs {
 			t.Run(tc.name, func(t *testing.T) {
 				event := "request_id_roundtrip_" + fake.LetterN(12)
 				require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 					AuditEvent: event,
 					Details:    `{"test": "data"}`,
-					RequestId:  tc.id,
+					RequestID:  tc.id,
 				}))
 
 				logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event})
 				require.NoError(t, err)
 				require.Equal(t, 1, total)
 				require.Len(t, logs, 1)
-				assert.Equalf(t, tc.id, logs[0].RequestId,
+				assert.Equalf(t, tc.id, logs[0].RequestID,
 					"the id the viewer shows must be the id the writer stored, byte for byte, on %s", dbType())
 			})
 		}
@@ -247,9 +247,9 @@ func TestGetAuditLogsPaginated_Sorting(t *testing.T) {
 
 // #328: the request id filter. It is an exact match over a value the client chose, so what it
 // must never do is list one request's audit entries under another request's id.
-func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
-	requestId := "itest-" + fake.LetterN(16)
-	otherRequestId := "itest-" + fake.LetterN(16)
+func TestGetAuditLogsPaginated_RequestIDFilter(t *testing.T) {
+	requestID := "itest-" + fake.LetterN(16)
+	otherRequestID := "itest-" + fake.LetterN(16)
 	event := "request_id_filter_" + fake.LetterN(10)
 	otherEvent := "request_id_filter_" + fake.LetterN(10)
 
@@ -258,44 +258,44 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 	// different request id.
 	rows := []struct {
 		event     string
-		requestId string
+		requestID string
 	}{
-		{event, requestId},
-		{otherEvent, requestId},
-		{event, otherRequestId},
+		{event, requestID},
+		{otherEvent, requestID},
+		{event, otherRequestID},
 	}
 	for _, row := range rows {
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 			AuditEvent: row.event,
 			Details:    `{"test": "data"}`,
-			RequestId:  row.requestId,
+			RequestID:  row.requestID,
 		}))
 		time.Sleep(timestampTick)
 	}
 
 	t.Run("the filter alone returns every entry that request raised", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestId: requestId})
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestID: requestID})
 		require.NoError(t, err)
 
 		assert.Equal(t, 2, total)
 		require.Len(t, logs, 2)
 		for _, log := range logs {
-			assert.Equal(t, requestId, log.RequestId)
+			assert.Equal(t, requestID, log.RequestID)
 		}
 	})
 
 	t.Run("combined with the audit event both narrow", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event, RequestId: requestId})
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{AuditEvent: event, RequestID: requestID})
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, total)
 		require.Len(t, logs, 1)
 		assert.Equal(t, event, logs[0].AuditEvent)
-		assert.Equal(t, requestId, logs[0].RequestId)
+		assert.Equal(t, requestID, logs[0].RequestID)
 	})
 
 	t.Run("an id nothing carries yields nothing", func(t *testing.T) {
-		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestId: "itest-" + fake.LetterN(16)})
+		logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, record.AuditLogFilter{RequestID: "itest-" + fake.LetterN(16)})
 		require.NoError(t, err)
 
 		assert.Equal(t, 0, total)
@@ -318,7 +318,7 @@ func TestGetAuditLogsPaginated_RequestIdFilter(t *testing.T) {
 // one must not be shown the other's entries, nor be told there are more of them than the page
 // lists. Page size 1 is what separates a page that was guarded from a total that was not: an
 // unguarded count answers 2 where the page holds 1 (#328).
-func TestGetAuditLogsPaginated_RequestIdFilterIsByteExact(t *testing.T) {
+func TestGetAuditLogsPaginated_RequestIDFilterIsByteExact(t *testing.T) {
 	event := "request_id_guard_" + fake.LetterN(10)
 	unpadded := "corr-" + fake.LetterN(12)
 	padded := unpadded + " "
@@ -330,8 +330,8 @@ func TestGetAuditLogsPaginated_RequestIdFilterIsByteExact(t *testing.T) {
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, &record.AuditLog{
 			AuditEvent: event,
 			Details:    `{"test": "data"}`,
-			RequestId:  id,
-			UserId:     sql.NullInt64{Int64: user, Valid: true},
+			RequestID:  id,
+			UserID:     sql.NullInt64{Int64: user, Valid: true},
 		}))
 		time.Sleep(timestampTick)
 	}
@@ -341,25 +341,25 @@ func TestGetAuditLogsPaginated_RequestIdFilterIsByteExact(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		auditEvent string
-		userId     int64
+		userID     int64
 		filter     string
 	}{
 		{name: "the id without the trailing space", auditEvent: event, filter: unpadded},
 		{name: "the id with the trailing space", auditEvent: event, filter: padded},
 		{name: "the id without the trailing space, alone", filter: unpadded},
 		{name: "the id with the trailing space, alone", filter: padded},
-		{name: "the id without the trailing space, with the user", userId: user, filter: unpadded},
-		{name: "the id with the trailing space, with the user", userId: user, filter: padded},
-		{name: "the id without the trailing space, with the event and the user", auditEvent: event, userId: user, filter: unpadded},
-		{name: "the id with the trailing space, with the event and the user", auditEvent: event, userId: user, filter: padded},
+		{name: "the id without the trailing space, with the user", userID: user, filter: unpadded},
+		{name: "the id with the trailing space, with the user", userID: user, filter: padded},
+		{name: "the id without the trailing space, with the event and the user", auditEvent: event, userID: user, filter: unpadded},
+		{name: "the id with the trailing space, with the event and the user", auditEvent: event, userID: user, filter: padded},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1,
-				record.AuditLogFilter{AuditEvent: tc.auditEvent, RequestId: tc.filter, UserId: tc.userId})
+				record.AuditLogFilter{AuditEvent: tc.auditEvent, RequestID: tc.filter, UserID: tc.userID})
 			require.NoError(t, err)
 
 			require.Len(t, logs, 1)
-			assert.Equalf(t, tc.filter, logs[0].RequestId,
+			assert.Equalf(t, tc.filter, logs[0].RequestID,
 				"the page listed an entry carrying an id the filter did not ask for, on %s", dbType())
 			assert.Equalf(t, len(logs), total,
 				"the total counted an entry the page did not list, on %s", dbType())
@@ -380,22 +380,22 @@ func TestCreateAuditLog_TheUserColumnsRoundTrip(t *testing.T) {
 	const beyondAFloat = int64(9007199254740993)
 	for _, tc := range []struct {
 		name           string
-		userId         int64
-		loggedInUserId int64
+		userID         int64
+		loggedInUserID int64
 	}{
-		{name: "about one user and made by another", userId: 41, loggedInUserId: 7},
-		{name: "about a user, made on no user's token", userId: 41},
-		{name: "made by a user, about no one", loggedInUserId: 7},
+		{name: "about one user and made by another", userID: 41, loggedInUserID: 7},
+		{name: "about a user, made on no user's token", userID: 41},
+		{name: "made by a user, about no one", loggedInUserID: 7},
 		{name: "naming neither"},
-		{name: "an id beyond a float's exact range", userId: beyondAFloat, loggedInUserId: beyondAFloat},
+		{name: "an id beyond a float's exact range", userID: beyondAFloat, loggedInUserID: beyondAFloat},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			event := "user_columns_roundtrip_" + fake.LetterN(12)
 			written := &record.AuditLog{
 				AuditEvent:     event,
 				Details:        `{"test": "data"}`,
-				UserId:         userColumn(tc.userId),
-				LoggedInUserId: userColumn(tc.loggedInUserId),
+				UserID:         userColumn(tc.userID),
+				LoggedInUserID: userColumn(tc.loggedInUserID),
 			}
 			require.NoError(t, database.CreateAuditLog(context.Background(), nil, written))
 
@@ -403,9 +403,9 @@ func TestCreateAuditLog_TheUserColumnsRoundTrip(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, total)
 			require.Len(t, logs, 1)
-			assert.Equal(t, written.Id, logs[0].Id)
-			assert.Equalf(t, userColumn(tc.userId), logs[0].UserId, "user_id read back on %s", dbType())
-			assert.Equalf(t, userColumn(tc.loggedInUserId), logs[0].LoggedInUserId, "logged_in_user_id read back on %s", dbType())
+			assert.Equal(t, written.ID, logs[0].ID)
+			assert.Equalf(t, userColumn(tc.userID), logs[0].UserID, "user_id read back on %s", dbType())
+			assert.Equalf(t, userColumn(tc.loggedInUserID), logs[0].LoggedInUserID, "logged_in_user_id read back on %s", dbType())
 		})
 	}
 }
@@ -428,8 +428,8 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 	rows := []struct {
 		name           string
 		event, request string
-		userId         int64
-		loggedInUserId int64
+		userID         int64
+		loggedInUserID int64
 	}{
 		{"about", event, request, user, 0},
 		{"by", otherEvent, request, other, user},
@@ -443,12 +443,12 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 		auditLog := &record.AuditLog{
 			AuditEvent:     row.event,
 			Details:        `{"test": "data"}`,
-			RequestId:      row.request,
-			UserId:         userColumn(row.userId),
-			LoggedInUserId: userColumn(row.loggedInUserId),
+			RequestID:      row.request,
+			UserID:         userColumn(row.userID),
+			LoggedInUserID: userColumn(row.loggedInUserID),
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
-		ids[row.name] = auditLog.Id
+		ids[row.name] = auditLog.ID
 		time.Sleep(timestampTick)
 	}
 
@@ -458,27 +458,27 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 		want   []string
 	}{
 		{"the user alone lists the rows about them and the rows they made",
-			record.AuditLogFilter{UserId: user}, []string{"by, about no one", "about and by", "by", "about"}},
+			record.AuditLogFilter{UserID: user}, []string{"by, about no one", "about and by", "by", "about"}},
 		{"a user named only as the one a row is about",
-			record.AuditLogFilter{UserId: other}, []string{"neither", "by"}},
+			record.AuditLogFilter{UserID: other}, []string{"neither", "by"}},
 		{"a user named only as the one who acted",
-			record.AuditLogFilter{UserId: third}, []string{"neither"}},
+			record.AuditLogFilter{UserID: third}, []string{"neither"}},
 		{"an id no row names lists nothing",
-			record.AuditLogFilter{UserId: nobody}, nil},
+			record.AuditLogFilter{UserID: nobody}, nil},
 		{"the user and the event",
-			record.AuditLogFilter{UserId: user, AuditEvent: event}, []string{"about and by", "about"}},
+			record.AuditLogFilter{UserID: user, AuditEvent: event}, []string{"about and by", "about"}},
 		{"the user and the request id",
-			record.AuditLogFilter{UserId: user, RequestId: request}, []string{"by", "about"}},
+			record.AuditLogFilter{UserID: user, RequestID: request}, []string{"by", "about"}},
 		{"the user, the event and the request id",
-			record.AuditLogFilter{UserId: user, AuditEvent: event, RequestId: request}, []string{"about"}},
+			record.AuditLogFilter{UserID: user, AuditEvent: event, RequestID: request}, []string{"about"}},
 		{"the user, the event and the request id, matching nothing together",
-			record.AuditLogFilter{UserId: third, AuditEvent: otherEvent, RequestId: request}, nil},
+			record.AuditLogFilter{UserID: third, AuditEvent: otherEvent, RequestID: request}, nil},
 		{"the event alone lists rows with and without user columns",
 			record.AuditLogFilter{AuditEvent: event}, []string{"no user columns", "neither", "about and by", "about"}},
 		{"the request id alone",
-			record.AuditLogFilter{RequestId: request}, []string{"no user columns", "neither", "by", "about"}},
+			record.AuditLogFilter{RequestID: request}, []string{"no user columns", "neither", "by", "about"}},
 		{"the event and the request id",
-			record.AuditLogFilter{AuditEvent: event, RequestId: request}, []string{"no user columns", "neither", "about"}},
+			record.AuditLogFilter{AuditEvent: event, RequestID: request}, []string{"no user columns", "neither", "about"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10, tc.filter)
@@ -490,7 +490,7 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 			}
 			got := []int64{}
 			for _, log := range logs {
-				got = append(got, log.Id)
+				got = append(got, log.ID)
 			}
 			assert.Equalf(t, want, got, "the rows %v, newest first, on %s", tc.want, dbType())
 			assert.Equalf(t, len(want), total, "the total counts each listed row once, on %s", dbType())
@@ -498,25 +498,25 @@ func TestGetAuditLogsPaginated_UserFilter(t *testing.T) {
 	}
 
 	t.Run("the user's rows page newest first, under the same total", func(t *testing.T) {
-		first, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 3, record.AuditLogFilter{UserId: user})
+		first, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 3, record.AuditLogFilter{UserID: user})
 		require.NoError(t, err)
 		assert.Equal(t, 4, total)
 		require.Len(t, first, 3)
 		assert.Equal(t, []int64{ids["by, about no one"], ids["about and by"], ids["by"]},
-			[]int64{first[0].Id, first[1].Id, first[2].Id})
+			[]int64{first[0].ID, first[1].ID, first[2].ID})
 
-		second, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 2, 3, record.AuditLogFilter{UserId: user})
+		second, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 2, 3, record.AuditLogFilter{UserID: user})
 		require.NoError(t, err)
 		assert.Equal(t, 4, total)
 		require.Len(t, second, 1)
-		assert.Equal(t, ids["about"], second[0].Id)
+		assert.Equal(t, ids["about"], second[0].ID)
 	})
 }
 
 // #781 decision 5: one user's audit events are every row about the user or made by them, each
 // once, in id order, oldest first, all of them at once. Each expected list is written out by hand
 // from the rows below.
-func TestGetAuditLogsByUserId(t *testing.T) {
+func TestGetAuditLogsByUserID(t *testing.T) {
 	// The user ids are unique to this test run, so each read lists only these rows; no foreign key
 	// holds them to a users row, as none holds an audit row's.
 	user := int64(fake.Number(1_000_000_000, 2_000_000_000))
@@ -525,8 +525,8 @@ func TestGetAuditLogsByUserId(t *testing.T) {
 	// Written oldest first, so id order is the order they are listed in.
 	rows := []struct {
 		name           string
-		userId         int64
-		loggedInUserId int64
+		userID         int64
+		loggedInUserID int64
 	}{
 		{"about", user, 0},
 		{"by", other, user},
@@ -540,17 +540,17 @@ func TestGetAuditLogsByUserId(t *testing.T) {
 		auditLog := &record.AuditLog{
 			AuditEvent:     "user_audit_logs_" + fake.LetterN(10),
 			Details:        `{"test": "data"}`,
-			RequestId:      "itest-" + fake.LetterN(16),
-			UserId:         userColumn(row.userId),
-			LoggedInUserId: userColumn(row.loggedInUserId),
+			RequestID:      "itest-" + fake.LetterN(16),
+			UserID:         userColumn(row.userID),
+			LoggedInUserID: userColumn(row.loggedInUserID),
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
-		ids[row.name] = auditLog.Id
+		ids[row.name] = auditLog.ID
 	}
 
 	for _, tc := range []struct {
 		name   string
-		userId int64
+		userID int64
 		want   []string
 	}{
 		{"the rows about the user and the rows they made, oldest first",
@@ -563,7 +563,7 @@ func TestGetAuditLogsByUserId(t *testing.T) {
 			nobody, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			logs, err := database.GetAuditLogsByUserId(context.Background(), nil, tc.userId)
+			logs, err := database.GetAuditLogsByUserID(context.Background(), nil, tc.userID)
 			require.NoError(t, err)
 
 			want := []int64{}
@@ -572,7 +572,7 @@ func TestGetAuditLogsByUserId(t *testing.T) {
 			}
 			got := []int64{}
 			for _, log := range logs {
-				got = append(got, log.Id)
+				got = append(got, log.ID)
 			}
 			assert.Equalf(t, want, got, "the rows %v, oldest first, on %s", tc.want, dbType())
 		})
@@ -582,28 +582,28 @@ func TestGetAuditLogsByUserId(t *testing.T) {
 		written := &record.AuditLog{
 			AuditEvent:     "user_audit_logs_whole_" + fake.LetterN(10),
 			Details:        `{"user_id": "41"}`,
-			RequestId:      "itest-" + fake.LetterN(16),
-			UserId:         userColumn(nobody),
-			LoggedInUserId: userColumn(third),
+			RequestID:      "itest-" + fake.LetterN(16),
+			UserID:         userColumn(nobody),
+			LoggedInUserID: userColumn(third),
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, written))
 
-		logs, err := database.GetAuditLogsByUserId(context.Background(), nil, nobody)
+		logs, err := database.GetAuditLogsByUserID(context.Background(), nil, nobody)
 		require.NoError(t, err)
 		require.Len(t, logs, 1)
-		assert.Equal(t, written.Id, logs[0].Id)
+		assert.Equal(t, written.ID, logs[0].ID)
 		assert.Equal(t, written.AuditEvent, logs[0].AuditEvent)
 		assert.Equal(t, written.Details, logs[0].Details)
-		assert.Equal(t, written.RequestId, logs[0].RequestId)
-		assert.Equal(t, userColumn(nobody), logs[0].UserId)
-		assert.Equal(t, userColumn(third), logs[0].LoggedInUserId)
+		assert.Equal(t, written.RequestID, logs[0].RequestID)
+		assert.Equal(t, userColumn(nobody), logs[0].UserID)
+		assert.Equal(t, userColumn(third), logs[0].LoggedInUserID)
 		assert.WithinDurationf(t, written.CreatedAt, logs[0].CreatedAt, time.Second, "created_at read back on %s", dbType())
 	})
 }
 
 // #781 decision 5: the read is not paged. The admin API's page holds at most 200 rows, so a user
 // with more than that is read whole, in id order.
-func TestGetAuditLogsByUserId_ReadsMoreThanAPage(t *testing.T) {
+func TestGetAuditLogsByUserID_ReadsMoreThanAPage(t *testing.T) {
 	user := int64(fake.Number(2_000_000_001, 3_000_000_000))
 	const written = 205
 
@@ -612,17 +612,17 @@ func TestGetAuditLogsByUserId_ReadsMoreThanAPage(t *testing.T) {
 		auditLog := &record.AuditLog{
 			AuditEvent: "user_audit_logs_many",
 			Details:    `{"test": "data"}`,
-			UserId:     userColumn(user),
+			UserID:     userColumn(user),
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
-		want = append(want, auditLog.Id)
+		want = append(want, auditLog.ID)
 	}
 
-	logs, err := database.GetAuditLogsByUserId(context.Background(), nil, user)
+	logs, err := database.GetAuditLogsByUserID(context.Background(), nil, user)
 	require.NoError(t, err)
 	got := []int64{}
 	for _, log := range logs {
-		got = append(got, log.Id)
+		got = append(got, log.ID)
 	}
 	assert.Equalf(t, want, got, "all %d rows, oldest first, on %s", written, dbType())
 }

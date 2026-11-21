@@ -87,18 +87,18 @@ func TestDPoP_ClientCredentialsGrant(t *testing.T) {
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 
 	redeemWithDPoP(t, url.Values{"grant_type": {"client_credentials"}}, client.ClientIdentifier, clientSecret,
 		dpoptest.RFC7517Key(t))
@@ -147,18 +147,18 @@ func TestDPoP_ARefusedProofAndARequestWithoutOne(t *testing.T) {
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	key := dpoptest.RFC7517Key(t)
 	form := url.Values{"grant_type": {"client_credentials"}}
 

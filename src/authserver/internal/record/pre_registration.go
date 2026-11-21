@@ -3,7 +3,7 @@ package record
 import "database/sql"
 
 type PreRegistration struct {
-	Id                        int64        `db:"id" fieldtag:"pk"`
+	ID                        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt                 sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt                 sql.NullTime `db:"updated_at"`
 	Email                     string       `db:"email"`

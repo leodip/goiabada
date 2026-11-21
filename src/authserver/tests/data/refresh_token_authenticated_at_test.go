@@ -26,10 +26,10 @@ func seedROPCRefreshToken(t *testing.T, instant sql.NullTime) *record.RefreshTok
 	jti := fake.UUID()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := &record.RefreshToken{
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenJTI:      jti,
+		FirstRefreshTokenJTI: jti,
 		RefreshTokenType:     "Offline",
 		Scope:                "openid",
 		IssuedAt:             sql.NullTime{Time: now, Valid: true},
@@ -56,12 +56,12 @@ func TestRefreshToken_AuthenticatedAtRoundTrips(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			created := seedROPCRefreshToken(t, tc.instant)
 
-			byId, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+			byID, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 			require.NoError(t, err)
-			byJti, err := database.GetRefreshTokenByJti(context.Background(), nil, created.RefreshTokenJti)
+			byJTI, err := database.GetRefreshTokenByJTI(context.Background(), nil, created.RefreshTokenJTI)
 			require.NoError(t, err)
 
-			for _, read := range []*record.RefreshToken{byId, byJti} {
+			for _, read := range []*record.RefreshToken{byID, byJTI} {
 				require.NotNil(t, read)
 				assert.Equal(t, tc.instant.Valid, read.AuthenticatedAt.Valid)
 				if tc.instant.Valid {
@@ -80,13 +80,13 @@ func TestUpdateRefreshToken_DoesNotClobberTheAuthenticationInstant(t *testing.T)
 	instant := sql.NullTime{Time: time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Microsecond), Valid: true}
 	created := seedROPCRefreshToken(t, instant)
 
-	reloaded, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+	reloaded, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 	require.NoError(t, err)
 	reloaded.AuthenticatedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	reloaded.Revoked = true
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, reloaded))
 
-	after, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+	after, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 	require.NoError(t, err)
 	require.True(t, after.AuthenticatedAt.Valid)
 	assert.True(t, instant.Time.Equal(after.AuthenticatedAt.Time),
@@ -96,7 +96,7 @@ func TestUpdateRefreshToken_DoesNotClobberTheAuthenticationInstant(t *testing.T)
 	// And a NULL in hand does not blank a recorded instant.
 	after.AuthenticatedAt = sql.NullTime{}
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, after))
-	final, err := database.GetRefreshTokenById(context.Background(), nil, created.Id)
+	final, err := database.GetRefreshTokenByID(context.Background(), nil, created.ID)
 	require.NoError(t, err)
 	assert.True(t, final.AuthenticatedAt.Valid, "UpdateRefreshToken blanked authenticated_at")
 }
@@ -108,25 +108,25 @@ func TestUpdateRefreshToken_DoesNotClobberTheAuthenticationInstant(t *testing.T)
 func TestGetRefreshTokensBySessionIdentifier_ReadsTheTokensInstantNotTheCodes(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
-	sessionId := "sess_" + fake.LetterN(12)
+	sessionID := "sess_" + fake.LetterN(12)
 	codeInstant := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Microsecond)
 	tokenInstant := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Microsecond)
 
 	code := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		Code:                "code_" + fake.LetterN(6),
 		CodeHash:            "hash_" + fake.LetterN(6),
 		CodeChallenge:       sql.NullString{String: "challenge_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     codeInstant,
-		SessionIdentifier:   sessionId,
-		AcrLevel:            "1",
+		SessionIdentifier:   sessionID,
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -137,10 +137,10 @@ func TestGetRefreshTokensBySessionIdentifier_ReadsTheTokensInstantNotTheCodes(t 
 	for _, instant := range []sql.NullTime{{}, {Time: tokenInstant, Valid: true}} {
 		jti := fake.UUID()
 		require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &record.RefreshToken{
-			CodeId:               sql.NullInt64{Int64: code.Id, Valid: true},
-			RefreshTokenJti:      jti,
-			FirstRefreshTokenJti: jti,
-			SessionIdentifier:    sessionId,
+			CodeID:               sql.NullInt64{Int64: code.ID, Valid: true},
+			RefreshTokenJTI:      jti,
+			FirstRefreshTokenJTI: jti,
+			SessionIdentifier:    sessionID,
 			RefreshTokenType:     "Refresh",
 			Scope:                "openid",
 			IssuedAt:             sql.NullTime{Time: now, Valid: true},
@@ -151,17 +151,17 @@ func TestGetRefreshTokensBySessionIdentifier_ReadsTheTokensInstantNotTheCodes(t 
 		wanted[jti] = instant
 	}
 
-	tokens, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, sessionId)
+	tokens, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, sessionID)
 	require.NoError(t, err)
 	require.Len(t, tokens, 2)
 	for _, token := range tokens {
-		want := wanted[token.RefreshTokenJti]
-		assert.Equal(t, want.Valid, token.AuthenticatedAt.Valid, "token %s", token.RefreshTokenJti)
+		want := wanted[token.RefreshTokenJTI]
+		assert.Equal(t, want.Valid, token.AuthenticatedAt.Valid, "token %s", token.RefreshTokenJTI)
 		if want.Valid {
 			assert.True(t, want.Time.Equal(token.AuthenticatedAt.Time),
-				"token %s read %v, which is not its own %v", token.RefreshTokenJti, token.AuthenticatedAt.Time, want.Time)
+				"token %s read %v, which is not its own %v", token.RefreshTokenJTI, token.AuthenticatedAt.Time, want.Time)
 		}
 		assert.False(t, token.AuthenticatedAt.Valid && token.AuthenticatedAt.Time.Equal(codeInstant),
-			"token %s read the code's authenticated_at", token.RefreshTokenJti)
+			"token %s read the code's authenticated_at", token.RefreshTokenJTI)
 	}
 }

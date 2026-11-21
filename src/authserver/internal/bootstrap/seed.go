@@ -233,7 +233,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		ConsentRequired:          false,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		// The admin console obtains a bearer token through client_credentials to reach
 		// its own browser sessions on the auth server, so this grant is on from the
 		// start. It carries the single browser-sessions permission granted below and
@@ -241,7 +241,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		ClientCredentialsEnabled:                true,
 		ClientSecretEncrypted:                   values.clientSecretEncrypted,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
 		ShowDisplayName:                         true,
 		// Allowed to request the administrative scopes, as migration 000060 sets it on an
 		// upgraded installation. The server allows this client whatever the row says, so this is
@@ -260,12 +260,12 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	// so it is no place an authorization code can be sent (#147 decision 8). Migration 000072 moves
 	// an upgraded installation's rows into the same shape.
 	if err := r.db.CreateRedirectURI(ctx, tx, &record.RedirectURI{
-		URI: r.cfg.AdminConsoleBaseURL + "/auth/callback", ClientId: client.Id,
+		URI: r.cfg.AdminConsoleBaseURL + "/auth/callback", ClientID: client.ID,
 	}); err != nil {
 		return err
 	}
 	if err := r.db.CreatePostLogoutRedirectURI(ctx, tx, &record.PostLogoutRedirectURI{
-		URI: r.cfg.AdminConsoleBaseURL, ClientId: client.Id,
+		URI: r.cfg.AdminConsoleBaseURL, ClientID: client.ID,
 	}); err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		permission := &record.Permission{
 			PermissionIdentifier: p.identifier,
 			Description:          p.description,
-			ResourceId:           resource.Id,
+			ResourceID:           resource.ID,
 		}
 		if err := r.db.CreatePermission(ctx, tx, permission); err != nil {
 			return err
@@ -317,16 +317,16 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 	// existed, and the two must not drift: the permission on the authserver resource,
 	// the grant to the admin console client, and client_credentials_enabled on it.
 	if err := r.db.CreateClientPermission(ctx, tx, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permissions[builtin.BrowserSessionsPermissionIdentifier].Id,
+		ClientID:     client.ID,
+		PermissionID: permissions[builtin.BrowserSessionsPermissionIdentifier].ID,
 	}); err != nil {
 		return err
 	}
 
 	for _, identifier := range []string{builtin.ManageAccountPermissionIdentifier, builtin.ManagePermissionIdentifier} {
 		if err := r.db.CreateUserPermission(ctx, tx, &record.UserPermission{
-			UserId:       user.Id,
-			PermissionId: permissions[identifier].Id,
+			UserID:       user.ID,
+			PermissionID: permissions[identifier].ID,
 		}); err != nil {
 			return err
 		}
@@ -377,13 +377,13 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 		// same (#783 decision 5).
 		AccountDeletionEnabled:                  true,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,  // Industry standard (Auth0, Microsoft, Keycloak)
+		IncludeOpenIDConnectClaimsInIDToken:     true,  // Industry standard (Auth0, Microsoft, Keycloak)
 		PKCERequired:                            true,  // OAuth 2.1 recommendation
 		ImplicitFlowEnabled:                     false, // Disabled by default (deprecated in OAuth 2.1)
 		AuditLogsInConsoleEnabled:               true,  // Enabled by default for observability
 		AuditLogsInDatabaseEnabled:              true,  // Enabled by default for compliance
 		AuditLogRetentionDays:                   180,   // 180 days default retention
-		DefaultBrandId:                          sql.NullInt64{Int64: brand.Id, Valid: true},
+		DefaultBrandID:                          sql.NullInt64{Int64: brand.ID, Valid: true},
 	})
 }
 

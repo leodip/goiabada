@@ -38,22 +38,22 @@ func TestRegisterRoutes_APublicResourceNotFoundIsNoStore(t *testing.T) {
 	}
 	noLogo := func(database *datamocks.Database) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "shop").
-			Return(&record.Client{Id: 3, ClientIdentifier: "shop"}, nil).Once()
-		database.On("GetClientLogoByClientId", mock.Anything, mock.Anything, int64(3)).Return(nil, nil).Once()
+			Return(&record.Client{ID: 3, ClientIdentifier: "shop"}, nil).Once()
+		database.On("GetClientLogoByClientID", mock.Anything, mock.Anything, int64(3)).Return(nil, nil).Once()
 	}
 	noUser := func(database *datamocks.Database) {
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, "no-such-subject").Return(nil, nil).Once()
 	}
 	noPicture := func(database *datamocks.Database) {
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, "plain-user").
-			Return(&record.User{Id: 5, Subject: "plain-user"}, nil).Once()
-		database.On("GetUserProfilePictureByUserId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
+			Return(&record.User{ID: 5, Subject: "plain-user"}, nil).Once()
+		database.On("GetUserProfilePictureByUserID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
 	}
 	noBrand := func(database *datamocks.Database) {
-		database.On("GetBrandById", mock.Anything, mock.Anything, int64(99)).Return(nil, nil).Once()
+		database.On("GetBrandByID", mock.Anything, mock.Anything, int64(99)).Return(nil, nil).Once()
 	}
 	noAsset := func(database *datamocks.Database) {
-		database.On("GetBrandAssetById", mock.Anything, mock.Anything, int64(99)).Return(nil, nil).Once()
+		database.On("GetBrandAssetByID", mock.Anything, mock.Anything, int64(99)).Return(nil, nil).Once()
 	}
 	nothing := func(*datamocks.Database) {}
 
@@ -134,9 +134,9 @@ func TestRegisterRoutes_AProfilePictureKeepsItsOwnCachePolicy(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			database := newRoutingDatabase(t)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, "pictured-user").
-				Return(&record.User{Id: 6, Subject: "pictured-user"}, nil).Once()
-			database.On("GetUserProfilePictureByUserId", mock.Anything, mock.Anything, int64(6)).
-				Return(&record.UserProfilePicture{UserId: 6, Picture: []byte("a picture"), ContentType: "image/png"}, nil).Once()
+				Return(&record.User{ID: 6, Subject: "pictured-user"}, nil).Once()
+			database.On("GetUserProfilePictureByUserID", mock.Anything, mock.Anything, int64(6)).
+				Return(&record.UserProfilePicture{UserID: 6, Picture: []byte("a picture"), ContentType: "image/png"}, nil).Once()
 			s := newRoutingTestServer(t, database)
 
 			rr := serveRouting(s, method, "/userinfo/picture/pictured-user", nil)
@@ -169,9 +169,9 @@ func TestRegisterRoutes_ThePublicSettingsAreNoStore(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("PoolStats").Return(testPoolStats).Maybe()
 		// The settings step reads the row, then the handler reads it again and fails.
-		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-			Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
-		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+		database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
+			Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Once()
+		database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 			Return(nil, errors.New("the settings row could not be read")).Once()
 		s := newRoutingTestServer(t, database)
 
@@ -184,7 +184,7 @@ func TestRegisterRoutes_ThePublicSettingsAreNoStore(t *testing.T) {
 	t.Run("a settings read that fails before the handler", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("PoolStats").Return(testPoolStats).Maybe()
-		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+		database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 			Return(nil, errors.New("the settings row could not be read")).Once()
 		s := newRoutingTestServer(t, database)
 

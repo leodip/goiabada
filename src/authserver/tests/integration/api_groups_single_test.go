@@ -22,11 +22,11 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Get group by ID
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -40,10 +40,10 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Group data should match
-	assert.Equal(t, testGroup.Id, getResponse.Group.ID)
+	assert.Equal(t, testGroup.ID, getResponse.Group.ID)
 	assert.Equal(t, testGroup.GroupIdentifier, getResponse.Group.GroupIdentifier)
 	assert.Equal(t, testGroup.Description, getResponse.Group.Description)
-	assert.Equal(t, testGroup.IncludeInIdToken, getResponse.Group.IncludeInIDToken)
+	assert.Equal(t, testGroup.IncludeInIDToken, getResponse.Group.IncludeInIDToken)
 	assert.Equal(t, testGroup.IncludeInAccessToken, getResponse.Group.IncludeInAccessToken)
 	assert.NotNil(t, getResponse.Group.CreatedAt)
 	assert.NotNil(t, getResponse.Group.UpdatedAt)
@@ -92,11 +92,11 @@ func TestAPIGroupGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
@@ -116,7 +116,7 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test users
@@ -131,11 +131,11 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Get group without members first
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -150,13 +150,13 @@ func TestAPIGroupGet_MemberCountAccuracy(t *testing.T) {
 
 	// Setup: Add user to group
 	userGroup := &record.UserGroup{
-		UserId:  testUser.Id,
-		GroupId: testGroup.Id,
+		UserID:  testUser.ID,
+		GroupID: testGroup.ID,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 	}()
 
 	// Test: Get group with member

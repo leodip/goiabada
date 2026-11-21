@@ -141,7 +141,7 @@ func registerConfidentialClient(t *testing.T, authMethod string) (string, string
 	t.Cleanup(func() {
 		client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 		if err == nil && client != nil {
-			_ = database.DeleteClient(context.Background(), nil, client.Id)
+			_ = database.DeleteClient(context.Background(), nil, client.ID)
 		}
 	})
 	return response.ClientID, response.ClientSecret
@@ -193,9 +193,9 @@ func TestDCR_AClientHeldToItsMethodIsIssuedATokenByIt(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	form := url.Values{"grant_type": {"client_credentials"},
 		"scope": {resource.ResourceIdentifier + ":" + permission.PermissionIdentifier}}
 
@@ -244,7 +244,7 @@ func TestDCR_AClientSwitchedToPublicAndBackAcceptsBoth(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	accessToken, _ := createAdminClientWithToken(t)
-	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/authentication"
 
 	toPublic := makeAPIRequest(t, http.MethodPut, authenticationURL, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	_ = toPublic.Body.Close()

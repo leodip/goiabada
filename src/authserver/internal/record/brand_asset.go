@@ -35,9 +35,9 @@ func (k BrandAssetKind) IsValid() bool {
 // asset no slot names is unattached, and the sweep, the only thing that deletes assets, deletes one
 // once it is older than its cutoff.
 //
-// Content is nil on a read that leaves the bytes out, as every read but GetBrandAssetById does.
+// Content is nil on a read that leaves the bytes out, as every read but GetBrandAssetByID does.
 type BrandAsset struct {
-	Id          int64          `db:"id" fieldtag:"pk"`
+	ID          int64          `db:"id" fieldtag:"pk"`
 	CreatedAt   time.Time      `db:"created_at" fieldtag:"dont-update"`
 	Kind        BrandAssetKind `db:"kind"`
 	ContentType string         `db:"content_type"`

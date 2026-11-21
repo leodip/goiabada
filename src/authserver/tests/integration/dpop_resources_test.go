@@ -47,11 +47,11 @@ func createDPoPUser(t *testing.T) dpopUser {
 
 	authserver, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserver.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserver.ID)
 	require.NoError(t, err)
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
-			assignPermissionToUser(t, u.user.Id, permissions[i].Id)
+			assignPermissionToUser(t, u.user.ID, permissions[i].ID)
 		}
 	}
 	return u

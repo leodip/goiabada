@@ -44,17 +44,17 @@ func expectAuthServerPermissions(database *datamocks.Database) {
 // expectAuthServerPermissionsOn registers the same read on tx.
 func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
 	database.On("GetResourceByResourceIdentifier", mock.Anything, tx, "authserver").
-		Return(&record.Resource{Id: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
-	database.On("GetPermissionsByResourceId", mock.Anything, tx, ceilingResourceId).
+		Return(&record.Resource{ID: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, tx, ceilingResourceId).
 		Return([]record.Permission{
-			{Id: permManageAccount, PermissionIdentifier: "manage-account", ResourceId: ceilingResourceId},
-			{Id: permManage, PermissionIdentifier: "manage", ResourceId: ceilingResourceId},
-			{Id: permAdminRead, PermissionIdentifier: "admin-read", ResourceId: ceilingResourceId},
-			{Id: permManageUsers, PermissionIdentifier: "manage-users", ResourceId: ceilingResourceId},
-			{Id: permManageClients, PermissionIdentifier: "manage-clients", ResourceId: ceilingResourceId},
-			{Id: permManageSettings, PermissionIdentifier: "manage-settings", ResourceId: ceilingResourceId},
-			{Id: permBrowserSessions, PermissionIdentifier: "browser-sessions", ResourceId: ceilingResourceId},
-			{Id: permCustomOnAuthServer, PermissionIdentifier: "reports", ResourceId: ceilingResourceId},
+			{ID: permManageAccount, PermissionIdentifier: "manage-account", ResourceID: ceilingResourceId},
+			{ID: permManage, PermissionIdentifier: "manage", ResourceID: ceilingResourceId},
+			{ID: permAdminRead, PermissionIdentifier: "admin-read", ResourceID: ceilingResourceId},
+			{ID: permManageUsers, PermissionIdentifier: "manage-users", ResourceID: ceilingResourceId},
+			{ID: permManageClients, PermissionIdentifier: "manage-clients", ResourceID: ceilingResourceId},
+			{ID: permManageSettings, PermissionIdentifier: "manage-settings", ResourceID: ceilingResourceId},
+			{ID: permBrowserSessions, PermissionIdentifier: "browser-sessions", ResourceID: ceilingResourceId},
+			{ID: permCustomOnAuthServer, PermissionIdentifier: "reports", ResourceID: ceilingResourceId},
 		}, nil).Once()
 }
 
@@ -66,10 +66,10 @@ func expectOrdinaryOwner(database *datamocks.Database, save grantSave) {
 	case targetKindUser:
 		expectHoldsNothing(database, grantOwnerId)
 	case targetKindGroup:
-		database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerId}).
+		database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerId}).
 			Return([]record.GroupPermission{}, nil).Once()
 	case targetKindClient:
-		database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
+		database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
 			Return([]record.ClientPermission{}, nil).Once()
 	}
 }
@@ -253,7 +253,7 @@ func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForTheGrantCeiling(t *t
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			database.AssertExpectations(t)
-			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 		})
 	}
 }
@@ -268,7 +268,7 @@ func TestGrantCeiling_AMissingPermissionIsAnsweredFirst(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, permManage)
-			database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), int64(99)).
+			database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), int64(99)).
 				Return((*record.Permission)(nil), nil).Once()
 
 			rr := save.serveWithScope(database, auditLogger, save.body(t, []int64{permManage, 99}, []int64{}), granularScopeOf(save))

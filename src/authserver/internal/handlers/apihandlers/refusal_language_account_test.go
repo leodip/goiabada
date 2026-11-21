@@ -51,7 +51,7 @@ func accountRefusalUser(t *testing.T, password string) *record.User {
 	t.Helper()
 	hash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
-	return &record.User{Id: 42, Subject: accountRefusalSubject, Enabled: true, Email: "old@example.com", PasswordHash: hash}
+	return &record.User{ID: 42, Subject: accountRefusalSubject, Enabled: true, Email: "old@example.com", PasswordHash: hash}
 }
 
 // callerIs answers the caller's row, as many times as the handler reads it.
@@ -187,9 +187,9 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			name: "a verification code send losing to an email change",
 			serve: send(smtpOn, func(database *datamocks.Database) {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), accountRefusalSubject).
-					Return(&record.User{Id: 7, Subject: accountRefusalSubject, Email: "anyone@example.com"}, nil).Once()
+					Return(&record.User{ID: 7, Subject: accountRefusalSubject, Email: "anyone@example.com"}, nil).Once()
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), accountRefusalSubject).
-					Return(&record.User{Id: 7, Subject: accountRefusalSubject, Email: "elsewhere@example.com"}, nil).Once()
+					Return(&record.User{ID: 7, Subject: accountRefusalSubject, Email: "elsewhere@example.com"}, nil).Once()
 				database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
 					mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 			}),
@@ -275,7 +275,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	lostChange := func(current *record.User, wantEnabled bool) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(current, nil).Once()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(current, nil).Once()
 			rr := httptest.NewRecorder()
 			writeLostOTPChange(rr, inRequestLanguage(httptest.NewRequest(http.MethodPut, "/api/v1/account/otp", nil), acceptLanguage),
 				database, 42, wantEnabled)
@@ -385,7 +385,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "an enable that lost to another enable",
-			serve:      lostChange(&record.User{Id: 42, OTPEnabled: true}, true),
+			serve:      lostChange(&record.User{ID: 42, OTPEnabled: true}, true),
 			status:     http.StatusBadRequest,
 			code:       "OTP_ALREADY_ENABLED",
 			english:    alreadyEnabledEnglish,
@@ -393,7 +393,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "a disable that lost to another disable",
-			serve:      lostChange(&record.User{Id: 42, OTPEnabled: false}, false),
+			serve:      lostChange(&record.User{ID: 42, OTPEnabled: false}, false),
 			status:     http.StatusBadRequest,
 			code:       "OTP_NOT_ENABLED",
 			english:    notEnabledEnglish,
@@ -401,7 +401,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "a change that lost to a change it cannot account for",
-			serve:      lostChange(&record.User{Id: 42, OTPEnabled: true}, false),
+			serve:      lostChange(&record.User{ID: 42, OTPEnabled: true}, false),
 			status:     http.StatusConflict,
 			code:       "CONCURRENT_UPDATE",
 			english:    "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again.",
@@ -456,7 +456,7 @@ func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "a sign-out redirect URI the client does not hold",
 			serve: logout(logoutPostLogoutUri, logoutClientIdent, func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), logoutClientIdent).
-					Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
+					Return(&record.Client{ID: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 			}),
 			status:     http.StatusBadRequest,

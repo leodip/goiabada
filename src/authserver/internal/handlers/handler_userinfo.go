@@ -69,7 +69,7 @@ func HandleUserInfoGetPost(
 
 		if !user.Enabled {
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id": user.ID,
 			})
 
 			// 401 invalid_token, for the reason the not-found branch above gives: the

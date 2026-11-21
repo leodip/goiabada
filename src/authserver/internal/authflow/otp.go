@@ -20,13 +20,13 @@ import (
 type otpStepDatabase interface {
 	ceremonyClientDisplayDatabase
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 // loadOTPUser reads the ceremony's user, whom either OTP form is for. A failed read, or a user not
 // found, is returned as an error.
 func loadOTPUser(ctx context.Context, database otpStepDatabase, authContext *ceremony.AuthContext) (*record.User, error) {
-	user, err := database.GetUserById(ctx, nil, authContext.UserId)
+	user, err := database.GetUserByID(ctx, nil, authContext.UserId)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ const (
 	// recovery codes it came with, committed.
 	OTPNoticeAuthenticatorSetUp
 	// OTPNoticeAuthenticatorLockedOut is the refused code whose count reached
-	// record.OtpConsecutiveFailureLimit, which disabled the authenticator. Only that refusal reports
+	// record.OTPConsecutiveFailureLimit, which disabled the authenticator. Only that refusal reports
 	// it, so it is told once per lockout (#724 decision 7).
 	OTPNoticeAuthenticatorLockedOut
 	// OTPNoticeRecoveryCodeUsed is a recovery code claimed, with NoticeRecoveryCodesLeft unused
@@ -338,13 +338,13 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	if !user.Enabled {
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		return o.refuse(ctx, authContext, result, OTPAccountDisabled)
 	}
 
 	if keyURL != "" && user.OTPEnabled {
-		return o.endLostEnrolment(ctx, browser, result, user.Id, authContext.CeremonyId), nil
+		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
 	}
 
 	if len(code) == 0 {
@@ -373,18 +373,18 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		}
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventOTPCodeReplayDetected, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 			"step":    verified.Step,
 		})
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		result = o.reportDisabled(ctx, verified, user, result)
 		return o.refuse(ctx, authContext, result, OTPRefused)
 	case otpcredential.OutcomeWrong:
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		result = o.reportDisabled(ctx, verified, user, result)
 		return o.refuse(ctx, authContext, result, OTPRefused)
@@ -392,13 +392,13 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		// Not charged to the rate limiter, and not counted against the authenticator by
 		// VerifyStored: a device whose clock runs ahead is no guess (#142).
 		o.auditLogger.Log(ctx, audit.EventAuthFailedOtp, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 			"reason":  audit.AuthFailedOtpClockAhead,
 		})
 		return o.refuse(ctx, authContext, result, OTPClockAhead)
 	}
 
-	verifiedGeneration := user.OtpConfigGeneration
+	verifiedGeneration := user.OTPConfigGeneration
 	enrolled := false
 	var recoveryCodes []string
 	if !user.OTPEnabled {
@@ -407,7 +407,7 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 			return OTPSubmissionResult{}, establishErr
 		}
 		if !established {
-			return o.endLostEnrolment(ctx, browser, result, user.Id, authContext.CeremonyId), nil
+			return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
 		}
 		verifiedGeneration = generation
 		enrolled = true
@@ -418,17 +418,17 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 		result.NoticeTo = current
 
 		o.auditLogger.Log(ctx, audit.EventEnabledOTP, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		// The new authenticator came with a set of recovery codes, created in Establish's
 		// transaction as on the account page (#257 decisions 1 and 10).
 		o.auditLogger.Log(ctx, audit.EventRecoveryCodesCreated, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 	}
 
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessOtp, map[string]interface{}{
-		"user_id": user.Id,
+		"user_id": user.ID,
 	})
 
 	authContext.RecordOTPVerified(time.Now(), verifiedGeneration, enrolled)
@@ -485,13 +485,13 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 
 	if !user.Enabled {
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		return o.refuse(ctx, authContext, result, OTPAccountDisabled)
 	}
 
 	if authContext.OTPKeyURL != "" && user.OTPEnabled {
-		return o.endLostEnrolment(ctx, browser, result, user.Id, authContext.CeremonyId), nil
+		return o.endLostEnrolment(ctx, browser, result, user.ID, authContext.CeremonyId), nil
 	}
 
 	if otpcredential.IsBlankRecoveryCode(code) {
@@ -507,24 +507,24 @@ func (o *OTPSubmission) RunRecoveryCode(ctx context.Context, browser otpSubmissi
 		browser.RecordCredentialFailure()
 		if used.Outcome == otpcredential.RecoveryCodeReplayed {
 			o.auditLogger.Log(ctx, audit.EventRecoveryCodeReplayDetected, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id": user.ID,
 			})
 		}
 		o.auditLogger.Log(ctx, audit.EventAuthFailedRecoveryCode, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		return o.refuse(ctx, authContext, result, OTPRecoveryCodeRefused)
 	}
 
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessRecoveryCode, map[string]interface{}{
-		"user_id":   user.Id,
+		"user_id":   user.ID,
 		"remaining": used.Remaining,
 	})
 	result.Notice = OTPNoticeRecoveryCodeUsed
 	result.NoticeTo = used.Current
 	result.NoticeRecoveryCodesLeft = used.Remaining
 
-	authContext.RecordRecoveryCodeVerified(time.Now(), user.OtpConfigGeneration)
+	authContext.RecordRecoveryCodeVerified(time.Now(), user.OTPConfigGeneration)
 
 	result.Answer = OTPAccepted
 	result.NextStep = "/auth/completed"
@@ -561,7 +561,7 @@ func (o *OTPSubmission) reportDisabled(ctx context.Context, verified otpcredenti
 		return result
 	}
 	o.auditLogger.Log(ctx, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-		"user_id": user.Id,
+		"user_id": user.ID,
 	})
 	result.Notice = OTPNoticeAuthenticatorLockedOut
 	result.NoticeTo = verified.Current

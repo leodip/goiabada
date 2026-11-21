@@ -98,8 +98,8 @@ func seedPreMigration000088Code(t *testing.T, h *isolatedDB) string {
 	t.Helper()
 	random := fake.LetterN(6)
 
-	clientId := seedClient(t, h, "mig88_client_"+random)
-	userId := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig88_" + random})
+	clientID := seedClient(t, h, "mig88_client_"+random)
+	userID := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig88_" + random})
 
 	falseLit, _ := boolLiterals000031()
 	codeHash := "mig88_hash_" + random
@@ -108,7 +108,7 @@ func seedPreMigration000088Code(t *testing.T, h *isolatedDB) string {
 		 response_mode, authenticated_at, session_identifier, acr_level, auth_methods, used)
 		VALUES ('%s', %d, 'openid', 'state', 'nonce', 'https://example.com/cb', %d, '192.0.2.1', 'probe',
 		        'query', %s, 'session', 'urn:goiabada:level1', 'pwd', %s)`,
-		codeHash, clientId, userId, seedBindAt(1), falseLit),
+		codeHash, clientID, userID, seedBindAt(1), falseLit),
 		time.Now().UTC().Truncate(time.Second))
 	require.NoError(t, err, "seed a pre-000088 code")
 	return codeHash

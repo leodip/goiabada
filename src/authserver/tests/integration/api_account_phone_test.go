@@ -39,7 +39,7 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.ID)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 	assert.Equal(t, reqBody.PhoneCountryUniqueID, updateResp.User.PhoneNumberCountryUniqueID)
 	assert.Equal(t, reqBody.PhoneNumber, updateResp.User.PhoneNumber)
 	assert.False(t, updateResp.User.PhoneNumberVerified)
@@ -47,10 +47,10 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	assert.Equal(t, "+1", updateResp.User.PhoneNumberCountryCallingCode)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
-	assert.Equal(t, reqBody.PhoneCountryUniqueID, updatedUser.PhoneNumberCountryUniqueId)
+	assert.Equal(t, reqBody.PhoneCountryUniqueID, updatedUser.PhoneNumberCountryUniqueID)
 	assert.Equal(t, reqBody.PhoneNumber, updatedUser.PhoneNumber)
 	assert.False(t, updatedUser.PhoneNumberVerified)
 	// The "+"-prefixed calling code must be persisted, not just returned.
@@ -77,7 +77,7 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.ID)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 	assert.Empty(t, updateResp.User.PhoneNumberCountryUniqueID)
 	assert.Empty(t, updateResp.User.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updateResp.User.PhoneNumber)

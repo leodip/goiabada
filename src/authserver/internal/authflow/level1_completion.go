@@ -129,7 +129,7 @@ func (o *Level1Completion) Run(ctx context.Context, browser level1CompletionBrow
 	if client == nil {
 		return Level1CompletionResult{}, errs.Errorf("client %v not found", authContext.ClientId)
 	}
-	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
+	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultACRLevel)
 
 	var reusableSession *record.UserSession
 	if !authContext.Level1AuthCompleted && o.sessions.HasValidUserSession(userSession,

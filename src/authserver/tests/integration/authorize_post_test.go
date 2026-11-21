@@ -32,14 +32,14 @@ func TestAuthorize_PostRequest(t *testing.T) {
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 				ConsentRequired:          false,
-				DefaultAcrLevel:          record.AcrLevel1,
+				DefaultACRLevel:          record.ACRLevel1,
 			}
 			if err := database.CreateClient(context.Background(), nil, client); err != nil {
 				t.Fatal(err)
 			}
 
 			redirectUri := &record.RedirectURI{
-				ClientId: client.Id,
+				ClientID: client.ID,
 				URI:      fake.URL(),
 			}
 			if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {

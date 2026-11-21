@@ -51,8 +51,8 @@ func TestUserImageUploads_RefuseAnAnimatedImage(t *testing.T) {
 	}{
 		{"POST /api/v1/admin/clients/{id}/logo", func(t *testing.T, data []byte) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).
-				Return(&record.Client{Id: 123, ClientIdentifier: "my-app"}, nil)
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).
+				Return(&record.Client{ID: 123, ClientIdentifier: "my-app"}, nil)
 			req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", data)
 			require.NoError(t, err)
 			req.SetPathValue("id", "123")
@@ -62,8 +62,8 @@ func TestUserImageUploads_RefuseAnAnimatedImage(t *testing.T) {
 		}},
 		{"POST /api/v1/admin/users/{id}/profile-picture", func(t *testing.T, data []byte) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).
-				Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(123)).
+				Return(&record.User{ID: 123, Subject: fake.UUID(), Enabled: true}, nil)
 			req, err := createMultipartRequest("POST", "/api/v1/admin/users/123/profile-picture", "picture", data)
 			require.NoError(t, err)
 			req.SetPathValue("id", "123")
@@ -75,7 +75,7 @@ func TestUserImageUploads_RefuseAnAnimatedImage(t *testing.T) {
 			sub := fake.UUID()
 			database := datamocks.NewDatabase(t)
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).
-				Return(&record.User{Id: 1, Subject: sub, Enabled: true}, nil)
+				Return(&record.User{ID: 1, Subject: sub, Enabled: true}, nil)
 			req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", data)
 			require.NoError(t, err)
 			req = setTokenContext(req, sub)

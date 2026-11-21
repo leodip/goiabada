@@ -35,11 +35,11 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "implicit-test-client",
 	}
 	user := &record.User{
-		Id:       1,
+		ID:       1,
 		Subject:  sub,
 		Email:    "implicit@example.com",
 		Username: "implicituser",
@@ -102,7 +102,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true,
+		IncludeOpenIDConnectClaimsInIDToken: true,
 	}
 
 	ctx := context.Background()
@@ -115,11 +115,11 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "idtoken-test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "idtoken@example.com",
 		EmailVerified: true,
@@ -137,7 +137,7 @@ func TestIssueImplicitTx_IdTokenOnly(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -206,11 +206,11 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "both-tokens-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "both@example.com",
 		EmailVerified: true,
@@ -228,7 +228,7 @@ func TestIssueImplicitTx_BothTokens(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, issueTx, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -293,11 +293,11 @@ func TestIssueImplicitTx_NoRefreshToken(t *testing.T) {
 	privateKeyBytes := getTestPrivateKey(t)
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "no-refresh-client",
 	}
 	user := &record.User{
-		Id:      1,
+		ID:      1,
 		Subject: sub,
 		Groups:  []record.Group{},
 	}
@@ -352,12 +352,12 @@ func TestIssueImplicitTx_ClientOverrideExpiration(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	client := &record.Client{
-		Id:                       1,
+		ID:                       1,
 		ClientIdentifier:         "custom-expiry-client",
 		TokenExpirationInSeconds: 1800, // 30 minutes client override
 	}
 	user := &record.User{
-		Id:      1,
+		ID:      1,
 		Subject: sub,
 		Groups:  []record.Group{},
 	}
@@ -415,22 +415,22 @@ func TestIssueImplicitTx_WithGroupsAndAttributes(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "groups-attrs-client",
 	}
 	user := &record.User{
-		Id:        1,
+		ID:        1,
 		Subject:   sub,
 		UpdatedAt: sql.NullTime{Time: time.Now().Add(-1 * time.Hour), Valid: true},
 		Groups: []record.Group{
-			{GroupIdentifier: "admin", IncludeInIdToken: true, IncludeInAccessToken: true},
-			{GroupIdentifier: "users", IncludeInIdToken: true, IncludeInAccessToken: false},
-			{GroupIdentifier: "readonly", IncludeInIdToken: false, IncludeInAccessToken: true},
+			{GroupIdentifier: "admin", IncludeInIDToken: true, IncludeInAccessToken: true},
+			{GroupIdentifier: "users", IncludeInIDToken: true, IncludeInAccessToken: false},
+			{GroupIdentifier: "readonly", IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 		Attributes: []record.UserAttribute{
-			{Key: "department", Value: "engineering", IncludeInIdToken: true, IncludeInAccessToken: true},
-			{Key: "level", Value: "senior", IncludeInIdToken: true, IncludeInAccessToken: false},
-			{Key: "team", Value: "platform", IncludeInIdToken: false, IncludeInAccessToken: true},
+			{Key: "department", Value: "engineering", IncludeInIDToken: true, IncludeInAccessToken: true},
+			{Key: "level", Value: "senior", IncludeInIDToken: true, IncludeInAccessToken: false},
+			{Key: "team", Value: "platform", IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 	}
 

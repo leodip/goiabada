@@ -135,7 +135,7 @@ func TestBrandAssetPost_StoresEachKindUnattachedAndAnswersItsURL(t *testing.T) {
 			database.On("CreateBrandAsset", mock.Anything, (*sql.Tx)(nil), mock.AnythingOfType("*record.BrandAsset")).
 				Run(func(args mock.Arguments) {
 					stored = args.Get(2).(*record.BrandAsset)
-					stored.Id = 41
+					stored.ID = 41
 				}).Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventUploadedBrandAsset, map[string]interface{}{
 				"brand_asset_id": int64(41),
@@ -150,7 +150,7 @@ func TestBrandAssetPost_StoresEachKindUnattachedAndAnswersItsURL(t *testing.T) {
 			require.NotNil(t, stored)
 			fingerprint := sha256Fingerprint(tt.data)
 			assert.Equal(t, record.BrandAsset{
-				Id:          41,
+				ID:          41,
 				Kind:        tt.kind,
 				ContentType: tt.contentType,
 				Fingerprint: fingerprint,
@@ -298,8 +298,8 @@ func TestBrandAssetPost_AStoreThatFailsIsA500AndNotAudited(t *testing.T) {
 
 func TestBrandAssetGet_AnswersTheAssetWithoutItsBytes(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{9}).Return([]record.BrandAsset{{
-		Id: 9, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "a1b2c3d4e5f6", Width: 96, Height: 96,
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{9}).Return([]record.BrandAsset{{
+		ID: 9, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "a1b2c3d4e5f6", Width: 96, Height: 96,
 	}}, nil).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/brand-assets/9", nil)
@@ -315,7 +315,7 @@ func TestBrandAssetGet_AnswersTheAssetWithoutItsBytes(t *testing.T) {
 func TestBrandAssetGet_Refusals(t *testing.T) {
 	t.Run("no such asset", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{404}).Return(nil, nil).Once()
+		database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{404}).Return(nil, nil).Once()
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/brand-assets/404", nil)
 		req.SetPathValue("id", "404")
 		rr := httptest.NewRecorder()
@@ -343,7 +343,7 @@ func TestBrandAssetGet_Refusals(t *testing.T) {
 
 	t.Run("a read that fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{9}).Return(nil, errors.New("gone")).Once()
+		database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{9}).Return(nil, errors.New("gone")).Once()
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/brand-assets/9", nil)
 		req.SetPathValue("id", "9")
 		rr := httptest.NewRecorder()

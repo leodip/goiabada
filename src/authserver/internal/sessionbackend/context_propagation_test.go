@@ -47,13 +47,13 @@ func TestDatabaseBackend_LoadReadsUnderTheCallersContext(t *testing.T) {
 	const owner, id = "owner", "propagation-id"
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetBrowserSessionByOwnerAndSessionIdHash", theCallersContext(), (*sql.Tx)(nil),
+	database.On("GetBrowserSessionByOwnerAndSessionIDHash", theCallersContext(), (*sql.Tx)(nil),
 		owner, hashutil.HashString(id), fixedNow).
 		Return(&record.BrowserSession{
 			Data:          "ciphertext",
 			LastAccessed:  fixedNow,
 			ExpiresAt:     fixedNow.Add(time.Hour),
-			SessionIdHash: hashutil.HashString(id),
+			SessionIDHash: hashutil.HashString(id),
 		}, nil).Once()
 
 	stored, err := testBackend(database, owner).Load(markedSettingsContext(), id)

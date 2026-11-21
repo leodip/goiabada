@@ -81,7 +81,7 @@ func registeredUser(t *testing.T, email string) *record.User {
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, user, "the account for %s exists", email)
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
@@ -106,7 +106,7 @@ func (f *legalAcceptanceFixture) carriedOnToTheApp(t *testing.T, browser *http.C
 	resp = postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	f.assertCodeIssued(t, browser, resp)
 
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.Id),
+	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.ID),
 		"the sign-in is the new user's")
 }
 

@@ -71,7 +71,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectRenderedLinkExpired(pageRenderer)
-		expectAuditFailedActivationCode(auditLogger, "code_expired", row.Id)
+		expectAuditFailedActivationCode(auditLogger, "code_expired", row.ID)
 
 		HandleActivateGet(pageRenderer, newMarkerTestStore(), db, auditLogger, testDataCipher).
 			ServeHTTP(httptest.NewRecorder(), activationLinkFollowedRequest(expiredCode))
@@ -98,7 +98,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		freshHash := hashutil.HashString(freshCode)
 
 		raced := &replacingDB{Database: db, afterLookup: func(read *record.PreRegistration) {
-			replaced, replaceErr := db.TryReplacePreRegistrationCode(ctx, nil, read.Id, read.VerificationCodeHash,
+			replaced, replaceErr := db.TryReplacePreRegistrationCode(ctx, nil, read.ID, read.VerificationCodeHash,
 				freshEncrypted, freshHash, time.Now().UTC())
 			require.NoError(t, replaceErr)
 			require.True(t, replaced, "the registration's replacement takes effect between the lookup and the delete")
@@ -107,7 +107,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectRenderedLinkExpired(pageRenderer)
-		expectAuditFailedActivationCode(auditLogger, "code_expired", row.Id)
+		expectAuditFailedActivationCode(auditLogger, "code_expired", row.ID)
 
 		rr := httptest.NewRecorder()
 		HandleActivateGet(pageRenderer, newMarkerTestStore(), raced, auditLogger, testDataCipher).
@@ -117,7 +117,7 @@ func TestHandleActivateGet_ExpiredLink_OnSQLite(t *testing.T) {
 		fresh, err := db.GetPreRegistrationByVerificationCodeHash(ctx, nil, freshHash)
 		require.NoError(t, err)
 		require.NotNil(t, fresh, "an expired link must not delete the fresh link that replaced it")
-		assert.Equal(t, row.Id, fresh.Id)
+		assert.Equal(t, row.ID, fresh.ID)
 		pageRenderer.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
@@ -146,7 +146,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		require.NoError(t, db.CreateResource(ctx, nil, resource))
 		require.NoError(t, db.CreatePermission(ctx, nil, &record.Permission{
 			PermissionIdentifier: builtin.ManageAccountPermissionIdentifier,
-			ResourceId:           resource.Id,
+			ResourceID:           resource.ID,
 		}))
 		row, codeHash := preRegistrationWithCode(t, 0, activateTestEmail, code, time.Now().UTC())
 		require.NoError(t, db.CreatePreRegistration(ctx, nil, row))
@@ -169,16 +169,16 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 
 		store := newMarkerTestStore()
 		HandleActivatePost(pageRenderer, store, heldCeremonies{}, db, usercreation.New(db), passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL).
-			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.Id, codeHash))
+			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.ID, codeHash))
 
 		user, err := db.GetUserByEmail(ctx, nil, activateTestEmail)
 		require.NoError(t, err)
 		require.NotNil(t, user, "the account is committed")
 		assert.True(t, user.EmailVerified)
-		permissions, err := db.GetUserPermissionsByUserId(ctx, nil, user.Id)
+		permissions, err := db.GetUserPermissionsByUserID(ctx, nil, user.ID)
 		require.NoError(t, err)
 		assert.Len(t, permissions, 1, "with its account permission")
-		pending, err := db.GetPreRegistrationById(ctx, nil, row.Id)
+		pending, err := db.GetPreRegistrationByID(ctx, nil, row.ID)
 		require.NoError(t, err)
 		assert.Nil(t, pending, "and the pending registration is consumed with it")
 		auditLogger.AssertExpectations(t)
@@ -201,7 +201,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		store := newMarkerTestStore()
 		HandleActivatePost(pageRenderer, store, heldCeremonies{}, &consumptionFailingDB{Database: db}, usercreation.New(db), passwordValidator,
 			auditLogger, testBaseURL, testAdminConsoleBaseURL).
-			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.Id, codeHash))
+			ServeHTTP(httptest.NewRecorder(), postActivationWithMarker(t, store, chosenPassword, chosenPassword, row.ID, codeHash))
 
 		user, err := db.GetUserByEmail(ctx, nil, activateTestEmail)
 		require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestHandleActivatePost_OnSQLite(t *testing.T) {
 		var permissionRows int
 		require.NoError(t, db.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM users_permissions").Scan(&permissionRows))
 		assert.Zero(t, permissionRows, "and no account permission")
-		pending, err := db.GetPreRegistrationById(ctx, nil, row.Id)
+		pending, err := db.GetPreRegistrationByID(ctx, nil, row.ID)
 		require.NoError(t, err)
 		require.NotNil(t, pending, "a failed activation must leave the pending registration")
 		assert.Equal(t, codeHash, pending.VerificationCodeHash)

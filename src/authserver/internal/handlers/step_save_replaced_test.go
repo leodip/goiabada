@@ -144,7 +144,7 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 			cookies := seed.Result().Cookies()
 			require.Len(t, cookies, 1)
 
-			// Tab A, held in GetUserById until the other tabs have saved.
+			// Tab A, held in GetUserByID until the other tabs have saved.
 			pageRendererA := handlersmocks.NewPageRenderer(t)
 			databaseA := datamocks.NewDatabase(t)
 			auditLoggerA := handlersmocks.NewAuditLogger(t)
@@ -158,11 +158,11 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 				}
 			}()
 			databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil).Maybe()
-			databaseA.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil).Maybe()
+			databaseA.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
 				close(reached)
 				<-release
-			}).Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+			}).Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 
 			reqA := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
 				"/auth/level2?ceremony="+testCeremonyId, nil)), cookies)
@@ -267,10 +267,10 @@ func TestHandleAuthLevel1Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 func TestHandleAuthLevel1CompletedGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		clientLevel record.AcrLevel
+		clientLevel record.ACRLevel
 	}{
-		{name: "on the way to level 2", clientLevel: record.AcrLevel2Optional},
-		{name: "on the way to completed", clientLevel: record.AcrLevel1},
+		{name: "on the way to level 2", clientLevel: record.ACRLevel2Optional},
+		{name: "on the way to completed", clientLevel: record.ACRLevel1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -298,7 +298,7 @@ func TestHandleAuthLevel1CompletedGet_AReplacedCeremonyAnswersNoLongerActive(t *
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.clientLevel}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: tc.clientLevel}, nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 			handler.ServeHTTP(rr, req)
@@ -330,9 +330,9 @@ func TestHandleAuthLevel2Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 		UserId:     1,
 	}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(
-		&record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(
+		&record.User{ID: 1, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 	expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)
@@ -375,8 +375,8 @@ func TestHandleAuthOtpGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 				// A key this ceremony already generated, so the enrolment arm draws no new one.
 				OTPKeyURL: otpTestKeyURL("JBSWY3DPEHPK3PXP"),
 			}, nil)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(
-				&record.User{Id: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled}, nil)
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(
+				&record.User{ID: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled}, nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&record.Client{ClientIdentifier: "test-client"}, nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)

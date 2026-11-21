@@ -200,7 +200,7 @@ func AccessToken(ctx context.Context, database Database, token oauth.JWTToken, s
 	if client == nil {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
-	if namesClientRow && clientRow != client.Id {
+	if namesClientRow && clientRow != client.ID {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
 	issued, err := issuedToClient(ctx, database, token, client)
@@ -437,7 +437,7 @@ func userAccessToken(ctx context.Context, database Database, token oauth.JWTToke
 	// ending when its owner's session ends and staying alive while its owner keeps using the browser
 	// (#133).
 	//
-	if session.UserId != user.Id {
+	if session.UserID != user.ID {
 		return Verdict{Refusal: SessionOfAnotherUser, User: user, SessionIdentifier: sid, Session: session}, nil
 	}
 

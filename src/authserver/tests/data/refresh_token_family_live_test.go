@@ -47,7 +47,7 @@ func TestIsRefreshTokenFamilyLive(t *testing.T) {
 		{name: "no member and no record", want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			family := newFamilyJti()
+			family := newFamilyJTI()
 			if len(tc.members) > 0 {
 				seedFamilyMembers(t, family, tc.members...)
 			}
@@ -63,8 +63,8 @@ func TestIsRefreshTokenFamilyLive(t *testing.T) {
 // A family is live by its own members and record, and no other family's.
 func TestIsRefreshTokenFamilyLive_OneFamilyDoesNotAnswerForAnother(t *testing.T) {
 	t.Run("another family's live member", func(t *testing.T) {
-		family := newFamilyJti()
-		bystander := newFamilyJti()
+		family := newFamilyJTI()
+		bystander := newFamilyJTI()
 		seedFamilyMembers(t, family, true)
 		seedFamilyMembers(t, bystander, false)
 
@@ -73,8 +73,8 @@ func TestIsRefreshTokenFamilyLive_OneFamilyDoesNotAnswerForAnother(t *testing.T)
 	})
 
 	t.Run("another family's record", func(t *testing.T) {
-		family := newFamilyJti()
-		recorded := newFamilyJti()
+		family := newFamilyJTI()
+		recorded := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 		seedFamilyMembers(t, recorded, false)
 		recordFamily(t, recorded)
@@ -85,11 +85,11 @@ func TestIsRefreshTokenFamilyLive_OneFamilyDoesNotAnswerForAnother(t *testing.T)
 }
 
 // The query compares the identifier as exactly what it is, for the reason
-// TestRefreshTokenFamilyRevocation_TheLookupComparesTheJtiExactly states: SQL Server pads for `=`
+// TestRefreshTokenFamilyRevocation_TheLookupComparesTheJTIExactly states: SQL Server pads for `=`
 // under every collation, so a trailing space would otherwise find the live member of the family
 // without one. The control is the exact identifier.
 func TestIsRefreshTokenFamilyLive_ComparesTheIdentifierExactly(t *testing.T) {
-	family := newFamilyJti()
+	family := newFamilyJTI()
 	seedFamilyMembers(t, family, false)
 	require.True(t, familyIsLive(t, family), "control: the exact identifier finds the live member")
 
@@ -125,7 +125,7 @@ func TestIsRefreshTokenFamilyLive_EnlistsInTheCallersTransaction(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("a revocation in the same transaction ends the grant there", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
@@ -147,7 +147,7 @@ func TestIsRefreshTokenFamilyLive_EnlistsInTheCallersTransaction(t *testing.T) {
 	})
 
 	t.Run("a revocation that rolls back leaves the grant live", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 		refused := errors.New("the revocation decided against it")
 

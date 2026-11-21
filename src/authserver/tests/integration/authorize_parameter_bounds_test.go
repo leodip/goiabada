@@ -54,8 +54,8 @@ func createScopeAtTheBound(t *testing.T, user *record.User, prefix string) strin
 		}
 		identifier += strings.Repeat("x", width-len(identifier))
 
-		permission := createPermissionWithId(t, resource.Id, identifier)
-		assignPermissionToUser(t, user.Id, permission.Id)
+		permission := createPermissionWithId(t, resource.ID, identifier)
+		assignPermissionToUser(t, user.ID, permission.ID)
 		scope += " " + resource.ResourceIdentifier + ":" + identifier
 		if width == room {
 			break
@@ -78,11 +78,11 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	password := fake.Password(8)

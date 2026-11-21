@@ -16,8 +16,8 @@ import (
 // permissions they carry.
 type groupsSearchDatabase interface {
 	GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]record.Group, int, error)
-	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
 }
 
 // HandleGroupsSearchGet
@@ -40,7 +40,7 @@ func HandleGroupsSearchGet(
 		}
 
 		// Ensure permission exists
-		perm, err := database.GetPermissionById(r.Context(), nil, permId)
+		perm, err := database.GetPermissionByID(r.Context(), nil, permId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting permission by ID for annotation"), "permission_id", permId)
 			return
@@ -77,11 +77,11 @@ func HandleGroupsSearchGet(
 			// Build list of group IDs
 			groupIds := make([]int64, len(groups))
 			for i := range groups {
-				groupIds[i] = groups[i].Id
+				groupIds[i] = groups[i].ID
 			}
 
 			// Load permissions for all groups in batch
-			gp, err := database.GetGroupPermissionsByGroupIds(r.Context(), nil, groupIds)
+			gp, err := database.GetGroupPermissionsByGroupIDs(r.Context(), nil, groupIds)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error getting group permissions by group IDs"), "group_count", len(groupIds))
 				return
@@ -90,8 +90,8 @@ func HandleGroupsSearchGet(
 			// Map groupId -> has permId
 			hasPerm := make(map[int64]bool, len(groupIds))
 			for _, g := range gp {
-				if g.PermissionId == permId {
-					hasPerm[g.GroupId] = true
+				if g.PermissionID == permId {
+					hasPerm[g.GroupID] = true
 				}
 			}
 
@@ -103,7 +103,7 @@ func HandleGroupsSearchGet(
 				}
 				annotated = append(annotated, api.GroupWithPermissionResponse{
 					GroupResponse: *gr,
-					HasPermission: hasPerm[groups[i].Id],
+					HasPermission: hasPerm[groups[i].ID],
 				})
 			}
 		}

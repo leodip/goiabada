@@ -167,7 +167,7 @@ func HandleAccountLogoutRequestPost(
 		}
 		hasClient := false
 		for _, sc := range userSession.Clients {
-			if sc.Client.Id == client.Id {
+			if sc.Client.ID == client.ID {
 				hasClient = true
 				break
 			}

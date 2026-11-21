@@ -16,8 +16,8 @@ import (
 // usersSearchDatabase is what the user search endpoint needs: one page of users and the groups
 // and permissions each carries.
 type usersSearchDatabase interface {
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
 	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error)
 	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error
 	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error
@@ -81,7 +81,7 @@ func HandleUsersSearchGet(
 			}
 
 			// Verify group exists
-			group, err := database.GetGroupById(r.Context(), nil, annotateGroupId)
+			group, err := database.GetGroupByID(r.Context(), nil, annotateGroupId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
 				return
@@ -103,7 +103,7 @@ func HandleUsersSearchGet(
 			for i, user := range users {
 				inGroup := false
 				for _, userGroup := range user.Groups {
-					if userGroup.Id == annotateGroupId {
+					if userGroup.ID == annotateGroupId {
 						inGroup = true
 						break
 					}
@@ -135,7 +135,7 @@ func HandleUsersSearchGet(
 			}
 
 			// Verify the permission exists
-			perm, err := database.GetPermissionById(r.Context(), nil, permId)
+			perm, err := database.GetPermissionByID(r.Context(), nil, permId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID"), "permission_id", permId)
 				return
@@ -155,7 +155,7 @@ func HandleUsersSearchGet(
 			for i, u := range users {
 				has := false
 				for _, up := range u.Permissions {
-					if up.Id == permId {
+					if up.ID == permId {
 						has = true
 						break
 					}

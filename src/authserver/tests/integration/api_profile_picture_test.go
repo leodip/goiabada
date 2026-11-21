@@ -274,7 +274,7 @@ func TestAPIUserProfilePictureGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -310,7 +310,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	pictureData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -348,7 +348,7 @@ func TestAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	invalidData := []byte("not a valid image")
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", invalidData, "invalid.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -365,7 +365,7 @@ func TestAPIUserProfilePictureDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 
 	// First upload a picture
 	pictureData := createTestPNGImage(100, 100)

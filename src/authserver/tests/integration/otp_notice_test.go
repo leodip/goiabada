@@ -119,7 +119,7 @@ func TestAPIUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 			user.OTPSecretEncrypted = encryptOTPSecretForTest(t, newOTPSecretForTest(t, user.Email))
 			require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 
-			removeAuthenticatorAsAdministrator(t, user.Id)
+			removeAuthenticatorAsAdministrator(t, user.ID)
 
 			messages := awaitMailTo(t, user.Email)
 			require.Len(t, messages, 1, "the account's address is told exactly once")

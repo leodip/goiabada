@@ -28,14 +28,14 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*record.Client, *re
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
@@ -84,7 +84,7 @@ func assertCeremonyMismatchPage(t *testing.T, resp *http.Response, what string) 
 func assertNothingWasCompleted(t *testing.T, userId int64) {
 	t.Helper()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, userId)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, userId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *tes
 	assert.Equal(t, "openid profile", codeB.Scope)
 
 	for client, scope := range map[*record.Client]string{clientA: "openid email", clientB: "openid profile"} {
-		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+		consent, getConsentErr := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 		if getConsentErr != nil {
 			t.Fatal(getConsentErr)
 		}
@@ -403,9 +403,9 @@ func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T
 	location = assertRedirect(t, resp, "/account/profile")
 	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", location,
 		"a browser holding no sign-in is sent to the account page")
-	assertNothingWasCompleted(t, userA.Id)
+	assertNothingWasCompleted(t, userA.ID)
 
-	storedA, err := database.GetUserById(context.Background(), nil, userA.Id)
+	storedA, err := database.GetUserByID(context.Background(), nil, userA.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

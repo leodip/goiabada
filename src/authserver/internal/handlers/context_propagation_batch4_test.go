@@ -42,10 +42,10 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+	database.On("GetSettingsByID", theRequestsContext(), mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "TestApp"}, nil).Once()
 	database.On("GetClientPageBrand", theRequestsContext(), (*sql.Tx)(nil), "admin-console-client").
-		Return(&record.Brand{Id: 1, Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}, nil).Once()
+		Return(&record.Brand{ID: 1, Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandlePublicSettingsGet(database, "https://auth.example.test").ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))

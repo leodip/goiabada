@@ -84,7 +84,7 @@ func HandleSettingsEmailPut(
 				return
 			}
 
-			saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+			saved, err := saveSettingsSection(r.Context(), database, currentSettings.ID, func(stored *record.Settings) {
 				stored.SMTPEnabled = false
 				stored.SMTPHost = ""
 				stored.SMTPPort = 0
@@ -268,7 +268,7 @@ func HandleSettingsEmailPut(
 		smtpUsername := strings.TrimSpace(req.SMTPUsername)
 		smtpFromName := strings.TrimSpace(req.SMTPFromName)
 		smtpFromEmail := senderAddressForStorage(req.SMTPFromEmail)
-		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.Id, func(stored *record.Settings) error {
+		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.ID, func(stored *record.Settings) error {
 			password := smtpPasswordEncrypted
 			if keptUnreadable {
 				// The kept password opens under neither key, so it could not be sealed again, and the

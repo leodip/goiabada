@@ -67,9 +67,9 @@ func newImplicitClientRequiringDPoP(t *testing.T, requires bool) (*record.Client
 	t.Helper()
 	implicitEnabled := true
 	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	if requires {
-		require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, client.Id, true))
+		require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, client.ID, true))
 	}
 	return client, redirectURI.URI
 }
@@ -119,7 +119,7 @@ func TestImplicitDPoPRequirement_SwitchedOnMidSignInIsAppliedAtIssuance(t *testi
 			state := fake.LetterN(16)
 
 			issue := signInToIssueAsANewUser(t, httpClient, implicitAuthorizeURL(client, redirectURI, responseType, state))
-			require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, client.Id, true))
+			require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, client.ID, true))
 			resp := loadPage(t, httpClient, issue)
 			defer func() { _ = resp.Body.Close() }()
 

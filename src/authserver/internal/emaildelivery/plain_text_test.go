@@ -268,7 +268,7 @@ func (s brandStub) GetClientPageBrand(context.Context, *sql.Tx, string) (*record
 	return s.brand, nil
 }
 
-func (s brandStub) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
+func (s brandStub) GetBrandAssetsByIDs(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
 	return s.assets, nil
 }
 
@@ -288,8 +288,8 @@ func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 	t.Helper()
 
 	brand := record.NewBrand("Shop", record.BrandAppearanceLight, "plum")
-	brand.Id = 7
-	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+	brand.ID = 7
+	brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
 	if footer {
 		brand.FooterLinks = record.BrandFooterLinks{
 			{URL: "https://acme.example/privacy", Label: "Privacy"},
@@ -298,7 +298,7 @@ func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 		brand.SupportEmail, brand.SupportPhone, brand.SupportURL = "help@acme.example", "+442079460958", "https://acme.example/support"
 	}
 	brands := brandStub{brand: &brand, assets: []record.BrandAsset{
-		{Id: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
+		{ID: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
 	}}
 
 	ctx := reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"})

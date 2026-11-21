@@ -90,7 +90,7 @@ func boundCodeGrant(t *testing.T, public bool, clientSecret string, key *dpoptes
 // bindingOf is the thumbprint the refresh token is bound to on its row, empty for none.
 func bindingOf(t *testing.T, refreshToken string) string {
 	t.Helper()
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, row)
 	if row.DPoPJkt.Valid {
@@ -107,10 +107,10 @@ func requireRefused(t *testing.T, resp *http.Response, body map[string]any, refr
 	assert.Equal(t, boundRefreshTokenRefusal, body)
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	assert.False(t, row.Revoked, "the refused refresh spent nothing")
-	revoked, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, row.FirstRefreshTokenJti)
+	revoked, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, row.FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.False(t, revoked, "and revoked no family")
 }
@@ -195,7 +195,7 @@ func TestDPoP_ABoundFamilyStaysBoundOnceItsClientIsConfidential(t *testing.T) {
 	code, first := boundCodeGrant(t, true, fake.LetterN(32), &key)
 
 	clientSecret := fake.LetterN(32)
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	client.IsPublic = false
 	client.ClientSecretEncrypted, err = dataCipher.Encrypt(clientSecret)
@@ -278,11 +278,11 @@ func TestDPoP_ConcurrentRefreshesOfABoundTokenLeaveNoUnboundToken(t *testing.T) 
 	}
 	assert.Equal(t, 1, succeeded, "exactly one refresh is answered with tokens")
 
-	tokens, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	tokens, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	require.Len(t, tokens, 2, "the family's first token and the one child its one rotation inserted")
 	for _, token := range tokens {
-		assert.Equalf(t, key.Thumbprint, token.DPoPJkt.String, "every token of the family is bound to its key, %s", token.RefreshTokenJti)
+		assert.Equalf(t, key.Thumbprint, token.DPoPJkt.String, "every token of the family is bound to its key, %s", token.RefreshTokenJTI)
 	}
 }
 

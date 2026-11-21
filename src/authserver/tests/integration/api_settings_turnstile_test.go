@@ -62,7 +62,7 @@ func putTurnstile(t *testing.T, accessToken string, body any) (*http.Response, s
 // storedTurnstile is the settings row as stored.
 func storedTurnstile(t *testing.T) *record.Settings {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	return settings

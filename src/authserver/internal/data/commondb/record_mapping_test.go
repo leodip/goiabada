@@ -94,14 +94,14 @@ func permissionMapping() mappingCase {
 		table:  "permissions",
 		record: reflect.TypeOf(record.Permission{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetPermissionById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetPermissionById(ctx, nil, 1)
+			"GetPermissionByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetPermissionByID(ctx, nil, 1)
 			},
-			"GetPermissionsByResourceId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetPermissionsByResourceId(ctx, nil, 1))
+			"GetPermissionsByResourceID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetPermissionsByResourceID(ctx, nil, 1))
 			},
-			"GetPermissionsByIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetPermissionsByIds(ctx, nil, []int64{1, 2}))
+			"GetPermissionsByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetPermissionsByIDs(ctx, nil, []int64{1, 2}))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -119,15 +119,15 @@ func resourceMapping() mappingCase {
 		table:  "resources",
 		record: reflect.TypeOf(record.Resource{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetResourceById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetResourceById(ctx, nil, 1)
+			"GetResourceByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetResourceByID(ctx, nil, 1)
 			},
 			"GetResourceByResourceIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				// The distinct value the row carries, so the exact-match check keeps it.
 				return d.GetResourceByResourceIdentifier(ctx, nil, distinctString("resource_identifier"))
 			},
-			"GetResourcesByIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetResourcesByIds(ctx, nil, []int64{1, 2}))
+			"GetResourcesByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetResourcesByIDs(ctx, nil, []int64{1, 2}))
 			},
 			"GetAllResources": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetAllResources(ctx, nil))
@@ -148,23 +148,23 @@ func clientMapping() mappingCase {
 		table:  "clients",
 		record: reflect.TypeOf(record.Client{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetClientById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetClientById(ctx, nil, 1)
+			"GetClientByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientByID(ctx, nil, 1)
 			},
-			"GetClientByIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+			"GetClientByIDForUpdate": func(ctx context.Context, d *Database) (any, error) {
 				tx, err := d.BeginTransaction(ctx)
 				if err != nil {
 					return nil, err
 				}
 				defer func() { _ = tx.Rollback() }()
-				return d.GetClientByIdForUpdate(ctx, tx, 1)
+				return d.GetClientByIDForUpdate(ctx, tx, 1)
 			},
 			"GetClientByClientIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				// The distinct value the row carries, so the exact-match check keeps it.
 				return d.GetClientByClientIdentifier(ctx, nil, distinctString("client_identifier"))
 			},
-			"GetClientsByIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetClientsByIds(ctx, nil, []int64{1, 2}))
+			"GetClientsByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientsByIDs(ctx, nil, []int64{1, 2}))
 			},
 			"GetAllClients": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetAllClients(ctx, nil))
@@ -185,8 +185,8 @@ func clientLogoMapping() mappingCase {
 		table:  "client_logos",
 		record: reflect.TypeOf(record.ClientLogo{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetClientLogoByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetClientLogoByClientId(ctx, nil, 1)
+			"GetClientLogoByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientLogoByClientID(ctx, nil, 1)
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -204,14 +204,14 @@ func clientPermissionMapping() mappingCase {
 		table:  "clients_permissions",
 		record: reflect.TypeOf(record.ClientPermission{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetClientPermissionById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetClientPermissionById(ctx, nil, 1)
+			"GetClientPermissionByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientPermissionByID(ctx, nil, 1)
 			},
-			"GetClientPermissionByClientIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetClientPermissionByClientIdAndPermissionId(ctx, nil, 1, 2)
+			"GetClientPermissionByClientIDAndPermissionID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetClientPermissionByClientIDAndPermissionID(ctx, nil, 1, 2)
 			},
-			"GetClientPermissionsByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetClientPermissionsByClientId(ctx, nil, 1))
+			"GetClientPermissionsByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientPermissionsByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -230,8 +230,8 @@ func clientIntrospectionResourceMapping() mappingCase {
 		table:  "clients_introspection_resources",
 		record: reflect.TypeOf(record.ClientIntrospectionResource{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetClientIntrospectionResourcesByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetClientIntrospectionResourcesByClientId(ctx, nil, 1))
+			"GetClientIntrospectionResourcesByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetClientIntrospectionResourcesByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -247,11 +247,11 @@ func redirectURIMapping() mappingCase {
 		table:  "redirect_uris",
 		record: reflect.TypeOf(record.RedirectURI{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetRedirectURIById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetRedirectURIById(ctx, nil, 1)
+			"GetRedirectURIByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRedirectURIByID(ctx, nil, 1)
 			},
-			"GetRedirectURIsByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetRedirectURIsByClientId(ctx, nil, 1))
+			"GetRedirectURIsByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetRedirectURIsByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -268,8 +268,8 @@ func postLogoutRedirectURIMapping() mappingCase {
 		table:  "post_logout_redirect_uris",
 		record: reflect.TypeOf(record.PostLogoutRedirectURI{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetPostLogoutRedirectURIsByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetPostLogoutRedirectURIsByClientId(ctx, nil, 1))
+			"GetPostLogoutRedirectURIsByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetPostLogoutRedirectURIsByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -287,8 +287,8 @@ func legalDocumentMapping() mappingCase {
 		table:  "legal_documents",
 		record: reflect.TypeOf(record.LegalDocument{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetLegalDocumentById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetLegalDocumentById(ctx, nil, 1)
+			"GetLegalDocumentByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetLegalDocumentByID(ctx, nil, 1)
 			},
 			"GetLegalDocumentByShortName": func(ctx context.Context, d *Database) (any, error) {
 				// The distinct value the row carries, so the exact-match check keeps it.
@@ -315,8 +315,8 @@ func legalDocumentVersionMapping() mappingCase {
 		table:  "legal_document_versions",
 		record: reflect.TypeOf(record.LegalDocumentVersion{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetLegalDocumentVersionsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, 1))
+			"GetLegalDocumentVersionsByLegalDocumentID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentVersionsByLegalDocumentID(ctx, nil, 1))
 			},
 			"GetLegalDocumentVersion": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetLegalDocumentVersion(ctx, nil, 1, 1)
@@ -336,11 +336,11 @@ func legalDocumentClientMapping() mappingCase {
 		table:  "legal_documents_clients",
 		record: reflect.TypeOf(record.LegalDocumentClient{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetLegalDocumentClientsByLegalDocumentId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetLegalDocumentClientsByLegalDocumentId(ctx, nil, 1))
+			"GetLegalDocumentClientsByLegalDocumentID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByLegalDocumentID(ctx, nil, 1))
 			},
-			"GetLegalDocumentClientsByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetLegalDocumentClientsByClientId(ctx, nil, 1))
+			"GetLegalDocumentClientsByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentClientsByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -357,8 +357,8 @@ func legalDocumentAcceptanceMapping() mappingCase {
 		table:  "legal_document_acceptances",
 		record: reflect.TypeOf(record.LegalDocumentAcceptance{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetLegalDocumentAcceptancesByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetLegalDocumentAcceptancesByUserId(ctx, nil, 1))
+			"GetLegalDocumentAcceptancesByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetLegalDocumentAcceptancesByUserID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -374,11 +374,11 @@ func webOriginMapping() mappingCase {
 		table:  "web_origins",
 		record: reflect.TypeOf(record.WebOrigin{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetWebOriginById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetWebOriginById(ctx, nil, 1)
+			"GetWebOriginByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetWebOriginByID(ctx, nil, 1)
 			},
-			"GetWebOriginsByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetWebOriginsByClientId(ctx, nil, 1))
+			"GetWebOriginsByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetWebOriginsByClientID(ctx, nil, 1))
 			},
 			"GetAllWebOrigins": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetAllWebOrigins(ctx, nil))
@@ -396,11 +396,11 @@ func groupMapping() mappingCase {
 		table:  "groups",
 		record: reflect.TypeOf(record.Group{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetGroupById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetGroupById(ctx, nil, 1)
+			"GetGroupByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupByID(ctx, nil, 1)
 			},
-			"GetGroupsByIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetGroupsByIds(ctx, nil, []int64{1, 2}))
+			"GetGroupsByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupsByIDs(ctx, nil, []int64{1, 2}))
 			},
 			"GetGroupByGroupIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				// The distinct value the row carries, so the exact-match check keeps it.
@@ -429,14 +429,14 @@ func groupAttributeMapping() mappingCase {
 		table:  "group_attributes",
 		record: reflect.TypeOf(record.GroupAttribute{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetGroupAttributeById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetGroupAttributeById(ctx, nil, 1)
+			"GetGroupAttributeByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupAttributeByID(ctx, nil, 1)
 			},
-			"GetGroupAttributesByGroupIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetGroupAttributesByGroupIds(ctx, nil, []int64{1, 2}))
+			"GetGroupAttributesByGroupIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupAttributesByGroupIDs(ctx, nil, []int64{1, 2}))
 			},
-			"GetGroupAttributesByGroupId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetGroupAttributesByGroupId(ctx, nil, 1))
+			"GetGroupAttributesByGroupID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupAttributesByGroupID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -454,17 +454,17 @@ func groupPermissionMapping() mappingCase {
 		table:  "groups_permissions",
 		record: reflect.TypeOf(record.GroupPermission{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetGroupPermissionById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetGroupPermissionById(ctx, nil, 1)
+			"GetGroupPermissionByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupPermissionByID(ctx, nil, 1)
 			},
-			"GetGroupPermissionByGroupIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetGroupPermissionByGroupIdAndPermissionId(ctx, nil, 1, 2)
+			"GetGroupPermissionByGroupIDAndPermissionID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetGroupPermissionByGroupIDAndPermissionID(ctx, nil, 1, 2)
 			},
-			"GetGroupPermissionsByGroupId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetGroupPermissionsByGroupId(ctx, nil, 1))
+			"GetGroupPermissionsByGroupID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupPermissionsByGroupID(ctx, nil, 1))
 			},
-			"GetGroupPermissionsByGroupIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetGroupPermissionsByGroupIds(ctx, nil, []int64{1, 2}))
+			"GetGroupPermissionsByGroupIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetGroupPermissionsByGroupIDs(ctx, nil, []int64{1, 2}))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -482,17 +482,17 @@ func userGroupMapping() mappingCase {
 		table:  "users_groups",
 		record: reflect.TypeOf(record.UserGroup{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserGroupById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserGroupById(ctx, nil, 1)
+			"GetUserGroupByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserGroupByID(ctx, nil, 1)
 			},
-			"GetUserGroupByUserIdAndGroupId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserGroupByUserIdAndGroupId(ctx, nil, 1, 2)
+			"GetUserGroupByUserIDAndGroupID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserGroupByUserIDAndGroupID(ctx, nil, 1, 2)
 			},
-			"GetUserGroupsByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserGroupsByUserId(ctx, nil, 1))
+			"GetUserGroupsByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserGroupsByUserID(ctx, nil, 1))
 			},
-			"GetUserGroupsByUserIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserGroupsByUserIds(ctx, nil, []int64{1, 2}))
+			"GetUserGroupsByUserIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserGroupsByUserIDs(ctx, nil, []int64{1, 2}))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -524,19 +524,19 @@ func userMapping() mappingCase {
 		table:  "users",
 		record: reflect.TypeOf(record.User{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserById(ctx, nil, 1)
+			"GetUserByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserByID(ctx, nil, 1)
 			},
-			"GetUserByIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+			"GetUserByIDForUpdate": func(ctx context.Context, d *Database) (any, error) {
 				tx, err := d.BeginTransaction(ctx)
 				if err != nil {
 					return nil, err
 				}
 				defer func() { _ = tx.Rollback() }()
-				return d.GetUserByIdForUpdate(ctx, tx, 1)
+				return d.GetUserByIDForUpdate(ctx, tx, 1)
 			},
-			"GetUsersByIds": func(ctx context.Context, d *Database) (any, error) {
-				return anyOf(d.GetUsersByIds(ctx, nil, []int64{1, 2}))
+			"GetUsersByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return anyOf(d.GetUsersByIDs(ctx, nil, []int64{1, 2}))
 			},
 			"GetUserByUsername": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetUserByUsername(ctx, nil, distinctString("username"))
@@ -564,8 +564,8 @@ func userMapping() mappingCase {
 				users, _, err := d.GetGroupMembersPaginated(ctx, nil, 1, 2, 10)
 				return firstOf(users, err)
 			},
-			"GetUsersByPermissionIdPaginated": func(ctx context.Context, d *Database) (any, error) {
-				users, _, err := d.GetUsersByPermissionIdPaginated(ctx, nil, 1, 2, 10)
+			"GetUsersByPermissionIDPaginated": func(ctx context.Context, d *Database) (any, error) {
+				users, _, err := d.GetUsersByPermissionIDPaginated(ctx, nil, 1, 2, 10)
 				return firstOf(users, err)
 			},
 		},
@@ -584,11 +584,11 @@ func userAttributeMapping() mappingCase {
 		table:  "user_attributes",
 		record: reflect.TypeOf(record.UserAttribute{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserAttributeById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserAttributeById(ctx, nil, 1)
+			"GetUserAttributeByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserAttributeByID(ctx, nil, 1)
 			},
-			"GetUserAttributesByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserAttributesByUserId(ctx, nil, 1))
+			"GetUserAttributesByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserAttributesByUserID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -606,17 +606,17 @@ func userPermissionMapping() mappingCase {
 		table:  "users_permissions",
 		record: reflect.TypeOf(record.UserPermission{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserPermissionById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserPermissionById(ctx, nil, 1)
+			"GetUserPermissionByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserPermissionByID(ctx, nil, 1)
 			},
-			"GetUserPermissionByUserIdAndPermissionId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserPermissionByUserIdAndPermissionId(ctx, nil, 1, 2)
+			"GetUserPermissionByUserIDAndPermissionID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserPermissionByUserIDAndPermissionID(ctx, nil, 1, 2)
 			},
-			"GetUserPermissionsByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserPermissionsByUserId(ctx, nil, 1))
+			"GetUserPermissionsByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserPermissionsByUserID(ctx, nil, 1))
 			},
-			"GetUserPermissionsByUserIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserPermissionsByUserIds(ctx, nil, []int64{1, 2}))
+			"GetUserPermissionsByUserIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserPermissionsByUserIDs(ctx, nil, []int64{1, 2}))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -634,8 +634,8 @@ func userProfilePictureMapping() mappingCase {
 		table:  "user_profile_pictures",
 		record: reflect.TypeOf(record.UserProfilePicture{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserProfilePictureByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserProfilePictureByUserId(ctx, nil, 1)
+			"GetUserProfilePictureByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserProfilePictureByUserID(ctx, nil, 1)
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -666,8 +666,8 @@ func codeMapping() mappingCase {
 		table:  "codes",
 		record: reflect.TypeOf(record.Code{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetCodeById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetCodeById(ctx, nil, 1)
+			"GetCodeByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetCodeByID(ctx, nil, 1)
 			},
 			"GetCodeByCodeHash": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetCodeByCodeHash(ctx, nil, distinctString("code_hash"), false)
@@ -690,30 +690,30 @@ func refreshTokenMapping() mappingCase {
 		table:  "refresh_tokens",
 		record: reflect.TypeOf(record.RefreshToken{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetRefreshTokenById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetRefreshTokenById(ctx, nil, 1)
+			"GetRefreshTokenByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRefreshTokenByID(ctx, nil, 1)
 			},
-			"GetRefreshTokenByJti": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetRefreshTokenByJti(ctx, nil, distinctString("refresh_token_jti"))
+			"GetRefreshTokenByJTI": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetRefreshTokenByJTI(ctx, nil, distinctString("refresh_token_jti"))
 			},
-			"GetRefreshTokensByCodeId": func(ctx context.Context, d *Database) (any, error) {
-				return firstPointerOf(d.GetRefreshTokensByCodeId(ctx, nil, 1))
+			"GetRefreshTokensByCodeID": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByCodeID(ctx, nil, 1))
 			},
 			"GetRefreshTokensBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				return firstPointerOf(d.GetRefreshTokensBySessionIdentifier(ctx, nil, distinctString("session_identifier")))
 			},
-			"GetSessionBoundRefreshTokensBySessionIdentifierAndClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstPointerOf(d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil,
+			"GetSessionBoundRefreshTokensBySessionIdentifierAndClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx, nil,
 					distinctString("session_identifier"), 2))
 			},
-			"GetRefreshTokensByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstPointerOf(d.GetRefreshTokensByUserId(ctx, nil, 1))
+			"GetRefreshTokensByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByUserID(ctx, nil, 1))
 			},
-			"GetRefreshTokensByUserIdAndClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstPointerOf(d.GetRefreshTokensByUserIdAndClientId(ctx, nil, 1, 2))
+			"GetRefreshTokensByUserIDAndClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByUserIDAndClientID(ctx, nil, 1, 2))
 			},
-			"GetRefreshTokensByClientId": func(ctx context.Context, d *Database) (any, error) {
-				return firstPointerOf(d.GetRefreshTokensByClientId(ctx, nil, 1))
+			"GetRefreshTokensByClientID": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetRefreshTokensByClientID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -754,18 +754,18 @@ func userSessionMapping() mappingCase {
 		table:  "user_sessions",
 		record: reflect.TypeOf(record.UserSession{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserSessionById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserSessionById(ctx, nil, 1)
+			"GetUserSessionByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserSessionByID(ctx, nil, 1)
 			},
 			"GetUserSessionBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetUserSessionBySessionIdentifier(ctx, nil, distinctString("session_identifier"))
 			},
-			"GetUserSessionsByClientIdPaginated": func(ctx context.Context, d *Database) (any, error) {
-				sessions, _, err := d.GetUserSessionsByClientIdPaginated(ctx, nil, 1, 2, 10)
+			"GetUserSessionsByClientIDPaginated": func(ctx context.Context, d *Database) (any, error) {
+				sessions, _, err := d.GetUserSessionsByClientIDPaginated(ctx, nil, 1, 2, 10)
 				return firstOf(sessions, err)
 			},
-			"GetUserSessionsByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserSessionsByUserId(ctx, nil, 1))
+			"GetUserSessionsByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionsByUserID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -785,17 +785,17 @@ func userSessionClientMapping() mappingCase {
 		table:  "user_session_clients",
 		record: reflect.TypeOf(record.UserSessionClient{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserSessionClientById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserSessionClientById(ctx, nil, 1)
+			"GetUserSessionClientByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserSessionClientByID(ctx, nil, 1)
 			},
-			"GetUserSessionClientsByUserSessionId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserSessionClientsByUserSessionId(ctx, nil, 1))
+			"GetUserSessionClientsByUserSessionID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionClientsByUserSessionID(ctx, nil, 1))
 			},
-			"GetUserSessionClientsByUserSessionIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserSessionClientsByUserSessionIds(ctx, nil, []int64{1, 2}))
+			"GetUserSessionClientsByUserSessionIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionClientsByUserSessionIDs(ctx, nil, []int64{1, 2}))
 			},
-			"GetUserSessionsClientByIds": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetUserSessionsClientByIds(ctx, nil, []int64{1, 2}))
+			"GetUserSessionsClientByIDs": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetUserSessionsClientByIDs(ctx, nil, []int64{1, 2}))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -815,8 +815,8 @@ func browserSessionMapping() mappingCase {
 		table:  "browser_sessions",
 		record: reflect.TypeOf(record.BrowserSession{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetBrowserSessionByOwnerAndSessionIdHash": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, distinctString("owner"),
+			"GetBrowserSessionByOwnerAndSessionIDHash": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrowserSessionByOwnerAndSessionIDHash(ctx, nil, distinctString("owner"),
 					distinctString("session_id_hash"), time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
 			},
 		},
@@ -832,22 +832,22 @@ func userConsentMapping() mappingCase {
 		table:  "user_consents",
 		record: reflect.TypeOf(record.UserConsent{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetUserConsentById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetUserConsentById(ctx, nil, 1)
+			"GetUserConsentByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetUserConsentByID(ctx, nil, 1)
 			},
-			"GetConsentByUserIdAndClientId": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetConsentByUserIdAndClientId(ctx, nil, 1, 2)
+			"GetConsentByUserIDAndClientID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetConsentByUserIDAndClientID(ctx, nil, 1, 2)
 			},
-			"GetConsentByUserIdAndClientIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+			"GetConsentByUserIDAndClientIDForUpdate": func(ctx context.Context, d *Database) (any, error) {
 				tx, err := d.BeginTransaction(ctx)
 				if err != nil {
 					return nil, err
 				}
 				defer func() { _ = tx.Rollback() }()
-				return d.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, 1, 2)
+				return d.GetConsentByUserIDAndClientIDForUpdate(ctx, tx, 1, 2)
 			},
-			"GetConsentsByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetConsentsByUserId(ctx, nil, 1))
+			"GetConsentsByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetConsentsByUserID(ctx, nil, 1))
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -862,15 +862,15 @@ func userConsentMapping() mappingCase {
 // settingsMapping's whole-row UPDATE leaves created_at, aes_encryption_key, last_cleanup_at and
 // default_brand_id alone, the four dont-update columns. CreateInitialSettings, which names the
 // row's id, is held to the tags by
-// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId.
+// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialID.
 func settingsMapping() mappingCase {
 	return mappingCase{
 		name:   "settings",
 		table:  "settings",
 		record: reflect.TypeOf(record.Settings{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetSettingsById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetSettingsById(ctx, nil, 1)
+			"GetSettingsByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetSettingsByID(ctx, nil, 1)
 			},
 		},
 		insert: func(ctx context.Context, d *Database, rec any) error {
@@ -891,8 +891,8 @@ func keyPairMapping() mappingCase {
 		table:  "key_pairs",
 		record: reflect.TypeOf(record.KeyPair{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetKeyPairById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetKeyPairById(ctx, nil, 1)
+			"GetKeyPairByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetKeyPairByID(ctx, nil, 1)
 			},
 			"GetAllSigningKeys": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetAllSigningKeys(ctx, nil))
@@ -929,14 +929,14 @@ func auditLogMapping() mappingCase {
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
 			"GetAuditLogsPaginated":                      page(record.AuditLogFilter{}),
 			"GetAuditLogsPaginated by event":             page(record.AuditLogFilter{AuditEvent: event}),
-			"GetAuditLogsPaginated by request id":        page(record.AuditLogFilter{RequestId: request}),
-			"GetAuditLogsPaginated by user":              page(record.AuditLogFilter{UserId: user}),
-			"GetAuditLogsPaginated by event and request": page(record.AuditLogFilter{AuditEvent: event, RequestId: request}),
-			"GetAuditLogsPaginated by event and user":    page(record.AuditLogFilter{AuditEvent: event, UserId: user}),
-			"GetAuditLogsPaginated by request and user":  page(record.AuditLogFilter{RequestId: request, UserId: user}),
-			"GetAuditLogsPaginated by all three":         page(record.AuditLogFilter{AuditEvent: event, RequestId: request, UserId: user}),
-			"GetAuditLogsByUserId": func(ctx context.Context, d *Database) (any, error) {
-				return firstOf(d.GetAuditLogsByUserId(ctx, nil, user))
+			"GetAuditLogsPaginated by request id":        page(record.AuditLogFilter{RequestID: request}),
+			"GetAuditLogsPaginated by user":              page(record.AuditLogFilter{UserID: user}),
+			"GetAuditLogsPaginated by event and request": page(record.AuditLogFilter{AuditEvent: event, RequestID: request}),
+			"GetAuditLogsPaginated by event and user":    page(record.AuditLogFilter{AuditEvent: event, UserID: user}),
+			"GetAuditLogsPaginated by request and user":  page(record.AuditLogFilter{RequestID: request, UserID: user}),
+			"GetAuditLogsPaginated by all three":         page(record.AuditLogFilter{AuditEvent: event, RequestID: request, UserID: user}),
+			"GetAuditLogsByUserID": func(ctx context.Context, d *Database) (any, error) {
+				return firstOf(d.GetAuditLogsByUserID(ctx, nil, user))
 			},
 		},
 		// CreateAuditLog stamps created_at from the clock whatever the record held; the value
@@ -953,8 +953,8 @@ func preRegistrationMapping() mappingCase {
 		table:  "pre_registrations",
 		record: reflect.TypeOf(record.PreRegistration{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetPreRegistrationById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetPreRegistrationById(ctx, nil, 1)
+			"GetPreRegistrationByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetPreRegistrationByID(ctx, nil, 1)
 			},
 			"GetPreRegistrationByVerificationCodeHash": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetPreRegistrationByVerificationCodeHash(ctx, nil, distinctString("verification_code_hash"))
@@ -979,8 +979,8 @@ func brandMapping() mappingCase {
 		table:  "brands",
 		record: reflect.TypeOf(record.Brand{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetBrandById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetBrandById(ctx, nil, 1)
+			"GetBrandByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrandByID(ctx, nil, 1)
 			},
 			"GetAllBrands": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetAllBrands(ctx, nil))
@@ -1006,14 +1006,14 @@ func brandAssetMapping() mappingCase {
 		table:  "brand_assets",
 		record: reflect.TypeOf(record.BrandAsset{}),
 		reads: map[string]func(ctx context.Context, d *Database) (any, error){
-			"GetBrandAssetById": func(ctx context.Context, d *Database) (any, error) {
-				return d.GetBrandAssetById(ctx, nil, 1)
+			"GetBrandAssetByID": func(ctx context.Context, d *Database) (any, error) {
+				return d.GetBrandAssetByID(ctx, nil, 1)
 			},
 		},
 		readsWithout: map[string]partialRead{
-			"GetBrandAssetsByIds": {
+			"GetBrandAssetsByIDs": {
 				read: func(ctx context.Context, d *Database) (any, error) {
-					return firstOf(d.GetBrandAssetsByIds(ctx, nil, []int64{1, 2}))
+					return firstOf(d.GetBrandAssetsByIDs(ctx, nil, []int64{1, 2}))
 				},
 				omits: []string{"content"},
 			},
@@ -1075,12 +1075,12 @@ func TestRecordMapping_EveryRecordMatchesItsTagsOnEveryEngine(t *testing.T) {
 	}
 }
 
-// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId holds the one INSERT
+// TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialID holds the one INSERT
 // that names its row's id to the settings tags on every engine: it writes every tagged column, the
-// primary key included, each from its field, and the id it writes is initialSettingsId, the one
+// primary key included, each from its field, and the id it writes is initialSettingsID, the one
 // every reader asks for (#424 decision 14). It runs as a plain statement on every engine, since the
 // id is the caller's and there is none to answer.
-func TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialId(t *testing.T) {
+func TestRecordMapping_TheInitialSettingsInsertWritesEveryColumnAtTheInitialID(t *testing.T) {
 	c := settingsMapping()
 	fields := taggedFields(c.record)
 	byColumn := map[string]taggedField{}
@@ -1152,8 +1152,8 @@ func checkInitialSettingsInsert(t *testing.T, dialect data.Dialect, c mappingCas
 			continue
 		}
 		problems = append(problems, checkWrittenColumn(where, dialect, rec, byColumn, col, argIndex, args)...)
-		if col.name == "id" && argIndex < len(args) && !sameValue(args[argIndex], int64(initialSettingsId)) {
-			problems = append(problems, fmt.Sprintf("%s: writes id %v, want %d", where, args[argIndex], initialSettingsId))
+		if col.name == "id" && argIndex < len(args) && !sameValue(args[argIndex], int64(initialSettingsID)) {
+			problems = append(problems, fmt.Sprintf("%s: writes id %v, want %d", where, args[argIndex], initialSettingsID))
 		}
 	}
 	for _, f := range fields {
@@ -1297,7 +1297,7 @@ func distinctValue(rt reflect.Type, i int, column string, pass int) (driver.Valu
 		// order, read back as the palette it holds.
 		dv, gv = mappingPaletteText(), mappingPalette()
 	default:
-		// A named string type, such as record.AcrLevel, is stored and scanned as its string, and a
+		// A named string type, such as record.ACRLevel, is stored and scanned as its string, and a
 		// named int type, such as record.PasswordPolicy, as its number.
 		if ft.Kind() == reflect.String {
 			return distinctString(column), reflect.ValueOf(distinctString(column)).Convert(ft), nil
@@ -1602,8 +1602,8 @@ func checkWrittenColumn(where string, dialect data.Dialect, rec reflect.Value, b
 	return problems
 }
 
-// newId is the id the scripted engine reports for every insert.
-const newId = 4242
+// newID is the id the scripted engine reports for every insert.
+const newID = 4242
 
 func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
 	byColumn map[string]taggedField, pass int) []string {
@@ -1611,9 +1611,9 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 	where := fmt.Sprintf("%s insert", dialect)
 	rec, problems := filledRecord(c, fields, pass)
 
-	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: newId}}}
+	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertID: newID}}}
 	script.answer = func(string, []driver.Value) *scriptedRows {
-		return &scriptedRows{cols: []string{"id"}, values: [][]driver.Value{{int64(newId)}}}
+		return &scriptedRows{cols: []string{"id"}, values: [][]driver.Value{{int64(newID)}}}
 	}
 	if err := c.insert(context.Background(), scriptedDBFor(t, script, dialect), rec.Interface()); err != nil {
 		return append(problems, fmt.Sprintf("%s: %v", where, err))
@@ -1687,8 +1687,8 @@ func checkInsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 	}
 	problems = append(problems, unwrittenLiterals(where, c, written)...)
 
-	if id := rec.Elem().FieldByName("Id"); !id.IsValid() || id.Int() != newId {
-		problems = append(problems, fmt.Sprintf("%s: the record's Id is not the id the engine answered, %d", where, newId))
+	if id := rec.Elem().FieldByName("ID"); !id.IsValid() || id.Int() != newID {
+		problems = append(problems, fmt.Sprintf("%s: the record's ID is not the id the engine answered, %d", where, newID))
 	}
 	return problems
 }
@@ -1712,16 +1712,16 @@ var (
 // statements: its insert writes every tagged column but the primary key, each from its field; its
 // replace writes every column the whole-row UPDATE would, each from the value the insert was given
 // for that same column, and no dont-update one; it decides on the record's key; and the record's
-// Id is the id the engine answered.
+// ID is the id the engine answered.
 func checkUpsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []taggedField,
 	byColumn map[string]taggedField, pass int) []string {
 	t.Helper()
 	where := fmt.Sprintf("%s upsert", dialect)
 	rec, problems := filledRecord(c, fields, pass)
 
-	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: newId}}}
+	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertID: newID}}}
 	script.answer = func(string, []driver.Value) *scriptedRows {
-		return &scriptedRows{cols: []string{"id"}, values: [][]driver.Value{{int64(newId)}}}
+		return &scriptedRows{cols: []string{"id"}, values: [][]driver.Value{{int64(newID)}}}
 	}
 	if err := c.upsert(context.Background(), scriptedDBFor(t, script, dialect), rec.Interface()); err != nil {
 		return append(problems, fmt.Sprintf("%s: %v", where, err))
@@ -1902,8 +1902,8 @@ func checkUpsert(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 		}
 	}
 
-	if id := rec.Elem().FieldByName("Id"); !id.IsValid() || id.Int() != newId {
-		problems = append(problems, fmt.Sprintf("%s: the record's Id is not the id the engine answered, %d", where, newId))
+	if id := rec.Elem().FieldByName("ID"); !id.IsValid() || id.Int() != newID {
+		problems = append(problems, fmt.Sprintf("%s: the record's ID is not the id the engine answered, %d", where, newID))
 	}
 	return problems
 }
@@ -1962,7 +1962,7 @@ func checkUpdate(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 		}
 	}
 
-	// The row addressed is the record's own: WHERE id = <its Id>.
+	// The row addressed is the record's own: WHERE id = <its ID>.
 	condition := strings.SplitN(m[3], "=", 2)
 	if len(condition) != 2 || parseIdentifier(condition[0]).name != "id" {
 		return append(problems, fmt.Sprintf("%s: the row is not addressed by id alone: %q", where, m[3]))
@@ -1980,7 +1980,7 @@ func checkUpdate(t *testing.T, dialect data.Dialect, c mappingCase, fields []tag
 // pass on a checker that had stopped reading anything.
 
 type widget struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	Name      string       `db:"name"`
 	Label     string       `db:"label"`
@@ -2007,7 +2007,7 @@ func rightWidgetSQL() widgetSQL {
 			mssql:    `id, created_at, name, label, "key", enabled, visible`,
 		},
 		scan: func(r rowScanner, w *widget) error {
-			return r.Scan(&w.Id, &w.CreatedAt, &w.Name, &w.Label, &w.Key, &w.Enabled, &w.Visible)
+			return r.Scan(&w.ID, &w.CreatedAt, &w.Name, &w.Label, &w.Key, &w.Enabled, &w.Visible)
 		},
 		insert: statement{
 			sqlite:   `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -2046,12 +2046,12 @@ func widgetMapping(w widgetSQL) mappingCase {
 		insert: func(ctx context.Context, d *Database, rec any) error {
 			v := rec.(*widget)
 			id, err := d.insert(ctx, nil, w.insert, "widget", v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible)
-			v.Id = id
+			v.ID = id
 			return err
 		},
 		update: func(ctx context.Context, d *Database, rec any) error {
 			v := rec.(*widget)
-			_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.Id)
+			_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.ID)
 			return err
 		},
 	}
@@ -2070,7 +2070,7 @@ func TestRecordMapping_TheCheckerRefusesAColumnMissingFromTheList(t *testing.T) 
 	w := rightWidgetSQL()
 	w.columns.postgres = `id, created_at, name, "key", enabled, visible`
 	w.scan = func(r rowScanner, v *widget) error {
-		return r.Scan(&v.Id, &v.CreatedAt, &v.Name, &v.Key, &v.Enabled, &v.Visible)
+		return r.Scan(&v.ID, &v.CreatedAt, &v.Name, &v.Key, &v.Enabled, &v.Visible)
 	}
 
 	problems := checkMapping(t, data.Postgres, widgetMapping(w))
@@ -2081,7 +2081,7 @@ func TestRecordMapping_TheCheckerRefusesAColumnMissingFromTheList(t *testing.T) 
 func TestRecordMapping_TheCheckerRefusesAFieldScannedOutOfOrder(t *testing.T) {
 	w := rightWidgetSQL()
 	w.scan = func(r rowScanner, v *widget) error {
-		return r.Scan(&v.Id, &v.CreatedAt, &v.Label, &v.Name, &v.Key, &v.Enabled, &v.Visible)
+		return r.Scan(&v.ID, &v.CreatedAt, &v.Label, &v.Name, &v.Key, &v.Enabled, &v.Visible)
 	}
 
 	problems := checkMapping(t, data.MySQL, widgetMapping(w))
@@ -2097,7 +2097,7 @@ func TestRecordMapping_TheCheckerRefusesAnUpdateWritingADontUpdateColumn(t *test
 	broken := widgetMapping(w)
 	broken.update = func(ctx context.Context, d *Database, rec any) error {
 		v := rec.(*widget)
-		_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.Id)
+		_, err := d.ExecSQL(ctx, nil, w.update.text(d.Dialect), v.CreatedAt, v.Name, v.Label, v.Key, v.Enabled, v.Visible, v.ID)
 		return err
 	}
 
@@ -2111,7 +2111,7 @@ func TestRecordMapping_TheCheckerRefusesAWrittenValueFromAnotherField(t *testing
 	broken.insert = func(ctx context.Context, d *Database, rec any) error {
 		v := rec.(*widget)
 		id, err := d.insert(ctx, nil, rightWidgetSQL().insert, "widget", v.CreatedAt, v.Label, v.Name, v.Key, v.Enabled, v.Visible)
-		v.Id = id
+		v.ID = id
 		return err
 	}
 
@@ -2128,7 +2128,7 @@ func TestRecordMapping_TheCheckerRefusesTheOtherEnginesQuote(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), `mysql read: column key is quoted with ", which mysql does not quote with`)
 }
 
-func TestRecordMapping_TheCheckerRefusesAnInsertNotAnsweringItsIdInTheEnginesGrammar(t *testing.T) {
+func TestRecordMapping_TheCheckerRefusesAnInsertNotAnsweringItsIDInTheEnginesGrammar(t *testing.T) {
 	w := rightWidgetSQL()
 	w.insert.postgres = `INSERT INTO widgets (created_at, name, label, "key", enabled, visible) VALUES ($1, $2, $3, $4, $5, $6)`
 
@@ -2139,7 +2139,7 @@ func TestRecordMapping_TheCheckerRefusesAnInsertNotAnsweringItsIdInTheEnginesGra
 func TestRecordMapping_TheCheckerRefusesTwoBoolColumnsScannedSwapped(t *testing.T) {
 	w := rightWidgetSQL()
 	w.scan = func(r rowScanner, v *widget) error {
-		return r.Scan(&v.Id, &v.CreatedAt, &v.Name, &v.Label, &v.Key, &v.Visible, &v.Enabled)
+		return r.Scan(&v.ID, &v.CreatedAt, &v.Name, &v.Label, &v.Key, &v.Visible, &v.Enabled)
 	}
 
 	problems := checkMapping(t, data.Postgres, widgetMapping(w))
@@ -2153,7 +2153,7 @@ func TestRecordMapping_TheCheckerRefusesTwoBoolValuesWrittenSwapped(t *testing.T
 	broken := widgetMapping(rightWidgetSQL())
 	broken.update = func(ctx context.Context, d *Database, rec any) error {
 		v := rec.(*widget)
-		_, err := d.ExecSQL(ctx, nil, rightWidgetSQL().update.text(d.Dialect), v.Name, v.Label, v.Key, v.Visible, v.Enabled, v.Id)
+		_, err := d.ExecSQL(ctx, nil, rightWidgetSQL().update.text(d.Dialect), v.Name, v.Label, v.Key, v.Visible, v.Enabled, v.ID)
 		return err
 	}
 
@@ -2296,11 +2296,11 @@ func widgetUpsertMapping(upsert statement, mysqlReplace func(*widget) []any) map
 		var err error
 		if d.Dialect == data.MySQL {
 			args = append(args, mysqlReplace(v)...)
-			id, err = d.insertReadingLastInsertId(ctx, nil, upsert.text(d.Dialect), "widget", args)
+			id, err = d.insertReadingLastInsertID(ctx, nil, upsert.text(d.Dialect), "widget", args)
 		} else {
-			id, err = d.insertReadingReturnedId(ctx, nil, upsert.text(d.Dialect), "widget", args)
+			id, err = d.insertReadingReturnedID(ctx, nil, upsert.text(d.Dialect), "widget", args)
 		}
-		v.Id = id
+		v.ID = id
 		return err
 	}
 	return c

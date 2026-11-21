@@ -30,7 +30,7 @@ type tokenGenerationInput struct {
 	Scope string
 
 	// Authentication context
-	AcrLevel        record.AcrLevel // e.g., record.AcrLevel1, record.AcrLevel2Optional
+	AcrLevel        record.ACRLevel // e.g., record.ACRLevel1, record.ACRLevel2Optional
 	AuthMethods     []string        // e.g., ["pwd"], ["pwd", "otp"]
 	AuthenticatedAt time.Time
 
@@ -78,7 +78,7 @@ type tokenGenerationInput struct {
 //
 // grantId is the grant's identifier, which the caller fixes before the access token is minted: on
 // the code exchange the jti the first refresh token is about to take, on a refresh the parent's
-// FirstRefreshTokenJti (#676 decision 1).
+// FirstRefreshTokenJTI (#676 decision 1).
 //
 // dpopThumbprint binds the access token to the request's proof key, empty for a bearer token.
 func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
@@ -260,7 +260,7 @@ func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *
 
 	claims["iss"] = settings.Issuer
 	claims["client_id"] = client.ClientIdentifier
-	claims["client_internal_id"] = client.Id
+	claims["client_internal_id"] = client.ID
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["jti"] = uuid.New()
@@ -330,10 +330,10 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	// OpenID Connect claims in ID token (if enabled)
 	// Per OIDC Core 5.4, scope claims (email, profile, etc.) MAY be in ID tokens
 	// but SHOULD be available from /userinfo endpoint for strict conformance.
-	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
-	if input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String()
+	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIDToken
+	if input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOn.String()
 	}
 
 	mapper := t.claimMapper(userclaims.InclusionIdToken)
@@ -342,7 +342,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 		mapper.AddOpenIDConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
-	// groups and attributes (using the IncludeInIdToken filter), outside the OIDC claim setting
+	// groups and attributes (using the IncludeInIDToken filter), outside the OIDC claim setting
 	// above, as they are in the access token.
 	mapper.AddGroupClaims(claims, input.User, scopes)
 	mapper.AddAttributeClaims(claims, input.User, scopes)
@@ -363,7 +363,7 @@ func (t *TokenIssuer) createTokenInputFromCode(code *record.Code) *tokenGenerati
 		User:              &code.User,
 		Client:            &code.Client,
 		Scope:             code.Scope,
-		AcrLevel:          code.AcrLevel,
+		AcrLevel:          code.ACRLevel,
 		AuthMethods:       authMethodsToArray(code.AuthMethods),
 		AuthenticatedAt:   code.AuthenticatedAt,
 		SessionIdentifier: code.SessionIdentifier,
@@ -404,7 +404,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGene
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          record.AcrLevel1,
+		AcrLevel:          record.ACRLevel1,
 		AuthMethods:       []string{oidc.AuthMethodPassword.String()},
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput

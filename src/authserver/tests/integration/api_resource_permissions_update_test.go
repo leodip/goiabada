@@ -21,25 +21,25 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 
 	// Create resource
 	resource := createTestResource(t, "perm-put-res-"+fake.LetterN(6), "Perms Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
 
 	// Seed existing permissions
-	p1 := createTestPermission(t, resource.Id, "read", "Read")
-	p2 := createTestPermission(t, resource.Id, "write", "Write")
+	p1 := createTestPermission(t, resource.ID, "read", "Read")
+	p2 := createTestPermission(t, resource.ID, "write", "Write")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, p1.Id)
-		_ = database.DeletePermission(context.Background(), nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.ID)
+		_ = database.DeletePermission(context.Background(), nil, p2.ID)
 	}()
 
 	// Build request: update p1 description, remove p2 (not included), add new p3
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{ID: p1.Id, PermissionIdentifier: "read", Description: "Read updated"},
+			{ID: p1.ID, PermissionIdentifier: "read", Description: "Read updated"},
 			{ID: 0, PermissionIdentifier: "admin", Description: "Admin"},
 			{ID: 0, PermissionIdentifier: "read-extra", Description: "Extra"},
 		},
-		ExpectedPermissions: storedPermissionEntries(t, resource.Id),
+		ExpectedPermissions: storedPermissionEntries(t, resource.ID),
 	}
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
@@ -77,9 +77,9 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-val-"+fake.LetterN(6), "Val Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
 
-	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 
 	cases := []struct {
 		name       string
@@ -116,7 +116,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	}
 
 	// Nothing in the table above was created, "valid<b" included.
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	perms, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 	assert.Empty(t, perms)
 }
@@ -126,21 +126,21 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-conf-"+fake.LetterN(6), "Conf Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
 
-	p1 := createTestPermission(t, resource.Id, "aaa", "A")
-	p2 := createTestPermission(t, resource.Id, "bbb", "B")
+	p1 := createTestPermission(t, resource.ID, "aaa", "A")
+	p2 := createTestPermission(t, resource.ID, "bbb", "B")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, p1.Id)
-		_ = database.DeletePermission(context.Background(), nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.ID)
+		_ = database.DeletePermission(context.Background(), nil, p2.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	// Try to change p1 identifier to "bbb" which already exists in DB (do not include p2 in request)
 	// This should fail before deletion phase due to identifier conflict with existing permission p2
 	req := api.UpdateResourcePermissionsRequest{
-		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "bbb", Description: "A"}},
-		ExpectedPermissions: storedPermissionEntries(t, resource.Id),
+		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.ID, PermissionIdentifier: "bbb", Description: "A"}},
+		ExpectedPermissions: storedPermissionEntries(t, resource.ID),
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -162,14 +162,14 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Build request with all existing built-in permissions PLUS a new one
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -184,17 +184,17 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 
 	// Cleanup: delete only the specific permission created by this test
 	defer func() {
-		afterPerms, _ := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+		afterPerms, _ := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 		for _, p := range afterPerms {
 			if p.PermissionIdentifier == newPermIdentifier {
-				_ = database.DeletePermission(context.Background(), nil, p.Id)
+				_ = database.DeletePermission(context.Background(), nil, p.ID)
 				break
 			}
 		}
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -211,14 +211,14 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.Id
+			managePermId = p.ID
 			break
 		}
 	}
@@ -230,18 +230,18 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		identifier := p.PermissionIdentifier
-		if p.Id == managePermId {
+		if p.ID == managePermId {
 			identifier = "manage-renamed" // Attempt to rename
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: identifier,
 			Description:          p.Description,
 		})
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -264,7 +264,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Build request that omits the "manage-account" built-in permission (attempt to delete)
@@ -272,7 +272,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier != builtin.ManageAccountPermissionIdentifier {
 			permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-				ID:                   p.Id,
+				ID:                   p.ID,
 				PermissionIdentifier: p.PermissionIdentifier,
 				Description:          p.Description,
 			})
@@ -280,8 +280,8 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 		// Omit manage-account permission
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -303,14 +303,14 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.Id
+			managePermId = p.ID
 			break
 		}
 	}
@@ -322,11 +322,11 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	// This attempts to delete the original and recreate with a new DB ID, orphaning FK references
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
-		if p.Id == managePermId {
+		if p.ID == managePermId {
 			continue // Omit original manage row
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -338,8 +338,8 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 		Description:          "Recreated manage",
 	})
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -362,7 +362,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission and save original description
@@ -370,7 +370,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	var origDescription string
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.Id
+			managePermId = p.ID
 			origDescription = p.Description
 			break
 		}
@@ -381,7 +381,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 
 	// Restore original description after test
 	defer func() {
-		perm, _ := database.GetPermissionById(context.Background(), nil, managePermId)
+		perm, _ := database.GetPermissionByID(context.Background(), nil, managePermId)
 		if perm != nil {
 			perm.Description = origDescription
 			_ = database.UpdatePermission(context.Background(), nil, perm)
@@ -392,27 +392,27 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		desc := p.Description
-		if p.Id == managePermId {
+		if p.ID == managePermId {
 			desc = "Updated description for manage permission"
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          desc,
 		})
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify description was updated
-	updatedPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	updatedPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 	for _, p := range updatedPerms {
-		if p.Id == managePermId {
+		if p.ID == managePermId {
 			assert.Equal(t, "Updated description for manage permission", p.Description)
 		}
 	}
@@ -430,14 +430,14 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
 	var managePermId int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.Id
+			managePermId = p.ID
 			break
 		}
 	}
@@ -450,7 +450,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -462,8 +462,8 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 		Description:          "Bypass attempt",
 	})
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
-	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.Id)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
+	req := api.UpdateResourcePermissionsRequest{Permissions: permUpserts, ExpectedPermissions: storedPermissionEntries(t, sysRes.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -479,17 +479,17 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-dupid-"+fake.LetterN(6), "DupId Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
 
-	p1 := createTestPermission(t, resource.Id, "read", "Read")
-	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.Id) }()
+	p1 := createTestPermission(t, resource.ID, "read", "Read")
+	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.ID) }()
 
 	// Two entries with the same existing ID
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{
-		{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-		{ID: p1.Id, PermissionIdentifier: "read-changed", Description: "Changed"},
-	}, ExpectedPermissions: storedPermissionEntries(t, resource.Id)}
+		{ID: p1.ID, PermissionIdentifier: "read", Description: "Read"},
+		{ID: p1.ID, PermissionIdentifier: "read-changed", Description: "Changed"},
+	}, ExpectedPermissions: storedPermissionEntries(t, resource.ID)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -503,9 +503,9 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	// Create a resource
 	res := createTestResource(t, "perm-put-unauth-"+fake.LetterN(6), "Unauth Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10) + "/permissions"
 
 	// No token
 	req, _ := http.NewRequest("PUT", url, strings.NewReader(`{"permissions":[]}`))
@@ -526,11 +526,11 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 // read them sends back: every entry's id, identifier and description (#428).
 func storedPermissionEntries(t *testing.T, resourceId int64) []api.ResourcePermissionUpsert {
 	t.Helper()
-	stored, err := database.GetPermissionsByResourceId(context.Background(), nil, resourceId)
+	stored, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceId)
 	require.NoError(t, err)
 	entries := make([]api.ResourcePermissionUpsert, 0, len(stored))
 	for _, p := range stored {
-		entries = append(entries, api.ResourcePermissionUpsert{ID: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		entries = append(entries, api.ResourcePermissionUpsert{ID: p.ID, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 	}
 	return entries
 }
@@ -552,11 +552,11 @@ func TestAPIResourcePermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-req-"+fake.LetterN(6), "Required Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
-	p1 := createTestPermission(t, resource.Id, "read", "Read")
-	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
+	p1 := createTestPermission(t, resource.ID, "read", "Read")
+	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	for name, body := range map[string]string{
 		"absent": `{"permissions":[]}`,
 		"null":   `{"permissions":[],"expectedPermissions":null}`,
@@ -570,8 +570,8 @@ func TestAPIResourcePermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
 			assert.Contains(t, errResp.ErrorDescription, "expectedPermissions is required")
 
-			assert.Equal(t, []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
-				storedPermissionEntries(t, resource.Id), "the save that would have dropped read wrote nothing")
+			assert.Equal(t, []api.ResourcePermissionUpsert{{ID: p1.ID, PermissionIdentifier: "read", Description: "Read"}},
+				storedPermissionEntries(t, resource.ID), "the save that would have dropped read wrote nothing")
 		})
 	}
 }
@@ -584,30 +584,30 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-old-"+fake.LetterN(6), "Outdated Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
-	p1 := createTestPermission(t, resource.Id, "read", "Read")
-	p2 := createTestPermission(t, resource.Id, "write", "Write")
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
+	p1 := createTestPermission(t, resource.ID, "read", "Read")
+	p2 := createTestPermission(t, resource.ID, "write", "Write")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, p1.Id)
-		_ = database.DeletePermission(context.Background(), nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.ID)
+		_ = database.DeletePermission(context.Background(), nil, p2.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
-	loaded := storedPermissionEntries(t, resource.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
+	loaded := storedPermissionEntries(t, resource.ID)
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-			{ID: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
+			{ID: p1.ID, PermissionIdentifier: "read", Description: "Read"},
+			{ID: p2.ID, PermissionIdentifier: "write", Description: "Write anything"},
 		},
 		ExpectedPermissions: loaded,
 	})
 	defer func() { _ = first.Body.Close() }()
 	require.Equal(t, http.StatusOK, first.StatusCode)
-	afterFirst := storedPermissionEntries(t, resource.Id)
+	afterFirst := storedPermissionEntries(t, resource.ID)
 
 	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
-		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
+		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.ID, PermissionIdentifier: "read", Description: "Read"}},
 		ExpectedPermissions: loaded,
 	})
 	defer func() { _ = second.Body.Close() }()
@@ -616,10 +616,10 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	require.NoError(t, json.NewDecoder(second.Body).Decode(&errResp))
 	assert.Equal(t, "CONCURRENT_UPDATE", errResp.ErrorCode)
 
-	assert.ElementsMatch(t, afterFirst, storedPermissionEntries(t, resource.Id), "the outdated save wrote nothing")
+	assert.ElementsMatch(t, afterFirst, storedPermissionEntries(t, resource.ID), "the outdated save wrote nothing")
 	assert.ElementsMatch(t, []api.ResourcePermissionUpsert{
-		{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-		{ID: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
+		{ID: p1.ID, PermissionIdentifier: "read", Description: "Read"},
+		{ID: p2.ID, PermissionIdentifier: "write", Description: "Write anything"},
 	}, afterFirst)
 }
 
@@ -632,15 +632,15 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-read-"+fake.LetterN(6), "Read Test")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
-	p1 := createTestPermission(t, resource.Id, "read", "Reads the invoices")
-	p2 := createTestPermission(t, resource.Id, "write", "Writes the invoices")
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) }()
+	p1 := createTestPermission(t, resource.ID, "read", "Reads the invoices")
+	p2 := createTestPermission(t, resource.ID, "write", "Writes the invoices")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, p1.Id)
-		_ = database.DeletePermission(context.Background(), nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.ID)
+		_ = database.DeletePermission(context.Background(), nil, p2.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	read := readResourcePermissions(t, url, accessToken)
 	require.Len(t, read, 2)
 	loaded := make([]api.ResourcePermissionUpsert, 0, len(read))
@@ -650,7 +650,7 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{ID: p1.Id, PermissionIdentifier: "read", Description: "Reads every invoice"},
+			{ID: p1.ID, PermissionIdentifier: "read", Description: "Reads every invoice"},
 			{PermissionIdentifier: "export", Description: "Exports the invoices"},
 		},
 		ExpectedPermissions: loaded,
@@ -679,21 +679,21 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 
 	var manageId int64
 	var manageDescription string
-	for _, p := range storedPermissionEntries(t, sysRes.Id) {
+	for _, p := range storedPermissionEntries(t, sysRes.ID) {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
 			manageId, manageDescription = p.ID, p.Description
 		}
 	}
 	require.NotZero(t, manageId, "the seed writes the manage permission")
 	t.Cleanup(func() {
-		perm, _ := database.GetPermissionById(context.Background(), nil, manageId)
+		perm, _ := database.GetPermissionByID(context.Background(), nil, manageId)
 		if perm != nil {
 			perm.Description = manageDescription
 			_ = database.UpdatePermission(context.Background(), nil, perm)
 		}
 	})
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
 	entriesAsRead := func() []api.ResourcePermissionUpsert {
 		read := readResourcePermissions(t, url, accessToken)
 		entries := make([]api.ResourcePermissionUpsert, 0, len(read))
@@ -708,7 +708,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: loaded, ExpectedPermissions: loaded})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.Id), "an unchanged save writes nothing")
+		assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.ID), "an unchanged save writes nothing")
 	})
 
 	t.Run("a built-in's description edited", func(t *testing.T) {
@@ -723,7 +723,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: edited, ExpectedPermissions: loaded})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.ElementsMatch(t, edited, storedPermissionEntries(t, sysRes.Id), "the save wrote the edited description and nothing else")
+		assert.ElementsMatch(t, edited, storedPermissionEntries(t, sysRes.ID), "the save wrote the edited description and nothing else")
 	})
 }
 
@@ -736,7 +736,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, sysRes, "the seed creates the authserver resource")
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10) + "/permissions"
 	require.Len(t, builtin.AuthServerPermissionIdentifiers(), 7)
 
 	for _, identifier := range builtin.AuthServerPermissionIdentifiers() {
@@ -780,7 +780,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 				assert.Equal(t, change.wantCode, errResp.ErrorCode)
 				assert.Equal(t, "Built-in permission '"+identifier+"' "+change.wantEnd, errResp.ErrorDescription)
-				assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.Id), "a refused save writes nothing")
+				assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.ID), "a refused save writes nothing")
 			})
 		}
 	}

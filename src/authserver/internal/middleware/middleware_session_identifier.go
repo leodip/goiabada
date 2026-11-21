@@ -84,7 +84,7 @@ func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIden
 					}
 				} else {
 					ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
-					ctx = reqctx.WithSessionUserId(ctx, userSession.UserId)
+					ctx = reqctx.WithSessionUserId(ctx, userSession.UserID)
 				}
 			}
 

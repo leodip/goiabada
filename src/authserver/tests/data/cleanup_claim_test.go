@@ -24,7 +24,7 @@ import (
 func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -35,7 +35,7 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *record.Settings {
 		// the NOT NULL columns, so reuse it rather than hand-rolling an insert.
 		createTestSettings(t)
 
-		settings, err = database.GetSettingsById(context.Background(), nil, 1)
+		settings, err = database.GetSettingsByID(context.Background(), nil, 1)
 		if err != nil {
 			t.Fatalf("Failed to read settings after creating them: %v", err)
 		}
@@ -90,7 +90,7 @@ func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {
 		t.Error("Expected the first ever run to be claimable")
 	}
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestTryClaimCleanupRun_NotClaimableWithinTheInterval(t *testing.T) {
 	}
 
 	// And the stored timestamp must be untouched by a lost claim.
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
 
 	// The snapshot a settings PUT's middleware loads at request start, read before
 	// the claim is taken.
-	snapshot, err := database.GetSettingsById(context.Background(), nil, 1)
+	snapshot, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestTryClaimCleanupRun_ASettingsSaveDoesNotReleaseTheClaim(t *testing.T) {
 	}
 
 	// The save itself must still have landed.
-	saved, err := database.GetSettingsById(context.Background(), nil, 1)
+	saved, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to re-read settings: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestTryClaimCleanupRun_AClaimWaitsForASectionSaveHoldingTheRowAndLandsAfter
 
 	// The save, of the token settings, holding the row uncommitted.
 	save := beginTx(t)
-	if err := saveSettingsSectionUnderTheLock(context.Background(), save, settings.Id, func(stored *record.Settings) {
+	if err := saveSettingsSectionUnderTheLock(context.Background(), save, settings.ID, func(stored *record.Settings) {
 		stored.TokenExpirationInSeconds = settings.TokenExpirationInSeconds + 7
 	}); err != nil {
 		t.Fatalf("The save under the lock failed: %v", err)
@@ -300,7 +300,7 @@ func TestTryClaimCleanupRun_AClaimWaitsForASectionSaveHoldingTheRowAndLandsAfter
 		t.Fatal("The claim never returned after the save committed")
 	}
 
-	stored, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	stored, err := database.GetSettingsByID(context.Background(), nil, settings.ID)
 	if err != nil {
 		t.Fatalf("Failed to re-read settings: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestTryClaimCleanupRun_AClaimWaitsForASectionSaveHoldingTheRowAndLandsAfter
 //
 // That distinction matters because a read-then-write implementation
 //
-//	settings := GetSettingsById(1)
+//	settings := GetSettingsByID(1)
 //	if settings.LastCleanupAt.Before(cutoff) { UpdateSettings(...); return true }
 //
 // passes the sequential test perfectly while being broken under load: two callers
@@ -396,7 +396,7 @@ func TestTryClaimCleanupRun_ConcurrentCallersProduceOneWinner(t *testing.T) {
 		}
 
 		// Exactly one write landed, and it recorded the claim time.
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		if err != nil {
 			t.Fatalf("round %d: failed to read settings: %v", round, err)
 		}

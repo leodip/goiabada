@@ -58,13 +58,13 @@ var countUserRecoveryCodesWithHash = statement{
 // between the deletion and the last insert would leave the user with part of a set, or none, and a
 // set is shown once. An empty hash is refused before anything is written, since it can only be a
 // caller that hashed nothing, and a row holding it would be claimed by one.
-func (d *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error {
+func (d *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error {
 
 	if tx == nil {
 		return errs.New("replacing a user's recovery codes requires a transaction: autocommitted, a failure part way through leaves part of a set")
 	}
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't replace the recovery codes of a user with id 0")
 	}
 
@@ -74,13 +74,13 @@ func (d *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, use
 		}
 	}
 
-	if err := d.DeleteUserRecoveryCodes(ctx, tx, userId); err != nil {
+	if err := d.DeleteUserRecoveryCodes(ctx, tx, userID); err != nil {
 		return err
 	}
 
 	createdAt := time.Now().UTC()
 	for _, codeHash := range codeHashes {
-		if _, err := d.ExecSQL(ctx, tx, insertUserRecoveryCode.text(d.Dialect), userId, codeHash, createdAt); err != nil {
+		if _, err := d.ExecSQL(ctx, tx, insertUserRecoveryCode.text(d.Dialect), userID, codeHash, createdAt); err != nil {
 			return errs.Wrap(err, "unable to insert a recovery code")
 		}
 	}
@@ -89,9 +89,9 @@ func (d *Database) ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, use
 }
 
 // DeleteUserRecoveryCodes deletes every code the user has. A user with none is no error.
-func (d *Database) DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) error {
 
-	if _, err := d.ExecSQL(ctx, tx, deleteUserRecoveryCodes.text(d.Dialect), userId); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, deleteUserRecoveryCodes.text(d.Dialect), userID); err != nil {
 		return errs.Wrap(err, "unable to delete the user's recovery codes")
 	}
 
@@ -108,16 +108,16 @@ func (d *Database) DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, user
 //
 // An empty hash or a zero user id is an error rather than a benign false, as for
 // TryConsumeForgotPasswordCode: either can only be a caller bug.
-func (d *Database) TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error) {
+func (d *Database) TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't use a recovery code of a user with id 0")
 	}
 	if codeHash == "" {
 		return false, errs.New("can't use a recovery code with an empty hash")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, tryUseUserRecoveryCode.text(d.Dialect), time.Now().UTC(), userId, codeHash)
+	result, err := d.ExecSQL(ctx, tx, tryUseUserRecoveryCode.text(d.Dialect), time.Now().UTC(), userID, codeHash)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to use a recovery code")
 	}
@@ -131,9 +131,9 @@ func (d *Database) TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userI
 }
 
 // CountUnusedUserRecoveryCodes is how many of the user's codes have no used_at.
-func (d *Database) CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error) {
+func (d *Database) CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) (int, error) {
 
-	count, err := queryOne(ctx, d, tx, countUnusedUserRecoveryCodes.text(d.Dialect), []any{userId},
+	count, err := queryOne(ctx, d, tx, countUnusedUserRecoveryCodes.text(d.Dialect), []any{userID},
 		func(row rowScanner, n *int) error { return row.Scan(n) }, "recovery code count")
 	if err != nil {
 		return 0, err
@@ -149,16 +149,16 @@ func (d *Database) CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx,
 // The sign-in asks it only after TryUseUserRecoveryCode refused the code, to tell a used code of
 // the current set, which it audits as a replay, from a code no set of the user's holds (#257
 // decision 10). An empty hash or a zero user id is an error, as for TryUseUserRecoveryCode.
-func (d *Database) UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error) {
+func (d *Database) UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't look up a recovery code of a user with id 0")
 	}
 	if codeHash == "" {
 		return false, errs.New("can't look up a recovery code with an empty hash")
 	}
 
-	count, err := queryOne(ctx, d, tx, countUserRecoveryCodesWithHash.text(d.Dialect), []any{userId, codeHash},
+	count, err := queryOne(ctx, d, tx, countUserRecoveryCodesWithHash.text(d.Dialect), []any{userID, codeHash},
 		func(row rowScanner, n *int) error { return row.Scan(n) }, "recovery code lookup")
 	if err != nil {
 		return false, err

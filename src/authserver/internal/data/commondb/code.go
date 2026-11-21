@@ -28,24 +28,24 @@ var codeColumns = columnList{
 // scanCode reads one row selected with codeColumns.
 func scanCode(row rowScanner, code *record.Code) error {
 	return row.Scan(
-		&code.Id,
+		&code.ID,
 		&code.CreatedAt,
 		&code.UpdatedAt,
 		&code.CodeHash,
-		&code.ClientId,
+		&code.ClientID,
 		&code.CodeChallenge,
 		&code.CodeChallengeMethod,
 		&code.Scope,
 		&code.State,
 		&code.Nonce,
 		&code.RedirectURI,
-		&code.UserId,
-		&code.IpAddress,
+		&code.UserID,
+		&code.IPAddress,
 		&code.UserAgent,
 		&code.ResponseMode,
 		&code.AuthenticatedAt,
 		&code.SessionIdentifier,
-		&code.AcrLevel,
+		&code.ACRLevel,
 		&code.AuthMethods,
 		&code.Used,
 		&code.Revoked,
@@ -100,7 +100,7 @@ var updateCode = statement{
 		"used = @p18 WHERE id = @p19",
 }
 
-var selectCodeById = statement{
+var selectCodeByID = statement{
 	sqlite:   "SELECT " + codeColumns.sqlite + " FROM codes WHERE id = ?",
 	mysql:    "SELECT " + codeColumns.mysql + " FROM codes WHERE id = ?",
 	postgres: "SELECT " + codeColumns.postgres + " FROM codes WHERE id = $1",
@@ -130,14 +130,14 @@ var revokeCodesBySessionIdentifier = statement{
 	mssql:    "UPDATE codes SET revoked = @p1, updated_at = @p2 WHERE session_identifier = @p3 AND revoked = @p4",
 }
 
-var revokeCodesByClientId = statement{
+var revokeCodesByClientID = statement{
 	sqlite:   "UPDATE codes SET revoked = ?, updated_at = ? WHERE client_id = ? AND revoked = ?",
 	mysql:    "UPDATE codes SET revoked = ?, updated_at = ? WHERE client_id = ? AND revoked = ?",
 	postgres: "UPDATE codes SET revoked = $1, updated_at = $2 WHERE client_id = $3 AND revoked = $4",
 	mssql:    "UPDATE codes SET revoked = @p1, updated_at = @p2 WHERE client_id = @p3 AND revoked = @p4",
 }
 
-var revokeUnusedCodesByUserIdAndClientId = statement{
+var revokeUnusedCodesByUserIDAndClientID = statement{
 	sqlite: "UPDATE codes SET revoked = ?, updated_at = ? " +
 		"WHERE user_id = ? AND client_id = ? AND used = ? AND revoked = ?",
 	mysql: "UPDATE codes SET revoked = ?, updated_at = ? " +
@@ -148,9 +148,9 @@ var revokeUnusedCodesByUserIdAndClientId = statement{
 		"WHERE user_id = @p3 AND client_id = @p4 AND used = @p5 AND revoked = @p6",
 }
 
-// revokeUnusedCodesBySessionIdentifierAndClientId binds revoked, updated_at, the session identifier,
+// revokeUnusedCodesBySessionIdentifierAndClientID binds revoked, updated_at, the session identifier,
 // the client id, then used and revoked as the row must still hold them.
-var revokeUnusedCodesBySessionIdentifierAndClientId = statement{
+var revokeUnusedCodesBySessionIdentifierAndClientID = statement{
 	sqlite: "UPDATE codes SET revoked = ?, updated_at = ? " +
 		"WHERE session_identifier = ? AND client_id = ? AND used = ? AND revoked = ?",
 	mysql: "UPDATE codes SET revoked = ?, updated_at = ? " +
@@ -181,11 +181,11 @@ var deleteCodesWithoutRefreshTokens = statement{
 
 func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
-	if code.ClientId == 0 {
+	if code.ClientID == 0 {
 		return errs.New("client id must be greater than 0")
 	}
 
-	if code.UserId == 0 {
+	if code.UserID == 0 {
 		return errs.New("user id must be greater than 0")
 	}
 
@@ -197,23 +197,23 @@ func (d *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 	code.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertCode, "code",
-		code.CreatedAt, code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge,
-		code.CodeChallengeMethod, code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserId,
-		code.IpAddress, code.UserAgent, code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier,
-		code.AcrLevel, code.AuthMethods, code.Used, code.Revoked, code.AuthStateGeneration, code.DPoPJkt)
+		code.CreatedAt, code.UpdatedAt, code.CodeHash, code.ClientID, code.CodeChallenge,
+		code.CodeChallengeMethod, code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserID,
+		code.IPAddress, code.UserAgent, code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier,
+		code.ACRLevel, code.AuthMethods, code.Used, code.Revoked, code.AuthStateGeneration, code.DPoPJkt)
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	code.Id = id
+	code.ID = id
 	return nil
 }
 
 func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error {
 
-	if code.Id == 0 {
+	if code.ID == 0 {
 		return errs.New("can't update code with id 0")
 	}
 
@@ -221,10 +221,10 @@ func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 	code.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateCode.text(d.Dialect),
-		code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge, code.CodeChallengeMethod,
-		code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserId, code.IpAddress, code.UserAgent,
-		code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier, code.AcrLevel, code.AuthMethods,
-		code.Used, code.Id)
+		code.UpdatedAt, code.CodeHash, code.ClientID, code.CodeChallenge, code.CodeChallengeMethod,
+		code.Scope, code.State, code.Nonce, code.RedirectURI, code.UserID, code.IPAddress, code.UserAgent,
+		code.ResponseMode, code.AuthenticatedAt, code.SessionIdentifier, code.ACRLevel, code.AuthMethods,
+		code.Used, code.ID)
 	if err != nil {
 		code.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update code")
@@ -249,14 +249,14 @@ func (d *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *record.Code
 // already in progress (#129). Validation and claiming are separate steps, so a code
 // validated a moment before its session was terminated would otherwise still be
 // claimed and its tokens issued.
-func (d *Database) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error) {
+func (d *Database) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeID int64) (bool, error) {
 
-	if codeId == 0 {
+	if codeID == 0 {
 		return false, errs.New("can't mark code with id 0 as used")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, markCodeAsUsed.text(d.Dialect),
-		true, time.Now().UTC(), codeId, false, false)
+		true, time.Now().UTC(), codeID, false, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark code as used")
 	}
@@ -304,7 +304,7 @@ func (d *Database) RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.T
 	return rowsAffected, nil
 }
 
-// RevokeCodesByClientId marks every not-yet-revoked code of one client revoked, and
+// RevokeCodesByClientID marks every not-yet-revoked code of one client revoked, and
 // reports how many rows this call transitioned. It is the durable half of flipping a
 // client from confidential to public (#245): the code is the grant record, and a
 // rotated refresh token inherits its parent's code_id, so marking the code marks every
@@ -320,14 +320,14 @@ func (d *Database) RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.T
 // A zero client id is rejected rather than used as a filter. codes.client_id is NOT
 // NULL and no clients row carries id 0, so a zero can only be a caller bug, and a flip
 // must never be able to sweep on one.
-func (d *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error) {
+func (d *Database) RevokeCodesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (int64, error) {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return 0, errs.New("can't revoke codes with a client id of 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, revokeCodesByClientId.text(d.Dialect),
-		true, time.Now().UTC(), clientId, false)
+	result, err := d.ExecSQL(ctx, tx, revokeCodesByClientID.text(d.Dialect),
+		true, time.Now().UTC(), clientID, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by client id")
 	}
@@ -340,29 +340,29 @@ func (d *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, client
 	return rowsAffected, nil
 }
 
-// RevokeUnusedCodesByUserIdAndClientId marks every code one user holds with one client
+// RevokeUnusedCodesByUserIDAndClientID marks every code one user holds with one client
 // that is neither used nor revoked yet revoked, and reports how many rows this call
 // transitioned. It is the code half of a consent withdrawal (#622): a code issued
 // before the withdrawal can still be redeemed for its 60 seconds, and redemption
 // consults no stored consent, so without the mark it would start a grant the
 // withdrawal never saw.
 //
-// Unused codes only, unlike RevokeCodesByClientId. A used code's grant is the refresh
+// Unused codes only, unlike RevokeCodesByClientID. A used code's grant is the refresh
 // tokens the withdrawal sweeps, and marking it as well would make the refresh arm's
 // revoked-code check answer those tokens with the session-terminated description
 // before the sweep's own "This refresh token has been revoked." could.
 //
 // The `revoked = false` term makes the count mean "rows this call transitioned", for
 // the reason RevokeCodesBySessionIdentifier gives. A zero user or client id is rejected
-// rather than used as a filter, for the reason RevokeCodesByClientId gives.
-func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error) {
+// rather than used as a filter, for the reason RevokeCodesByClientID gives.
+func (d *Database) RevokeUnusedCodesByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (int64, error) {
 
-	if userId == 0 || clientId == 0 {
+	if userID == 0 || clientID == 0 {
 		return 0, errs.New("can't revoke codes with a user id or a client id of 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesByUserIdAndClientId.text(d.Dialect),
-		true, time.Now().UTC(), userId, clientId, false, false)
+	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesByUserIDAndClientID.text(d.Dialect),
+		true, time.Now().UTC(), userID, clientID, false, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke unused codes by user id and client id")
 	}
@@ -375,29 +375,29 @@ func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx 
 	return rowsAffected, nil
 }
 
-// RevokeUnusedCodesBySessionIdentifierAndClientId marks every code one client holds from one session
+// RevokeUnusedCodesBySessionIdentifierAndClientID marks every code one client holds from one session
 // that is neither used nor revoked yet revoked, and reports how many rows this call transitioned. It
 // is the code half of a sign-out with a confirmed id_token_hint (#135 decision 9): a code the
 // departing client was issued on the session before it signed out could otherwise still start a
 // grant on the session after it.
 //
-// Unused codes only, as RevokeUnusedCodesByUserIdAndClientId marks them: a used code's grant is its
+// Unused codes only, as RevokeUnusedCodesByUserIDAndClientID marks them: a used code's grant is its
 // refresh tokens, which the same sign-out sweeps when they are session-bound, and an offline token
 // descended from a marked code would be refused with it, where the sign-out must leave it working.
 //
 // The `revoked = false` term makes the count mean "rows this call transitioned", for the reason
 // RevokeCodesBySessionIdentifier gives. An empty session identifier or a zero client id is rejected
 // rather than used as a filter, for the reasons RevokeCodesBySessionIdentifier and
-// RevokeCodesByClientId give.
-func (d *Database) RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx,
-	sessionIdentifier string, clientId int64) (int64, error) {
+// RevokeCodesByClientID give.
+func (d *Database) RevokeUnusedCodesBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx,
+	sessionIdentifier string, clientID int64) (int64, error) {
 
-	if sessionIdentifier == "" || clientId == 0 {
+	if sessionIdentifier == "" || clientID == 0 {
 		return 0, errs.New("can't revoke codes with an empty session identifier or a client id of 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesBySessionIdentifierAndClientId.text(d.Dialect),
-		true, time.Now().UTC(), sessionIdentifier, clientId, false, false)
+	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesBySessionIdentifierAndClientID.text(d.Dialect),
+		true, time.Now().UTC(), sessionIdentifier, clientID, false, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke unused codes by session identifier and client id")
 	}
@@ -410,8 +410,8 @@ func (d *Database) RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.C
 	return rowsAffected, nil
 }
 
-func (d *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error) {
-	return queryOne(ctx, d, tx, selectCodeById.text(d.Dialect), []any{codeId}, scanCode, "code")
+func (d *Database) GetCodeByID(ctx context.Context, tx *sql.Tx, codeID int64) (*record.Code, error) {
+	return queryOne(ctx, d, tx, selectCodeByID.text(d.Dialect), []any{codeID}, scanCode, "code")
 }
 
 func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error {
@@ -420,7 +420,7 @@ func (d *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.
 		return nil
 	}
 
-	client, err := d.GetClientById(ctx, tx, code.ClientId)
+	client, err := d.GetClientByID(ctx, tx, code.ClientID)
 	if err != nil {
 		return errs.Wrap(err, "unable to load client")
 	}
@@ -437,7 +437,7 @@ func (d *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Co
 		return nil
 	}
 
-	user, err := d.GetUserById(ctx, tx, code.UserId)
+	user, err := d.GetUserByID(ctx, tx, code.UserID)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}
@@ -452,9 +452,9 @@ func (d *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash s
 	return queryOne(ctx, d, tx, selectCodeByCodeHash.text(d.Dialect), []any{codeHash, used}, scanCode, "code")
 }
 
-func (d *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error {
+func (d *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteCode.text(d.Dialect), codeId)
+	_, err := d.ExecSQL(ctx, tx, deleteCode.text(d.Dialect), codeID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete code")
 	}

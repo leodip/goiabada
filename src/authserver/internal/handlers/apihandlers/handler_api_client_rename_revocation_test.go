@@ -38,12 +38,12 @@ func serveRenamePut(database *datamocks.Database, auditLogger *handlersmocks.Aud
 // expectRenameWrites registers a save of client 7 from old-name to new-name up to the identifier's
 // write, which answers changed, with every statement on the save's transaction.
 func expectRenameWrites(database *datamocks.Database, changed bool, note ...func(string)) *datamocks.RunInTransactionStub {
-	database.On("GetClientById", mock.Anything, mock.Anything, int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "old-name"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, mock.Anything, int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "old-name"}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note...)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "old-name"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "old-name"}, nil).Once()
 	database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
@@ -63,11 +63,11 @@ func TestHandleClientUpdatePut_ARenameRevokesTheClientsGrantsInItsTransaction(t 
 	var edges []string
 	expectRenameWrites(database, true, func(edge string) { edges = append(edges, edge) })
 
-	live := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "fam-1"}
-	rotated := &record.RefreshToken{Id: 2, RefreshTokenJti: "rt-rotated", FirstRefreshTokenJti: "fam-1", Revoked: true}
-	ropc := &record.RefreshToken{Id: 3, RefreshTokenJti: "rt-ropc", FirstRefreshTokenJti: "fam-2"}
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(3), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	live := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: "fam-1"}
+	rotated := &record.RefreshToken{ID: 2, RefreshTokenJTI: "rt-rotated", FirstRefreshTokenJTI: "fam-1", Revoked: true}
+	ropc := &record.RefreshToken{ID: 3, RefreshTokenJTI: "rt-ropc", FirstRefreshTokenJTI: "fam-2"}
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(3), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{live, rotated, ropc}, nil).Once()
 	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, clientUpdateTx, "fam-1", "client_identifier_changed").
 		Return(true, nil).Once()
@@ -99,7 +99,7 @@ func TestHandleClientUpdatePut_ARenameRevokesTheClientsGrantsInItsTransaction(t 
 	assert.True(t, ropc.Revoked)
 
 	// Decided by the write: the sweep follows SetClientIdentifier in the same transaction.
-	assert.Less(t, callIndex(t, database, "SetClientIdentifier"), callIndex(t, database, "RevokeCodesByClientId"))
+	assert.Less(t, callIndex(t, database, "SetClientIdentifier"), callIndex(t, database, "RevokeCodesByClientID"))
 	// And recorded after the commit, never inside the transaction it reports.
 	assert.Equal(t, []string{"begin", "commit", "revoked_client_grants"}, edges)
 }
@@ -110,8 +110,8 @@ func TestHandleClientUpdatePut_ARenameWithNothingToRevokeIsStillRecorded(t *test
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectRenameWrites(database, true)
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 
@@ -142,7 +142,7 @@ func TestHandleClientUpdatePut_AWriteThatChangesNoIdentifierRevokesNothing(t *te
 	rr := serveRenamePut(database, auditLogger, renameBody)
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientId", "GetRefreshTokensByClientId",
+	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientID", "GetRefreshTokensByClientID",
 		"RecordRefreshTokenFamilyRevoked", "UpdateRefreshToken")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
 }
@@ -153,7 +153,7 @@ func TestHandleClientUpdatePut_AFailedRevocationRollsTheRenameBack(t *testing.T)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	stub := expectRenameWrites(database, true)
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return(int64(0), errors.New("connection reset")).Once()
 
 	rr := serveRenamePut(database, auditLogger, renameBody)

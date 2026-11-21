@@ -18,7 +18,7 @@ import (
 // is what keeps #212 item 2's saved read: an audited request reads the settings row once, not once
 // more per event.
 
-// The settings on the context answer, and the strict mock is given no GetSettingsById
+// The settings on the context answer, and the strict mock is given no GetSettingsByID
 // expectation, so a read of the row anyway fails the test as an unexpected call.
 func TestAuditSwitches_AnswersFromTheRequestsSettings(t *testing.T) {
 	combinations := []audit.Switches{
@@ -39,7 +39,7 @@ func TestAuditSwitches_AnswersFromTheRequestsSettings(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
-		mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		mockDB.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 	}
 }
 
@@ -59,7 +59,7 @@ func TestAuditSwitches_ReadsTheRowWhenTheContextHasNoSettings(t *testing.T) {
 	for _, tc := range contexts {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
-			mockDB.On("GetSettingsById", tc.ctx, mock.Anything, int64(1)).Return(&record.Settings{
+			mockDB.On("GetSettingsByID", tc.ctx, mock.Anything, int64(1)).Return(&record.Settings{
 				AuditLogsInConsoleEnabled:  true,
 				AuditLogsInDatabaseEnabled: false,
 			}, nil).Once()
@@ -82,7 +82,7 @@ func TestAuditSwitches_ReadsTheRowWhenTheContextHasNoSettings(t *testing.T) {
 func TestAuditSwitches_ARowThatCannotBeReadIsAnError(t *testing.T) {
 	t.Run("the read fails", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
+		mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError).Once()
 
 		got, err := NewAuditSwitches(mockDB).AuditSwitches(context.Background())
 
@@ -92,7 +92,7 @@ func TestAuditSwitches_ARowThatCannotBeReadIsAnError(t *testing.T) {
 
 	t.Run("there is no row", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+		mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 		var got audit.Switches
 		var err error

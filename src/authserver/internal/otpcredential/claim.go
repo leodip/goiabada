@@ -32,13 +32,13 @@ func (c OTPClaim) StandsFor(user *record.User) bool {
 	if !c.Claimed {
 		return true
 	}
-	return user != nil && user.OTPEnabled && c.Generation != nil && *c.Generation == user.OtpConfigGeneration
+	return user != nil && user.OTPEnabled && c.Generation != nil && *c.Generation == user.OTPConfigGeneration
 }
 
 // ClaimDatabase is what Recheck reads the user through.
 type ClaimDatabase interface {
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 // Recheck takes userId's row in tx and answers ErrAuthenticatorRemoved unless the claim stands for
@@ -64,7 +64,7 @@ func (c OTPClaim) Recheck(ctx context.Context, db ClaimDatabase, tx *sql.Tx, use
 	if err := db.AcquireUserRow(ctx, tx, userId); err != nil {
 		return err
 	}
-	user, err := db.GetUserById(ctx, tx, userId)
+	user, err := db.GetUserByID(ctx, tx, userId)
 	if err != nil {
 		return err
 	}

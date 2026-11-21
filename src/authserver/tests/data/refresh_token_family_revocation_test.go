@@ -32,9 +32,9 @@ import (
 // familyRevocationReason is a reason the column holds: 64 characters is its width.
 const familyRevocationReason = "refresh_token_replay"
 
-// newFamilyJti is a family's first jti, with a lower-case prefix so its upper-case spelling is a
+// newFamilyJTI is a family's first jti, with a lower-case prefix so its upper-case spelling is a
 // different string, and random so a case can run twice on one database.
-func newFamilyJti() string {
+func newFamilyJTI() string {
 	return "fam-" + fake.UUID()
 }
 
@@ -85,7 +85,7 @@ func TestRefreshTokenFamilyRevocation_RecordThenRead(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("an unrecorded family reads as not revoked", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		assert.False(t, familyIsRevoked(t, family), "no record, so the token proceeds")
 		_, _, found := familyRevocationRow(t, family)
@@ -93,7 +93,7 @@ func TestRefreshTokenFamilyRevocation_RecordThenRead(t *testing.T) {
 	})
 
 	t.Run("the first record creates the row and reports it", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		created, err := database.RecordRefreshTokenFamilyRevoked(ctx, nil, family, familyRevocationReason)
 		require.NoError(t, err)
@@ -107,8 +107,8 @@ func TestRefreshTokenFamilyRevocation_RecordThenRead(t *testing.T) {
 	})
 
 	t.Run("a record of one family leaves another unrecorded", func(t *testing.T) {
-		recorded := newFamilyJti()
-		bystander := newFamilyJti()
+		recorded := newFamilyJTI()
+		bystander := newFamilyJTI()
 		recordFamily(t, recorded)
 
 		assert.True(t, familyIsRevoked(t, recorded))
@@ -131,7 +131,7 @@ func TestRefreshTokenFamilyRevocation_ASecondRecordKeepsTheFirst(t *testing.T) {
 		{"a second record with the same reason", familyRevocationReason},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			family := newFamilyJti()
+			family := newFamilyJTI()
 			recordFamily(t, family)
 			firstReason, firstAt, found := familyRevocationRow(t, family)
 			require.True(t, found)
@@ -168,7 +168,7 @@ func TestRefreshTokenFamilyRevocation_RefusesWhatCannotBeKeyed(t *testing.T) {
 	})
 
 	t.Run("recording with an empty reason is an error and writes nothing", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		rowsBefore := familyRevocationCount(t)
 
 		created, err := database.RecordRefreshTokenFamilyRevoked(ctx, nil, family, "")
@@ -192,8 +192,8 @@ func TestRefreshTokenFamilyRevocation_RefusesWhatCannotBeKeyed(t *testing.T) {
 // find the record of the one without; the data layer compares the row it got back against the jti
 // it was asked for. The control is the exact jti, read in the same case, so each variation below is
 // the only thing that differs from a read that finds the record.
-func TestRefreshTokenFamilyRevocation_TheLookupComparesTheJtiExactly(t *testing.T) {
-	family := newFamilyJti()
+func TestRefreshTokenFamilyRevocation_TheLookupComparesTheJTIExactly(t *testing.T) {
+	family := newFamilyJTI()
 	recordFamily(t, family)
 	require.True(t, familyIsRevoked(t, family), "control: the exact jti finds the record")
 
@@ -240,7 +240,7 @@ func TestRefreshTokenFamilyRevocation_TheLookupDoesNotTrustAnEngineThatFolds(t *
 		revoked_at DATETIME NOT NULL)`)
 	require.NoError(t, err)
 
-	family := newFamilyJti()
+	family := newFamilyJTI()
 	created, err := h.DB.RecordRefreshTokenFamilyRevoked(ctx, nil, family, familyRevocationReason)
 	require.NoError(t, err)
 	require.True(t, created)
@@ -271,7 +271,7 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 	ctx := context.Background()
 
 	t.Run("a record in a transaction that rolls back leaves no row", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		refused := errors.New("the revocation decided against it")
 
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
@@ -292,7 +292,7 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 	})
 
 	t.Run("a record in a transaction that commits leaves the row", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 			created, recordErr := database.RecordRefreshTokenFamilyRevoked(ctx, tx, family, familyRevocationReason)
@@ -310,7 +310,7 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 	})
 
 	t.Run("a read on the transaction sees the row the same transaction just wrote", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 			before, readErr := database.IsRefreshTokenFamilyRevoked(ctx, tx, family)
@@ -338,7 +338,7 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 	})
 
 	t.Run("a sweep in a transaction that rolls back leaves the record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		recordFamily(t, family) // no member: the next sweep removes it
 		refused := errors.New("the sweep decided against it")
 
@@ -352,7 +352,7 @@ func TestRefreshTokenFamilyRevocation_MethodsEnlistInTheCallersTransaction(t *te
 	})
 
 	t.Run("a sweep in a transaction that commits removes the record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		recordFamily(t, family)
 
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
@@ -374,7 +374,7 @@ func seedFamilyMembers(t *testing.T, family string, revoked ...bool) []*record.R
 	members := make([]*record.RefreshToken, 0, len(revoked))
 	for _, isRevoked := range revoked {
 		members = append(members, seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: family, UserId: user.Id, ClientId: client.Id, Revoked: isRevoked,
+			FamilyJTI: family, UserID: user.ID, ClientID: client.ID, Revoked: isRevoked,
 		}))
 	}
 	return members
@@ -392,7 +392,7 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	}
 
 	t.Run("a recorded family with a live member keeps its record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 		recordFamily(t, family)
 
@@ -402,7 +402,7 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	})
 
 	t.Run("a recorded family with only revoked members keeps its record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, true, true)
 		recordFamily(t, family)
 
@@ -412,7 +412,7 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	})
 
 	t.Run("a recorded family with no member at all loses its record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		recordFamily(t, family)
 
 		sweep(t)
@@ -423,8 +423,8 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	})
 
 	t.Run("a member of another family does not keep the record", func(t *testing.T) {
-		family := newFamilyJti()
-		seedFamilyMembers(t, newFamilyJti(), false)
+		family := newFamilyJTI()
+		seedFamilyMembers(t, newFamilyJTI(), false)
 		recordFamily(t, family)
 
 		sweep(t)
@@ -433,7 +433,7 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	})
 
 	t.Run("a member whose family jti differs only by case does not keep the record", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, strings.ToUpper(family), false)
 		recordFamily(t, family)
 
@@ -444,9 +444,9 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 	})
 
 	t.Run("the three cases together, and a second sweep is a no-op", func(t *testing.T) {
-		withLive := newFamilyJti()
-		withRevoked := newFamilyJti()
-		withNone := newFamilyJti()
+		withLive := newFamilyJTI()
+		withRevoked := newFamilyJTI()
+		withNone := newFamilyJTI()
 		liveMembers := seedFamilyMembers(t, withLive, false)
 		revokedMembers := seedFamilyMembers(t, withRevoked, true)
 		for _, family := range []string{withLive, withRevoked, withNone} {
@@ -460,8 +460,8 @@ func TestRefreshTokenFamilyRevocation_TheOrphanSweep(t *testing.T) {
 		assert.False(t, familyIsRevoked(t, withNone), "no member: swept")
 
 		// The sweep reaps records and nothing else: the members are the same rows, in the same state.
-		assert.False(t, refreshTokenIsRevoked(t, liveMembers[0].Id), "a live member stays live")
-		assert.True(t, refreshTokenIsRevoked(t, revokedMembers[0].Id), "a revoked member stays revoked")
+		assert.False(t, refreshTokenIsRevoked(t, liveMembers[0].ID), "a live member stays live")
+		assert.True(t, refreshTokenIsRevoked(t, revokedMembers[0].ID), "a revoked member stays revoked")
 
 		rowsAfterFirst := familyRevocationCount(t)
 		sweep(t)
@@ -545,7 +545,7 @@ func TestRefreshTokenFamilyRevocation_TwoConcurrentFirstWritesHaveExactlyOneCrea
 
 	lostTheKey := 0
 	for round := 0; round < concurrentRounds; round++ {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		outcomes := recordConcurrently(ctx, t, family, database.RunInTransaction)
 
@@ -581,7 +581,7 @@ func TestRefreshTokenFamilyRevocation_TwoConcurrentFirstWritesThroughTheRetryBot
 	}
 
 	for round := 0; round < concurrentRounds; round++ {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 
 		outcomes := recordConcurrently(ctx, t, family, retrying)
 

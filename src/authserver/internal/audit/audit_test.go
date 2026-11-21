@@ -486,7 +486,7 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 
 			mockDB.AssertExpectations(t)
 			require.NotNil(t, row, "the row handed to CreateAuditLog")
-			assert.Equal(t, tc.expected, row.RequestId,
+			assert.Equal(t, tc.expected, row.RequestID,
 				"the persisted request id is the log's own rendering of it, not chi's raw string")
 
 			written := logs.Records()
@@ -496,7 +496,7 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 					"no id means no attribute, and the row's empty string says the same thing")
 				return
 			}
-			assert.Equal(t, row.RequestId, written[0].Attrs["request_id"],
+			assert.Equal(t, row.RequestID, written[0].Attrs["request_id"],
 				"the whole point of the column: the page and the log show one string, not two")
 		})
 	}

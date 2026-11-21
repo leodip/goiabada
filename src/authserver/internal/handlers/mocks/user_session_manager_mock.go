@@ -281,7 +281,7 @@ func (_c *UserSessionManager_BindUserSession_Call) RunAndReturn(run func(ctx con
 }
 
 // BumpUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
+func (_mock *UserSessionManager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error) {
 	ret := _mock.Called(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 
 	if len(ret) == 0 {
@@ -290,17 +290,17 @@ func (_mock *UserSessionManager) BumpUserSession(ctx context.Context, sessionIde
 
 	var r0 *record.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, record.AcrLevel, string) (*record.UserSession, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, record.ACRLevel, string) (*record.UserSession, error)); ok {
 		return returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, record.AcrLevel, string) *record.UserSession); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, record.ACRLevel, string) *record.UserSession); ok {
 		r0 = returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*record.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int64, string, record.AcrLevel, string) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int64, string, record.ACRLevel, string) error); ok {
 		r1 = returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	} else {
 		r1 = ret.Error(1)
@@ -318,13 +318,13 @@ type UserSessionManager_BumpUserSession_Call struct {
 //   - sessionIdentifier string
 //   - clientId int64
 //   - authMethods string
-//   - acrLevel record.AcrLevel
+//   - acrLevel record.ACRLevel
 //   - ipAddress string
 func (_e *UserSessionManager_Expecter) BumpUserSession(ctx any, sessionIdentifier any, clientId any, authMethods any, acrLevel any, ipAddress any) *UserSessionManager_BumpUserSession_Call {
 	return &UserSessionManager_BumpUserSession_Call{Call: _e.mock.On("BumpUserSession", ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)}
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.AcrLevel, ipAddress string)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.ACRLevel, ipAddress string)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -342,9 +342,9 @@ func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(ctx context.Cont
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
-		var arg4 record.AcrLevel
+		var arg4 record.ACRLevel
 		if args[4] != nil {
-			arg4 = args[4].(record.AcrLevel)
+			arg4 = args[4].(record.ACRLevel)
 		}
 		var arg5 string
 		if args[5] != nil {
@@ -367,7 +367,7 @@ func (_c *UserSessionManager_BumpUserSession_Call) Return(userSession *record.Us
 	return _c
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

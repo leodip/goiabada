@@ -82,8 +82,8 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 
 	for _, c := range []struct {
 		name                  string
-		auditEvent, requestId string
-		userId                int64
+		auditEvent, requestID string
+		userID                int64
 		page, count           recordedStatement
 	}{
 		{
@@ -101,7 +101,7 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		},
 		{
 			name:      "by request id",
-			requestId: "req-1",
+			requestID: "req-1",
 			page: recordedStatement{columns + " WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) " +
 				"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
 				[]driver.Value{"req-1", int64(10), int64(20)}},
@@ -111,7 +111,7 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		{
 			name:       "by event and request id",
 			auditEvent: "user_created",
-			requestId:  "req-1",
+			requestID:  "req-1",
 			page: recordedStatement{columns + " WHERE audit_event = @p1 AND request_id = @p2 " +
 				"AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512)) " +
 				"ORDER BY created_at DESC, id DESC OFFSET @p4 ROWS FETCH NEXT @p3 ROWS ONLY",
@@ -122,7 +122,7 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		},
 		{
 			name:   "by user",
-			userId: 41,
+			userID: 41,
 			page: recordedStatement{columns + " WHERE " + user(1) + " ORDER BY created_at DESC, id DESC OFFSET @p4 ROWS FETCH NEXT @p3 ROWS ONLY",
 				[]driver.Value{int64(41), int64(41), int64(10), int64(20)}},
 			count: recordedStatement{"SELECT COUNT(*) FROM audit_logs WHERE " + user(1), []driver.Value{int64(41), int64(41)}},
@@ -130,7 +130,7 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		{
 			name:       "by event and user",
 			auditEvent: "user_created",
-			userId:     41,
+			userID:     41,
 			page: recordedStatement{columns + " WHERE audit_event = @p1 AND " + user(2) +
 				" ORDER BY created_at DESC, id DESC OFFSET @p5 ROWS FETCH NEXT @p4 ROWS ONLY",
 				[]driver.Value{"user_created", int64(41), int64(41), int64(10), int64(20)}},
@@ -139,8 +139,8 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		},
 		{
 			name:      "by request id and user",
-			requestId: "req-1",
-			userId:    41,
+			requestID: "req-1",
+			userID:    41,
 			page: recordedStatement{columns + " WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) " +
 				"AND " + user(2) + " ORDER BY created_at DESC, id DESC OFFSET @p5 ROWS FETCH NEXT @p4 ROWS ONLY",
 				[]driver.Value{"req-1", int64(41), int64(41), int64(10), int64(20)}},
@@ -151,8 +151,8 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 		{
 			name:       "by event, request id and user",
 			auditEvent: "user_created",
-			requestId:  "req-1",
-			userId:     41,
+			requestID:  "req-1",
+			userID:     41,
 			page: recordedStatement{columns + " WHERE audit_event = @p1 AND request_id = @p2 " +
 				"AND CAST(request_id AS VARBINARY(512)) = CAST(@p2 AS VARBINARY(512)) AND " + user(3) +
 				" ORDER BY created_at DESC, id DESC OFFSET @p6 ROWS FETCH NEXT @p5 ROWS ONLY",
@@ -164,27 +164,27 @@ func TestGetAuditLogsPaginated_SQLServerClosesThePaddingInBothStatements(t *test
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			want := record.AuditLog{Id: 41, CreatedAt: auditCutoff, AuditEvent: "the event", Details: "{}", RequestId: "the request",
-				UserId: sql.NullInt64{Int64: 7, Valid: true}, LoggedInUserId: sql.NullInt64{Int64: 9, Valid: true}}
+			want := record.AuditLog{ID: 41, CreatedAt: auditCutoff, AuditEvent: "the event", Details: "{}", RequestID: "the request",
+				UserID: sql.NullInt64{Int64: 7, Valid: true}, LoggedInUserID: sql.NullInt64{Int64: 9, Valid: true}}
 			// A row the engine answers for a request-id filter carries that id, as the byte
 			// comparison makes it; commondb's guard after the scan drops any other.
-			if c.requestId != "" {
-				want.RequestId = c.requestId
+			if c.requestID != "" {
+				want.RequestID = c.requestID
 			}
 			connector := &recordingConnector{answer: func(query string) (cols []string, values [][]driver.Value) {
 				if strings.HasPrefix(query, "SELECT COUNT(*)") {
 					return []string{"count"}, [][]driver.Value{{int64(57)}}
 				}
 				return []string{"id", "created_at", "audit_event", "details", "request_id", "user_id", "logged_in_user_id"},
-					[][]driver.Value{{want.Id, want.CreatedAt, want.AuditEvent, want.Details, want.RequestId,
-						want.UserId.Int64, want.LoggedInUserId.Int64}}
+					[][]driver.Value{{want.ID, want.CreatedAt, want.AuditEvent, want.Details, want.RequestID,
+						want.UserID.Int64, want.LoggedInUserID.Int64}}
 			}}
 			db := sql.OpenDB(connector)
 			t.Cleanup(func() { _ = db.Close() })
 			d := &mssqldb.Database{Database: commondb.New(db, data.MSSQL, false)}
 
 			logs, total, err := d.GetAuditLogsPaginated(context.Background(), nil, 3, 10,
-				record.AuditLogFilter{AuditEvent: c.auditEvent, RequestId: c.requestId, UserId: c.userId})
+				record.AuditLogFilter{AuditEvent: c.auditEvent, RequestID: c.requestID, UserID: c.userID})
 			if err != nil {
 				t.Fatalf("GetAuditLogsPaginated: %v", err)
 			}

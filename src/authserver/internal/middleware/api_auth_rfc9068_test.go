@@ -56,7 +56,7 @@ func guardSettings() *record.Settings {
 // a grant never reads the jti.
 func armGuardClient(mockDB *datamocks.Database) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), guardClientIdentifier).
-		Return(&record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Maybe()
+		Return(&record.Client{ID: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Maybe()
 	mockDB.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), guardJti).Return(false, nil).Maybe()
 }
 
@@ -112,7 +112,7 @@ func TestRequireValidSession_RFC9068(t *testing.T) {
 			}
 			if tc.readsUser {
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
-					Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil).Once()
 			}
 			if tc.wantStatus == http.StatusOK {
 				// A live token without grant_id is judged last by its jti (#676 decision 1).

@@ -345,7 +345,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				armGuardClient(mockDB)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").
-					Return(&record.User{Id: 7, Enabled: true}, nil)
+					Return(&record.User{ID: 7, Enabled: true}, nil)
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 					Return(nil, errors.New("the database is down"))
 

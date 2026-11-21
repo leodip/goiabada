@@ -36,7 +36,7 @@ func TestRequireValidSession_Grant(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			armGuardClient(mockDB)
 			mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
-				Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil).Once()
+				Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil).Once()
 			mockDB.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), grantId).Return(tc.grantLive, nil).Once()
 
 			token := issuedAccessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId})
@@ -93,10 +93,10 @@ func TestRequireValidSession_RevokedJti(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			mockDB := datamocks.NewDatabase(t)
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), guardClientIdentifier).
-				Return(&record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Once()
+				Return(&record.Client{ID: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}, nil).Once()
 			if _, isUsers := tc.claims["auth_time"]; isUsers {
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
-					Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil).Once()
 			}
 			mockDB.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), jti).Return(tc.revoked, nil).Once()
 

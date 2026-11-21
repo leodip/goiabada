@@ -31,13 +31,13 @@ const (
 
 func TestAPIEmailTemplatePreview_AnswersTheEmailAndStoresNothing(t *testing.T) {
 	readToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	appName := appNameOfSettings(t)
 	dark := record.NewBrand(brandName("Preview"), record.BrandAppearanceDark, "plum")
 	require.NoError(t, database.CreateBrand(context.Background(), nil, &dark))
 	t.Cleanup(func() {
 		_ = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(context.Background(), tx, dark.Id)
+			_, err := database.DeleteBrand(context.Background(), tx, dark.ID)
 			return err
 		})
 	})
@@ -46,7 +46,7 @@ func TestAPIEmailTemplatePreview_AnswersTheEmailAndStoresNothing(t *testing.T) {
 		"subject":     "Nouveau mot de passe pour {{app_name}}",
 		"buttonLabel": "Changer",
 		"body":        "Bonjour {{name}}, le lien vaut {{expiry}} : {{link}}\n\n{{button}}",
-		"brandId":     dark.Id,
+		"brandId":     dark.ID,
 	})
 
 	require.Equal(t, http.StatusOK, status, "preview: %v", body)
@@ -109,7 +109,7 @@ func TestAPIEmailTemplateSendTest_TakesManage(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	token, client := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	to := plusAddress()
 	text := map[string]any{"to": to, "subject": "Bienvenido", "buttonLabel": "Activar", "body": "Hola.\n\n{{button}}"}
 

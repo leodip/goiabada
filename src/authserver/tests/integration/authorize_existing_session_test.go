@@ -19,7 +19,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -60,7 +60,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,14 +78,14 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -101,7 +101,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -146,7 +146,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,14 +164,14 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -190,7 +190,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,14 +261,14 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -284,7 +284,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -338,7 +338,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,14 +356,14 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -383,7 +383,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +404,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -436,7 +436,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,14 +454,14 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -471,7 +471,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,7 +492,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -512,7 +512,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -530,14 +530,14 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -554,7 +554,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,7 +575,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -595,7 +595,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -613,14 +613,14 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -643,7 +643,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -653,7 +653,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
 	// inside their own transactions; these cases are about what the ceremony does with a session
 	// that owes a re-prompt, not about how it came to owe one (#242).
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -670,7 +670,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -702,7 +702,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -720,14 +720,14 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -736,11 +736,11 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	// compared, /auth/level2 only captured onto the auth context, and /auth/completed is what
 	// wrote. A ceremony abandoned before that point would have left the snapshot behind and this
 	// same request would prompt for OTP again (#242 decision 3).
-	userAfter, err := database.GetUserById(context.Background(), nil, user.Id)
+	userAfter, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, userAfter.OtpConfigGeneration, userSession2.OtpConfigGeneration,
+	assert.Equal(t, userAfter.OTPConfigGeneration, userSession2.OTPConfigGeneration,
 		"the session must have caught up with the user's counter after answering the OTP prompt")
 }
 
@@ -755,7 +755,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -776,7 +776,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -809,7 +809,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -827,20 +827,20 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that OTP is now enabled for the user
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -862,7 +862,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -883,7 +883,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -915,7 +915,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -933,20 +933,20 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that OTP is still enabled for the user
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -960,7 +960,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	started := time.Now().UTC()
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -981,7 +981,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1001,7 +1001,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1019,14 +1019,14 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
@@ -1039,7 +1039,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	// The client's level is a floor that acr_values never lowers (#240), so the request below is at
 	// level 2 optional only once the client is. At the helper's level 3 it was a level 3 request
 	// from a user with no authenticator, which sets one up now (#542 live check).
-	client.DefaultAcrLevel = record.AcrLevel2Optional
+	client.DefaultACRLevel = record.ACRLevel2Optional
 	err := database.UpdateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
@@ -1047,14 +1047,14 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 
 	// An administrator turns the user's two-factor authentication off, which lowers the level 3
 	// session to what a password alone earns: level 2 optional, "pwd" (#542 decision 1).
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	userSession1 := userSessions[0]
-	assert.Equal(t, record.AcrLevel2Optional, userSession1.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, userSession1.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), userSession1.AuthMethods)
 
 	time.Sleep(200 * time.Millisecond)
@@ -1072,7 +1072,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1098,7 +1098,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1116,22 +1116,22 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
 	// The level and methods the lowered session holds: the code no longer names the removed
 	// authenticator, where it said level 3 and "pwd otp" before the removal lowered the session.
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings haven't changed
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1144,7 +1144,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 
 	// As in the OtpDisabled case above: the client's level is a floor acr_values never lowers
 	// (#240), so the request is at level 2 optional only once the client is.
-	client.DefaultAcrLevel = record.AcrLevel2Optional
+	client.DefaultACRLevel = record.ACRLevel2Optional
 	err := database.UpdateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
@@ -1155,7 +1155,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal("Expected user to have OTP enabled")
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1176,7 +1176,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1196,7 +1196,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1214,20 +1214,20 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings haven't changed
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1251,12 +1251,12 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	// tagged dont-update precisely so an ordinary whole-user write can never move it. Without
 	// this the enrollment below submits a code from the same time step the session helper
 	// already consumed, and the claim refuses it (#111 decision 8).
-	err = database.ResetUserOTPStep(context.Background(), nil, user.Id)
+	err = database.ResetUserOTPStep(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1266,7 +1266,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
 	// inside their own transactions; these cases are about what the ceremony does with a session
 	// that owes a re-prompt, not about how it came to owe one (#242).
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -1283,7 +1283,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1316,7 +1316,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1334,20 +1334,20 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings have been updated
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1364,7 +1364,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal("Expected user to have OTP enabled")
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1385,7 +1385,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1405,7 +1405,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1423,20 +1423,20 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
-	assert.Equal(t, userSession1.Id, userSession2.Id)
+	assert.Equal(t, userSession1.ID, userSession2.ID)
 	assert.Equal(t, userSession1.SessionIdentifier, userSession2.SessionIdentifier)
 	assert.Equal(t, userSession1.Started, userSession2.Started)
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Check that the user's OTP settings remain unchanged
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -41,7 +41,7 @@ func TestWorker_PerformTask_SweepsDeadPreRegistrationsTenMinutesBack(t *testing.
 			deadBefore = args.Get(2).(time.Time)
 		}).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Run(recordStep("settings")).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
@@ -70,7 +70,7 @@ func TestWorker_PerformTask_ContinuesAfterThePreRegistrationSweepFails(t *testin
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           30,
@@ -97,7 +97,7 @@ func TestWorker_PerformTask_SweepsPreRegistrationsAfterTheCodeSweepFails(t *test
 		Return(errors.New("delete failed")).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	worker.performTask(context.Background())
 
@@ -138,7 +138,7 @@ func TestWorker_PerformTask_StopsAroundThePreRegistrationSweepWhenCancelled(t *t
 
 		worker.performTask(ctx)
 
-		mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		mockDB.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 		mockDB.AssertExpectations(t)
 	})
 }

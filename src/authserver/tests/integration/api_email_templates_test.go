@@ -80,7 +80,7 @@ func TestAPIEmailTemplates_ASavedEditIsSentAndAResetRestoresTheBuiltInText(t *te
 	useMailpitSMTP(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	resetEmailTemplateWhenDone(t, "password_reset_link", "en")
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	status, body, _ := emailTemplateCall(t, manageToken, http.MethodPut, emailTemplatesPath+"/password_reset_link/en", map[string]any{
@@ -304,7 +304,7 @@ func TestAPIEmailTemplates_TheScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 			for _, path := range reads {
 				status, _, _ := emailTemplateCall(t, token, http.MethodGet, path, nil)

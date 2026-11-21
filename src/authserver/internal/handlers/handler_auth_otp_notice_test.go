@@ -70,7 +70,7 @@ func signInNoticeSettings() *record.Settings {
 // authenticator yet.
 func signInNoticeUser() *record.User {
 	return &record.User{
-		Id:            1,
+		ID:            1,
 		Enabled:       true,
 		GivenName:     "Joana",
 		FamilyName:    "Reis",
@@ -95,16 +95,16 @@ func signInNoticeRequest(t *testing.T, settings *record.Settings, code string) *
 
 // stubSignInEnrolment answers an enrolment whose authenticator write commits, up to the rotation.
 func stubSignInEnrolment(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
-	database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
-	database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(true, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
+	database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(true, nil).Once()
 	datamocks.ExpectRunInTransaction(database, otpEnrolTx)
-	database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+	database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 		Return(true, nil).Once()
-	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, user.Id).Return(int64(1), nil).Once()
-	database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, user.Id).Return(nil).Once()
-	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpEnrolTx, user.Id).Return(nil).Once()
-	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, user.Id, mock.Anything).Return(nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, otpEnrolTx, user.Id).Return(user, nil).Once()
+	database.On("IncrementUserOTPConfigGeneration", mock.Anything, otpEnrolTx, user.ID).Return(int64(1), nil).Once()
+	database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, user.ID).Return(nil).Once()
+	database.On("ClearUserOTPConsecutiveFailures", mock.Anything, otpEnrolTx, user.ID).Return(nil).Once()
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpEnrolTx, user.ID, mock.Anything).Return(nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, otpEnrolTx, user.ID).Return(user, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
@@ -214,10 +214,10 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 				user := signInNoticeUser()
 				user.OTPEnabled = true
 				user.OTPSecretEncrypted = encryptOTPForTest(t, secret)
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
-				database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything, user.OtpConfigGeneration).
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
+				database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything, user.OTPConfigGeneration).
 					Return(true, nil).Once()
-				database.On("ClearUserOtpConsecutiveFailures", mock.Anything, mock.Anything, user.Id).Return(nil).Maybe()
+				database.On("ClearUserOTPConsecutiveFailures", mock.Anything, mock.Anything, user.ID).Return(nil).Maybe()
 				auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessOtp, mock.Anything).Return().Once()
 				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
@@ -228,10 +228,10 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				authContext.OTPKeyURL = otpTestKeyURL(secret)
 				user := signInNoticeUser()
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
-				database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(true, nil).Once()
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
+				database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(true, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpEnrolTx)
-				database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+				database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 					Return(false, nil).Once()
 				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
@@ -243,12 +243,12 @@ func TestHandleAuthOtpPost_SendsNoSetUpNoticeWhereNoneMayGo(t *testing.T) {
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				authContext.OTPKeyURL = otpTestKeyURL(secret)
 				user := signInNoticeUser()
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
-				database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(true, nil).Once()
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
+				database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(true, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpEnrolTx)
-				database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+				database.On("TryEstablishUserOTP", mock.Anything, otpEnrolTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 					Return(true, nil).Once()
-				database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, user.Id).
+				database.On("IncrementUserOTPConfigGeneration", mock.Anything, otpEnrolTx, user.ID).
 					Return(int64(0), errors.New("increment failed")).Once()
 				pageRenderer.On("InternalServerError", rr, req, mock.Anything).Return().Once()
 			}},

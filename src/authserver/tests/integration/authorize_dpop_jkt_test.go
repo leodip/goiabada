@@ -326,7 +326,7 @@ func TestDPoPJkt_ABoundCodeIsRedeemedOnlyByItsKey(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, resp.StatusCode, "%v", body)
 		assert.Equal(t, boundCodeRefusal, body)
 		assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
-		row, err := database.GetCodeById(context.Background(), nil, code.Id)
+		row, err := database.GetCodeByID(context.Background(), nil, code.ID)
 		require.NoError(t, err)
 		assert.False(t, row.Used, "the refused redemption spent nothing")
 		assert.False(t, row.Revoked)
@@ -345,7 +345,7 @@ func TestDPoPJkt_ABoundCodeIsRedeemedOnlyByItsKey(t *testing.T) {
 	t.Run("then a proof by its key", func(t *testing.T) {
 		body := redeemWithDPoP(t, form, clientId, "", key)
 		assertBoundTo(t, body, key)
-		row, err := database.GetCodeById(context.Background(), nil, code.Id)
+		row, err := database.GetCodeByID(context.Background(), nil, code.ID)
 		require.NoError(t, err)
 		assert.True(t, row.Used, "the code is spent by its key")
 	})
@@ -441,7 +441,7 @@ func TestDPoPJkt_ConcurrentRedemptionsOfABoundCodeHaveOneWinner(t *testing.T) {
 	}
 	assert.Equal(t, 1, winners, "exactly one redemption is answered tokens")
 
-	row, err := database.GetCodeById(context.Background(), nil, code.Id)
+	row, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, row.Used, "the code is spent")
 }

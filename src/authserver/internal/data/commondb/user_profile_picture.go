@@ -20,10 +20,10 @@ var userProfilePictureColumns = columnList{
 // scanUserProfilePicture reads one row selected with userProfilePictureColumns.
 func scanUserProfilePicture(row rowScanner, profilePicture *record.UserProfilePicture) error {
 	return row.Scan(
-		&profilePicture.Id,
+		&profilePicture.ID,
 		&profilePicture.CreatedAt,
 		&profilePicture.UpdatedAt,
-		&profilePicture.UserId,
+		&profilePicture.UserID,
 		&profilePicture.Picture,
 		&profilePicture.ContentType,
 	)
@@ -44,7 +44,7 @@ var updateUserProfilePicture = statement{
 	mssql:    "UPDATE user_profile_pictures SET updated_at = @p1, user_id = @p2, picture = @p3, content_type = @p4 WHERE id = @p5",
 }
 
-var selectUserProfilePictureByUserId = statement{
+var selectUserProfilePictureByUserID = statement{
 	sqlite:   "SELECT " + userProfilePictureColumns.sqlite + " FROM user_profile_pictures WHERE user_id = ?",
 	mysql:    "SELECT " + userProfilePictureColumns.mysql + " FROM user_profile_pictures WHERE user_id = ?",
 	postgres: "SELECT " + userProfilePictureColumns.postgres + " FROM user_profile_pictures WHERE user_id = $1",
@@ -69,7 +69,7 @@ var selectUserHasProfilePicture = statement{
 
 func (d *Database) CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error {
 
-	if profilePicture.UserId == 0 {
+	if profilePicture.UserID == 0 {
 		return errs.New("can't create profile picture with user_id 0")
 	}
 
@@ -81,7 +81,7 @@ func (d *Database) CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, pro
 	profilePicture.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertUserProfilePicture, "profile picture",
-		profilePicture.CreatedAt, profilePicture.UpdatedAt, profilePicture.UserId, profilePicture.Picture,
+		profilePicture.CreatedAt, profilePicture.UpdatedAt, profilePicture.UserID, profilePicture.Picture,
 		profilePicture.ContentType)
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
@@ -89,13 +89,13 @@ func (d *Database) CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, pro
 		return err
 	}
 
-	profilePicture.Id = id
+	profilePicture.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error {
 
-	if profilePicture.Id == 0 {
+	if profilePicture.ID == 0 {
 		return errs.New("can't update profile picture with id 0")
 	}
 
@@ -103,8 +103,8 @@ func (d *Database) UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, pro
 	profilePicture.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateUserProfilePicture.text(d.Dialect),
-		profilePicture.UpdatedAt, profilePicture.UserId, profilePicture.Picture, profilePicture.ContentType,
-		profilePicture.Id)
+		profilePicture.UpdatedAt, profilePicture.UserID, profilePicture.Picture, profilePicture.ContentType,
+		profilePicture.ID)
 	if err != nil {
 		profilePicture.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update profile picture")
@@ -113,14 +113,14 @@ func (d *Database) UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, pro
 	return nil
 }
 
-func (d *Database) GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error) {
-	return queryOne(ctx, d, tx, selectUserProfilePictureByUserId.text(d.Dialect), []any{userId},
+func (d *Database) GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error) {
+	return queryOne(ctx, d, tx, selectUserProfilePictureByUserID.text(d.Dialect), []any{userID},
 		scanUserProfilePicture, "profile picture")
 }
 
-func (d *Database) DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteUserProfilePicture.text(d.Dialect), userId)
+	_, err := d.ExecSQL(ctx, tx, deleteUserProfilePicture.text(d.Dialect), userID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete profile picture")
 	}
@@ -128,9 +128,9 @@ func (d *Database) DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, use
 	return nil
 }
 
-func (d *Database) UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error) {
+func (d *Database) UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error) {
 
-	rows, err := d.QuerySQL(ctx, tx, selectUserHasProfilePicture.text(d.Dialect), userId)
+	rows, err := d.QuerySQL(ctx, tx, selectUserHasProfilePicture.text(d.Dialect), userID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

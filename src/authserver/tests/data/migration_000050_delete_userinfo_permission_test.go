@@ -63,19 +63,19 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 	seedPermission(t, h, unrelated, "mig50-unrelated", "Unrelated")
 
 	f.resource = &record.Resource{
-		Id:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
+		ID:                 seedResource(t, h, builtin.AuthServerResourceIdentifier, "Authorization server (system-level)"),
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 	}
 	f.userinfo = &record.Permission{
-		Id:                   seedPermission(t, h, f.resource.Id, "userinfo", userinfoDescription000050),
+		ID:                   seedPermission(t, h, f.resource.ID, "userinfo", userinfoDescription000050),
 		PermissionIdentifier: "userinfo",
 	}
 	f.control = &record.Permission{
-		Id:                   seedPermission(t, h, f.resource.Id, "mig50-control", "Control"),
+		ID:                   seedPermission(t, h, f.resource.ID, "mig50-control", "Control"),
 		PermissionIdentifier: "mig50-control",
 	}
 
-	f.user = &record.User{Id: seedUser(t, h, userSeed{
+	f.user = &record.User{ID: seedUser(t, h, userSeed{
 		Enabled:      true,
 		Subject:      "00000000-0000-0000-0000-000000050001",
 		Username:     "mig50user",
@@ -83,23 +83,23 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 		PasswordHash: "not-a-real-hash",
 	})}
 	f.group = &record.Group{
-		Id:              seedGroup(t, h, "mig50-group", "Migration 000050 test group"),
+		ID:              seedGroup(t, h, "mig50-group", "Migration 000050 test group"),
 		GroupIdentifier: "mig50-group",
 	}
 	// In SQL rather than through the ORM, whose record names clients columns later migrations add,
 	// administrative_scopes_allowed (000060) among them.
-	f.client = &record.Client{Id: seedClient(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
+	f.client = &record.Client{ID: seedClient(t, h, "mig50-client"), ClientIdentifier: "mig50-client"}
 
 	for _, permission := range []*record.Permission{f.userinfo, f.control} {
-		seedUserPermission(t, h, f.user.Id, permission.Id)
-		seedGroupPermission(t, h, f.group.Id, permission.Id)
-		seedClientPermission(t, h, f.client.Id, permission.Id)
+		seedUserPermission(t, h, f.user.ID, permission.ID)
+		seedGroupPermission(t, h, f.group.ID, permission.ID)
+		seedClientPermission(t, h, f.client.ID, permission.ID)
 	}
 
 	userHolds, groupHolds, clientHolds := f.held(t)
-	require.ElementsMatch(t, []int64{f.userinfo.Id, f.control.Id}, userHolds, "the fixture: the user holds both")
-	require.ElementsMatch(t, []int64{f.userinfo.Id, f.control.Id}, groupHolds, "the fixture: the group holds both")
-	require.ElementsMatch(t, []int64{f.userinfo.Id, f.control.Id}, clientHolds, "the fixture: the client holds both")
+	require.ElementsMatch(t, []int64{f.userinfo.ID, f.control.ID}, userHolds, "the fixture: the user holds both")
+	require.ElementsMatch(t, []int64{f.userinfo.ID, f.control.ID}, groupHolds, "the fixture: the group holds both")
+	require.ElementsMatch(t, []int64{f.userinfo.ID, f.control.ID}, clientHolds, "the fixture: the client holds both")
 	return f
 }
 
@@ -111,17 +111,17 @@ func seedUserinfoFixture000050(t *testing.T, h *isolatedDB) *userinfoFixture0000
 // own (#510).
 func (f *userinfoFixture000050) held(t *testing.T) (userHolds, groupHolds, clientHolds []int64) {
 	t.Helper()
-	userHolds = f.permissionIds(t, "users_permissions", "user_id", f.user.Id)
-	groupHolds = f.permissionIds(t, "groups_permissions", "group_id", f.group.Id)
-	clientHolds = f.permissionIds(t, "clients_permissions", "client_id", f.client.Id)
+	userHolds = f.permissionIDs(t, "users_permissions", "user_id", f.user.ID)
+	groupHolds = f.permissionIDs(t, "groups_permissions", "group_id", f.group.ID)
+	clientHolds = f.permissionIDs(t, "clients_permissions", "client_id", f.client.ID)
 	return userHolds, groupHolds, clientHolds
 }
 
-// permissionIds reads the permission ids one principal holds in one link table.
-func (f *userinfoFixture000050) permissionIds(t *testing.T, table, principalColumn string, principalId int64) []int64 {
+// permissionIDs reads the permission ids one principal holds in one link table.
+func (f *userinfoFixture000050) permissionIDs(t *testing.T, table, principalColumn string, principalID int64) []int64 {
 	t.Helper()
 	rows, err := f.h.SQL.QueryContext(context.Background(), fmt.Sprintf(
-		"SELECT permission_id FROM %s WHERE %s = %d ORDER BY id", table, principalColumn, principalId))
+		"SELECT permission_id FROM %s WHERE %s = %d ORDER BY id", table, principalColumn, principalID))
 	require.NoErrorf(t, err, "read the %s grants", table)
 	defer func() { _ = rows.Close() }()
 	var ids []int64
@@ -138,7 +138,7 @@ func (f *userinfoFixture000050) permissionIds(t *testing.T, table, principalColu
 func (f *userinfoFixture000050) identifiers(t *testing.T) map[string]string {
 	t.Helper()
 	rows, err := f.h.SQL.QueryContext(context.Background(), fmt.Sprintf(
-		"SELECT permission_identifier, description FROM permissions WHERE resource_id = %d", f.resource.Id))
+		"SELECT permission_identifier, description FROM permissions WHERE resource_id = %d", f.resource.ID))
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 	out := map[string]string{}
@@ -186,18 +186,18 @@ func TestMigration000050_DeletesTheUserinfoPermissionAndItsGrants(t *testing.T) 
 	assert.Equalf(t, map[string]string{"mig50-control": "Control"}, f.identifiers(t),
 		"000050 must delete the userinfo permission and nothing else on the authserver resource on %s", dbType())
 	userHolds, groupHolds, clientHolds := f.held(t)
-	assert.Equalf(t, []int64{f.control.Id}, userHolds, "000050 must delete the user's userinfo grant, and only it, on %s", dbType())
-	assert.Equalf(t, []int64{f.control.Id}, groupHolds, "000050 must delete the group's userinfo grant, and only it, on %s", dbType())
-	assert.Equalf(t, []int64{f.control.Id}, clientHolds, "000050 must delete the client's userinfo grant, and only it, on %s", dbType())
+	assert.Equalf(t, []int64{f.control.ID}, userHolds, "000050 must delete the user's userinfo grant, and only it, on %s", dbType())
+	assert.Equalf(t, []int64{f.control.ID}, groupHolds, "000050 must delete the group's userinfo grant, and only it, on %s", dbType())
+	assert.Equalf(t, []int64{f.control.ID}, clientHolds, "000050 must delete the client's userinfo grant, and only it, on %s", dbType())
 
 	// 2. Down restores the row with the seed's description, and no grant of it.
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, before), "roll back 000050 on %s", dbType())
 	assert.Equalf(t, map[string]string{"mig50-control": "Control", "userinfo": userinfoDescription000050}, f.identifiers(t),
 		"000050's down must restore the userinfo row on the authserver resource on %s", dbType())
 	userHolds, groupHolds, clientHolds = f.held(t)
-	assert.Equal(t, []int64{f.control.Id}, userHolds, "the down restores no grant: they are recorded nowhere else")
-	assert.Equal(t, []int64{f.control.Id}, groupHolds, "the down restores no grant: they are recorded nowhere else")
-	assert.Equal(t, []int64{f.control.Id}, clientHolds, "the down restores no grant: they are recorded nowhere else")
+	assert.Equal(t, []int64{f.control.ID}, userHolds, "the down restores no grant: they are recorded nowhere else")
+	assert.Equal(t, []int64{f.control.ID}, groupHolds, "the down restores no grant: they are recorded nowhere else")
+	assert.Equal(t, []int64{f.control.ID}, clientHolds, "the down restores no grant: they are recorded nowhere else")
 
 	// 3. And forward again.
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, deleteUserinfoPermission000050), "re-apply 000050 on %s", dbType())
@@ -246,9 +246,9 @@ func TestMigration000050_SQLiteWithForeignKeysOff(t *testing.T) {
 	assert.Equal(t, map[string]string{"mig50-control": "Control"}, f.identifiers(t),
 		"000050 must delete the userinfo permission and nothing else on the authserver resource")
 	userHolds, groupHolds, clientHolds := f.held(t)
-	assert.Equal(t, []int64{f.control.Id}, userHolds, "000050 must delete the user's userinfo grant itself, with no cascade to do it")
-	assert.Equal(t, []int64{f.control.Id}, groupHolds, "000050 must delete the group's userinfo grant itself, with no cascade to do it")
-	assert.Equal(t, []int64{f.control.Id}, clientHolds, "000050 must delete the client's userinfo grant itself, with no cascade to do it")
+	assert.Equal(t, []int64{f.control.ID}, userHolds, "000050 must delete the user's userinfo grant itself, with no cascade to do it")
+	assert.Equal(t, []int64{f.control.ID}, groupHolds, "000050 must delete the group's userinfo grant itself, with no cascade to do it")
+	assert.Equal(t, []int64{f.control.ID}, clientHolds, "000050 must delete the client's userinfo grant itself, with no cascade to do it")
 
 	// And no row anywhere is left pointing at a parent that is gone.
 	rows, err := h.SQL.QueryContext(ctx, "PRAGMA foreign_key_check;")

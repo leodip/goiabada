@@ -51,12 +51,12 @@ func TestStartNewUserSession_RecordsTheDevicesDigest(t *testing.T) {
 			captured := m.expectPersistThroughCommit(123, nil)
 
 			_, _, err := m.manager.StartNewUserSession(context.Background(), 7,
-				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, tc.device, "192.168.1.50", nil, SessionLimits{})
+				authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, tc.device, "192.168.1.50", nil, SessionLimits{})
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, (*captured).DeviceId)
-			assert.Equal(t, sha256Hex(tc.device.Identifier), (*captured).DeviceId)
-			assert.NotEqual(t, tc.device.Identifier, (*captured).DeviceId, "the session stores the value's digest")
+			assert.Equal(t, tc.want, (*captured).DeviceID)
+			assert.Equal(t, sha256Hex(tc.device.Identifier), (*captured).DeviceID)
+			assert.NotEqual(t, tc.device.Identifier, (*captured).DeviceID, "the session stores the value's digest")
 		})
 	}
 }

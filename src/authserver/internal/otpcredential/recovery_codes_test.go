@@ -35,7 +35,7 @@ func expectEstablishWrites(database *datamocks.Database, calls *[]string) {
 			*calls = append(*calls, "establish")
 			return true, nil
 		}).Once()
-	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserId).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (int64, error) {
 			*calls = append(*calls, "increment")
 			return 9, nil
@@ -45,7 +45,7 @@ func expectEstablishWrites(database *datamocks.Database, calls *[]string) {
 			*calls = append(*calls, "clear")
 			return nil
 		}).Once()
-	database.EXPECT().ClearUserOtpConsecutiveFailures(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().ClearUserOTPConsecutiveFailures(mock.Anything, otpTx, otpUserId).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) error {
 			*calls = append(*calls, "clear-count")
 			return nil
@@ -195,7 +195,7 @@ func TestRemove_DeletesTheRecoveryCodesInItsTransaction(t *testing.T) {
 			calls = append(calls, "delete-codes")
 			return nil
 		}).Once()
-	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).
+	database.EXPECT().IncrementUserOTPConfigGeneration(mock.Anything, otpTx, otpUserId).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (int64, error) {
 			calls = append(calls, "increment")
 			return 6, nil
@@ -227,7 +227,7 @@ func TestRemoveTx_AFailedRecoveryCodeDeletionFailsTheRemoval(t *testing.T) {
 
 	require.ErrorIs(t, err, deleteErr)
 	assert.False(t, removed)
-	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "IncrementUserOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A code is looked up by its hash, and entry ignores case, spaces and hyphens, so every way a person

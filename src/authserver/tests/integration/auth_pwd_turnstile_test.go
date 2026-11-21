@@ -59,7 +59,7 @@ func turnstileUser(t *testing.T, password string) *record.User {
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: strings.ToLower(fake.Email()), PasswordHash: hashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
@@ -149,7 +149,7 @@ func TestAuthPwdTurnstile_TheAlwaysPassSecretKeyLetsTheSignInProceed(t *testing.
 func TestAuthPwdTurnstile_AVerdictAgainstTheTokenIsRefusedBeforeThePassword(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	for _, tt := range []struct{ name, secretKey string }{
 		{"always fail", turnstileAlwaysFailSecretKey},

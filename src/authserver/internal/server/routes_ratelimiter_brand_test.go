@@ -27,8 +27,8 @@ import (
 // route's published budget through the real route table, its middleware and the real page
 // renderer, beneath the page middleware that gives every page request its client (#812).
 func TestInitRoutes_ALimiterRefusalIsDrawnInTheBrandOfTheSignInsClient(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name          string

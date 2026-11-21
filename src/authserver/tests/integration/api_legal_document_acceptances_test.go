@@ -56,7 +56,7 @@ func newAcceptancesFixture(t *testing.T, user *record.User) *acceptancesFixture 
 	publishFor := func(prefix, title string) (int64, string) {
 		shortName := legalShortName(prefix)
 		id := createLegalDocumentOverAPI(t, adminToken, "must_accept", shortName, title, "Be nice: "+title+".")
-		status, body := setApps(t, adminToken, id, "selected_apps", []int64{app.Id}, []int64{})
+		status, body := setApps(t, adminToken, id, "selected_apps", []int64{app.ID}, []int64{})
 		require.Equal(t, http.StatusOK, status, "apps: %v", body)
 		status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(id, "/publish"), nil)
 		require.Equal(t, http.StatusOK, status, "publish: %v", body)
@@ -64,7 +64,7 @@ func newAcceptancesFixture(t *testing.T, user *record.User) *acceptancesFixture 
 	}
 	accept := func(userId, versionId int64, at time.Time) {
 		require.NoError(t, database.CreateLegalDocumentAcceptance(context.Background(), nil,
-			&record.LegalDocumentAcceptance{AcceptedAt: at, UserId: userId, LegalDocumentVersionId: versionId}))
+			&record.LegalDocumentAcceptance{AcceptedAt: at, UserID: userId, LegalDocumentVersionID: versionId}))
 	}
 
 	base := time.Now().UTC().Add(-3 * time.Hour).Truncate(time.Second)
@@ -72,7 +72,7 @@ func newAcceptancesFixture(t *testing.T, user *record.User) *acceptancesFixture 
 
 	f.termsId, f.termsShort = publishFor("acceptances-terms", "Terms of use")
 	f.termsVersion1 = versionId(t, f.termsId, 1)
-	accept(user.Id, f.termsVersion1, f.termsV1At)
+	accept(user.ID, f.termsVersion1, f.termsV1At)
 
 	status, body, _ := legalCall(t, adminToken, http.MethodPut, legalPath(f.termsId, "/draft"), map[string]any{
 		"title": "Terms of use, revised", "markdown": "Be nicer.",
@@ -80,16 +80,16 @@ func newAcceptancesFixture(t *testing.T, user *record.User) *acceptancesFixture 
 	require.Equal(t, http.StatusOK, status, "draft: %v", body)
 	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.termsId, "/publish"), nil)
 	require.Equal(t, http.StatusOK, status, "publish version 2: %v", body)
-	accept(user.Id, versionId(t, f.termsId, 2), f.termsV2At)
+	accept(user.ID, versionId(t, f.termsId, 2), f.termsV2At)
 
 	f.houseId, f.houseShort = publishFor("acceptances-house", "House rules")
-	accept(user.Id, versionId(t, f.houseId, 1), f.houseV1At)
+	accept(user.ID, versionId(t, f.houseId, 1), f.houseV1At)
 	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.houseId, "/retire"), nil)
 	require.Equal(t, http.StatusOK, status, "retire: %v", body)
 
 	other, _ := newLegalAcceptanceUser(t)
-	f.otherUserId = other.Id
-	accept(other.Id, f.termsVersion1, f.termsV1At)
+	f.otherUserId = other.ID
+	accept(other.ID, f.termsVersion1, f.termsV1At)
 	return f
 }
 
@@ -174,7 +174,7 @@ func TestAPIUserLegalDocumentAcceptances_ListsWhatTheUserAccepted(t *testing.T) 
 	user, _ := newLegalAcceptanceUser(t)
 	f := newAcceptancesFixture(t, user)
 
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(user.Id), f.adminToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(user.ID), f.adminToken, nil)
 	f.assertTheFixturesAcceptances(t, decodeAcceptances(t, resp))
 
 	resp = makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(f.otherUserId), f.adminToken, nil)
@@ -212,9 +212,9 @@ func TestAPIUserLegalDocumentAcceptances_TheUsersReadScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-			status, body, _ := legalCall(t, token, http.MethodGet, userLegalDocumentAcceptancesPath(user.Id), nil)
+			status, body, _ := legalCall(t, token, http.MethodGet, userLegalDocumentAcceptancesPath(user.ID), nil)
 			assert.Equal(t, c.status, status, "%v", body)
 		})
 	}

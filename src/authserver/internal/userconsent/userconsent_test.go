@@ -29,13 +29,13 @@ var consentTx = &sql.Tx{}
 func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	stub := datamocks.ExpectRunInTransaction(db, consentTx)
-	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
+	db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 
 	var created *record.UserConsent
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			created = args.Get(2).(*record.UserConsent)
-			created.Id = 11
+			created.ID = 11
 		}).
 		Return(nil).Once()
 
@@ -45,9 +45,9 @@ func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
 	require.NoError(t, stub.BodyErr)
 
 	assert.Same(t, created, consent, "the row returned is the row written")
-	assert.Equal(t, int64(11), consent.Id)
-	assert.Equal(t, consentUserId, consent.UserId)
-	assert.Equal(t, consentClientId, consent.ClientId)
+	assert.Equal(t, int64(11), consent.ID)
+	assert.Equal(t, consentUserId, consent.UserID)
+	assert.Equal(t, consentClientId, consent.ClientID)
 	assert.Equal(t, "openid profile", consent.Scope)
 	require.True(t, consent.GrantedAt.Valid, "a new consent records when it was granted")
 	assert.False(t, consent.GrantedAt.Time.Before(before))
@@ -61,11 +61,11 @@ func TestRecord_CreatesAConsentWhenNoneIsStored(t *testing.T) {
 func TestRecord_ReplacesAStoredConsentWholeAndRefreshesItsDate(t *testing.T) {
 	grantedAt := sql.NullTime{Time: time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC), Valid: true}
 	stored := &record.UserConsent{
-		Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid profile email", GrantedAt: grantedAt,
+		ID: 5, UserID: consentUserId, ClientID: consentClientId, Scope: "openid profile email", GrantedAt: grantedAt,
 	}
 	db := datamocks.NewDatabase(t)
 	stub := datamocks.ExpectRunInTransaction(db, consentTx)
-	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(stored, nil).Once()
+	db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(stored, nil).Once()
 	db.On("UpdateUserConsent", mock.Anything, consentTx, stored).Return(nil).Once()
 
 	before := time.Now().UTC()
@@ -74,7 +74,7 @@ func TestRecord_ReplacesAStoredConsentWholeAndRefreshesItsDate(t *testing.T) {
 	require.NoError(t, stub.BodyErr)
 
 	assert.Same(t, stored, consent)
-	assert.Equal(t, int64(5), consent.Id, "the stored row is rewritten, not a second one created")
+	assert.Equal(t, int64(5), consent.ID, "the stored row is rewritten, not a second one created")
 	assert.Equal(t, "email", consent.Scope, "the scope is replaced, not appended to")
 	require.True(t, consent.GrantedAt.Valid)
 	assert.False(t, consent.GrantedAt.Time.Before(before), "a rewrite records this save's time, not the first grant's")
@@ -93,9 +93,9 @@ func TestRecord_ASaveThatLosesTheKeyRunsOnceMoreAndRewritesTheWinnersRow(t *test
 	db := datamocks.NewDatabase(t)
 	first := datamocks.ExpectRunInTransaction(db, consentTx)
 	second := datamocks.ExpectRunInTransaction(db, consentTx)
-	winners := &record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId, Scope: "openid"}
-	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
-	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(winners, nil).Once()
+	winners := &record.UserConsent{ID: 5, UserID: consentUserId, ClientID: consentClientId, Scope: "openid"}
+	db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
+	db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(winners, nil).Once()
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(lostTheKey).Once()
 	db.On("UpdateUserConsent", mock.Anything, consentTx, winners).Return(nil).Once()
 
@@ -118,7 +118,7 @@ func TestRecord_ASecondLossIsAFaultAndIsNotRetriedAgain(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, consentTx)
 	datamocks.ExpectRunInTransaction(db, consentTx)
-	db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Twice()
+	db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Twice()
 	db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(lostTheKey).Twice()
 
 	consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
@@ -134,7 +134,7 @@ func TestRecord_Failures(t *testing.T) {
 	t.Run("the read failing writes nothing", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		stub := datamocks.ExpectRunInTransaction(db, consentTx)
-		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, boom).Once()
+		db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
 		require.ErrorIs(t, err, boom)
@@ -147,7 +147,7 @@ func TestRecord_Failures(t *testing.T) {
 	t.Run("the create failing returns no row and is not retried", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		stub := datamocks.ExpectRunInTransaction(db, consentTx)
-		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
+		db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
@@ -159,8 +159,8 @@ func TestRecord_Failures(t *testing.T) {
 	t.Run("the update failing returns no row and is not retried", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		stub := datamocks.ExpectRunInTransaction(db, consentTx)
-		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).
-			Return(&record.UserConsent{Id: 5, UserId: consentUserId, ClientId: consentClientId}, nil).Once()
+		db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).
+			Return(&record.UserConsent{ID: 5, UserID: consentUserId, ClientID: consentClientId}, nil).Once()
 		db.On("UpdateUserConsent", mock.Anything, consentTx, mock.Anything).Return(boom).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
@@ -172,7 +172,7 @@ func TestRecord_Failures(t *testing.T) {
 	t.Run("a commit the engine refuses returns no row, though the body ran to the end", func(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransactionThenFail(db, consentTx, boom)
-		db.On("GetConsentByUserIdAndClientId", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
+		db.On("GetConsentByUserIDAndClientID", mock.Anything, consentTx, consentUserId, consentClientId).Return(nil, nil).Once()
 		db.On("CreateUserConsent", mock.Anything, consentTx, mock.Anything).Return(nil).Once()
 
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
@@ -187,6 +187,6 @@ func TestRecord_Failures(t *testing.T) {
 		consent, err := Record(context.Background(), db, consentUserId, consentClientId, "openid")
 		require.ErrorIs(t, err, boom)
 		assert.Nil(t, consent)
-		db.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }

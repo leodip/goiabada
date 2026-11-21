@@ -42,8 +42,8 @@ var sensitiveUserFields = []string{
 	"PhoneNumberVerificationCodeIssuedAt",
 	"ForgotPasswordCodeEncrypted",
 	"ForgotPasswordCodeIssuedAt",
-	"OtpEnrollmentSecretEncrypted",
-	"OtpEnrollmentIssuedAt",
+	"OTPEnrollmentSecretEncrypted",
+	"OTPEnrollmentIssuedAt",
 }
 
 // This catches a sensitive field being added to api.UserResponse even before any
@@ -73,7 +73,7 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 	otpEnrollmentEncrypted := []byte("SENTINEL-otp-enrollment-key-url")
 
 	user := &record.User{
-		Id:                             1,
+		ID:                             1,
 		Email:                          "user@example.com",
 		PasswordHash:                   "SENTINEL-password-hash",
 		OTPSecretEncrypted:             otpSecretEncrypted,
@@ -81,8 +81,8 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now(), Valid: true},
 		ForgotPasswordCodeEncrypted:    forgotCodeEncrypted,
 		ForgotPasswordCodeIssuedAt:     sql.NullTime{Time: time.Now(), Valid: true},
-		OtpEnrollmentSecretEncrypted:   otpEnrollmentEncrypted,
-		OtpEnrollmentIssuedAt:          sql.NullTime{Time: time.Now(), Valid: true},
+		OTPEnrollmentSecretEncrypted:   otpEnrollmentEncrypted,
+		OTPEnrollmentIssuedAt:          sql.NullTime{Time: time.Now(), Valid: true},
 	}
 
 	resp := ToUserResponse(user)
@@ -121,7 +121,7 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 // detail or the list.
 func TestToClientResponse_CarriesNoClientSecret(t *testing.T) {
 	client := &record.Client{
-		Id:                    1,
+		ID:                    1,
 		ClientIdentifier:      "some-client",
 		ClientSecretEncrypted: []byte("SENTINEL-client-secret-encrypted"),
 		Enabled:               true,
@@ -150,7 +150,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	subject := fake.UUID()
 
 	user := &record.User{
-		Id:                            7,
+		ID:                            7,
 		CreatedAt:                     sql.NullTime{Time: createdAt, Valid: true},
 		UpdatedAt:                     sql.NullTime{Time: updatedAt, Valid: true},
 		Enabled:                       true,
@@ -169,7 +169,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 		Locale:                        "pt-BR",
 		PageLanguage:                  "fr",
 		BirthDate:                     sql.NullTime{Time: birthDate, Valid: true},
-		PhoneNumberCountryUniqueId:    "BRA_0",
+		PhoneNumberCountryUniqueID:    "BRA_0",
 		PhoneNumberCountryCallingCode: "55",
 		PhoneNumber:                   "11999999999",
 		PhoneNumberVerified:           true,
@@ -180,9 +180,9 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 		AddressPostalCode:             "01000-000",
 		AddressCountry:                "BR",
 		OTPEnabled:                    true,
-		Groups:                        []record.Group{{Id: 1, GroupIdentifier: "admins"}},
-		Permissions:                   []record.Permission{{Id: 2, PermissionIdentifier: "read"}},
-		Attributes:                    []record.UserAttribute{{Id: 3, Key: "k", Value: "v"}},
+		Groups:                        []record.Group{{ID: 1, GroupIdentifier: "admins"}},
+		Permissions:                   []record.Permission{{ID: 2, PermissionIdentifier: "read"}},
+		Attributes:                    []record.UserAttribute{{ID: 3, Key: "k", Value: "v"}},
 	}
 
 	resp := ToUserResponse(user)
@@ -233,13 +233,13 @@ func TestToUserResponse_OTPAuthenticatorDisabled(t *testing.T) {
 		failures   int64
 		want       bool
 	}{
-		{name: "on, under the limit", otpEnabled: true, failures: record.OtpConsecutiveFailureLimit - 1, want: false},
-		{name: "on, at the limit", otpEnabled: true, failures: record.OtpConsecutiveFailureLimit, want: true},
+		{name: "on, under the limit", otpEnabled: true, failures: record.OTPConsecutiveFailureLimit - 1, want: false},
+		{name: "on, at the limit", otpEnabled: true, failures: record.OTPConsecutiveFailureLimit, want: true},
 		{name: "removed, the count left at the limit", otpEnabled: false,
-			failures: record.OtpConsecutiveFailureLimit, want: false},
+			failures: record.OTPConsecutiveFailureLimit, want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := ToUserResponse(&record.User{Id: 1, OTPEnabled: tc.otpEnabled, OtpConsecutiveFailures: tc.failures})
+			resp := ToUserResponse(&record.User{ID: 1, OTPEnabled: tc.otpEnabled, OTPConsecutiveFailures: tc.failures})
 			assert.Equal(t, tc.want, resp.OTPAuthenticatorDisabled)
 			assert.Equal(t, tc.otpEnabled, resp.OTPEnabled)
 		})
@@ -249,7 +249,7 @@ func TestToUserResponse_OTPAuthenticatorDisabled(t *testing.T) {
 // Invalid sql.NullTime values must become nil pointers rather than the zero time.
 func TestToUserResponse_InvalidNullTimesBecomeNil(t *testing.T) {
 	resp := ToUserResponse(&record.User{
-		Id:        1,
+		ID:        1,
 		CreatedAt: sql.NullTime{Valid: false},
 		UpdatedAt: sql.NullTime{Valid: false},
 		BirthDate: sql.NullTime{Valid: false},
@@ -282,9 +282,9 @@ func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
 
 func TestToUserResponses_MapsEachUserDistinctly(t *testing.T) {
 	users := []record.User{
-		{Id: 1, Email: "one@example.com"},
-		{Id: 2, Email: "two@example.com"},
-		{Id: 3, Email: "three@example.com"},
+		{ID: 1, Email: "one@example.com"},
+		{ID: 2, Email: "two@example.com"},
+		{ID: 3, Email: "three@example.com"},
 	}
 
 	responses := ToUserResponses(users)
@@ -351,7 +351,7 @@ func TestListMappers_NilSliceBehaviorDiffersByType(t *testing.T) {
 // decision 12).
 func TestToSessionOwnerResponse_CarriesTheFiveFieldsAndNoOthers(t *testing.T) {
 	resp := ToSessionOwnerResponse(&record.User{
-		Id:         7,
+		ID:         7,
 		Email:      "jane@example.com",
 		GivenName:  "Jane",
 		MiddleName: "Q",
@@ -385,8 +385,8 @@ func TestToSessionOwnerResponse_CarriesTheFiveFieldsAndNoOthers(t *testing.T) {
 
 func TestToSessionOwnerResponses_MapsEachUserDistinctly(t *testing.T) {
 	resps := ToSessionOwnerResponses([]record.User{
-		{Id: 1, Email: "one@example.com", GivenName: "One"},
-		{Id: 2, Email: "two@example.com", GivenName: "Two"},
+		{ID: 1, Email: "one@example.com", GivenName: "One"},
+		{ID: 2, Email: "two@example.com", GivenName: "Two"},
 	})
 
 	require.Len(t, resps, 2)
@@ -413,19 +413,19 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 	authTime := time.Date(2024, 3, 1, 10, 0, 5, 0, time.UTC)
 
 	session := &record.UserSession{
-		Id:                3,
+		ID:                3,
 		SessionIdentifier: "session-abc",
 		Started:           started,
 		LastAccessed:      lastAccessed,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          "urn:goiabada:level2_mandatory",
+		ACRLevel:          "urn:goiabada:level2_mandatory",
 		AuthTime:          authTime,
-		IpAddress:         "10.0.0.1",
+		IPAddress:         "10.0.0.1",
 		DeviceName:        "Pixel",
 		DeviceType:        "mobile",
 		DeviceOS:          "Android",
 		UserAgent:         "Mozilla/5.0 (Linux; Android 10; K) Chrome/120.0.0.0 Mobile Safari/537.36",
-		UserId:            42,
+		UserID:            42,
 	}
 
 	resp := ToUserSessionResponse(session)
@@ -448,7 +448,7 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 // Started, LastAccessed and AuthTime are plain time.Time, so absence is the
 // zero value rather than an invalid NullTime.
 func TestToUserSessionResponse_ZeroTimesBecomeNil(t *testing.T) {
-	resp := ToUserSessionResponse(&record.UserSession{Id: 1})
+	resp := ToUserSessionResponse(&record.UserSession{ID: 1})
 
 	assert.Nil(t, resp.Started)
 	assert.Nil(t, resp.LastAccessed)
@@ -474,7 +474,7 @@ func TestToUserSessionDetailResponse_IsCurrentComparesTheCallersSid(t *testing.T
 		{"another session", "session-xyz", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			detail := ToUserSessionDetailResponse(&record.UserSession{Id: 3, SessionIdentifier: "session-abc"}, tc.currentSid)
+			detail := ToUserSessionDetailResponse(&record.UserSession{ID: 3, SessionIdentifier: "session-abc"}, tc.currentSid)
 
 			require.NotNil(t, detail)
 			assert.Equal(t, tc.want, detail.IsCurrent)
@@ -486,7 +486,7 @@ func TestToUserSessionDetailResponse_IsCurrentComparesTheCallersSid(t *testing.T
 // must not match an empty sid either. Written separately because the case above fixes the
 // identifier and varies the claim; this one fixes the claim and varies the identifier.
 func TestToUserSessionDetailResponse_AnEmptySessionIdentifierIsNeverCurrent(t *testing.T) {
-	detail := ToUserSessionDetailResponse(&record.UserSession{Id: 3}, "")
+	detail := ToUserSessionDetailResponse(&record.UserSession{ID: 3}, "")
 
 	require.NotNil(t, detail)
 	assert.False(t, detail.IsCurrent)
@@ -501,8 +501,8 @@ func TestToUserSessionDetailResponse_ClientIdentifiersComeFromTheLoadedClients(t
 		{
 			name: "loaded",
 			clients: []record.UserSessionClient{
-				{ClientId: 1, Client: record.Client{Id: 1, ClientIdentifier: "portal"}},
-				{ClientId: 2, Client: record.Client{Id: 2, ClientIdentifier: "backoffice"}},
+				{ClientID: 1, Client: record.Client{ID: 1, ClientIdentifier: "portal"}},
+				{ClientID: 2, Client: record.Client{ID: 2, ClientIdentifier: "backoffice"}},
 			},
 			want: []string{"portal", "backoffice"},
 		},
@@ -513,7 +513,7 @@ func TestToUserSessionDetailResponse_ClientIdentifiersComeFromTheLoadedClients(t
 		{"nil", nil, []string{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			detail := ToUserSessionDetailResponse(&record.UserSession{Id: 3, Clients: tc.clients}, "")
+			detail := ToUserSessionDetailResponse(&record.UserSession{ID: 3, Clients: tc.clients}, "")
 
 			require.NotNil(t, detail)
 			require.NotNil(t, detail.ClientIdentifiers)
@@ -525,10 +525,10 @@ func TestToUserSessionDetailResponse_ClientIdentifiersComeFromTheLoadedClients(t
 // Clients carries the name a user is shown for each client, in the order of clientIdentifiers, and
 // is never nil for the reason clientIdentifiers is not.
 func TestToUserSessionDetailResponse_ClientsCarryTheNameUsersAreShown(t *testing.T) {
-	detail := ToUserSessionDetailResponse(&record.UserSession{Id: 3, Clients: []record.UserSessionClient{
-		{ClientId: 1, Client: record.Client{Id: 1, ClientIdentifier: "portal", DisplayName: "Customer portal", ShowDisplayName: true}},
-		{ClientId: 2, Client: record.Client{Id: 2, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}},
-		{ClientId: 3, Client: record.Client{Id: 3, ClientIdentifier: "backoffice", DisplayName: "Back office"}},
+	detail := ToUserSessionDetailResponse(&record.UserSession{ID: 3, Clients: []record.UserSessionClient{
+		{ClientID: 1, Client: record.Client{ID: 1, ClientIdentifier: "portal", DisplayName: "Customer portal", ShowDisplayName: true}},
+		{ClientID: 2, Client: record.Client{ID: 2, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}},
+		{ClientID: 3, Client: record.Client{ID: 3, ClientIdentifier: "backoffice", DisplayName: "Back office"}},
 	}}, "")
 
 	require.NotNil(t, detail)
@@ -538,7 +538,7 @@ func TestToUserSessionDetailResponse_ClientsCarryTheNameUsersAreShown(t *testing
 		{ClientIdentifier: "backoffice", Name: "backoffice"},
 	}, detail.Clients)
 
-	empty := ToUserSessionDetailResponse(&record.UserSession{Id: 3}, "")
+	empty := ToUserSessionDetailResponse(&record.UserSession{ID: 3}, "")
 	require.NotNil(t, empty.Clients)
 	assert.Empty(t, empty.Clients)
 }
@@ -552,7 +552,7 @@ func TestToUserSessionDetailResponse_NilSession(t *testing.T) {
 // every field: TestToUserSessionResponse_MapsFields owns those.
 func TestToUserSessionDetailResponse_CarriesTheBaseResponse(t *testing.T) {
 	started := time.Date(2024, 3, 1, 10, 0, 0, 0, time.UTC)
-	session := &record.UserSession{Id: 3, SessionIdentifier: "session-abc", Started: started, UserId: 42}
+	session := &record.UserSession{ID: 3, SessionIdentifier: "session-abc", Started: started, UserID: 42}
 
 	detail := ToUserSessionDetailResponse(session, "")
 
@@ -653,13 +653,13 @@ func TestToUserConsentResponse_IncludesClientDetailsWhenClientLoaded(t *testing.
 	grantedAt := time.Date(2024, 4, 1, 9, 0, 0, 0, time.UTC)
 
 	consent := &record.UserConsent{
-		Id:        5,
-		ClientId:  11,
-		UserId:    22,
+		ID:        5,
+		ClientID:  11,
+		UserID:    22,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: grantedAt, Valid: true},
 		Client: record.Client{
-			Id:               11,
+			ID:               11,
 			ClientIdentifier: "web-app",
 			Description:      "The web app",
 		},
@@ -681,8 +681,8 @@ func TestToUserConsentResponse_IncludesClientDetailsWhenClientLoaded(t *testing.
 // The name is the one the consent screen showed: a self-registered client nobody has named is
 // named by its own claim, marked as one.
 func TestToUserConsentResponse_NamesTheClientAsTheConsentScreenDid(t *testing.T) {
-	resp := ToUserConsentResponse(&record.UserConsent{Id: 5, ClientId: 11, Client: record.Client{
-		Id: 11, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}})
+	resp := ToUserConsentResponse(&record.UserConsent{ID: 5, ClientID: 11, Client: record.Client{
+		ID: 11, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal", CreatedViaDCR: true}})
 
 	assert.Equal(t, "Payroll Portal", resp.ClientName)
 	assert.True(t, resp.ClientNameUnverified)
@@ -693,9 +693,9 @@ func TestToUserConsentResponse_NamesTheClientAsTheConsentScreenDid(t *testing.T)
 // sign-in screens does not reach the user through it.
 func TestToAccountConsentResponses_DescriptionAsTheConsentScreenShowsIt(t *testing.T) {
 	consents := []record.UserConsent{
-		{Id: 1, ClientId: 11, Client: record.Client{Id: 11, ClientIdentifier: "portal", Description: "Orders and invoices", ShowDescription: true}},
-		{Id: 2, ClientId: 12, Client: record.Client{Id: 12, ClientIdentifier: "legacy", Description: "Team notes: retire in Q3"}},
-		{Id: 3, ClientId: 13, Client: record.Client{Id: 13, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal",
+		{ID: 1, ClientID: 11, Client: record.Client{ID: 11, ClientIdentifier: "portal", Description: "Orders and invoices", ShowDescription: true}},
+		{ID: 2, ClientID: 12, Client: record.Client{ID: 12, ClientIdentifier: "legacy", Description: "Team notes: retire in Q3"}},
+		{ID: 3, ClientID: 13, Client: record.Client{ID: 13, ClientIdentifier: "dcr_a3f9", Description: "Payroll Portal",
 			CreatedViaDCR: true, ShowDescription: true}},
 	}
 
@@ -715,8 +715,8 @@ func TestToAccountConsentResponses_DescriptionAsTheConsentScreenShowsIt(t *testi
 // which the mapper detects via a non-zero Client.Id.
 func TestToUserConsentResponse_OmitsClientDetailsWhenClientNotLoaded(t *testing.T) {
 	resp := ToUserConsentResponse(&record.UserConsent{
-		Id:       5,
-		ClientId: 11,
+		ID:       5,
+		ClientID: 11,
 		Scope:    "openid",
 		Client:   record.Client{}, // not loaded
 	})
@@ -727,8 +727,8 @@ func TestToUserConsentResponse_OmitsClientDetailsWhenClientNotLoaded(t *testing.
 
 func TestToUserConsentResponses_MapsEachConsentDistinctly(t *testing.T) {
 	responses := ToUserConsentResponses([]record.UserConsent{
-		{Id: 1, Scope: "openid"},
-		{Id: 2, Scope: "profile"},
+		{ID: 1, Scope: "openid"},
+		{ID: 2, Scope: "profile"},
 	})
 
 	assert.Len(t, responses, 2)
@@ -742,10 +742,10 @@ func TestToUserConsentResponses_MapsEachConsentDistinctly(t *testing.T) {
 
 func TestToGroupResponse_MapsFieldsAndMemberCount(t *testing.T) {
 	group := &record.Group{
-		Id:                   4,
+		ID:                   4,
 		GroupIdentifier:      "admins",
 		Description:          "Administrators",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 
@@ -761,9 +761,9 @@ func TestToGroupResponse_MapsFieldsAndMemberCount(t *testing.T) {
 
 func TestToGroupResponses_AppliesMemberCountsPerGroup(t *testing.T) {
 	groups := []record.Group{
-		{Id: 1, GroupIdentifier: "a"},
-		{Id: 2, GroupIdentifier: "b"},
-		{Id: 3, GroupIdentifier: "c"},
+		{ID: 1, GroupIdentifier: "a"},
+		{ID: 2, GroupIdentifier: "b"},
+		{ID: 3, GroupIdentifier: "c"},
 	}
 	memberCounts := map[int64]int{1: 10, 3: 30}
 
@@ -778,7 +778,7 @@ func TestToGroupResponses_AppliesMemberCountsPerGroup(t *testing.T) {
 }
 
 func TestToGroupResponses_NilMemberCountsYieldsZeroes(t *testing.T) {
-	responses := ToGroupResponses([]record.Group{{Id: 1, GroupIdentifier: "a"}}, nil)
+	responses := ToGroupResponses([]record.Group{{ID: 1, GroupIdentifier: "a"}}, nil)
 
 	assert.Len(t, responses, 1)
 	assert.Equal(t, 0, responses[0].MemberCount)
@@ -795,10 +795,10 @@ func TestToGroupResponse_LeavesAnAbsentUpdatedAtNil(t *testing.T) {
 	createdAt := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 
 	original := &record.Group{
-		Id:                   4,
+		ID:                   4,
 		GroupIdentifier:      "admins",
 		Description:          "Administrators",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
 		CreatedAt:            sql.NullTime{Time: createdAt, Valid: true},
 	}
@@ -817,12 +817,12 @@ func TestToGroupResponse_LeavesAnAbsentUpdatedAtNil(t *testing.T) {
 
 func TestToPermissionResponse_IncludesNestedResource(t *testing.T) {
 	perm := &record.Permission{
-		Id:                   8,
+		ID:                   8,
 		PermissionIdentifier: "read",
 		Description:          "Read access",
-		ResourceId:           10,
+		ResourceID:           10,
 		Resource: record.Resource{
-			Id:                 10,
+			ID:                 10,
 			ResourceIdentifier: "backend-svc",
 			Description:        "Backend service",
 		},
@@ -841,8 +841,8 @@ func TestToPermissionResponse_IncludesNestedResource(t *testing.T) {
 
 func TestToPermissionResponses_MapsEachPermissionDistinctly(t *testing.T) {
 	responses := ToPermissionResponses([]record.Permission{
-		{Id: 1, PermissionIdentifier: "read"},
-		{Id: 2, PermissionIdentifier: "write"},
+		{ID: 1, PermissionIdentifier: "read"},
+		{ID: 2, PermissionIdentifier: "write"},
 	})
 
 	assert.Len(t, responses, 2)
@@ -852,8 +852,8 @@ func TestToPermissionResponses_MapsEachPermissionDistinctly(t *testing.T) {
 
 func TestToResourceResponses_MapsEachResourceDistinctly(t *testing.T) {
 	responses := ToResourceResponses([]record.Resource{
-		{Id: 1, ResourceIdentifier: "svc-a"},
-		{Id: 2, ResourceIdentifier: "svc-b"},
+		{ID: 1, ResourceIdentifier: "svc-a"},
+		{ID: 2, ResourceIdentifier: "svc-b"},
 	})
 
 	assert.Len(t, responses, 2)
@@ -866,12 +866,12 @@ func TestToUserAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	updatedAt := time.Date(2024, 7, 2, 0, 0, 0, 0, time.UTC)
 
 	original := &record.UserAttribute{
-		Id:                   3,
+		ID:                   3,
 		Key:                  "department",
 		Value:                "engineering",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
-		UserId:               42,
+		UserID:               42,
 		CreatedAt:            sql.NullTime{Time: createdAt, Valid: true},
 		UpdatedAt:            sql.NullTime{Time: updatedAt, Valid: true},
 	}
@@ -888,8 +888,8 @@ func TestToUserAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 
 func TestToUserAttributeResponses_MapsEachAttributeDistinctly(t *testing.T) {
 	responses := ToUserAttributeResponses([]record.UserAttribute{
-		{Id: 1, Key: "a", Value: "1"},
-		{Id: 2, Key: "b", Value: "2"},
+		{ID: 1, Key: "a", Value: "1"},
+		{ID: 2, Key: "b", Value: "2"},
 	})
 
 	assert.Len(t, responses, 2)
@@ -901,12 +901,12 @@ func TestToGroupAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	createdAt := time.Date(2024, 8, 1, 0, 0, 0, 0, time.UTC)
 
 	original := &record.GroupAttribute{
-		Id:                   3,
+		ID:                   3,
 		Key:                  "tier",
 		Value:                "gold",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
-		GroupId:              9,
+		GroupID:              9,
 		CreatedAt:            sql.NullTime{Time: createdAt, Valid: true},
 	}
 
@@ -923,8 +923,8 @@ func TestToGroupAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 
 func TestToGroupAttributeResponses_MapsEachAttributeDistinctly(t *testing.T) {
 	responses := ToGroupAttributeResponses([]record.GroupAttribute{
-		{Id: 1, Key: "a"},
-		{Id: 2, Key: "b"},
+		{ID: 1, Key: "a"},
+		{ID: 2, Key: "b"},
 	})
 
 	assert.Len(t, responses, 2)
@@ -941,7 +941,7 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	implicitEnabled := false
 
 	client := &record.Client{
-		Id:                                      12,
+		ID:                                      12,
 		ClientIdentifier:                        "web-app",
 		Description:                             "The web app",
 		WebsiteURL:                              "https://app.example.com",
@@ -961,8 +961,8 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
-		RedirectURIs:                            []record.RedirectURI{{Id: 1, URI: "https://app.example.com/cb"}},
-		WebOrigins:                              []record.WebOrigin{{Id: 1, Origin: "https://app.example.com"}},
+		RedirectURIs:                            []record.RedirectURI{{ID: 1, URI: "https://app.example.com/cb"}},
+		WebOrigins:                              []record.WebOrigin{{ID: 1, Origin: "https://app.example.com"}},
 	}
 
 	resp := ToClientResponse(client)
@@ -1069,7 +1069,7 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 
 	t.Run("user session", func(t *testing.T) {
 		resp := ToUserSessionResponse(&record.UserSession{
-			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
+			ID: 1, CreatedAt: valid, UpdatedAt: validUpdated,
 		})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
@@ -1077,7 +1077,7 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 
 	t.Run("user consent", func(t *testing.T) {
 		resp := ToUserConsentResponse(&record.UserConsent{
-			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
+			ID: 1, CreatedAt: valid, UpdatedAt: validUpdated,
 		})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
@@ -1085,14 +1085,14 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("group", func(t *testing.T) {
-		resp := ToGroupResponse(&record.Group{Id: 1, CreatedAt: valid, UpdatedAt: validUpdated}, 0)
+		resp := ToGroupResponse(&record.Group{ID: 1, CreatedAt: valid, UpdatedAt: validUpdated}, 0)
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
 	})
 
 	t.Run("group attribute", func(t *testing.T) {
 		resp := ToGroupAttributeResponse(&record.GroupAttribute{
-			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
+			ID: 1, CreatedAt: valid, UpdatedAt: validUpdated,
 		})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
@@ -1100,21 +1100,21 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 
 	t.Run("user attribute", func(t *testing.T) {
 		resp := ToUserAttributeResponse(&record.UserAttribute{
-			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
+			ID: 1, CreatedAt: valid, UpdatedAt: validUpdated,
 		})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
 	})
 
 	t.Run("user", func(t *testing.T) {
-		resp := ToUserResponse(&record.User{Id: 1, CreatedAt: valid, UpdatedAt: validUpdated})
+		resp := ToUserResponse(&record.User{ID: 1, CreatedAt: valid, UpdatedAt: validUpdated})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
 		assert.Nil(t, resp.BirthDate, "an absent birth date reaches the wire as null")
 	})
 
 	t.Run("client", func(t *testing.T) {
-		resp := ToClientResponse(&record.Client{Id: 1, CreatedAt: valid, UpdatedAt: validUpdated})
+		resp := ToClientResponse(&record.Client{ID: 1, CreatedAt: valid, UpdatedAt: validUpdated})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
 	})
@@ -1122,8 +1122,8 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 
 func TestToClientResponses_MapsEachClientDistinctly(t *testing.T) {
 	responses := ToClientResponses([]record.Client{
-		{Id: 1, ClientIdentifier: "one"},
-		{Id: 2, ClientIdentifier: "two"},
+		{ID: 1, ClientIdentifier: "one"},
+		{ID: 2, ClientIdentifier: "two"},
 	})
 
 	assert.Len(t, responses, 2)

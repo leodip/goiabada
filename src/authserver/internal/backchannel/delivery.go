@@ -45,7 +45,7 @@ type SessionDatabase interface {
 func SessionDeliveries(ctx context.Context, db SessionDatabase, tx *sql.Tx, session *record.UserSession,
 	subject string) ([]Delivery, error) {
 
-	sessionClients, err := db.GetCommittedUserSessionClients(ctx, tx, session.Id)
+	sessionClients, err := db.GetCommittedUserSessionClients(ctx, tx, session.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +67,12 @@ func SessionClientDelivery(client *record.Client, session *record.UserSession, s
 		return Delivery{}, false
 	}
 	return Delivery{
-		ClientId:          client.Id,
+		ClientId:          client.ID,
 		ClientIdentifier:  client.ClientIdentifier,
 		URI:               client.BackchannelLogoutURI,
 		IsPublic:          client.IsPublic,
 		CreatedViaDCR:     client.CreatedViaDCR,
-		UserId:            session.UserId,
+		UserId:            session.UserID,
 		Subject:           subject,
 		SessionIdentifier: session.SessionIdentifier,
 	}, true

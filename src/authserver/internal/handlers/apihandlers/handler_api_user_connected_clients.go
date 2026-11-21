@@ -22,7 +22,7 @@ type userConnectedClientsDatabase interface {
 	connectedClientsDatabase
 	userTargetPolicyDatabase
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 // GET /api/v1/admin/users/{id}/connected-clients
@@ -44,7 +44,7 @@ func HandleUserConnectedClientsGet(
 			writeJSONError(w, "Invalid user ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -54,7 +54,7 @@ func HandleUserConnectedClientsGet(
 			return
 		}
 
-		connected, err := connectedClientsOf(r.Context(), database, user.Id, time.Now().UTC())
+		connected, err := connectedClientsOf(r.Context(), database, user.ID, time.Now().UTC())
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -102,7 +102,7 @@ func HandleUserConnectedClientDelete(
 			writeJSONError(w, "Invalid user ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -123,7 +123,7 @@ func HandleUserConnectedClientDelete(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -133,7 +133,7 @@ func HandleUserConnectedClientDelete(
 			return
 		}
 
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -143,7 +143,7 @@ func HandleUserConnectedClientDelete(
 			return
 		}
 
-		result, consentId, err := disconnectClient(r.Context(), database, user.Id, client.Id, settings)
+		result, consentId, err := disconnectClient(r.Context(), database, user.ID, client.ID, settings)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -157,12 +157,12 @@ func HandleUserConnectedClientDelete(
 
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedUserConsent, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"consent_id":     consentId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
-		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.Id, client.Id, callerSubject(r), result)
+		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.ID, client.ID, callerSubject(r), result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})

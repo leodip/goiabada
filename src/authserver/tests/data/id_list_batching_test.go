@@ -8,25 +8,25 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
-// absentIdBase is the first of a run of ids no row holds. Every table's ids are assigned by the
+// absentIDBase is the first of a run of ids no row holds. Every table's ids are assigned by the
 // engine from one, so a billion up is free, and padding with distinct values is what makes the
 // parameter count the real one: a list of 2,101 repetitions of the same id is one parameter after
 // deduplication and would prove nothing.
-const absentIdBase = int64(1_000_000_000)
+const absentIDBase = int64(1_000_000_000)
 
-// TestIdListLookups_MoreIdsThanOneStatementCanCarry asks every id-list lookup in commondb for more
+// TestIDListLookups_MoreIDsThanOneStatementCanCarry asks every id-list lookup in commondb for more
 // ids than a single statement can bind.
 //
 // Every id in an IN list is a bound parameter, and SQL Server refuses a statement carrying more
 // than 2,100 of them with error 8003, the lowest ceiling of the four engines, so an unbounded list
-// answered a valid request with an error rather than its rows. #373 fixed that at GetClientsByIds,
+// answered a valid request with an error rather than its rows. #373 fixed that at GetClientsByIDs,
 // which is where the crash was noticed, and left twelve lookups in the same package expanding
-// without a bound; they read long lists in several statements now, through forEachIdBatch, and
+// without a bound; they read long lists in several statements now, through forEachIDBatch, and
 // this is the case that says so on every engine.
 //
 // One table rather than a case per file, because the property is one property and the thirteen
 // lookups differ only in what they select. A new lookup adds a row here and the lint in
-// src/authserver/internal/data adds nothing by itself: it can see that forEachIdBatch is called
+// src/authserver/internal/data adds nothing by itself: it can see that forEachIDBatch is called
 // and not that the IN list was built from the batch rather than from the whole list. This is
 // what sees that.
 //
@@ -35,12 +35,12 @@ const absentIdBase = int64(1_000_000_000)
 // of failing loudly. The real ids sit in different batches in both, including the last slot, so a
 // batch that is never issued loses a row the assertions are counting.
 //
-// GetClientsByIds keeps its own pair of cases in client_test.go: it was first, and it carries the
+// GetClientsByIDs keeps its own pair of cases in client_test.go: it was first, and it carries the
 // repeated-id-across-a-boundary case that belongs to the deduplication rather than to the split.
 // readEmailGroup is the one lookup absent here, because its list is the users whose address
 // differs from another only by case, and a group of 2,101 of those cannot be built without 2,101
 // accounts; its batching is pinned in commondb's own tier instead.
-func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
+func TestIDListLookups_MoreIDsThanOneStatementCanCarry(t *testing.T) {
 	lengths := []struct {
 		name string
 		// total is how many ids the list carries, real and padding together.
@@ -63,113 +63,113 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 		answered func(t *testing.T, ids []int64) []int64
 	}{
 		{
-			name: "GetGroupsByIds",
+			name: "GetGroupsByIDs",
 			rows: func(t *testing.T) []int64 {
-				return idsOfThree(func() int64 { return createTestGroup(t).Id })
+				return idsOfThree(func() int64 { return createTestGroup(t).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				groups, err := database.GetGroupsByIds(context.Background(), nil, ids)
+				groups, err := database.GetGroupsByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(groups))
 				for _, group := range groups {
-					found = append(found, group.Id)
+					found = append(found, group.ID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetGroupAttributesByGroupIds",
+			name: "GetGroupAttributesByGroupIDs",
 			rows: func(t *testing.T) []int64 {
 				return idsOfThree(func() int64 {
 					group := createTestGroup(t)
-					createTestGroupAttribute(t, group.Id)
-					return group.Id
+					createTestGroupAttribute(t, group.ID)
+					return group.ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				attributes, err := database.GetGroupAttributesByGroupIds(context.Background(), nil, ids)
+				attributes, err := database.GetGroupAttributesByGroupIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(attributes))
 				for _, attribute := range attributes {
-					found = append(found, attribute.GroupId)
+					found = append(found, attribute.GroupID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetGroupPermissionsByGroupIds",
+			name: "GetGroupPermissionsByGroupIDs",
 			rows: func(t *testing.T) []int64 {
 				resource := createTestResource(t)
 				permission := createTestPermission(t, resource)
 				return idsOfThree(func() int64 {
 					group := createTestGroup(t)
-					createTestGroupPermission(t, group.Id, permission.Id)
-					return group.Id
+					createTestGroupPermission(t, group.ID, permission.ID)
+					return group.ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				groupPermissions, err := database.GetGroupPermissionsByGroupIds(context.Background(), nil, ids)
+				groupPermissions, err := database.GetGroupPermissionsByGroupIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(groupPermissions))
 				for _, groupPermission := range groupPermissions {
-					found = append(found, groupPermission.GroupId)
+					found = append(found, groupPermission.GroupID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetPermissionsByIds",
+			name: "GetPermissionsByIDs",
 			rows: func(t *testing.T) []int64 {
 				resource := createTestResource(t)
-				return idsOfThree(func() int64 { return createTestPermission(t, resource).Id })
+				return idsOfThree(func() int64 { return createTestPermission(t, resource).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				permissions, err := database.GetPermissionsByIds(context.Background(), nil, ids)
+				permissions, err := database.GetPermissionsByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(permissions))
 				for _, permission := range permissions {
-					found = append(found, permission.Id)
+					found = append(found, permission.ID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetResourcesByIds",
+			name: "GetResourcesByIDs",
 			rows: func(t *testing.T) []int64 {
-				return idsOfThree(func() int64 { return createTestResource(t).Id })
+				return idsOfThree(func() int64 { return createTestResource(t).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				resources, err := database.GetResourcesByIds(context.Background(), nil, ids)
+				resources, err := database.GetResourcesByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(resources))
 				for _, resource := range resources {
-					found = append(found, resource.Id)
+					found = append(found, resource.ID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetBrandAssetsByIds",
+			name: "GetBrandAssetsByIDs",
 			rows: func(t *testing.T) []int64 {
-				return idsOfThree(func() int64 { return createTestBrandAsset(t, database, record.BrandAssetKindLogo).Id })
+				return idsOfThree(func() int64 { return createTestBrandAsset(t, database, record.BrandAssetKindLogo).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				assets, err := database.GetBrandAssetsByIds(context.Background(), nil, ids)
+				assets, err := database.GetBrandAssetsByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(assets))
 				for _, asset := range assets {
-					found = append(found, asset.Id)
+					found = append(found, asset.ID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetUsersByIds",
+			name: "GetUsersByIDs",
 			rows: func(t *testing.T) []int64 {
-				return idsOfThree(func() int64 { return createTestUser(t).Id })
+				return idsOfThree(func() int64 { return createTestUser(t).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				users, err := database.GetUsersByIds(context.Background(), nil, ids)
+				users, err := database.GetUsersByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(users))
 				for id := range users {
@@ -179,83 +179,83 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			},
 		},
 		{
-			name: "GetUserGroupsByUserIds",
+			name: "GetUserGroupsByUserIDs",
 			rows: func(t *testing.T) []int64 {
 				group := createTestGroup(t)
 				return idsOfThree(func() int64 {
 					user := createTestUser(t)
-					createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
-					return user.Id
+					createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
+					return user.ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				userGroups, err := database.GetUserGroupsByUserIds(context.Background(), nil, ids)
+				userGroups, err := database.GetUserGroupsByUserIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(userGroups))
 				for _, userGroup := range userGroups {
-					found = append(found, userGroup.UserId)
+					found = append(found, userGroup.UserID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetUserPermissionsByUserIds",
+			name: "GetUserPermissionsByUserIDs",
 			rows: func(t *testing.T) []int64 {
 				resource := createTestResource(t)
 				permission := createTestPermission(t, resource)
 				return idsOfThree(func() int64 {
 					user := createTestUser(t)
-					createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
-					return user.Id
+					createTestUserPermissionWithUserAndPermission(t, user.ID, permission.ID)
+					return user.ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				userPermissions, err := database.GetUserPermissionsByUserIds(context.Background(), nil, ids)
+				userPermissions, err := database.GetUserPermissionsByUserIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(userPermissions))
 				for _, userPermission := range userPermissions {
-					found = append(found, userPermission.UserId)
+					found = append(found, userPermission.UserID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetUserSessionClientsByUserSessionIds",
+			name: "GetUserSessionClientsByUserSessionIDs",
 			rows: func(t *testing.T) []int64 {
 				client := createTestClient(t)
 				return idsOfThree(func() int64 {
 					user := createTestUser(t)
-					session := createTestUserSession(t, user.Id)
-					createTestUserSessionClientWithIds(t, session.Id, client.Id)
-					return session.Id
+					session := createTestUserSession(t, user.ID)
+					createTestUserSessionClientWithIDs(t, session.ID, client.ID)
+					return session.ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				sessionClients, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, ids)
+				sessionClients, err := database.GetUserSessionClientsByUserSessionIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(sessionClients))
 				for _, sessionClient := range sessionClients {
-					found = append(found, sessionClient.UserSessionId)
+					found = append(found, sessionClient.UserSessionID)
 				}
 				return found
 			},
 		},
 		{
-			name: "GetUserSessionsClientByIds",
+			name: "GetUserSessionsClientByIDs",
 			rows: func(t *testing.T) []int64 {
 				client := createTestClient(t)
 				return idsOfThree(func() int64 {
 					user := createTestUser(t)
-					session := createTestUserSession(t, user.Id)
-					return createTestUserSessionClientWithIds(t, session.Id, client.Id).Id
+					session := createTestUserSession(t, user.ID)
+					return createTestUserSessionClientWithIDs(t, session.ID, client.ID).ID
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				sessionClients, err := database.GetUserSessionsClientByIds(context.Background(), nil, ids)
+				sessionClients, err := database.GetUserSessionsClientByIDs(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(sessionClients))
 				for _, sessionClient := range sessionClients {
-					found = append(found, sessionClient.Id)
+					found = append(found, sessionClient.ID)
 				}
 				return found
 			},
@@ -265,7 +265,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			// ones carrying the new generation are what the list reached.
 			name: "PromoteRefreshTokenGenerations",
 			rows: func(t *testing.T) []int64 {
-				return idsOfThree(func() int64 { return createTestRefreshToken(t).Id })
+				return idsOfThree(func() int64 { return createTestRefreshToken(t).ID })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
 				const generation = int64(4242)
@@ -276,13 +276,13 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 
 				found := make([]int64, 0, 3)
 				for _, id := range ids {
-					if id >= absentIdBase {
+					if id >= absentIDBase {
 						continue
 					}
-					token, err := database.GetRefreshTokenById(context.Background(), nil, id)
+					token, err := database.GetRefreshTokenByID(context.Background(), nil, id)
 					requireNoLookupError(t, err)
 					if token != nil && token.AuthStateGeneration == generation {
-						found = append(found, token.Id)
+						found = append(found, token.ID)
 					}
 				}
 				return found
@@ -292,30 +292,30 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			realIds := testCase.rows(t)
-			if len(realIds) != 3 {
-				t.Fatalf("the fixture must create three rows, it created %d", len(realIds))
+			realIDs := testCase.rows(t)
+			if len(realIDs) != 3 {
+				t.Fatalf("the fixture must create three rows, it created %d", len(realIDs))
 			}
 
 			for _, length := range lengths {
 				t.Run(length.name, func(t *testing.T) {
 					ids := make([]int64, length.total)
 					for i := range ids {
-						ids[i] = absentIdBase + int64(i)
+						ids[i] = absentIDBase + int64(i)
 					}
 					for i, position := range length.positions {
-						ids[position] = realIds[i]
+						ids[position] = realIDs[i]
 					}
 
 					found := testCase.answered(t, ids)
 
-					for _, realId := range realIds {
-						if !containsId(found, realId) {
-							t.Errorf("the list named id %d and the answer does not carry it: %v", realId, found)
+					for _, realID := range realIDs {
+						if !containsID(found, realID) {
+							t.Errorf("the list named id %d and the answer does not carry it: %v", realID, found)
 						}
 					}
 					for _, id := range found {
-						if id >= absentIdBase {
+						if id >= absentIDBase {
 							t.Errorf("the answer carries id %d, which no row holds", id)
 						}
 					}
@@ -345,7 +345,7 @@ func requireNoLookupError(t *testing.T, err error) {
 	}
 }
 
-func containsId(ids []int64, wanted int64) bool {
+func containsID(ids []int64, wanted int64) bool {
 	for _, id := range ids {
 		if id == wanted {
 			return true

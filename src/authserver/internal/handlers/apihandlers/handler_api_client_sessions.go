@@ -20,9 +20,9 @@ import (
 type clientSessionsDatabase interface {
 	sessionDetailsDatabase
 
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error)
-	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetUserSessionsByClientIDPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error)
+	GetUsersByIDs(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -53,7 +53,7 @@ func HandleClientSessionsGet(
 		}
 
 		// Ensure client exists
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -81,7 +81,7 @@ func HandleClientSessionsGet(
 		}
 
 		// Fetch sessions linked to the client
-		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(r.Context(), nil, client.Id, page, size)
+		userSessions, _, err := database.GetUserSessionsByClientIDPaginated(r.Context(), nil, client.ID, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -154,7 +154,7 @@ func sessionOwners(ctx context.Context, database clientSessionsDatabase, session
 		return []api.SessionOwnerResponse{}, nil
 	}
 
-	usersById, err := database.GetUsersByIds(ctx, nil, userIds)
+	usersById, err := database.GetUsersByIDs(ctx, nil, userIds)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to get users by ids")
 	}

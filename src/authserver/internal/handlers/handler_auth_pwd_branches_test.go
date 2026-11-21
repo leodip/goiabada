@@ -150,7 +150,7 @@ func TestHandleAuthPwdPost_AClientReadFailingOnARefusalAnswers500AfterTheCredent
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
+		ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
 	}, nil).Once()
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -238,7 +238,7 @@ func (m pwdStepMocks) armAcceptedPassword(t *testing.T, pageLanguage string) {
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+		ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
 		PageLanguage: pageLanguage,
 	}, nil)
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, map[string]interface{}{"user_id": int64(1)}).
@@ -294,7 +294,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+			ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
 			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
@@ -315,7 +315,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+			ID: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
 			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
@@ -340,7 +340,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+			ID: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
 			Return().Once()

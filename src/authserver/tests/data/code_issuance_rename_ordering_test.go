@@ -19,7 +19,7 @@ import (
 // A rename of a client revokes its codes in the rename's transaction (#710 decision 5). Code
 // issuance looks its client up by the identifier the ceremony named with a plain read, which on
 // PostgreSQL and MySQL, and on SQL Server with READ_COMMITTED_SNAPSHOT on, does not wait for a
-// rename holding the row, so it reads the client's row again with GetClientByIdForShare, a shared
+// rename holding the row, so it reads the client's row again with GetClientByIDForShare, a shared
 // lock held to the end of its transaction, and refuses when the identifier is no longer the one it
 // looked up. Either the code commits before the rename can change the row, and the rename's sweep
 // revokes it, or the rename commits first and issuance writes nothing. Never a live code under the
@@ -27,28 +27,28 @@ import (
 // statements that ship: issuance.CodeIssuer and revocation.RevokeClientGrantsTx around
 // SetClientIdentifier.
 
-// TestGetClientByIdForShare: the read answers the client GetClientById answers, nothing for a
+// TestGetClientByIDForShare: the read answers the client GetClientByID answers, nothing for a
 // client that is not there, writes nothing, and requires a transaction, without which the lock
 // would be released before the caller decides.
-func TestGetClientByIdForShare(t *testing.T) {
+func TestGetClientByIDForShare(t *testing.T) {
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
-	plain, err := database.GetClientById(ctx, nil, client.Id)
+	plain, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 
 	tx := beginTx(t)
-	held, err := database.GetClientByIdForShare(ctx, tx, client.Id)
+	held, err := database.GetClientByIDForShare(ctx, tx, client.ID)
 	require.NoError(t, err)
-	assert.Equal(t, plain, held, "the same client GetClientById reads")
-	missing, err := database.GetClientByIdForShare(ctx, tx, client.Id+1_000_000)
+	assert.Equal(t, plain, held, "the same client GetClientByID reads")
+	missing, err := database.GetClientByIDForShare(ctx, tx, client.ID+1_000_000)
 	require.NoError(t, err)
 	assert.Nil(t, missing)
 	require.NoError(t, database.RollbackTransaction(ctx, tx))
 
-	_, err = database.GetClientByIdForShare(ctx, nil, client.Id)
+	_, err = database.GetClientByIDForShare(ctx, nil, client.ID)
 	require.Error(t, err)
 
-	after, err := database.GetClientById(ctx, nil, client.Id)
+	after, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, plain.UpdatedAt, after.UpdatedAt, "the read writes nothing, updated_at included")
 }
@@ -57,19 +57,19 @@ func TestGetClientByIdForShare(t *testing.T) {
 // sign-ins to one client in different sessions are not queued behind one another on its row. The
 // second read is bounded: a read that waited for the first transaction would reach the deadline
 // instead of answering.
-func TestGetClientByIdForShare_TwoHoldersDoNotWaitForEachOther(t *testing.T) {
+func TestGetClientByIDForShare_TwoHoldersDoNotWaitForEachOther(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
 
 	first := beginTx(t)
-	_, err := database.GetClientByIdForShare(ctx, first, client.Id)
+	_, err := database.GetClientByIDForShare(ctx, first, client.ID)
 	require.NoError(t, err)
 
 	second := beginTx(t)
 	bounded, cancel := context.WithTimeout(ctx, blockedCeiling)
 	defer cancel()
-	held, err := database.GetClientByIdForShare(bounded, second, client.Id)
+	held, err := database.GetClientByIDForShare(bounded, second, client.ID)
 	require.NoError(t, err, "the second shared read answers while the first transaction holds its lock")
 	require.NotNil(t, held)
 }
@@ -126,7 +126,7 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		ctx, cancel := context.WithCancel(context.Background())
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 
 		// The real issuance, on a transaction this test holds open, held at its insert: it has read
 		// the client's row under the shared lock and written no code yet, so what the rename waits
@@ -159,7 +159,7 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		}
 		rename := goBlocked(t, "the rename", tx, func(reached func()) renameOutcome {
 			reached()
-			result, renameErr := renameRevoking(ctx, other, client.Id, "renamed_"+fake.LetterN(8))
+			result, renameErr := renameRevoking(ctx, other, client.ID, "renamed_"+fake.LetterN(8))
 			return renameOutcome{result, renameErr}
 		})
 
@@ -182,14 +182,14 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		require.NoError(t, renamed.err, "the rename waits for the ceremony and then commits")
 		assert.Equal(t, int64(1), renamed.result.RevokedCodeCount,
 			"the rename's sweep ran after the code committed, so it found it")
-		assertCodeRevokedOn(t, db, code.Id, true, "the code the ceremony issued")
+		assertCodeRevokedOn(t, db, code.ID, true, "the code the ceremony issued")
 	})
 
 	t.Run("the rename goes first and issuance waits", func(t *testing.T) {
 		ctx := context.Background()
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 		input := ceremonyCodeInput(client, user, session.SessionIdentifier)
 
 		// RevokeClientGrantsTx owns and commits its own transaction, so the rename HELD OPEN across
@@ -198,10 +198,10 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		tx, err := db.BeginTransaction(ctx)
 		require.NoError(t, err, "opening the rename's transaction")
 		defer func() { _ = db.RollbackTransaction(ctx, tx) }()
-		changed, err := db.SetClientIdentifier(ctx, tx, client.Id, "renamed_"+fake.LetterN(8))
+		changed, err := db.SetClientIdentifier(ctx, tx, client.ID, "renamed_"+fake.LetterN(8))
 		require.NoError(t, err)
 		require.True(t, changed)
-		_, err = revocation.RevokeClientGrants(ctx, db, tx, client.Id, revocation.ReasonClientIdentifierChanged)
+		_, err = revocation.RevokeClientGrants(ctx, db, tx, client.ID, revocation.ReasonClientIdentifierChanged)
 		require.NoError(t, err)
 
 		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {

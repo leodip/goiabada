@@ -41,15 +41,15 @@ import (
 type lastAdministratorDatabase interface {
 	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
 	CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error)
-	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
+	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
 }
 
 // userRemovalDatabase is what the guard reads to decide whether disabling or deleting a user removes
 // a holder: beside the above, the user's direct grant and their groups.
 type userRemovalDatabase interface {
 	lastAdministratorDatabase
-	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
-	GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*record.UserPermission, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
+	GetUserPermissionByUserIDAndPermissionID(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*record.UserPermission, error)
 }
 
 // errLastAdministrator is what a guarded write's transaction returns when the write would leave no
@@ -124,32 +124,32 @@ func (a *administratorRemoval) groupsGiveManage(ctx context.Context, groupIds []
 	if len(groupIds) == 0 {
 		return false, nil
 	}
-	grants, err := a.database.GetGroupPermissionsByGroupIds(ctx, a.tx, groupIds)
+	grants, err := a.database.GetGroupPermissionsByGroupIDs(ctx, a.tx, groupIds)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the groups' permissions for the last-administrator guard")
 	}
 	return slices.ContainsFunc(grants, func(grant record.GroupPermission) bool {
-		return grant.PermissionId == a.manageId
+		return grant.PermissionID == a.manageId
 	}), nil
 }
 
 // userHoldsManage reports whether the user holds manage, directly or through any of their groups,
 // read on the transaction.
 func (a *administratorRemoval) userHoldsManage(ctx context.Context, database userRemovalDatabase, userId int64) (bool, error) {
-	direct, err := database.GetUserPermissionByUserIdAndPermissionId(ctx, a.tx, userId, a.manageId)
+	direct, err := database.GetUserPermissionByUserIDAndPermissionID(ctx, a.tx, userId, a.manageId)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's grant for the last-administrator guard")
 	}
 	if direct != nil {
 		return true, nil
 	}
-	memberships, err := database.GetUserGroupsByUserId(ctx, a.tx, userId)
+	memberships, err := database.GetUserGroupsByUserID(ctx, a.tx, userId)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to read the user's groups for the last-administrator guard")
 	}
 	groupIds := make([]int64, 0, len(memberships))
 	for _, membership := range memberships {
-		groupIds = append(groupIds, membership.GroupId)
+		groupIds = append(groupIds, membership.GroupID)
 	}
 	return a.groupsGiveManage(ctx, groupIds)
 }

@@ -17,7 +17,7 @@ import (
 // settingsDatabase is what the settings middleware needs: the settings row it puts on every
 // request's context.
 type settingsDatabase interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
 }
 
 // Settings puts the settings row on the request's context. A failure to read it is
@@ -26,7 +26,7 @@ func Settings(database settingsDatabase, faults ServerFaults) func(next http.Han
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			settings, err := database.GetSettingsById(r.Context(), nil, 1)
+			settings, err := database.GetSettingsByID(r.Context(), nil, 1)
 			if err != nil {
 				if faults.answered(w, r, errs.Wrap(err, "unable to load the settings")) {
 					return
@@ -67,7 +67,7 @@ func (a *AuditSwitches) AuditSwitches(ctx context.Context) (audit.Switches, erro
 	settings, ok := reqctx.SettingsFrom(ctx)
 	if !ok {
 		var err error
-		settings, err = a.database.GetSettingsById(ctx, nil, 1)
+		settings, err = a.database.GetSettingsByID(ctx, nil, 1)
 		if err != nil {
 			return audit.Switches{}, errs.Wrap(err, "unable to read the settings row")
 		}

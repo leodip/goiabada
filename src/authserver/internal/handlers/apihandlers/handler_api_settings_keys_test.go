@@ -48,7 +48,7 @@ var rotateTx = &sql.Tx{}
 // signingKey builds a key_pairs row in the given state. Only Id and State matter here: nothing in
 // this file reads key material.
 func signingKey(id int64, state record.KeyState) record.KeyPair {
-	return record.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
+	return record.KeyPair{ID: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
 }
 
 // stubRotateRead registers the transaction the rotator opens through RunInTransaction and the

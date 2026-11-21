@@ -48,13 +48,13 @@ func TestMigration000032_OTPEnrollment(t *testing.T) {
 	// Seeded with raw SQL rather than CreateUser: the Go model already carries both fields, so an
 	// ORM insert at 000031 would name two columns that do not exist yet. Follows
 	// seedPreMigration000031User.
-	userId := seedPreMigration000032User(t, h)
+	userID := seedPreMigration000032User(t, h)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 32), "apply 000032")
 
 	// 2 and 3.
 	assertPendingEnrollmentShape000032(t, h, "after apply")
-	assertPendingEnrollmentIsNull000032(t, h, userId, "after apply")
+	assertPendingEnrollmentIsNull000032(t, h, userID, "after apply")
 
 	// 4. Down, then up again.
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "roll back 000032")
@@ -65,7 +65,7 @@ func TestMigration000032_OTPEnrollment(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 32), "re-apply 000032")
 	assertPendingEnrollmentShape000032(t, h, "after down/up round trip")
-	assertPendingEnrollmentIsNull000032(t, h, userId, "after down/up round trip")
+	assertPendingEnrollmentIsNull000032(t, h, userID, "after down/up round trip")
 }
 
 var otpEnrollmentColumns000032 = []string{
@@ -110,12 +110,12 @@ func assertPendingEnrollmentShape000032(t *testing.T, h *isolatedDB, phase strin
 	}
 }
 
-func assertPendingEnrollmentIsNull000032(t *testing.T, h *isolatedDB, userId int64, phase string) {
+func assertPendingEnrollmentIsNull000032(t *testing.T, h *isolatedDB, userID int64, phase string) {
 	t.Helper()
 	for _, col := range otpEnrollmentColumns000032 {
 		var isNull bool
 		q := fmt.Sprintf("SELECT CASE WHEN %s IS NULL THEN 1 ELSE 0 END FROM users WHERE id = %d",
-			col, userId)
+			col, userID)
 		require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&isNull), "[%s] read users.%s", phase, col)
 		assert.Truef(t, isNull, "[%s] a users row that predates the column must read NULL in %s",
 			phase, col)

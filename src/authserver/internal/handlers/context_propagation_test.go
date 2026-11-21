@@ -62,10 +62,10 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
 	rr := httptest.NewRecorder()
 
-	user := &record.User{Id: 7, Subject: "sub-1"}
+	user := &record.User{ID: 7, Subject: "sub-1"}
 	database.On("GetUserBySubject", theRequestsContext(), mock.Anything, "sub-1").Return(user, nil).Once()
-	database.On("GetUserProfilePictureByUserId", theRequestsContext(), mock.Anything, int64(7)).
-		Return(&record.UserProfilePicture{UserId: 7, ContentType: "image/png", Picture: []byte{1, 2, 3}}, nil).Once()
+	database.On("GetUserProfilePictureByUserID", theRequestsContext(), mock.Anything, int64(7)).
+		Return(&record.UserProfilePicture{UserID: 7, ContentType: "image/png", Picture: []byte{1, 2, 3}}, nil).Once()
 
 	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
 
@@ -88,7 +88,7 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 
 	require.Equal(t, http.StatusNotFound, rr.Code)
 	database.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "GetUserProfilePictureByUserId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserProfilePictureByUserID", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // Stage 6 adds the session, token and code half. Two places in this package now change a context
@@ -135,9 +135,9 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 
 	// The session read and the issuer, each matched on THIS request's context.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
+		Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil)
 	codeIssuer.On("IssueAuthCodeTx", theRequestsContext(), mock.Anything).
-		Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
+		Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1, RedirectURI: "https://example.com/callback"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)

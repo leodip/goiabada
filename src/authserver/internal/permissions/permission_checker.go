@@ -46,7 +46,7 @@ type ScopeResolution struct {
 // shape #386 decision 3 rejected when it chose a port per file over a port per package.
 type ScopeResolverDatabase interface {
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
 }
 
 // IsResourceScope reports whether a scope has the resource:permission shape, which is exactly one
@@ -92,7 +92,7 @@ func ResolveScope(ctx context.Context, db ScopeResolverDatabase, scopeStr string
 		return resolution, nil
 	}
 
-	permissions, err := db.GetPermissionsByResourceId(ctx, nil, res.Id)
+	permissions, err := db.GetPermissionsByResourceID(ctx, nil, res.ID)
 	if err != nil {
 		return ScopeResolution{}, err
 	}
@@ -118,7 +118,7 @@ func ResolveScope(ctx context.Context, db ScopeResolverDatabase, scopeStr string
 type permissionCheckerDatabase interface {
 	ScopeResolverDatabase
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
@@ -142,7 +142,7 @@ func NewChecker(database permissionCheckerDatabase) *Checker {
 // mutate a struct its caller goes on to use, and a user deleted since the caller read it holds
 // nothing rather than whatever the caller's copy still says.
 func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*record.User, error) {
-	user, err := pc.database.GetUserById(ctx, nil, userId)
+	user, err := pc.database.GetUserByID(ctx, nil, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -173,14 +173,14 @@ func (pc *Checker) loadGrantHolder(ctx context.Context, userId int64) (*record.U
 // only unique within its resource (#104).
 func holdsPermission(user *record.User, permissionId int64) bool {
 	for _, userPerm := range user.Permissions {
-		if userPerm.Id == permissionId {
+		if userPerm.ID == permissionId {
 			return true
 		}
 	}
 
 	for _, group := range user.Groups {
 		for _, groupPerm := range group.Permissions {
-			if groupPerm.Id == permissionId {
+			if groupPerm.ID == permissionId {
 				return true
 			}
 		}
@@ -207,7 +207,7 @@ func (pc *Checker) UserHasScopePermission(ctx context.Context, userId int64, sco
 	case ScopeMalformed:
 		return false, errs.New("invalid scope format: " + scope + ". expected format: resource_identifier:permission_identifier")
 	case ScopeOK:
-		return holdsPermission(user, resolution.Permission.Id), nil
+		return holdsPermission(user, resolution.Permission.ID), nil
 	default:
 		// An unknown resource or an unknown permission on it: nobody holds it.
 		return false, nil
@@ -259,7 +259,7 @@ func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, 
 		}
 
 		if !holderLoaded {
-			holder, err = pc.loadGrantHolder(ctx, user.Id)
+			holder, err = pc.loadGrantHolder(ctx, user.ID)
 			if err != nil {
 				return "", err
 			}
@@ -267,7 +267,7 @@ func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, 
 		}
 
 		// A nil holder is a user deleted since the caller read them: every resource scope goes.
-		if holder != nil && holdsPermission(holder, resolution.Permission.Id) {
+		if holder != nil && holdsPermission(holder, resolution.Permission.ID) {
 			newScope += scopeStr + " "
 		}
 	}

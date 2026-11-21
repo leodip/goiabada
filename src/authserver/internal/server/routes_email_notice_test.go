@@ -61,7 +61,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 
 		database := datamocks.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-			Id:            1,
+			ID:            1,
 			Enabled:       true,
 			Subject:       routesTestSubject,
 			Email:         previousEmail,
@@ -90,20 +90,20 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		capture := newSMTPCapture(t)
 
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-			Id:      1,
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			ID:      1,
 			Enabled: true,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-			Id:      1,
+			ID:      1,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
 		database.On("SetUserEmail", mock.Anything, mock.Anything, mock.MatchedBy(func(user *record.User) bool {
-			return user.Id == 1 && user.Email == newEmail
+			return user.ID == 1 && user.Email == newEmail
 		})).Return(nil).Once()
 		s := newServer(t, database)
 
@@ -186,7 +186,7 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 	require.NoError(t, err)
 
 	var mu sync.Mutex
-	row := record.User{Id: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
+	row := record.User{ID: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
 		EmailVerified: true, PasswordHash: passwordHash}
 
 	arrived := 0

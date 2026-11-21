@@ -22,7 +22,7 @@ func TestAPIResourceDelete_Success(t *testing.T) {
 	res := createTestResource(t, "api-test-del-resource-"+fake.LetterN(6), "To be deleted")
 
 	// Delete the resource via API
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -76,7 +76,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -90,9 +90,9 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
 	res := createTestResource(t, "api-test-del-unauth-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 
 	// No token
 	req, err := http.NewRequest("DELETE", url, nil)

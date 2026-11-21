@@ -303,7 +303,7 @@ func clientCarrying(t *testing.T, cookies []*http.Cookie) *http.Client {
 func passwordHashOf(t *testing.T, userId int64) string {
 	t.Helper()
 
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.PasswordHash
@@ -343,7 +343,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, bodyString(t, resp), resetSucceededText)
 
-	after := passwordHashOf(t, user.Id)
+	after := passwordHashOf(t, user.ID)
 	assert.True(t, passwordhash.Verify(after, newPassword),
 		"the reset must have replaced the password hash")
 	assert.False(t, passwordhash.Verify(after, oldPassword))
@@ -371,7 +371,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
-	hashAfterReset := passwordHashOf(t, user.Id)
+	hashAfterReset := passwordHashOf(t, user.ID)
 	require.True(t, passwordhash.Verify(hashAfterReset, newPassword))
 
 	attacker := clientCarrying(t, captured)
@@ -391,7 +391,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
 	assert.Contains(t, postBody, resetCodeInvalidText)
 
-	assert.Equal(t, hashAfterReset, passwordHashOf(t, user.Id),
+	assert.Equal(t, hashAfterReset, passwordHashOf(t, user.ID),
 		"a replayed marker must not change the password")
 }
 
@@ -426,7 +426,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
 	assert.Contains(t, postBody, resetCodeInvalidText)
 
-	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), oldPassword),
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), oldPassword),
 		"a marker superseded by a newer code must not change the password")
 }
 
@@ -482,12 +482,12 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, body, resetSucceededText)
 
-	victimHash := passwordHashOf(t, victim.Id)
+	victimHash := passwordHashOf(t, victim.ID)
 	assert.True(t, passwordhash.Verify(victimHash, newPassword),
 		"the password typed must land in the account whose link rendered the form")
 	assert.False(t, passwordhash.Verify(victimHash, victimOldPassword))
 
-	otherHash := passwordHashOf(t, other.Id)
+	otherHash := passwordHashOf(t, other.ID)
 	assert.True(t, passwordhash.Verify(otherHash, otherOldPassword),
 		"the second account must be untouched")
 	assert.False(t, passwordhash.Verify(otherHash, newPassword))
@@ -528,7 +528,7 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
-	victimHash := passwordHashOf(t, victim.Id)
+	victimHash := passwordHashOf(t, victim.ID)
 	require.True(t, passwordhash.Verify(victimHash, victimPassword))
 
 	// The slot is free now, so the other account's link takes it legitimately: this is not
@@ -546,14 +546,14 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	assert.Equal(t, http.StatusBadRequest, staleResp.StatusCode)
 	assert.Contains(t, staleBody, resetCodeInvalidText)
 
-	otherHash := passwordHashOf(t, other.Id)
+	otherHash := passwordHashOf(t, other.ID)
 	assert.True(t, passwordhash.Verify(otherHash, otherOldPassword),
 		"a form rendered for one account must not write into the account the session moved on to")
 	assert.False(t, passwordhash.Verify(otherHash, typedInTheStaleTab))
 
 	// And the account the stale form did belong to is untouched too: its reset already
 	// completed, and this submission changed nothing.
-	assert.Equal(t, victimHash, passwordHashOf(t, victim.Id))
+	assert.Equal(t, victimHash, passwordHashOf(t, victim.ID))
 }
 
 // Two clients holding one copied marker, submitting different passwords. Exactly one may
@@ -591,7 +591,7 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 	assert.Equal(t, http.StatusBadRequest, secondResp.StatusCode)
 	assert.Contains(t, secondBody, resetCodeInvalidText)
 
-	after := passwordHashOf(t, user.Id)
+	after := passwordHashOf(t, user.ID)
 	assert.True(t, passwordhash.Verify(after, firstPassword),
 		"the winner's password must be the one that stands")
 	assert.False(t, passwordhash.Verify(after, secondPassword),
@@ -618,7 +618,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 
 	disabledEmail := plusAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.Id, true, false)
+	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.ID, true, false)
 	require.NoError(t, err)
 	require.True(t, flipped)
 
@@ -644,7 +644,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 			// sends nothing to, so once it is there nothing more is coming.
 			require.NotEmpty(t, awaitRequestedPasswordResetRecords(t, tc.email), "the request's work has run")
 
-			stored, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+			stored, err := database.GetUserByID(context.Background(), nil, tc.user.ID)
 			require.NoError(t, err)
 			assert.Empty(t, stored.ForgotPasswordCodeHash, "no reset code may be stored")
 			assert.Empty(t, stored.ForgotPasswordCodeEncrypted, "no reset code may be stored")
@@ -698,14 +698,14 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 
 	email := plusAddress()
 	user, oldPassword := createResetTestUser(t, email)
-	hashBefore := passwordHashOf(t, user.Id)
+	hashBefore := passwordHashOf(t, user.ID)
 
 	client := createHttpClient(t)
 	requestPasswordReset(t, client, email)
 	link := latestResetLink(t, email)
 
 	// 1. Following the emailed link.
-	setEnabled(t, user.Id, false)
+	setEnabled(t, user.ID, false)
 	resp := loadPage(t, client, link)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
@@ -713,11 +713,11 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	assert.Contains(t, body, resetCodeInvalidText)
 
 	// 2. Rendering the form, from a marker set while the account was enabled.
-	setEnabled(t, user.Id, true)
+	setEnabled(t, user.ID, true)
 	cleanURL := followResetLink(t, client, link)
 	continuationId := loadResetForm(t, client, cleanURL)
 
-	setEnabled(t, user.Id, false)
+	setEnabled(t, user.ID, false)
 	resp = loadPage(t, client, cleanURL)
 	body = bodyString(t, resp)
 	_ = resp.Body.Close()
@@ -732,11 +732,11 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Contains(t, body, resetCodeInvalidText)
 
-	assert.Equal(t, hashBefore, passwordHashOf(t, user.Id), "a disabled account must not be given a password")
-	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), oldPassword))
+	assert.Equal(t, hashBefore, passwordHashOf(t, user.ID), "a disabled account must not be given a password")
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), oldPassword))
 
 	assert.Equal(t, []string{"account_disabled", "account_disabled", "account_disabled"},
-		failedResetReasonsFor(t, user.Id), "each refused step is audited with the reason account_disabled")
+		failedResetReasonsFor(t, user.ID), "each refused step is audited with the reason account_disabled")
 }
 
 // awaitRequestedPasswordResetRecords returns the payload of every requested_password_reset record
@@ -799,7 +799,7 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 
 	disabledEmail := plusAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.Id, true, false)
+	flipped, err := database.TrySetUserEnabled(context.Background(), nil, disabled.ID, true, false)
 	require.NoError(t, err)
 	require.True(t, flipped)
 
@@ -822,9 +822,9 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 		outcome string
 	}{
 		{name: "an address with no account", address: unknown, outcome: "unknown_address"},
-		{name: "an unverified address", address: unverifiedEmail, userId: unverified.Id, outcome: "unverified_address"},
-		{name: "a disabled account", address: disabledEmail, userId: disabled.Id, outcome: "account_disabled"},
-		{name: "a live account", address: liveEmail, userId: live.Id, outcome: "code_issued"},
+		{name: "an unverified address", address: unverifiedEmail, userId: unverified.ID, outcome: "unverified_address"},
+		{name: "a disabled account", address: disabledEmail, userId: disabled.ID, outcome: "account_disabled"},
+		{name: "a live account", address: liveEmail, userId: live.ID, outcome: "code_issued"},
 		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -916,7 +916,7 @@ func TestForgotPassword_AnswersBeforeTheMailIsSent(t *testing.T) {
 	require.Len(t, records, 1)
 	assert.Equal(t, "code_issued", records[0]["outcome"])
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.NotEmpty(t, stored.ForgotPasswordCodeHash, "the code is stored before the send")
 }

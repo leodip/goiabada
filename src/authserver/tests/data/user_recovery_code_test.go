@@ -25,25 +25,25 @@ func recoveryCodeHashes(n int) []string {
 	return hashes
 }
 
-// replaceRecoveryCodes stores hashes as userId's set, in a transaction as the method requires.
-func replaceRecoveryCodes(t *testing.T, userId int64, hashes []string) {
+// replaceRecoveryCodes stores hashes as userID's set, in a transaction as the method requires.
+func replaceRecoveryCodes(t *testing.T, userID int64, hashes []string) {
 	t.Helper()
 	ctx := context.Background()
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.ReplaceUserRecoveryCodes(ctx, tx, userId, hashes)
+		return database.ReplaceUserRecoveryCodes(ctx, tx, userID, hashes)
 	}), "ReplaceUserRecoveryCodes")
 }
 
-func unusedRecoveryCodes(t *testing.T, userId int64) int {
+func unusedRecoveryCodes(t *testing.T, userID int64) int {
 	t.Helper()
-	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userId)
+	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userID)
 	require.NoError(t, err, "CountUnusedUserRecoveryCodes")
 	return n
 }
 
-func useRecoveryCode(t *testing.T, userId int64, hash string) bool {
+func useRecoveryCode(t *testing.T, userID int64, hash string) bool {
 	t.Helper()
-	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userId, hash)
+	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userID, hash)
 	require.NoError(t, err, "TryUseUserRecoveryCode")
 	return used
 }
@@ -53,14 +53,14 @@ func TestReplaceUserRecoveryCodes_StoresTheSetUnused(t *testing.T) {
 	other := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
 
-	replaceRecoveryCodes(t, user.Id, hashes)
+	replaceRecoveryCodes(t, user.ID, hashes)
 
-	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id), "every code of a new set is unused")
-	assert.Equal(t, 0, unusedRecoveryCodes(t, other.Id), "another user has none")
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.ID), "every code of a new set is unused")
+	assert.Equal(t, 0, unusedRecoveryCodes(t, other.ID), "another user has none")
 	for _, hash := range hashes {
-		assert.True(t, useRecoveryCode(t, user.Id, hash), "each stored hash is a code of the set")
+		assert.True(t, useRecoveryCode(t, user.ID, hash), "each stored hash is a code of the set")
 	}
-	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id))
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.ID))
 }
 
 // A new set replaces the old one whole: the old codes stop working at once, used or not, and the
@@ -68,17 +68,17 @@ func TestReplaceUserRecoveryCodes_StoresTheSetUnused(t *testing.T) {
 func TestReplaceUserRecoveryCodes_ReplacesTheOldSet(t *testing.T) {
 	user := createTestUser(t)
 	old := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, old)
-	require.True(t, useRecoveryCode(t, user.Id, old[0]))
+	replaceRecoveryCodes(t, user.ID, old)
+	require.True(t, useRecoveryCode(t, user.ID, old[0]))
 
 	replacement := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, replacement)
+	replaceRecoveryCodes(t, user.ID, replacement)
 
-	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id), "the new set's ten, and none of the old")
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.ID), "the new set's ten, and none of the old")
 	for _, hash := range old[1:] {
-		assert.False(t, useRecoveryCode(t, user.Id, hash), "an unused code of the old set is gone")
+		assert.False(t, useRecoveryCode(t, user.ID, hash), "an unused code of the old set is gone")
 	}
-	assert.True(t, useRecoveryCode(t, user.Id, replacement[3]), "the new set's codes work")
+	assert.True(t, useRecoveryCode(t, user.ID, replacement[3]), "the new set's codes work")
 }
 
 // The replacement leaves every other user's set as it was.
@@ -86,12 +86,12 @@ func TestReplaceUserRecoveryCodes_LeavesOtherUsersAlone(t *testing.T) {
 	user := createTestUser(t)
 	other := createTestUser(t)
 	theirs := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, other.Id, theirs)
+	replaceRecoveryCodes(t, other.ID, theirs)
 
-	replaceRecoveryCodes(t, user.Id, recoveryCodeHashes(10))
+	replaceRecoveryCodes(t, user.ID, recoveryCodeHashes(10))
 
-	assert.Equal(t, 10, unusedRecoveryCodes(t, other.Id))
-	assert.True(t, useRecoveryCode(t, other.Id, theirs[0]))
+	assert.Equal(t, 10, unusedRecoveryCodes(t, other.ID))
+	assert.True(t, useRecoveryCode(t, other.ID, theirs[0]))
 }
 
 // The delete and the inserts are one replacement only inside a transaction: autocommitted, a
@@ -100,10 +100,10 @@ func TestReplaceUserRecoveryCodes_RequiresATransaction(t *testing.T) {
 	user := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
 
-	err := database.ReplaceUserRecoveryCodes(context.Background(), nil, user.Id, hashes)
+	err := database.ReplaceUserRecoveryCodes(context.Background(), nil, user.ID, hashes)
 
 	require.Error(t, err)
-	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id), "and nothing was written")
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.ID), "and nothing was written")
 }
 
 // A set that cannot all be stored stores none of it: the same code twice is the key's refusal, and
@@ -111,22 +111,22 @@ func TestReplaceUserRecoveryCodes_RequiresATransaction(t *testing.T) {
 func TestReplaceUserRecoveryCodes_ARefusedCodeRollsTheReplacementBack(t *testing.T) {
 	user := createTestUser(t)
 	old := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, old)
+	replaceRecoveryCodes(t, user.ID, old)
 
 	duplicated := recoveryCodeHashes(9)
 	duplicated = append(duplicated, duplicated[0])
 	ctx := context.Background()
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.ReplaceUserRecoveryCodes(ctx, tx, user.Id, duplicated)
+		return database.ReplaceUserRecoveryCodes(ctx, tx, user.ID, duplicated)
 	})
 
 	require.Error(t, err)
-	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id), "the old set stands")
-	assert.True(t, useRecoveryCode(t, user.Id, old[5]))
-	assert.False(t, useRecoveryCode(t, user.Id, duplicated[1]))
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.ID), "the old set stands")
+	assert.True(t, useRecoveryCode(t, user.ID, old[5]))
+	assert.False(t, useRecoveryCode(t, user.ID, duplicated[1]))
 }
 
-func TestReplaceUserRecoveryCodes_RefusesAZeroUserId(t *testing.T) {
+func TestReplaceUserRecoveryCodes_RefusesAZeroUserID(t *testing.T) {
 	ctx := context.Background()
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		return database.ReplaceUserRecoveryCodes(ctx, tx, 0, recoveryCodeHashes(10))
@@ -143,11 +143,11 @@ func TestReplaceUserRecoveryCodes_RefusesAnEmptyHash(t *testing.T) {
 
 	ctx := context.Background()
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.ReplaceUserRecoveryCodes(ctx, tx, user.Id, hashes)
+		return database.ReplaceUserRecoveryCodes(ctx, tx, user.ID, hashes)
 	})
 
 	require.Error(t, err)
-	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id))
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.ID))
 }
 
 // Using a code is one conditional write: the first use claims it, every later one is refused, and
@@ -155,26 +155,26 @@ func TestReplaceUserRecoveryCodes_RefusesAnEmptyHash(t *testing.T) {
 func TestTryUseUserRecoveryCode_ClaimsACodeOnce(t *testing.T) {
 	user := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, hashes)
+	replaceRecoveryCodes(t, user.ID, hashes)
 
-	assert.True(t, useRecoveryCode(t, user.Id, hashes[2]), "the first use claims it")
-	assert.Equal(t, 9, unusedRecoveryCodes(t, user.Id))
-	assert.False(t, useRecoveryCode(t, user.Id, hashes[2]), "the second use is refused")
-	assert.Equal(t, 9, unusedRecoveryCodes(t, user.Id), "and changes nothing")
+	assert.True(t, useRecoveryCode(t, user.ID, hashes[2]), "the first use claims it")
+	assert.Equal(t, 9, unusedRecoveryCodes(t, user.ID))
+	assert.False(t, useRecoveryCode(t, user.ID, hashes[2]), "the second use is refused")
+	assert.Equal(t, 9, unusedRecoveryCodes(t, user.ID), "and changes nothing")
 }
 
 // A hash the user's set does not hold claims nothing: one of no set, and one of another user's set.
 func TestTryUseUserRecoveryCode_RefusesACodeNotInTheUsersSet(t *testing.T) {
 	user := createTestUser(t)
 	other := createTestUser(t)
-	replaceRecoveryCodes(t, user.Id, recoveryCodeHashes(10))
+	replaceRecoveryCodes(t, user.ID, recoveryCodeHashes(10))
 	theirs := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, other.Id, theirs)
+	replaceRecoveryCodes(t, other.ID, theirs)
 
-	assert.False(t, useRecoveryCode(t, user.Id, hashutil.HashString(fake.UUID())), "a code of no set")
-	assert.False(t, useRecoveryCode(t, user.Id, theirs[0]), "another user's code")
-	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id))
-	assert.Equal(t, 10, unusedRecoveryCodes(t, other.Id), "the other user's code is still unused")
+	assert.False(t, useRecoveryCode(t, user.ID, hashutil.HashString(fake.UUID())), "a code of no set")
+	assert.False(t, useRecoveryCode(t, user.ID, theirs[0]), "another user's code")
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.ID))
+	assert.Equal(t, 10, unusedRecoveryCodes(t, other.ID), "the other user's code is still unused")
 }
 
 // The hash is compared exactly: the stored form is lowercase hex, and the same digits in upper
@@ -182,21 +182,21 @@ func TestTryUseUserRecoveryCode_RefusesACodeNotInTheUsersSet(t *testing.T) {
 func TestTryUseUserRecoveryCode_ComparesTheHashCaseSensitively(t *testing.T) {
 	user := createTestUser(t)
 	hash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	replaceRecoveryCodes(t, user.Id, []string{hash})
+	replaceRecoveryCodes(t, user.ID, []string{hash})
 
-	assert.False(t, useRecoveryCode(t, user.Id, "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"))
-	assert.True(t, useRecoveryCode(t, user.Id, hash))
+	assert.False(t, useRecoveryCode(t, user.ID, "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"))
+	assert.True(t, useRecoveryCode(t, user.ID, hash))
 }
 
-func TestTryUseUserRecoveryCode_RefusesAnEmptyHashOrAZeroUserId(t *testing.T) {
+func TestTryUseUserRecoveryCode_RefusesAnEmptyHashOrAZeroUserID(t *testing.T) {
 	user := createTestUser(t)
-	replaceRecoveryCodes(t, user.Id, recoveryCodeHashes(10))
+	replaceRecoveryCodes(t, user.ID, recoveryCodeHashes(10))
 
-	_, err := database.TryUseUserRecoveryCode(context.Background(), nil, user.Id, "")
+	_, err := database.TryUseUserRecoveryCode(context.Background(), nil, user.ID, "")
 	require.Error(t, err)
 	_, err = database.TryUseUserRecoveryCode(context.Background(), nil, 0, hashutil.HashString(fake.UUID()))
 	require.Error(t, err)
-	assert.Equal(t, 10, unusedRecoveryCodes(t, user.Id))
+	assert.Equal(t, 10, unusedRecoveryCodes(t, user.ID))
 }
 
 // Two submissions of one code, at once: exactly one claims it. Single use is a property of the one
@@ -204,7 +204,7 @@ func TestTryUseUserRecoveryCode_RefusesAnEmptyHashOrAZeroUserId(t *testing.T) {
 func TestTryUseUserRecoveryCode_OfTwoConcurrentUsesExactlyOneClaims(t *testing.T) {
 	user := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, hashes)
+	replaceRecoveryCodes(t, user.ID, hashes)
 
 	const attempts = 8
 	results := make([]bool, attempts)
@@ -216,7 +216,7 @@ func TestTryUseUserRecoveryCode_OfTwoConcurrentUsesExactlyOneClaims(t *testing.T
 		go func(i int) {
 			defer done.Done()
 			start.Wait()
-			results[i], failures[i] = database.TryUseUserRecoveryCode(context.Background(), nil, user.Id, hashes[7])
+			results[i], failures[i] = database.TryUseUserRecoveryCode(context.Background(), nil, user.ID, hashes[7])
 		}(i)
 	}
 	start.Done()
@@ -230,7 +230,7 @@ func TestTryUseUserRecoveryCode_OfTwoConcurrentUsesExactlyOneClaims(t *testing.T
 		}
 	}
 	assert.Equal(t, 1, claimed, "one code, one use")
-	assert.Equal(t, 9, unusedRecoveryCodes(t, user.Id))
+	assert.Equal(t, 9, unusedRecoveryCodes(t, user.ID))
 }
 
 // Removing the authenticator deletes the user's whole set, used codes too, and no one else's.
@@ -238,23 +238,23 @@ func TestDeleteUserRecoveryCodes(t *testing.T) {
 	user := createTestUser(t)
 	other := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, hashes)
-	replaceRecoveryCodes(t, other.Id, recoveryCodeHashes(10))
-	require.True(t, useRecoveryCode(t, user.Id, hashes[0]))
+	replaceRecoveryCodes(t, user.ID, hashes)
+	replaceRecoveryCodes(t, other.ID, recoveryCodeHashes(10))
+	require.True(t, useRecoveryCode(t, user.ID, hashes[0]))
 
-	require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, user.Id))
+	require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, user.ID))
 
-	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id))
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.ID))
 	for _, hash := range hashes[1:] {
-		assert.False(t, useRecoveryCode(t, user.Id, hash), "a deleted code no longer works")
+		assert.False(t, useRecoveryCode(t, user.ID, hash), "a deleted code no longer works")
 	}
 	// A new set after the deletion holds only itself: the used code deleted with the old one does
 	// not linger as a used row of the new set.
-	replaceRecoveryCodes(t, user.Id, []string{hashes[0]})
-	assert.Equal(t, 1, unusedRecoveryCodes(t, user.Id))
-	assert.Equal(t, 10, unusedRecoveryCodes(t, other.Id), "another user's set stays")
+	replaceRecoveryCodes(t, user.ID, []string{hashes[0]})
+	assert.Equal(t, 1, unusedRecoveryCodes(t, user.ID))
+	assert.Equal(t, 10, unusedRecoveryCodes(t, other.ID), "another user's set stays")
 
-	require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, createTestUser(t).Id),
+	require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, createTestUser(t).ID),
 		"a user with no codes is no error")
 }
 
@@ -262,12 +262,12 @@ func TestDeleteUserRecoveryCodes(t *testing.T) {
 func TestUserRecoveryCodes_GoWithTheirUser(t *testing.T) {
 	user := createTestUser(t)
 	hashes := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, hashes)
+	replaceRecoveryCodes(t, user.ID, hashes)
 
-	require.NoError(t, database.DeleteUser(context.Background(), nil, user.Id))
+	require.NoError(t, database.DeleteUser(context.Background(), nil, user.ID))
 
-	assert.Equal(t, 0, unusedRecoveryCodes(t, user.Id))
-	assert.False(t, useRecoveryCode(t, user.Id, hashes[0]))
+	assert.Equal(t, 0, unusedRecoveryCodes(t, user.ID))
+	assert.False(t, useRecoveryCode(t, user.ID, hashes[0]))
 }
 
 // UserRecoveryCodeExists tells a used code of the user's current set, which the sign-in audits as
@@ -278,26 +278,26 @@ func TestUserRecoveryCodeExists(t *testing.T) {
 	user := createTestUser(t)
 	other := createTestUser(t)
 	old := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, old)
+	replaceRecoveryCodes(t, user.ID, old)
 	current := recoveryCodeHashes(10)
-	replaceRecoveryCodes(t, user.Id, current)
-	require.True(t, useRecoveryCode(t, user.Id, current[0]))
+	replaceRecoveryCodes(t, user.ID, current)
+	require.True(t, useRecoveryCode(t, user.ID, current[0]))
 
-	exists := func(userId int64, hash string) bool {
+	exists := func(userID int64, hash string) bool {
 		t.Helper()
-		found, err := database.UserRecoveryCodeExists(ctx, nil, userId, hash)
+		found, err := database.UserRecoveryCodeExists(ctx, nil, userID, hash)
 		require.NoError(t, err, "UserRecoveryCodeExists")
 		return found
 	}
 
-	assert.True(t, exists(user.Id, current[0]), "a used code of the current set")
-	assert.True(t, exists(user.Id, current[1]), "an unused code of the current set")
-	assert.False(t, exists(user.Id, old[0]), "a code of the replaced set is gone")
-	assert.False(t, exists(user.Id, recoveryCodeHashes(1)[0]), "a code the set never held")
-	assert.False(t, exists(other.Id, current[0]), "another user's set holds none of this user's codes")
+	assert.True(t, exists(user.ID, current[0]), "a used code of the current set")
+	assert.True(t, exists(user.ID, current[1]), "an unused code of the current set")
+	assert.False(t, exists(user.ID, old[0]), "a code of the replaced set is gone")
+	assert.False(t, exists(user.ID, recoveryCodeHashes(1)[0]), "a code the set never held")
+	assert.False(t, exists(other.ID, current[0]), "another user's set holds none of this user's codes")
 
 	_, err := database.UserRecoveryCodeExists(ctx, nil, 0, current[0])
 	require.Error(t, err, "a zero user id is a caller bug")
-	_, err = database.UserRecoveryCodeExists(ctx, nil, user.Id, "")
+	_, err = database.UserRecoveryCodeExists(ctx, nil, user.ID, "")
 	require.Error(t, err, "an empty hash is a caller bug")
 }

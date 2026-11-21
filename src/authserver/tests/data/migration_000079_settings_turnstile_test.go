@@ -60,24 +60,24 @@ func TestMigration000079_SettingsTurnstile(t *testing.T) {
 	assertColumns000079(t, h, "after apply")
 
 	// 2.
-	enabled, siteKey, secretKey := turnstileOf000079(t, h, settings.Id)
+	enabled, siteKey, secretKey := turnstileOf000079(t, h, settings.ID)
 	assert.Falsef(t, enabled, "2. an existing installation has the challenge off on %s", dbType())
 	assert.Emptyf(t, siteKey, "2. and no site key on %s", dbType())
 	assert.Emptyf(t, secretKey, "2. and no secret key on %s", dbType())
 
 	// 3.
 	_, err := h.SQL.Exec("UPDATE settings SET turnstile_enabled = " + true000079() +
-		", turnstile_site_key = 'stored-site-key' WHERE id = " + fmt.Sprint(settings.Id))
+		", turnstile_site_key = 'stored-site-key' WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "store a site key on %s", dbType())
-	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.Id))
+	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "save the settings as the previous release does on %s", dbType())
-	enabled, siteKey, _ = turnstileOf000079(t, h, settings.Id)
+	enabled, siteKey, _ = turnstileOf000079(t, h, settings.ID)
 	assert.Truef(t, enabled, "3. a save naming none of the columns leaves the switch on %s", dbType())
 	assert.Equalf(t, "stored-site-key", siteKey, "3. and the site key on %s", dbType())
 
 	// 4.
 	migrateToHead000063(t, h)
-	stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+	stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	for _, on := range []bool{true, false} {
@@ -85,7 +85,7 @@ func TestMigration000079_SettingsTurnstile(t *testing.T) {
 		stored.TurnstileSiteKey = fmt.Sprintf("site-key-%v", on)
 		stored.TurnstileSecretKeyEncrypted = []byte(fmt.Sprintf("sealed-%v", on))
 		require.NoError(t, h.DB.UpdateSettings(ctx, nil, stored))
-		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		read, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		require.NotNil(t, read)
 		assert.Equalf(t, on, read.TurnstileEnabled, "4. the switch round-trips as %v on %s", on, dbType())
@@ -101,7 +101,7 @@ func TestMigration000079_SettingsTurnstile(t *testing.T) {
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, settingsTurnstile000079), "re-apply 000079 on %s", dbType())
 	assertColumns000079(t, h, "after down/up round trip")
-	enabled, siteKey, secretKey = turnstileOf000079(t, h, settings.Id)
+	enabled, siteKey, secretKey = turnstileOf000079(t, h, settings.ID)
 	assert.Falsef(t, enabled, "5. the switch dropped with the column reads off once it is back on %s", dbType())
 	assert.Emptyf(t, siteKey, "5. the site key reads empty once it is back on %s", dbType())
 	assert.Emptyf(t, secretKey, "5. the secret key reads empty once it is back on %s", dbType())
@@ -190,12 +190,12 @@ func true000079() string {
 
 // turnstileOf000079 reads the three columns with raw SQL, since the data layer can read them only at
 // head.
-func turnstileOf000079(t *testing.T, h *isolatedDB, settingsId int64) (bool, string, []byte) {
+func turnstileOf000079(t *testing.T, h *isolatedDB, settingsID int64) (bool, string, []byte) {
 	t.Helper()
 	var enabled bool
 	var siteKey string
 	var secretKey []byte
-	q := fmt.Sprintf("SELECT turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted FROM settings WHERE id = %d", settingsId)
+	q := fmt.Sprintf("SELECT turnstile_enabled, turnstile_site_key, turnstile_secret_key_encrypted FROM settings WHERE id = %d", settingsID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&enabled, &siteKey, &secretKey), "read the Turnstile columns on %s", dbType())
 	return enabled, siteKey, secretKey
 }

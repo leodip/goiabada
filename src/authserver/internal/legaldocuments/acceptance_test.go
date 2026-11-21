@@ -35,7 +35,7 @@ func storeAcceptances(database *datamocks.Database, tx *sql.Tx, refused map[int6
 	stored := &[]record.LegalDocumentAcceptance{}
 	database.EXPECT().CreateLegalDocumentAcceptance(mock.Anything, on(tx), mock.Anything).
 		RunAndReturn(func(_ context.Context, _ *sql.Tx, acceptance *record.LegalDocumentAcceptance) error {
-			if err := refused[acceptance.LegalDocumentVersionId]; err != nil {
+			if err := refused[acceptance.LegalDocumentVersionID]; err != nil {
 				return err
 			}
 			*stored = append(*stored, *acceptance)
@@ -47,8 +47,8 @@ func storeAcceptances(database *datamocks.Database, tx *sql.Tx, refused map[int6
 func TestRecordAcceptances_WritesEachVersionNotYetAccepted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, firstAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).
-		Return([]record.LegalDocumentAcceptance{{UserId: 42, LegalDocumentVersionId: 11}}, nil).Once()
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).
+		Return([]record.LegalDocumentAcceptance{{UserID: 42, LegalDocumentVersionID: 11}}, nil).Once()
 	stored := storeAcceptances(database, firstAttempt, nil)
 
 	before := time.Now().UTC()
@@ -56,9 +56,9 @@ func TestRecordAcceptances_WritesEachVersionNotYetAccepted(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, *stored, 2, "version 11 was already accepted and is not written again")
-	assert.Equal(t, []int64{12, 71}, []int64{(*stored)[0].LegalDocumentVersionId, (*stored)[1].LegalDocumentVersionId})
+	assert.Equal(t, []int64{12, 71}, []int64{(*stored)[0].LegalDocumentVersionID, (*stored)[1].LegalDocumentVersionID})
 	for _, acceptance := range *stored {
-		assert.Equal(t, int64(42), acceptance.UserId)
+		assert.Equal(t, int64(42), acceptance.UserID)
 		assert.False(t, acceptance.AcceptedAt.Before(before), "stamped now")
 	}
 	assert.Equal(t, *stored, written, "it answers what it wrote, for the audit records")
@@ -69,12 +69,12 @@ func TestRecordAcceptances_WritesEachVersionNotYetAccepted(t *testing.T) {
 func TestRecordAcceptances_ALostRaceRunsAgainAndWritesNothingTheWinnerWrote(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	first := datamocks.ExpectRunInTransaction(database, firstAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Once()
 	storeAcceptances(database, firstAttempt, map[int64]error{12: errs.Errorf("insert: %w", data.ErrUniqueViolation)})
 	datamocks.ExpectRunInTransaction(database, secondAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(secondAttempt), int64(42)).
-		Return([]record.LegalDocumentAcceptance{{UserId: 42, LegalDocumentVersionId: 12}}, nil).Once()
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(secondAttempt), int64(42)).
+		Return([]record.LegalDocumentAcceptance{{UserID: 42, LegalDocumentVersionID: 12}}, nil).Once()
 
 	written, err := RecordAcceptances(context.Background(), database, 42, []int64{12})
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestRecordAcceptances_ALostRaceRunsAgainAndWritesNothingTheWinnerWrote(t *t
 func TestRecordAcceptances_ARerunAnswersOnlyTheAttemptThatCommitted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransactionRerun(database, firstAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Twice()
 	stored := storeAcceptances(database, firstAttempt, nil)
 
@@ -96,7 +96,7 @@ func TestRecordAcceptances_ARerunAnswersOnlyTheAttemptThatCommitted(t *testing.T
 
 	require.Len(t, *stored, 4, "both attempts wrote both versions")
 	require.Len(t, written, 2, "the rolled-back attempt's rows are not answered")
-	assert.Equal(t, []int64{12, 71}, []int64{written[0].LegalDocumentVersionId, written[1].LegalDocumentVersionId})
+	assert.Equal(t, []int64{12, 71}, []int64{written[0].LegalDocumentVersionID, written[1].LegalDocumentVersionID})
 }
 
 // A commit that fails after every write succeeded records nothing as far as the caller knows, so
@@ -105,7 +105,7 @@ func TestRecordAcceptances_AFailedCommitAnswersNothing(t *testing.T) {
 	commitFailed := errors.New("commit failed")
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransactionThenFail(database, firstAttempt, commitFailed)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Once()
 	storeAcceptances(database, firstAttempt, nil)
 
@@ -120,7 +120,7 @@ func TestRecordAcceptances_APartialWriteAnswersNothing(t *testing.T) {
 	insertFailed := errors.New("insert failed")
 	database := datamocks.NewDatabase(t)
 	attempt := datamocks.ExpectRunInTransaction(database, firstAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Once()
 	stored := storeAcceptances(database, firstAttempt, map[int64]error{71: insertFailed})
 
@@ -135,7 +135,7 @@ func TestRecordAcceptances_AFailureIsAnError(t *testing.T) {
 	failure := errors.New("database down")
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, firstAttempt)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, on(firstAttempt), int64(42)).Return(nil, failure).Once()
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, on(firstAttempt), int64(42)).Return(nil, failure).Once()
 
 	written, err := RecordAcceptances(context.Background(), database, 42, []int64{12})
 	require.ErrorIs(t, err, failure)

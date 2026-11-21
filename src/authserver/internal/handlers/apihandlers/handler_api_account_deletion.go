@@ -198,7 +198,7 @@ func HandleAccountDeletionPost(
 			if lockErr != nil {
 				return lockErr
 			}
-			locked, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
+			locked, readErr := database.GetUserByIDForUpdate(r.Context(), tx, user.ID)
 			if readErr != nil {
 				return errs.Wrap(readErr, "unable to read the account under its lock")
 			}
@@ -215,11 +215,11 @@ func HandleAccountDeletionPost(
 				return errSecondFactorNowRequired
 			}
 			// Two-factor removed meanwhile leaves the password alone enough, as decision 1 allows.
-			if locked.OTPEnabled && usedOTPCode && locked.OtpConfigGeneration != user.OtpConfigGeneration {
+			if locked.OTPEnabled && usedOTPCode && locked.OTPConfigGeneration != user.OTPConfigGeneration {
 				return errAuthenticatorReplaced
 			}
 			if useRecoveryCode {
-				used, claimErr := database.TryUseUserRecoveryCode(r.Context(), tx, user.Id, codeHash)
+				used, claimErr := database.TryUseUserRecoveryCode(r.Context(), tx, user.ID, codeHash)
 				if claimErr != nil {
 					return errs.Wrap(claimErr, "unable to claim the recovery code")
 				}
@@ -227,19 +227,19 @@ func HandleAccountDeletionPost(
 					return errRecoveryCodeRefused
 				}
 			}
-			holdsManage, guardErr := administrators.userHoldsManage(r.Context(), database, user.Id)
+			holdsManage, guardErr := administrators.userHoldsManage(r.Context(), database, user.ID)
 			if guardErr != nil {
 				return guardErr
 			}
 			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 				return decideErr
 			}
-			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, user.Id, locked.Subject,
+			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, user.ID, locked.Subject,
 				sessionLive(settings))
 			if collectErr != nil {
 				return collectErr
 			}
-			if deleteErr := database.DeleteUser(r.Context(), tx, user.Id); deleteErr != nil {
+			if deleteErr := database.DeleteUser(r.Context(), tx, user.ID); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the account")
 			}
 			if leaveErr := administrators.leavesAnAdministrator(r.Context()); leaveErr != nil {
@@ -254,7 +254,7 @@ func HandleAccountDeletionPost(
 			writeLocalizedError(w, r, lastAdministrator, "LAST_ADMINISTRATOR", http.StatusConflict)
 			return
 		case errors.Is(err, errRecoveryCodeRefused):
-			refuseDeletionRecoveryCode(w, r, database, auditLogger, credentialFailures, user.Id, subject, codeHash)
+			refuseDeletionRecoveryCode(w, r, database, auditLogger, credentialFailures, user.ID, subject, codeHash)
 			return
 		case errors.Is(err, errPasswordReplaced):
 			// Not a guess: the password was right when it was checked, so it spends nothing.
@@ -284,7 +284,7 @@ func HandleAccountDeletionPost(
 		defer notifier.Send(r, accountnotice.AccountDeleted, accountnotice.To(current))
 
 		auditLogger.Log(r.Context(), audit.EventDeletedOwnAccount, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 		logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
@@ -306,7 +306,7 @@ func soleAdministrator(ctx context.Context, database accountDeletionDatabase, us
 		if err != nil {
 			return err
 		}
-		holdsManage, err := administrators.userHoldsManage(ctx, database, user.Id)
+		holdsManage, err := administrators.userHoldsManage(ctx, database, user.ID)
 		if err != nil || !holdsManage || !user.Enabled {
 			return err
 		}
@@ -349,7 +349,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 		// against the account's row, so the account was there when the code was claimed: it is a
 		// replay, and its committed lockout is audited and told whatever a read now would say.
 		if !verified.Disabled {
-			current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+			current, readErr := database.GetUserByID(r.Context(), nil, user.ID)
 			if readErr != nil {
 				writeInternalServerError(w, r, readErr)
 				return false
@@ -361,13 +361,13 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 		}
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"step":           verified.Step,
 			"logged_in_user": subject,
 		})
 	case otpcredential.OutcomeClockAhead:
 		auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 			"reason":         audit.AuthFailedOtpClockAhead,
 		})
@@ -380,7 +380,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 
 	if verified.Disabled {
 		auditLogger.Log(r.Context(), audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 		defer notifier.Send(r, accountnotice.OTPLockout, accountnotice.To(verified.Current))

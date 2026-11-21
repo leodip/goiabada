@@ -30,11 +30,11 @@ func stubRevocationSweepTx(database *datamocks.Database, userId int64, newGenera
 	datamocks.ExpectRunInTransaction(database, revokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
 		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).
+	database.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, userId).
 		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
-	database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, userId).
+	database.On("GetUserSessionsByUserID", mock.Anything, revokeTx, userId).
 		Return([]record.UserSession{}, nil).Once()
 }
 
@@ -42,6 +42,6 @@ func stubRevocationSweepTx(database *datamocks.Database, userId int64, newGenera
 // under that hold, holding the verification state given.
 func stubResetRowRead(database *datamocks.Database, userId int64, emailVerified bool) {
 	database.On("AcquireUserRow", mock.Anything, revokeTx, userId).Return(nil).Once()
-	database.On("GetUserById", mock.Anything, revokeTx, userId).
-		Return(&record.User{Id: userId, Enabled: true, EmailVerified: emailVerified}, nil).Once()
+	database.On("GetUserByID", mock.Anything, revokeTx, userId).
+		Return(&record.User{ID: userId, Enabled: true, EmailVerified: emailVerified}, nil).Once()
 }

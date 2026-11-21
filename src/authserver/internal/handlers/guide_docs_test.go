@@ -69,7 +69,7 @@ func registrationAnswer(t *testing.T, body string) (string, []string) {
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 	rr := httptest.NewRecorder()
 	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 
@@ -94,11 +94,11 @@ func sortedNames(object map[string]json.RawMessage) []string {
 // level 3 session whose two-factor settings are unchanged (#522 decision 13).
 func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 	session := &record.UserSession{
-		AcrLevel:            record.AcrLevel2Mandatory,
-		OtpConfigGeneration: 2,
-		User:                record.User{OTPEnabled: true, OtpConfigGeneration: 2},
+		ACRLevel:            record.ACRLevel2Mandatory,
+		OTPConfigGeneration: 2,
+		User:                record.User{OTPEnabled: true, OTPConfigGeneration: 2},
 	}
-	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
+	step, err := ceremony.StepUpOwed(record.ACRLevel2Mandatory, session)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -119,11 +119,11 @@ func TestGuideDocs_ASessionAtTheLevelIsReusedWithoutACode(t *testing.T) {
 // check).
 func TestGuideDocs_ALostAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	session := &record.UserSession{
-		AcrLevel:            record.AcrLevel2Mandatory,
-		OtpConfigGeneration: 3,
-		User:                record.User{OTPEnabled: false, OtpConfigGeneration: 3},
+		ACRLevel:            record.ACRLevel2Mandatory,
+		OTPConfigGeneration: 3,
+		User:                record.User{OTPEnabled: false, OTPConfigGeneration: 3},
 	}
-	step, err := ceremony.StepUpOwed(record.AcrLevel2Mandatory, session)
+	step, err := ceremony.StepUpOwed(record.ACRLevel2Mandatory, session)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -161,12 +161,12 @@ func TestGuideDocs_PromptLoginAsksForTheCodeAgain(t *testing.T) {
 		CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 		Level1AuthCompleted: true, ClientId: "app", UserId: 1,
 	}, nil)
-	session := &record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
-		OtpConfigGeneration: 2, User: record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 2}}
+	session := &record.UserSession{ID: 1, UserID: 1, ACRLevel: record.ACRLevel2Mandatory, AuthMethods: "pwd otp",
+		OTPConfigGeneration: 2, User: record.User{ID: 1, OTPEnabled: true, OTPConfigGeneration: 2}}
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "s").Return(session, nil)
 	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "app").
-		Return(&record.Client{Id: 1, ClientIdentifier: "app", DefaultAcrLevel: record.AcrLevel2Mandatory}, nil)
+		Return(&record.Client{ID: 1, ClientIdentifier: "app", DefaultACRLevel: record.ACRLevel2Mandatory}, nil)
 	ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	handler.ServeHTTP(rr, req)

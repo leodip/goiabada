@@ -436,7 +436,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 				// Fixed once, where the request is accepted: every later step, SilentAuthentication
 				// included, reads this snapshot and not the client's row, so an edit to
 				// default_acr_level mid-ceremony cannot change what the step-up decided (#240).
-				authContext.SetTargetAcrLevel(client.DefaultAcrLevel)
+				authContext.SetTargetAcrLevel(client.DefaultACRLevel)
 			}
 			facts.validated = true
 			facts.refused = refusal != nil
@@ -495,7 +495,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 			}
 			if *facts.sessionValid {
 				protocolvalidation.LogAdministrativeScopeRefused(ctx, o.auditLogger, client, refusedAdministrativeScopes,
-					"authorize", userSession.UserId)
+					"authorize", userSession.UserID)
 			} else {
 				warnAdministrativeScopeRefused(ctx, client, refusedAdministrativeScopes)
 			}
@@ -532,7 +532,7 @@ func (o *Authorization) Run(ctx context.Context, browser authorizeBrowser, setti
 
 	case authorizeRouteDisabledUser:
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": userSession.UserId,
+			"user_id": userSession.UserID,
 		})
 		// Answered at once, never parked: the browser holds a valid session, so somebody has
 		// authenticated already, and a disabled user sent to the login page could not finish it (#213).

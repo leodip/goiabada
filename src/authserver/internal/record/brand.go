@@ -122,7 +122,7 @@ func (f BrandBackgroundFit) IsValid() bool {
 // themes (#810), and its kit: corners, a font, a background fit, whether the app name's text is
 // hidden beside a logo, and six slots naming a stored brand asset each (#813); and the footer links
 // and the support contact drawn under its card (#814); and a custom palette (#815). One brand is the
-// default, the one the settings row's DefaultBrandId points at, and every page is drawn in it; the
+// default, the one the settings row's DefaultBrandID points at, and every page is drawn in it; the
 // others are stored and editable. Name is unique among brands, compared exactly as every name in
 // the schema is.
 //
@@ -132,7 +132,7 @@ func (f BrandBackgroundFit) IsValid() bool {
 // slot takes is the writer's to hold: the logo and dark logo take a logo, the favicon a favicon, the
 // background a background, and the two font slots a font.
 type Brand struct {
-	Id                 int64              `db:"id" fieldtag:"pk"`
+	ID                 int64              `db:"id" fieldtag:"pk"`
 	CreatedAt          sql.NullTime       `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt          sql.NullTime       `db:"updated_at"`
 	Name               string             `db:"name"`
@@ -142,12 +142,12 @@ type Brand struct {
 	Font               BrandFont          `db:"font"`
 	BackgroundFit      BrandBackgroundFit `db:"background_fit"`
 	HideAppName        bool               `db:"hide_app_name"`
-	LogoAssetId        sql.NullInt64      `db:"logo_asset_id"`
-	DarkLogoAssetId    sql.NullInt64      `db:"dark_logo_asset_id"`
-	FaviconAssetId     sql.NullInt64      `db:"favicon_asset_id"`
-	BackgroundAssetId  sql.NullInt64      `db:"background_asset_id"`
-	RegularFontAssetId sql.NullInt64      `db:"regular_font_asset_id"`
-	BoldFontAssetId    sql.NullInt64      `db:"bold_font_asset_id"`
+	LogoAssetID        sql.NullInt64      `db:"logo_asset_id"`
+	DarkLogoAssetID    sql.NullInt64      `db:"dark_logo_asset_id"`
+	FaviconAssetID     sql.NullInt64      `db:"favicon_asset_id"`
+	BackgroundAssetID  sql.NullInt64      `db:"background_asset_id"`
+	RegularFontAssetID sql.NullInt64      `db:"regular_font_asset_id"`
+	BoldFontAssetID    sql.NullInt64      `db:"bold_font_asset_id"`
 	// SupportEmail, SupportURL and SupportPhone are the brand's support contact, each optional and
 	// empty when unset (#814 decision 1). The phone number is stored in E.164, a "+" and digits.
 	SupportEmail string `db:"support_email"`

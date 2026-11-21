@@ -7,14 +7,14 @@ import (
 )
 
 type UserSession struct {
-	Id                int64        `db:"id" fieldtag:"pk"`
+	ID                int64        `db:"id" fieldtag:"pk"`
 	CreatedAt         sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt         sql.NullTime `db:"updated_at"`
 	SessionIdentifier string       `db:"session_identifier"`
 	Started           time.Time    `db:"started"`
 	LastAccessed      time.Time    `db:"last_accessed"`
 	AuthMethods       string       `db:"auth_methods"`
-	AcrLevel          AcrLevel     `db:"acr_level"`
+	ACRLevel          ACRLevel     `db:"acr_level"`
 	AuthTime          time.Time    `db:"auth_time"`
 	// PasswordAuthTime is when the password was last entered for this session: at the sign-in that
 	// created it, or at a later one that authenticated afresh over it (#537). A code entered after
@@ -23,27 +23,27 @@ type UserSession struct {
 	// (#542). Every session has one: a session is only created after a password, and migration
 	// 000062 ended the sessions stored before it was recorded.
 	PasswordAuthTime time.Time `db:"password_auth_time"`
-	IpAddress        string    `db:"ip_address"`
+	IPAddress        string    `db:"ip_address"`
 	DeviceName       string    `db:"device_name"`
 	DeviceType       string    `db:"device_type"`
 	DeviceOS         string    `db:"device_os"`
 	// UserAgent is the request's User-Agent header as the browser sent it, repaired to
-	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. Like IpAddress and the three
+	// valid UTF-8 and cut to 512 bytes by useragent.BoundRaw. Like IPAddress and the three
 	// Device* fields above it, it is recorded and shown and compared by nothing: two browsers
 	// sending one header from one address are two devices (#281, #564).
 	UserAgent string `db:"user_agent"`
-	// DeviceId names the browser that started the session: the SHA-256, in hex, of the value of the
+	// DeviceID names the browser that started the session: the SHA-256, in hex, of the value of the
 	// auth server's device cookie, never the value itself, so a database read hands out nothing a
 	// browser could present (#564). It is the key StartNewUserSession sweeps on: a sign-in that
 	// starts a session ends the user's other sessions with the same identifier. It is empty on a
 	// session stored before migration 000063, and an empty identifier names no browser.
-	DeviceId string `db:"device_id"`
+	DeviceID string `db:"device_id"`
 	// AuthStateGeneration records the user's generation when this session was
 	// created. Tagged dont-update so an ordinary full-row UpdateUserSession cannot
 	// regress it: it is written on insert and afterwards only by
 	// PromoteUserSessionGeneration (#106).
 	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
-	// OtpConfigGeneration is the user's otp_config_generation as it stood when this
+	// OTPConfigGeneration is the user's otp_config_generation as it stood when this
 	// session last satisfied the level 2 question, so this session owes a level 2
 	// re-prompt whenever the two differ. It replaced a boolean the readers cleared as
 	// they read it, which is why the comparison here is the whole point: reading is not
@@ -54,9 +54,9 @@ type UserSession struct {
 	// loads the whole row and writes it back, and BumpUserSession rewrites it on every
 	// request, so leaving it in the ordinary update set would let a stale model regress
 	// it. It is written on insert and afterwards only by
-	// PromoteUserSessionOtpConfigGeneration.
-	OtpConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
-	// UserId is the session's owner, written on insert and never changed: no code path
+	// PromoteUserSessionOTPConfigGeneration.
+	OTPConfigGeneration int64 `db:"otp_config_generation" fieldtag:"dont-update"`
+	// UserID is the session's owner, written on insert and never changed: no code path
 	// reassigns a session to another user, and the cross-user handover at /auth/completed
 	// ends the old session and starts a new one rather than moving it.
 	//
@@ -70,7 +70,7 @@ type UserSession struct {
 	// ceremony as the victim. Leaving the column out of the update set is what removes that
 	// edge; PostgreSQL and MySQL skip the re-check on an unchanged value and were never
 	// affected (#139).
-	UserId  int64               `db:"user_id" fieldtag:"dont-update"`
+	UserID  int64               `db:"user_id" fieldtag:"dont-update"`
 	User    User                `db:"-"`
 	Clients []UserSessionClient `db:"-"`
 }

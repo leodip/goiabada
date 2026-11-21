@@ -17,7 +17,7 @@ import (
 
 func loadBrowserSession(t *testing.T, owner, hash string, now time.Time) string {
 	t.Helper()
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, owner, hash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil, owner, hash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded, "the session must still be there")
 	return loaded.Data
@@ -27,12 +27,12 @@ func TestBrowserSession_UpdateIfUnchangedWritesWhileTheDataIsTheOneRead(t *testi
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		bs.Data, "new contents", now.Add(time.Minute), now.Add(3*time.Hour))
 	require.NoError(t, err)
 	assert.True(t, moved, "an unchanged live row transitions")
 
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil, bs.Owner, bs.SessionIDHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	assert.Equal(t, "new contents", loaded.Data)
@@ -49,33 +49,33 @@ func TestBrowserSession_UpdateIfUnchangedComparesLargeData(t *testing.T) {
 	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, bs))
 
 	almost := strings.Repeat("x", 64*1024-1) + "y"
-	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		almost, "lost", now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, moved, "data differing in its last character is not the data read")
 
-	moved, err = database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err = database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		bs.Data, "won", now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.True(t, moved)
-	assert.Equal(t, "won", loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now))
+	assert.Equal(t, "won", loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now))
 }
 
 func TestBrowserSession_UpdateIfUnchangedAfterAnotherWriteWritesNothing(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		"another request's", now, now.Add(2*time.Hour))
 	require.NoError(t, err)
 	require.True(t, moved)
 
-	moved, err = database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err = database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		bs.Data, "stale write", now.Add(time.Minute), now.Add(5*time.Hour))
 	require.NoError(t, err)
 	assert.False(t, moved, "a row written since the read does not transition")
 
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil, bs.Owner, bs.SessionIDHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	assert.Equal(t, "another request's", loaded.Data)
@@ -91,11 +91,11 @@ func TestBrowserSession_UpdateIfUnchangedIsCaseSensitive(t *testing.T) {
 	bs.Data = "AbCdEf-_0123"
 	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, bs))
 
-	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		"abcdef-_0123", "lost", now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, moved, "data differing only in case is not the data read")
-	assert.Equal(t, "AbCdEf-_0123", loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now))
+	assert.Equal(t, "AbCdEf-_0123", loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now))
 }
 
 // A touch moves the timestamps and not the data, so it never makes a conditional write lose.
@@ -103,16 +103,16 @@ func TestBrowserSession_UpdateIfUnchangedAfterATouchStillWrites(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	touched, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	touched, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		now.Add(time.Minute), now.Add(2*time.Hour))
 	require.NoError(t, err)
 	require.True(t, touched)
 
-	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		bs.Data, "new contents", now.Add(2*time.Minute), now.Add(3*time.Hour))
 	require.NoError(t, err)
 	assert.True(t, moved)
-	assert.Equal(t, "new contents", loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now))
+	assert.Equal(t, "new contents", loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now))
 }
 
 func TestBrowserSession_UpdateIfUnchangedOfAGoneRowWritesNothing(t *testing.T) {
@@ -128,12 +128,12 @@ func TestBrowserSession_UpdateIfUnchangedOfAGoneRowWritesNothing(t *testing.T) {
 	t.Run("expired", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAuthServer, now.Add(-2*time.Hour), time.Hour)
 
-		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 			bs.Data, "revived", now, now.Add(time.Hour))
 		require.NoError(t, err)
 		assert.False(t, moved, "an expired row is no such session, unchanged or not")
 
-		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
+		after, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil, bs.Owner, bs.SessionIDHash, now)
 		require.NoError(t, err)
 		assert.Nil(t, after, "the refused write did not touch the row back to life")
 	})
@@ -141,11 +141,11 @@ func TestBrowserSession_UpdateIfUnchangedOfAGoneRowWritesNothing(t *testing.T) {
 	t.Run("another owner's", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAdminConsole, now, time.Hour)
 
-		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, ownerAuthServer, bs.SessionIdHash,
+		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), nil, ownerAuthServer, bs.SessionIDHash,
 			bs.Data, "crossed over", now, now.Add(time.Hour))
 		require.NoError(t, err)
 		assert.False(t, moved)
-		assert.Equal(t, bs.Data, loadBrowserSession(t, ownerAdminConsole, bs.SessionIdHash, now))
+		assert.Equal(t, bs.Data, loadBrowserSession(t, ownerAdminConsole, bs.SessionIDHash, now))
 	})
 }
 
@@ -153,11 +153,11 @@ func TestBrowserSession_DeleteIfUnchangedRemovesTheRowRead(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash, bs.Data, now)
+	deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash, bs.Data, now)
 	require.NoError(t, err)
 	assert.True(t, deleted)
 
-	after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
+	after, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil, bs.Owner, bs.SessionIDHash, now)
 	require.NoError(t, err)
 	assert.Nil(t, after)
 }
@@ -166,15 +166,15 @@ func TestBrowserSession_DeleteIfUnchangedAfterAnotherWriteKeepsTheRow(t *testing
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIdHash,
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIDHash,
 		"another request's", now, now.Add(time.Hour))
 	require.NoError(t, err)
 	require.True(t, moved)
 
-	deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash, bs.Data, now)
+	deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash, bs.Data, now)
 	require.NoError(t, err)
 	assert.False(t, deleted)
-	assert.Equal(t, "another request's", loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now))
+	assert.Equal(t, "another request's", loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now))
 }
 
 func TestBrowserSession_DeleteIfUnchangedOfAGoneRowReportsNothingRemoved(t *testing.T) {
@@ -190,7 +190,7 @@ func TestBrowserSession_DeleteIfUnchangedOfAGoneRowReportsNothingRemoved(t *test
 	t.Run("expired", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAuthServer, now.Add(-2*time.Hour), time.Hour)
 
-		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIdHash, bs.Data, now)
+		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, bs.Owner, bs.SessionIDHash, bs.Data, now)
 		require.NoError(t, err)
 		assert.False(t, deleted, "an expired row is no such session to rotate away")
 	})
@@ -198,10 +198,10 @@ func TestBrowserSession_DeleteIfUnchangedOfAGoneRowReportsNothingRemoved(t *test
 	t.Run("another owner's", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAdminConsole, now, time.Hour)
 
-		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, ownerAuthServer, bs.SessionIdHash, bs.Data, now)
+		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), nil, ownerAuthServer, bs.SessionIDHash, bs.Data, now)
 		require.NoError(t, err)
 		assert.False(t, deleted)
-		assert.Equal(t, bs.Data, loadBrowserSession(t, ownerAdminConsole, bs.SessionIdHash, now))
+		assert.Equal(t, bs.Data, loadBrowserSession(t, ownerAdminConsole, bs.SessionIDHash, now))
 	})
 }
 
@@ -218,16 +218,16 @@ func TestBrowserSession_ConditionalStorageFailuresAreErrors(t *testing.T) {
 	}
 
 	moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), deadTx(t), existing.Owner,
-		existing.SessionIdHash, existing.Data, "x", now, now.Add(time.Hour))
+		existing.SessionIDHash, existing.Data, "x", now, now.Add(time.Hour))
 	require.Error(t, err)
 	assert.False(t, moved, "a failed statement must not report a transition")
 
 	deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), deadTx(t), existing.Owner,
-		existing.SessionIdHash, existing.Data, now)
+		existing.SessionIDHash, existing.Data, now)
 	require.Error(t, err)
 	assert.False(t, deleted)
 
-	assert.Equal(t, existing.Data, loadBrowserSession(t, existing.Owner, existing.SessionIdHash, now),
+	assert.Equal(t, existing.Data, loadBrowserSession(t, existing.Owner, existing.SessionIDHash, now),
 		"neither failed statement did its work anyway")
 }
 
@@ -260,13 +260,13 @@ func TestBrowserSession_ConditionalEnlistsInTheCallersTransaction(t *testing.T) 
 		require.NoError(t, err, "BeginTransaction")
 		// A failure below must not leave the transaction holding SQLite's one connection.
 		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
-		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), tx, bs.Owner, bs.SessionIdHash,
+		moved, err := database.UpdateBrowserSessionDataIfUnchanged(context.Background(), tx, bs.Owner, bs.SessionIDHash,
 			bs.Data, "rewritten", now, now.Add(2*time.Hour))
 		require.NoError(t, err)
 		require.True(t, moved)
 		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
-		assert.Equal(t, bs.Data, loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now),
+		assert.Equal(t, bs.Data, loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now),
 			"a rolled back transaction must leave the contents where they were")
 	})
 
@@ -276,12 +276,12 @@ func TestBrowserSession_ConditionalEnlistsInTheCallersTransaction(t *testing.T) 
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
-		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), tx, bs.Owner, bs.SessionIdHash, bs.Data, now)
+		deleted, err := database.DeleteBrowserSessionIfUnchanged(context.Background(), tx, bs.Owner, bs.SessionIDHash, bs.Data, now)
 		require.NoError(t, err)
 		require.True(t, deleted)
 		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
-		assert.Equal(t, bs.Data, loadBrowserSession(t, bs.Owner, bs.SessionIdHash, now),
+		assert.Equal(t, bs.Data, loadBrowserSession(t, bs.Owner, bs.SessionIDHash, now),
 			"a rolled back delete must leave the row in place")
 	})
 }

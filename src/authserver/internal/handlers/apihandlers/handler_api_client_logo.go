@@ -21,8 +21,8 @@ type clientLogoDatabase interface {
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
 	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 }
 
@@ -49,7 +49,7 @@ func HandleClientLogoPost(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -77,7 +77,7 @@ func HandleClientLogoPost(
 		}
 
 		// Check if client already has a logo
-		existingLogo, err := database.GetClientLogoByClientId(r.Context(), nil, clientId)
+		existingLogo, err := database.GetClientLogoByClientID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -91,7 +91,7 @@ func HandleClientLogoPost(
 		} else {
 			// Create new logo
 			clientLogo := &record.ClientLogo{
-				ClientId:    clientId,
+				ClientID:    clientId,
 				Logo:        fileData,
 				ContentType: result.ContentType,
 			}
@@ -112,7 +112,7 @@ func HandleClientLogoPost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientLogo, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": loggedInUser,
 		})
 
@@ -145,7 +145,7 @@ func HandleClientLogoDelete(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -177,7 +177,7 @@ func HandleClientLogoDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedClientLogo, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": loggedInUser,
 		})
 
@@ -207,7 +207,7 @@ func HandleClientLogoGet(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

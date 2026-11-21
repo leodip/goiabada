@@ -24,7 +24,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	mockDB := datamocks.NewDatabase(t)
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
 	requestid.Middleware(Settings(mockDB, PageFaults())(http.HandlerFunc(

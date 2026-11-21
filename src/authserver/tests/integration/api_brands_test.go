@@ -67,7 +67,7 @@ func keepDefaultBrand(t *testing.T) (defaultId int64, created *[]int64) {
 	ids := &[]int64{}
 	t.Cleanup(func() {
 		assert.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			if _, err := database.MakeBrandDefault(ctx, tx, current.Id); err != nil {
+			if _, err := database.MakeBrandDefault(ctx, tx, current.ID); err != nil {
 				return err
 			}
 			for _, id := range *ids {
@@ -78,7 +78,7 @@ func keepDefaultBrand(t *testing.T) (defaultId int64, created *[]int64) {
 			return nil
 		}), "unable to put the default brand back")
 	})
-	return current.Id, ids
+	return current.ID, ids
 }
 
 // createBrandOverAPI creates a brand and answers its id, which keepDefaultBrand's cleanup deletes.
@@ -142,7 +142,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.NotNil(t, brand["createdAt"])
 	assert.NotNil(t, brand["updatedAt"])
 
-	stored, err := database.GetBrandById(ctx, nil, id)
+	stored, err := database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, name, stored.Name)
@@ -161,7 +161,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	// A brand read and written back is unchanged.
 	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""), read)
 	require.Equal(t, http.StatusOK, status, "write back: %v", body)
-	rewritten, err := database.GetBrandById(ctx, nil, id)
+	rewritten, err := database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	rewritten.UpdatedAt = stored.UpdatedAt
 	assert.Equal(t, stored, rewritten, "a brand read and written back is unchanged")
@@ -175,7 +175,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	assert.Equal(t, renamed, body["brand"].(map[string]any)["name"])
 	assert.Equal(t, "square", body["brand"].(map[string]any)["corners"])
 	assert.Equal(t, false, body["brand"].(map[string]any)["hideAppName"])
-	stored, err = database.GetBrandById(ctx, nil, id)
+	stored, err = database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	assert.Equal(t, renamed, stored.Name)
 	assert.Equal(t, "light", string(stored.Appearance))
@@ -188,7 +188,7 @@ func TestAPIBrands_CreateReadUpdateAndDelete(t *testing.T) {
 	status, body, _ = brandCall(t, accessToken, http.MethodDelete, brandPath(id, ""), nil)
 	require.Equal(t, http.StatusOK, status, "delete: %v", body)
 	assert.Equal(t, true, body["success"])
-	stored, err = database.GetBrandById(ctx, nil, id)
+	stored, err = database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	assert.Nil(t, stored)
 
@@ -239,7 +239,7 @@ func TestAPIBrands_Refusals(t *testing.T) {
 	taken := createBrandOverAPI(t, accessToken, created, brandName("Taken"), "auto", "blueberry")
 	other := createBrandOverAPI(t, accessToken, created, brandName("Other"), "auto", "blueberry")
 	takenName := func() string {
-		brand, err := database.GetBrandById(context.Background(), nil, taken)
+		brand, err := database.GetBrandByID(context.Background(), nil, taken)
 		require.NoError(t, err)
 		return brand.Name
 	}()
@@ -311,7 +311,7 @@ func TestAPIBrands_Refusals(t *testing.T) {
 	still, err := database.GetDefaultBrand(context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, still)
-	assert.Equal(t, defaultId, still.Id)
+	assert.Equal(t, defaultId, still.ID)
 
 	// A malformed id and a body that is not JSON.
 	status, body, _ = brandCall(t, accessToken, http.MethodGet, brandsPath+"/abc", nil)
@@ -335,7 +335,7 @@ func TestAPIBrands_MakeDefault(t *testing.T) {
 	current, err := database.GetDefaultBrand(context.Background(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, current)
-	assert.Equal(t, id, current.Id, "the settings row points at the brand")
+	assert.Equal(t, id, current.ID, "the settings row points at the brand")
 
 	status, body, _ = brandCall(t, accessToken, http.MethodGet, brandPath(previousId, ""), nil)
 	require.Equal(t, http.StatusOK, status)
@@ -356,7 +356,7 @@ func TestAPIBrands_MakeDefault(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
 	current, err = database.GetDefaultBrand(context.Background(), nil)
 	require.NoError(t, err)
-	assert.Equal(t, id, current.Id, "an unknown brand moves nothing")
+	assert.Equal(t, id, current.ID, "an unknown brand moves nothing")
 }
 
 func TestAPIBrands_ChangesAreAudited(t *testing.T) {
@@ -364,7 +364,7 @@ func TestAPIBrands_ChangesAreAudited(t *testing.T) {
 	accessToken, caller := createAdminClientWithToken(t)
 	who := caller.ClientIdentifier
 	previousId, created := keepDefaultBrand(t)
-	previous, err := database.GetBrandById(context.Background(), nil, previousId)
+	previous, err := database.GetBrandByID(context.Background(), nil, previousId)
 	require.NoError(t, err)
 
 	name := brandName("Audit")
@@ -468,7 +468,7 @@ func TestAPIBrands_TheSettingsDomainsScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 			for _, path := range reads {
 				status, _, _ := brandCall(t, token, http.MethodGet, path, nil)

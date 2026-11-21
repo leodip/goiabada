@@ -91,17 +91,17 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 			// The scope exists and is well formed: what refuses it is who asked for it.
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid authserver:manage").Return(nil)
 			// Maybe, because a self-registered client's redirect is withheld before the registration
 			// is read.
-			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+			database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 				Return([]record.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
-				Return(&record.UserSession{Id: 1, UserId: sessionUserId}, nil).Maybe()
+				Return(&record.UserSession{ID: 1, UserID: sessionUserId}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(tc.hasSession).Maybe()
 
@@ -174,8 +174,8 @@ func TestHandleAuthorizeGet_AnAdministrativeScopeTheClientMayNotRequest(t *testi
 // refused, so each goes on to the sign-in like any accepted request.
 func TestHandleAuthorizeGet_AnAllowedClientIsNotRefusedAnAdministrativeScope(t *testing.T) {
 	for _, client := range []*record.Client{
-		{Id: 1, ClientIdentifier: "test-client", AdministrativeScopesAllowed: true},
-		{Id: 1, ClientIdentifier: "admin-console-client"},
+		{ID: 1, ClientIdentifier: "test-client", AdministrativeScopesAllowed: true},
+		{ID: 1, ClientIdentifier: "admin-console-client"},
 	} {
 		t.Run(client.ClientIdentifier, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)

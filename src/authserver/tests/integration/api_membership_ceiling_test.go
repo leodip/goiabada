@@ -32,20 +32,20 @@ func newMembershipUser(t *testing.T) int64 {
 	t.Helper()
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("ceiling@members.test"), GivenName: "Member"}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	return user.Id
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	return user.ID
 }
 
 // newGroupHolding is a fresh group granted the given permissions.
 func newGroupHolding(t *testing.T, permissionIds ...int64) int64 {
 	t.Helper()
 	group := createTestGroup(t)
-	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
 	for _, permissionId := range permissionIds {
 		require.NoError(t, database.CreateGroupPermission(context.Background(), nil,
-			&record.GroupPermission{GroupId: group.Id, PermissionId: permissionId}))
+			&record.GroupPermission{GroupID: group.ID, PermissionID: permissionId}))
 	}
-	return group.Id
+	return group.ID
 }
 
 // ordinaryGroup is a fresh group holding manage-account and an operator's custom authserver
@@ -54,26 +54,26 @@ func ordinaryGroup(t *testing.T) int64 {
 	t.Helper()
 	authServer, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	custom := createTestPermission(t, authServer.Id, "members-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.Id) })
-	return newGroupHolding(t, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier), custom.Id)
+	custom := createTestPermission(t, authServer.ID, "members-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.ID) })
+	return newGroupHolding(t, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier), custom.ID)
 }
 
 func joinGroup(t *testing.T, userId, groupId int64) {
 	t.Helper()
-	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: userId, GroupId: groupId}))
+	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserID: userId, GroupID: groupId}))
 }
 
 func memberOf(t *testing.T, userId, groupId int64) bool {
 	t.Helper()
-	membership, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, userId, groupId)
+	membership, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, userId, groupId)
 	require.NoError(t, err)
 	return membership != nil
 }
 
 func groupExists(t *testing.T, groupId int64) bool {
 	t.Helper()
-	group, err := database.GetGroupById(context.Background(), nil, groupId)
+	group, err := database.GetGroupByID(context.Background(), nil, groupId)
 	require.NoError(t, err)
 	return group != nil
 }
@@ -188,7 +188,7 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, change := range membershipCeilingChanges {
 		for _, identifier := range administrativePermissionIdentifiers {
@@ -242,7 +242,7 @@ func TestMembershipCeiling_AGranularTokenStillChangesOrdinaryGroups(t *testing.T
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, change := range membershipCeilingChanges {
 		t.Run(change.name, func(t *testing.T) {

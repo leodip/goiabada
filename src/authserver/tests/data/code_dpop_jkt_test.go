@@ -34,18 +34,18 @@ func TestCode_DPoPJktRoundTrips(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			created := createBoundTestCodeOn(t, database, tc.binding)
 
-			byId, err := database.GetCodeById(context.Background(), nil, created.Id)
+			byID, err := database.GetCodeByID(context.Background(), nil, created.ID)
 			require.NoError(t, err)
 			byHash, err := database.GetCodeByCodeHash(context.Background(), nil, created.CodeHash, false)
 			require.NoError(t, err)
-			for _, read := range []*record.Code{byId, byHash} {
+			for _, read := range []*record.Code{byID, byHash} {
 				require.NotNil(t, read)
 				assert.Equal(t, tc.binding, read.DPoPJkt)
 			}
 
 			// A used code is read through the reuse lookup too, which the token endpoint's binding
 			// check answers from.
-			claimed, err := database.MarkCodeAsUsed(context.Background(), nil, created.Id)
+			claimed, err := database.MarkCodeAsUsed(context.Background(), nil, created.ID)
 			require.NoError(t, err)
 			require.True(t, claimed)
 			used, err := database.GetCodeByCodeHash(context.Background(), nil, created.CodeHash, true)
@@ -71,13 +71,13 @@ func TestUpdateCode_NeitherChangesNorClearsTheDPoPJkt(t *testing.T) {
 			created := createBoundTestCodeOn(t, database, tc.binding)
 
 			for _, inHand := range []sql.NullString{{String: bindingOtherKey, Valid: true}, {}} {
-				reloaded, err := database.GetCodeById(context.Background(), nil, created.Id)
+				reloaded, err := database.GetCodeByID(context.Background(), nil, created.ID)
 				require.NoError(t, err)
 				reloaded.DPoPJkt = inHand
 				reloaded.Scope = "openid " + fake.LetterN(6)
 				require.NoError(t, database.UpdateCode(context.Background(), nil, reloaded))
 
-				after, err := database.GetCodeById(context.Background(), nil, created.Id)
+				after, err := database.GetCodeByID(context.Background(), nil, created.ID)
 				require.NoError(t, err)
 				assert.Equal(t, tc.binding, after.DPoPJkt, "UpdateCode with %v in hand moved dpop_jkt (is the dont-update tag missing?)", inHand)
 				assert.Equal(t, reloaded.Scope, after.Scope, "the rest of the update still applies")
@@ -135,11 +135,11 @@ func TestRedeemBoundCode_ConcurrentRedemptionsHaveExactlyOneWinner(t *testing.T)
 	assert.Equal(t, map[string]any{"jkt": bindingFamilyKey}, claimsOf(t, accessTokens[0])["cnf"],
 		"the winner's access token is bound to the code's key")
 
-	after, err := database.GetCodeById(context.Background(), nil, code.Id)
+	after, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, after.Used, "the code is spent")
 	assert.Equal(t, sql.NullString{String: bindingFamilyKey, Valid: true}, after.DPoPJkt, "and still bound to its key")
-	refreshTokens, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	refreshTokens, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.Len(t, refreshTokens, 1, "one redemption's refresh token, and no other")
 }
@@ -150,10 +150,10 @@ func createBoundTestCodeOn(t *testing.T, db data.Database, binding sql.NullStrin
 	t.Helper()
 	client := createTestClientOn(t, db)
 	user := createTestUserOn(t, db)
-	session := createTestUserSessionOn(t, db, user.Id)
+	session := createTestUserSessionOn(t, db, user.ID)
 
-	code := createTestCodeOn(t, db, client.Id, user.Id)
-	code.Id = 0
+	code := createTestCodeOn(t, db, client.ID, user.ID)
+	code.ID = 0
 	random := fake.LetterN(8)
 	code.Code = "boundcode_" + random
 	code.CodeHash = "boundhash_" + random

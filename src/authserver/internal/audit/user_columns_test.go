@@ -151,8 +151,8 @@ func TestLogger_TheRowRecordsTheUserItIsAboutAndTheUserWhoActed(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
 			row := rowWritten(t, fakeActingUser{}, tc.ctx, tc.details)
-			assert.Equal(t, tc.userId, row.UserId, "user_id, the user the event is about")
-			assert.Equal(t, tc.loggedInUserId, row.LoggedInUserId, "logged_in_user_id, the user who acted")
+			assert.Equal(t, tc.userId, row.UserID, "user_id, the user the event is about")
+			assert.Equal(t, tc.loggedInUserId, row.LoggedInUserID, "logged_in_user_id, the user who acted")
 		})
 	}
 }
@@ -169,6 +169,6 @@ func TestLogger_TheColumnsLeaveTheDetailsAsTheyAre(t *testing.T) {
 // losing it.
 func TestLogger_WithoutAnActingUserPortTheActorIsNull(t *testing.T) {
 	row := rowWritten(t, nil, actingAs(7), map[string]interface{}{"user_id": int64(42)})
-	assert.Equal(t, userColumn(42), row.UserId)
-	assert.Equal(t, noUser, row.LoggedInUserId)
+	assert.Equal(t, userColumn(42), row.UserID)
+	assert.Equal(t, noUser, row.LoggedInUserID)
 }

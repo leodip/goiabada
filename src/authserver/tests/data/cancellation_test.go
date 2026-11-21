@@ -132,10 +132,10 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 // at all (#386), and that is exactly the claim being made: the context is consulted, not carried
 // and dropped.
 
-func TestGetUserById_RefusesAnAlreadyCancelledContext(t *testing.T) {
+func TestGetUserByID_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
 
-	got, err := database.GetUserById(cancelled(), nil, user.Id)
+	got, err := database.GetUserByID(cancelled(), nil, user.ID)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
@@ -164,7 +164,7 @@ func TestCreateUser_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 }
 
 // A loader rather than a plain select, because UserLoadPermissions reaches the database through
-// GetUserPermissionsByUserId and then through GetPermissionsByIds: the context has to survive two
+// GetUserPermissionsByUserID and then through GetPermissionsByIDs: the context has to survive two
 // hops inside commondb, which is the shape the other four loaders share.
 func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
@@ -187,7 +187,7 @@ func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // to abandon.
 func TestGetUserSessionBySessionIdentifier_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	got, err := database.GetUserSessionBySessionIdentifier(cancelled(), nil, session.SessionIdentifier)
 
@@ -207,18 +207,18 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 	random := fake.LetterN(8)
 
 	code := &record.Code{
-		ClientId:          client.Id,
-		UserId:            user.Id,
+		ClientID:          client.ID,
+		UserID:            user.ID,
 		Code:              "cancelled_" + random,
 		CodeHash:          "cancelledhash_" + random,
 		RedirectURI:       "https://example.com/callback",
 		Scope:             "openid profile",
-		IpAddress:         "192.168.1.1",
+		IPAddress:         "192.168.1.1",
 		UserAgent:         testUserAgent,
 		ResponseMode:      "query",
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier: "cancelledsession_" + random,
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 	}
 
@@ -233,12 +233,12 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 }
 
 // A loader rather than a plain select: UserSessionLoadClients reaches the database through
-// GetUserSessionClientsByUserSessionId, so the context has to survive a hop inside commondb. It
+// GetUserSessionClientsByUserSessionID, so the context has to survive a hop inside commondb. It
 // is the shape the seven other Load* methods in this batch share.
 func TestUserSessionLoadClients_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	session := createTestUserSessionWithClient(t, user.Id, client.Id)
+	session := createTestUserSessionWithClient(t, user.ID, client.ID)
 
 	err := database.UserSessionLoadClients(cancelled(), nil, session)
 
@@ -253,7 +253,7 @@ func TestUserSessionLoadClients_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // is the answer that restarts the ceremony at level 1.
 func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
@@ -307,14 +307,14 @@ func TestCreateClient_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testi
 }
 
 // A loader rather than a plain select: ClientLoadPermissions reaches the database through
-// GetClientPermissionsByClientId and then through GetPermissionsByIds. What this case owns is
+// GetClientPermissionsByClientID and then through GetPermissionsByIDs. What this case owns is
 // that the loader as a whole refuses a caller that is already gone, and no more than that: with
 // an already-cancelled context either hop alone is enough to refuse, so neutralising one hop's
 // context leaves the case green and only neutralising both turns it red. Both were measured.
 //
 // Each hop therefore owes a case of its own, and this batch adds both below:
-// TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext for the join rows and
-// TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext for the permissions themselves.
+// TestGetClientPermissionsByClientID_RefusesAnAlreadyCancelledContext for the join rows and
+// TestGetPermissionsByIDs_RefusesAnAlreadyCancelledContext for the permissions themselves.
 //
 // It is also the method stage 1 fixed, and the two claims are separate:
 // TestClientLoadPermissions_EnlistsInTheCallersTransaction says the second hop uses the caller's
@@ -324,7 +324,7 @@ func TestClientLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	client := createTestClient(t)
 
-	clientPermission := &record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	clientPermission := &record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
 
 	err := database.ClientLoadPermissions(cancelled(), nil, client)
@@ -336,15 +336,15 @@ func TestClientLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 
 // The first hop on its own account: the join rows the admin API's client-permission page reads
 // through this same method, one query and no batching.
-func TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext(t *testing.T) {
+func TestGetClientPermissionsByClientID_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 	client := createTestClient(t)
 
-	clientPermission := &record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	clientPermission := &record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
 
-	got, err := database.GetClientPermissionsByClientId(cancelled(), nil, client.Id)
+	got, err := database.GetClientPermissionsByClientID(cancelled(), nil, client.ID)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
@@ -352,17 +352,17 @@ func TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext(t *test
 }
 
 // The second hop, reached directly because the loader above cannot reach it with a context that
-// is already over. GetPermissionsByIds is the method four loaders share -- the client one, both
+// is already over. GetPermissionsByIDs is the method four loaders share -- the client one, both
 // group ones and both user ones -- and the one whose read #413 was escaping, so it is worth being
 // able to abandon on its own account.
 //
 // The empty-list short circuit is why the case creates a permission first: with no ids there is
 // no statement, and the method returns nil, nil however the context stands.
-func TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext(t *testing.T) {
+func TestGetPermissionsByIDs_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 
-	got, err := database.GetPermissionsByIds(cancelled(), nil, []int64{permission.Id})
+	got, err := database.GetPermissionsByIDs(cancelled(), nil, []int64{permission.ID})
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
@@ -381,7 +381,7 @@ func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
-	err = database.AcquireClientRow(cancelled(), tx, client.Id)
+	err = database.AcquireClientRow(cancelled(), tx, client.ID)
 
 	require.Error(t, err, "a refusal, not a silent acquisition of nothing")
 	assert.ErrorIs(t, err, context.Canceled)
@@ -394,7 +394,7 @@ func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // permissive one.
 func TestWebOriginExists_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	client := createTestClient(t)
-	origin := createTestWebOrigin(t, client.Id)
+	origin := createTestWebOrigin(t, client.ID)
 
 	exists, err := database.WebOriginExists(cancelled(), nil, origin.Origin)
 

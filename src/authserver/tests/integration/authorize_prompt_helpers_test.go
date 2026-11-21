@@ -46,7 +46,7 @@ func createTestClientAndRedirectURI(t *testing.T) (*record.Client, *record.Redir
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -54,7 +54,7 @@ func createTestClientAndRedirectURI(t *testing.T) (*record.Client, *record.Redir
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -72,7 +72,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -81,7 +81,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 

@@ -29,26 +29,26 @@ const brandBaseURL = "https://auth.example.test"
 // brandLibrary is every stored asset these tests know, read without its bytes: 11 to 16 fill
 // storedKitBrand's slots in slot order, and 21 to 24 are one asset of each kind, attached to none.
 var brandLibrary = []record.BrandAsset{
-	{Id: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "11aaaaaaaaaa", Width: 240, Height: 80},
-	{Id: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/webp", Fingerprint: "12aaaaaaaaaa", Width: 240, Height: 80},
-	{Id: 13, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "13aaaaaaaaaa", Width: 64, Height: 64},
-	{Id: 14, Kind: record.BrandAssetKindBackground, ContentType: "image/jpeg", Fingerprint: "14aaaaaaaaaa", Width: 1920, Height: 1080},
-	{Id: 15, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "15aaaaaaaaaa"},
-	{Id: 16, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "16aaaaaaaaaa"},
-	{Id: 21, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "21aaaaaaaaaa", Width: 100, Height: 100},
-	{Id: 22, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "22aaaaaaaaaa", Width: 48, Height: 48},
-	{Id: 23, Kind: record.BrandAssetKindBackground, ContentType: "image/webp", Fingerprint: "23aaaaaaaaaa", Width: 800, Height: 600},
-	{Id: 24, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "24aaaaaaaaaa"},
+	{ID: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "11aaaaaaaaaa", Width: 240, Height: 80},
+	{ID: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/webp", Fingerprint: "12aaaaaaaaaa", Width: 240, Height: 80},
+	{ID: 13, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "13aaaaaaaaaa", Width: 64, Height: 64},
+	{ID: 14, Kind: record.BrandAssetKindBackground, ContentType: "image/jpeg", Fingerprint: "14aaaaaaaaaa", Width: 1920, Height: 1080},
+	{ID: 15, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "15aaaaaaaaaa"},
+	{ID: 16, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "16aaaaaaaaaa"},
+	{ID: 21, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "21aaaaaaaaaa", Width: 100, Height: 100},
+	{ID: 22, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "22aaaaaaaaaa", Width: 48, Height: 48},
+	{ID: 23, Kind: record.BrandAssetKindBackground, ContentType: "image/webp", Fingerprint: "23aaaaaaaaaa", Width: 800, Height: 600},
+	{ID: 24, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "24aaaaaaaaaa"},
 }
 
 // expectBrandAssets has database answer, for any ids, the assets of brandLibrary they name, as the
 // data layer answers them: without their bytes, an id naming none left out.
 func expectBrandAssets(database *datamocks.Database) *mock.Call {
-	return database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(
+	return database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(
 		func(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
 			var found []record.BrandAsset
 			for _, asset := range brandLibrary {
-				if slices.Contains(ids, asset.Id) {
+				if slices.Contains(ids, asset.ID) {
 					found = append(found, asset)
 				}
 			}
@@ -60,7 +60,7 @@ func expectBrandAssets(database *datamocks.Database) *mock.Call {
 // its fingerprint, type and pixel size, written out by hand.
 func assetAnswer(id int64) map[string]any {
 	for _, asset := range brandLibrary {
-		if asset.Id == id {
+		if asset.ID == id {
 			return map[string]any{
 				"id": float64(id), "kind": string(asset.Kind),
 				"url":         fmt.Sprintf("https://auth.example.test/brand-assets/%d?v=%s", id, asset.Fingerprint),
@@ -130,7 +130,7 @@ func TestBrandUpdate_SlotRefusals(t *testing.T) {
 	for _, c := range brandSlotRefusals {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
 			expectBrandAssets(database).Maybe()
 			body := validBrandBody()
 			c.edit(body)
@@ -154,7 +154,7 @@ func TestBrandCreate_StoresEachSlotAndAnswersItsAsset(t *testing.T) {
 	database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		brand := args.Get(2).(*record.Brand)
 		stored = *brand
-		brand.Id = 7
+		brand.ID = 7
 	}).Return(nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedBrand, mock.Anything).Once()
@@ -170,8 +170,8 @@ func TestBrandCreate_StoresEachSlotAndAnswersItsAsset(t *testing.T) {
 	require.Equal(t, http.StatusCreated, status, "%v", answer)
 	assert.Equal(t, []sql.NullInt64{{Int64: 11, Valid: true}, {Int64: 12, Valid: true}, {Int64: 13, Valid: true},
 		{Int64: 14, Valid: true}, {Int64: 15, Valid: true}, {Int64: 16, Valid: true}},
-		[]sql.NullInt64{stored.LogoAssetId, stored.DarkLogoAssetId, stored.FaviconAssetId,
-			stored.BackgroundAssetId, stored.RegularFontAssetId, stored.BoldFontAssetId})
+		[]sql.NullInt64{stored.LogoAssetID, stored.DarkLogoAssetID, stored.FaviconAssetID,
+			stored.BackgroundAssetID, stored.RegularFontAssetID, stored.BoldFontAssetID})
 	assert.Equal(t, record.BrandFontUploaded, stored.Font)
 	assert.Equal(t, assetAnswer(11), brandAt(answer, "brand", "logo"))
 	assert.Equal(t, assetAnswer(12), brandAt(answer, "brand", "darkLogo"))
@@ -201,8 +201,8 @@ func TestBrandCreate_OneAssetMayFillTwoSlotsOfItsKind(t *testing.T) {
 	status, answer := serveBrand(HandleBrandCreatePost(database, auditLogger, brandBaseURL), brandRequest(t, http.MethodPost, body))
 
 	require.Equal(t, http.StatusCreated, status, "%v", answer)
-	assert.Equal(t, int64(21), stored.DarkLogoAssetId.Int64)
-	assert.Equal(t, int64(24), stored.BoldFontAssetId.Int64)
+	assert.Equal(t, int64(21), stored.DarkLogoAssetID.Int64)
+	assert.Equal(t, int64(24), stored.BoldFontAssetID.Int64)
 	assert.Equal(t, record.BrandFont("serif"), stored.Font)
 	assert.Equal(t, assetAnswer(21), brandAt(answer, "brand", "darkLogo"))
 }
@@ -211,7 +211,7 @@ func TestBrandCreate_OneAssetMayFillTwoSlotsOfItsKind(t *testing.T) {
 func TestBrandReads_AnswerEachFilledSlot(t *testing.T) {
 	t.Run("one brand", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
 		expectBrandAssets(database).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
@@ -226,7 +226,7 @@ func TestBrandReads_AnswerEachFilledSlot(t *testing.T) {
 	})
 	t.Run("the list", func(t *testing.T) {
 		other := storedBrand(5, "Zest", record.BrandAppearanceLight, "tangerine")
-		other.FaviconAssetId = sql.NullInt64{Int64: 22, Valid: true}
+		other.FaviconAssetID = sql.NullInt64{Int64: 22, Valid: true}
 		database := datamocks.NewDatabase(t)
 		database.On("GetAllBrands", mock.Anything, (*sql.Tx)(nil)).Return([]record.Brand{
 			*storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), *storedKitBrand(), *other,
@@ -248,8 +248,8 @@ func TestBrandReads_AnswerEachFilledSlot(t *testing.T) {
 	})
 	t.Run("assets that cannot be read fail the answer", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
-		database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil, errs.New("connection reset")).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+		database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil, errs.New("connection reset")).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Maybe()
 		database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Maybe()
@@ -267,15 +267,15 @@ func TestBrandReads_AnswerEachFilledSlot(t *testing.T) {
 func TestBrandMakeDefault_ReadsTheSlotsInItsTransaction(t *testing.T) {
 	expectMove := func(database *datamocks.Database) {
 		database.On("MakeBrandDefault", mock.Anything, brandTx, int64(4)).Return(int64(1), nil).Once()
-		database.On("GetBrandById", mock.Anything, brandTx, int64(4)).Return(storedKitBrand(), nil).Once()
-		database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
+		database.On("GetBrandByID", mock.Anything, brandTx, int64(4)).Return(storedKitBrand(), nil).Once()
+		database.On("GetBrandByID", mock.Anything, brandTx, int64(1)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	}
 	t.Run("the slots answered", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(database, brandTx)
 		expectMove(database)
-		database.On("GetBrandAssetsByIds", mock.Anything, brandTx, []int64{11, 12, 13, 14, 15, 16}).
+		database.On("GetBrandAssetsByIDs", mock.Anything, brandTx, []int64{11, 12, 13, 14, 15, 16}).
 			Return(brandLibrary[:6], nil).Once()
 		database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{4: 2}, nil).Once()
 		auditLogger := handlersmocks.NewAuditLogger(t)
@@ -294,7 +294,7 @@ func TestBrandMakeDefault_ReadsTheSlotsInItsTransaction(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(database, brandTx, func(step string) { steps = append(steps, step) })
 		expectMove(database)
-		database.On("GetBrandAssetsByIds", mock.Anything, brandTx, mock.Anything).Return(nil, errs.New("connection reset")).Once()
+		database.On("GetBrandAssetsByIDs", mock.Anything, brandTx, mock.Anything).Return(nil, errs.New("connection reset")).Once()
 
 		status, body := serveBrand(HandleBrandMakeDefaultPost(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 			brandRequest(t, http.MethodPost, nil, "id", "4"))
@@ -309,7 +309,7 @@ func TestBrandMakeDefault_ReadsTheSlotsInItsTransaction(t *testing.T) {
 // what they did before the kit.
 func TestBrandReads_ABrandWithoutFilesReadsNoAsset(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
@@ -317,7 +317,7 @@ func TestBrandReads_ABrandWithoutFilesReadsNoAsset(t *testing.T) {
 	status, _ := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "3"))
 
 	assert.Equal(t, http.StatusOK, status)
-	database.AssertNotCalled(t, "GetBrandAssetsByIds", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetBrandAssetsByIDs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A brand write checks its slots' assets before it writes, and the sweep may delete an old,
@@ -326,7 +326,7 @@ func TestBrandReads_ABrandWithoutFilesReadsNoAsset(t *testing.T) {
 // and a write that fails while every slot's asset is still stored stays a server error.
 func TestBrandWrites_AnAssetSweptBeforeTheWriteIsRefusedAtItsSlot(t *testing.T) {
 	foreignKey := errs.New("FOREIGN KEY constraint failed")
-	logo := []record.BrandAsset{{Id: 21, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "21aaaaaaaaaa", Width: 100, Height: 100}}
+	logo := []record.BrandAsset{{ID: 21, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "21aaaaaaaaaa", Width: 100, Height: 100}}
 
 	tests := []struct {
 		name       string
@@ -343,8 +343,8 @@ func TestBrandWrites_AnAssetSweptBeforeTheWriteIsRefusedAtItsSlot(t *testing.T) 
 		for _, tc := range tests {
 			t.Run(method+" "+tc.name, func(t *testing.T) {
 				database := datamocks.NewDatabase(t)
-				database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(logo, nil).Once()
-				database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(tc.afterWrite, tc.readErr).Once()
+				database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(logo, nil).Once()
+				database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{21}).Return(tc.afterWrite, tc.readErr).Once()
 				body := validBrandBody()
 				body["logo"] = map[string]any{"id": 21}
 
@@ -355,7 +355,7 @@ func TestBrandWrites_AnAssetSweptBeforeTheWriteIsRefusedAtItsSlot(t *testing.T) 
 					handler = HandleBrandCreatePost(database, handlersmocks.NewAuditLogger(t), brandBaseURL)
 					req = brandRequest(t, method, body)
 				} else {
-					database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+					database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
 					database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(foreignKey).Once()
 					handler = HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL)
 					req = brandRequest(t, method, body, "id", "4")

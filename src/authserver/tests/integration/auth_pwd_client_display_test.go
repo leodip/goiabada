@@ -19,12 +19,12 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	// Create redirect URI
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -58,11 +58,11 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -92,11 +92,11 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -125,11 +125,11 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -158,11 +158,11 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -191,11 +191,11 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -224,11 +224,11 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -257,11 +257,11 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -290,11 +290,11 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -323,11 +323,11 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -356,11 +356,11 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -389,11 +389,11 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -425,11 +425,11 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true, // Upload logo
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -462,11 +462,11 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)

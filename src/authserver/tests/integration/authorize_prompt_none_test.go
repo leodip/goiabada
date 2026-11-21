@@ -111,7 +111,7 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -207,7 +207,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -215,7 +215,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -336,7 +336,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 
 	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,8 +455,8 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	httpClient, client, redirectUri, user, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -498,7 +498,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	assert.Empty(t, redirectURL.Query().Get("error"), "error should not be present")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 // =============================================================================
@@ -553,7 +553,7 @@ func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 
 	// Verify code belongs to the user
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
@@ -580,7 +580,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -623,13 +623,13 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	}
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
@@ -642,7 +642,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -681,14 +681,14 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		t.Fatal(updateUserErr)
 	}
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
-	snapshotBefore := userSessions[0].OtpConfigGeneration
+	snapshotBefore := userSessions[0].OTPConfigGeneration
 
 	silentRequest := func() string {
 		requestState := fake.LetterN(8)
@@ -700,7 +700,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 			"&scope=" + url.QueryEscape("openid profile") +
 			"&state=" + requestState +
 			"&prompt=none" +
-			"&acr_values=" + record.AcrLevel2Optional.String()
+			"&acr_values=" + record.ACRLevel2Optional.String()
 
 		resp, getErr := httpClient.Get(destUrl)
 		if getErr != nil {
@@ -720,12 +720,12 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		"and so must an identical second one. A refusal is a read: no interaction happened, so "+
 			"nothing may be discharged by it")
 
-	after, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	after, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, after, 1)
-	assert.Equal(t, snapshotBefore, after[0].OtpConfigGeneration,
+	assert.Equal(t, snapshotBefore, after[0].OTPConfigGeneration,
 		"the refusals must not have moved the session's snapshot")
 }
 
@@ -734,13 +734,13 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
@@ -756,7 +756,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -784,7 +784,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	assert.Empty(t, errorVal, "error should not be present")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 func TestPromptNone_ConsentExists_Success(t *testing.T) {
@@ -834,14 +834,14 @@ func TestPromptNone_ConsentExists_Success(t *testing.T) {
 
 	// Verify code belongs to correct user
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Get original LastAccessed
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -887,7 +887,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	assert.NotEmpty(t, codeVal, "code should be present")
 
 	// Check that session was bumped
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -909,7 +909,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -917,7 +917,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -944,8 +944,8 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 
 	// Create consent that covers MORE than what we'll request
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email", // Covers openid profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1053,7 +1053,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -1061,7 +1061,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -1088,8 +1088,8 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 
 	// Create consent for only openid (partial coverage)
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid", // Only openid, not profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1176,7 +1176,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -1184,7 +1184,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -1211,8 +1211,8 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 
 	// Create consent WITHOUT offline_access
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1308,7 +1308,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -1316,7 +1316,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -1343,8 +1343,8 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 
 	// Create consent WITH offline_access
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile offline_access",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1452,7 +1452,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -1460,7 +1460,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -1487,8 +1487,8 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 
 	// Create consent for more scopes than we'll request
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email address phone",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1599,7 +1599,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	// Create a resource and permission
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 
 	client, redirectUri := createTestClientAndRedirectURI(t)
 
@@ -1737,7 +1737,7 @@ func advanceOtpConfigGeneration(t *testing.T, userId int64) {
 	}
 	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
-	if _, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId); err != nil {
+	if _, err := database.IncrementUserOTPConfigGeneration(context.Background(), tx, userId); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.CommitTransaction(context.Background(), tx); err != nil {

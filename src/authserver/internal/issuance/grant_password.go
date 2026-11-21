@@ -142,7 +142,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	var refreshToken string
 	var refreshExpiresIn int64
 	err = t.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		current, readErr := t.database.GetClientByIdForUpdate(ctx, tx, input.Client.Id)
+		current, readErr := t.database.GetClientByIDForUpdate(ctx, tx, input.Client.ID)
 		if readErr != nil {
 			return readErr
 		}

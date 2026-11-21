@@ -13,12 +13,12 @@ import (
 
 func TestTargetRequiresSecondFactor(t *testing.T) {
 	testCases := []struct {
-		target record.AcrLevel
+		target record.ACRLevel
 		want   bool
 	}{
-		{record.AcrLevel1, false},
-		{record.AcrLevel2Optional, true},
-		{record.AcrLevel2Mandatory, true},
+		{record.ACRLevel1, false},
+		{record.ACRLevel2Optional, true},
+		{record.ACRLevel2Mandatory, true},
 		// A level outside the three ranks below level 1, so it asks nothing.
 		{"", false},
 		{"urn:goiabada:level3", false},
@@ -33,12 +33,12 @@ func TestTargetRequiresSecondFactor(t *testing.T) {
 
 func TestStepUpOwed_NoSession(t *testing.T) {
 	testCases := []struct {
-		target record.AcrLevel
+		target record.ACRLevel
 		want   StepUp
 	}{
-		{record.AcrLevel1, StepUpNone},
-		{record.AcrLevel2Optional, StepUpLevel},
-		{record.AcrLevel2Mandatory, StepUpLevel},
+		{record.ACRLevel1, StepUpNone},
+		{record.ACRLevel2Optional, StepUpLevel},
+		{record.ACRLevel2Mandatory, StepUpLevel},
 		{"", StepUpNone},
 	}
 
@@ -54,15 +54,15 @@ func TestStepUpOwed_NoSession(t *testing.T) {
 
 func TestStepUpOwed_Session(t *testing.T) {
 	const (
-		level1    = record.AcrLevel1
-		optional  = record.AcrLevel2Optional
-		mandatory = record.AcrLevel2Mandatory
+		level1    = record.ACRLevel1
+		optional  = record.ACRLevel2Optional
+		mandatory = record.ACRLevel2Mandatory
 	)
 
 	testCases := []struct {
 		name          string
-		target        record.AcrLevel
-		sessionAcr    record.AcrLevel
+		target        record.ACRLevel
+		sessionAcr    record.ACRLevel
 		sessionOtpGen int64
 		userOtpGen    int64
 		want          StepUp
@@ -101,9 +101,9 @@ func TestStepUpOwed_Session(t *testing.T) {
 			// Every row's user has an authenticator. TestStepUpOwed_UserWithNoAuthenticator is the
 			// table for a user without one.
 			session := &record.UserSession{
-				AcrLevel:            tc.sessionAcr,
-				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                record.User{OTPEnabled: true, OtpConfigGeneration: tc.userOtpGen},
+				ACRLevel:            tc.sessionAcr,
+				OTPConfigGeneration: tc.sessionOtpGen,
+				User:                record.User{OTPEnabled: true, OTPConfigGeneration: tc.userOtpGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
@@ -121,15 +121,15 @@ func TestStepUpOwed_Session(t *testing.T) {
 // answering level 3 with nothing to answer it, while prompt=none refused the same request.
 func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 	const (
-		level1    = record.AcrLevel1
-		optional  = record.AcrLevel2Optional
-		mandatory = record.AcrLevel2Mandatory
+		level1    = record.ACRLevel1
+		optional  = record.ACRLevel2Optional
+		mandatory = record.ACRLevel2Mandatory
 	)
 
 	testCases := []struct {
 		name          string
-		target        record.AcrLevel
-		sessionAcr    record.AcrLevel
+		target        record.ACRLevel
+		sessionAcr    record.ACRLevel
 		sessionOtpGen int64
 		userOtpGen    int64
 		want          StepUp
@@ -147,9 +147,9 @@ func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			session := &record.UserSession{
-				AcrLevel:            tc.sessionAcr,
-				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                record.User{OTPEnabled: false, OtpConfigGeneration: tc.userOtpGen},
+				ACRLevel:            tc.sessionAcr,
+				OTPConfigGeneration: tc.sessionOtpGen,
+				User:                record.User{OTPEnabled: false, OTPConfigGeneration: tc.userOtpGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
@@ -161,9 +161,9 @@ func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 }
 
 func TestStepUpOwed_UnparsableSessionAcr(t *testing.T) {
-	for _, target := range []record.AcrLevel{record.AcrLevel1, record.AcrLevel2Mandatory} {
+	for _, target := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Mandatory} {
 		t.Run(string(target), func(t *testing.T) {
-			session := &record.UserSession{AcrLevel: "urn:goiabada:unknown"}
+			session := &record.UserSession{ACRLevel: "urn:goiabada:unknown"}
 
 			_, err := StepUpOwed(target, session)
 

@@ -19,7 +19,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	req := api.UpdateClientTokensRequest{
 		TokenExpirationInSeconds:                3600,
@@ -29,7 +29,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 		IncludeOpenIDConnectClaimsInIDToken:     "off",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -46,23 +46,23 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, updateResp.Client.IncludeOpenIDConnectClaimsInAccessToken)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, updateResp.Client.IncludeOpenIDConnectClaimsInIDToken)
 
-	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
+	refreshed, err2 := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, req.TokenExpirationInSeconds, refreshed.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, refreshed.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, refreshed.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, refreshed.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, refreshed.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, refreshed.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 
 	// Too large values
 	tooLarge := 160000001
@@ -179,9 +179,9 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
@@ -215,9 +215,9 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.ID, 10) + "/tokens"
 	reqBody := api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

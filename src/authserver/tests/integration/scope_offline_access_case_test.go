@@ -214,7 +214,7 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 	refreshToken := exchangeAuthCode(t, httpClient, clientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 
-	storedCode, err := database.GetCodeById(ctx, nil, code.Id)
+	storedCode, err := database.GetCodeByID(ctx, nil, code.ID)
 	require.NoError(t, err)
 	require.NotNil(t, storedCode)
 	storedCode.Scope = legacyScope

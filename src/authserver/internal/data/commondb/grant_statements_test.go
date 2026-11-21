@@ -22,12 +22,12 @@ import (
 // read of whole records are left to the record mapping test.
 
 const (
-	grantCodeId    = 9
-	grantUserId    = 7
-	grantClientId  = 3
-	grantSessionId = "sid-1"
-	grantFamilyJti = "first-jti"
-	grantAccessJti = "at-jti"
+	grantCodeID    = 9
+	grantUserID    = 7
+	grantClientID  = 3
+	grantSessionID = "sid-1"
+	grantFamilyJTI = "first-jti"
+	grantAccessJTI = "at-jti"
 )
 
 func grantStatements() []narrowWrite {
@@ -36,7 +36,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "MarkCodeAsUsed",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.MarkCodeAsUsed(ctx, nil, grantCodeId)
+				return d.MarkCodeAsUsed(ctx, nil, grantCodeID)
 			},
 			answer: true,
 			statements: []string{
@@ -47,7 +47,7 @@ func grantStatements() []narrowWrite {
 			name:  "MarkCodeAsUsed when no row transitioned",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.MarkCodeAsUsed(ctx, nil, grantCodeId)
+				return d.MarkCodeAsUsed(ctx, nil, grantCodeID)
 			},
 			answer: false,
 			statements: []string{
@@ -58,7 +58,7 @@ func grantStatements() []narrowWrite {
 			name:  "RevokeCodesBySessionIdentifier",
 			execs: []*scriptedExec{{rowsAffected: 2}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RevokeCodesBySessionIdentifier(ctx, nil, grantSessionId)
+				return d.RevokeCodesBySessionIdentifier(ctx, nil, grantSessionID)
 			},
 			answer: int64(2),
 			statements: []string{
@@ -66,10 +66,10 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name:  "RevokeCodesByClientId",
+			name:  "RevokeCodesByClientID",
 			execs: []*scriptedExec{{rowsAffected: 2}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RevokeCodesByClientId(ctx, nil, grantClientId)
+				return d.RevokeCodesByClientID(ctx, nil, grantClientID)
 			},
 			answer: int64(2),
 			statements: []string{
@@ -77,10 +77,10 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name:  "RevokeUnusedCodesByUserIdAndClientId",
+			name:  "RevokeUnusedCodesByUserIDAndClientID",
 			execs: []*scriptedExec{{rowsAffected: 2}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RevokeUnusedCodesByUserIdAndClientId(ctx, nil, grantUserId, grantClientId)
+				return d.RevokeUnusedCodesByUserIDAndClientID(ctx, nil, grantUserID, grantClientID)
 			},
 			answer: int64(2),
 			statements: []string{
@@ -91,10 +91,10 @@ func grantStatements() []narrowWrite {
 		{
 			// A hinted sign-out's code mark: the departing client's codes from the session not yet
 			// redeemed (#135 decision 9).
-			name:  "RevokeUnusedCodesBySessionIdentifierAndClientId",
+			name:  "RevokeUnusedCodesBySessionIdentifierAndClientID",
 			execs: []*scriptedExec{{rowsAffected: 2}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+				return d.RevokeUnusedCodesBySessionIdentifierAndClientID(ctx, nil, grantSessionID, grantClientID)
 			},
 			answer: int64(2),
 			statements: []string{
@@ -103,9 +103,9 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetCodeById",
+			name: "GetCodeByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetCodeById(ctx, nil, grantCodeId)
+				_, err := d.GetCodeByID(ctx, nil, grantCodeID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM codes WHERE id = 9"},
@@ -121,7 +121,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "DeleteCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteCode(ctx, nil, grantCodeId)
+				return nil, d.DeleteCode(ctx, nil, grantCodeID)
 			},
 			statements: []string{"DELETE FROM codes WHERE id = 9"},
 		},
@@ -140,7 +140,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "MarkRefreshTokenAsRevoked",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.MarkRefreshTokenAsRevoked(ctx, nil, grantCodeId)
+				return d.MarkRefreshTokenAsRevoked(ctx, nil, grantCodeID)
 			},
 			answer: true,
 			statements: []string{
@@ -151,7 +151,7 @@ func grantStatements() []narrowWrite {
 			name:  "MarkRefreshTokenAsRevoked when no row transitioned",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.MarkRefreshTokenAsRevoked(ctx, nil, grantCodeId)
+				return d.MarkRefreshTokenAsRevoked(ctx, nil, grantCodeID)
 			},
 			answer: false,
 			statements: []string{
@@ -162,7 +162,7 @@ func grantStatements() []narrowWrite {
 			name:  "RevokeRefreshTokenFamily",
 			execs: []*scriptedExec{{rowsAffected: 2}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RevokeRefreshTokenFamily(ctx, nil, grantFamilyJti)
+				return d.RevokeRefreshTokenFamily(ctx, nil, grantFamilyJTI)
 			},
 			answer: int64(2),
 			statements: []string{
@@ -181,25 +181,25 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetRefreshTokenById",
+			name: "GetRefreshTokenByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokenById(ctx, nil, grantCodeId)
+				_, err := d.GetRefreshTokenByID(ctx, nil, grantCodeID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM refresh_tokens WHERE id = 9"},
 		},
 		{
-			name: "GetRefreshTokenByJti",
+			name: "GetRefreshTokenByJTI",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokenByJti(ctx, nil, "jti-1")
+				_, err := d.GetRefreshTokenByJTI(ctx, nil, "jti-1")
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM refresh_tokens WHERE refresh_token_jti = 'jti-1'"},
 		},
 		{
-			name: "GetRefreshTokensByCodeId",
+			name: "GetRefreshTokensByCodeID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokensByCodeId(ctx, nil, grantCodeId)
+				_, err := d.GetRefreshTokensByCodeID(ctx, nil, grantCodeID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM refresh_tokens WHERE code_id = 9"},
@@ -207,7 +207,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "GetRefreshTokensBySessionIdentifier",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokensBySessionIdentifier(ctx, nil, grantSessionId)
+				_, err := d.GetRefreshTokensBySessionIdentifier(ctx, nil, grantSessionID)
 				return nil, err
 			},
 			statements: []string{
@@ -219,9 +219,9 @@ func grantStatements() []narrowWrite {
 			// A hinted sign-out's sweep: the departing client's tokens through codes on the session,
 			// the token's own session identifier the session's, which is what an offline token's lacks
 			// (#135 decision 9).
-			name: "GetSessionBoundRefreshTokensBySessionIdentifierAndClientId",
+			name: "GetSessionBoundRefreshTokensBySessionIdentifierAndClientID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+				_, err := d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx, nil, grantSessionID, grantClientID)
 				return nil, err
 			},
 			statements: []string{
@@ -231,9 +231,9 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetRefreshTokensByUserId",
+			name: "GetRefreshTokensByUserID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokensByUserId(ctx, nil, grantUserId)
+				_, err := d.GetRefreshTokensByUserID(ctx, nil, grantUserID)
 				return nil, err
 			},
 			statements: []string{
@@ -243,9 +243,9 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetRefreshTokensByUserIdAndClientId",
+			name: "GetRefreshTokensByUserIDAndClientID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokensByUserIdAndClientId(ctx, nil, grantUserId, grantClientId)
+				_, err := d.GetRefreshTokensByUserIDAndClientID(ctx, nil, grantUserID, grantClientID)
 				return nil, err
 			},
 			statements: []string{
@@ -266,9 +266,9 @@ func grantStatements() []narrowWrite {
 		{
 			// A live grant: its row not revoked, its expiry after the instant, its family unrecorded,
 			// through the code's user and client or the token's own (#135 decision 4).
-			name: "GetLiveGrantsByUserId",
+			name: "GetLiveGrantsByUserID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetLiveGrantsByUserId(ctx, nil, grantUserId, issuedAt)
+				_, err := d.GetLiveGrantsByUserID(ctx, nil, grantUserID, issuedAt)
 				return nil, err
 			},
 			statements: []string{
@@ -285,9 +285,9 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetRefreshTokensByClientId",
+			name: "GetRefreshTokensByClientID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetRefreshTokensByClientId(ctx, nil, grantClientId)
+				_, err := d.GetRefreshTokensByClientID(ctx, nil, grantClientID)
 				return nil, err
 			},
 			statements: []string{
@@ -299,21 +299,21 @@ func grantStatements() []narrowWrite {
 		{
 			name: "DeleteRefreshToken",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteRefreshToken(ctx, nil, grantCodeId)
+				return nil, d.DeleteRefreshToken(ctx, nil, grantCodeID)
 			},
 			statements: []string{"DELETE FROM refresh_tokens WHERE id = 9"},
 		},
 		{
 			name: "deleteRefreshTokensByColumn by user",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.deleteRefreshTokensByColumn(ctx, nil, "user_id", grantUserId)
+				return nil, d.deleteRefreshTokensByColumn(ctx, nil, "user_id", grantUserID)
 			},
 			statements: []string{"DELETE FROM refresh_tokens WHERE user_id = 7"},
 		},
 		{
 			name: "deleteRefreshTokensByColumn by client",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.deleteRefreshTokensByColumn(ctx, nil, "client_id", grantClientId)
+				return nil, d.deleteRefreshTokensByColumn(ctx, nil, "client_id", grantClientID)
 			},
 			statements: []string{"DELETE FROM refresh_tokens WHERE client_id = 3"},
 		},
@@ -329,7 +329,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "RecordRefreshTokenFamilyRevoked",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RecordRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJti, "replay")
+				return d.RecordRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJTI, "replay")
 			},
 			answer: true,
 			statements: []string{
@@ -340,9 +340,9 @@ func grantStatements() []narrowWrite {
 		},
 		{
 			name: "RecordRefreshTokenFamilyRevoked for a family already recorded",
-			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJti}}}},
+			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RecordRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJti, "replay")
+				return d.RecordRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJTI, "replay")
 			},
 			answer: false,
 			statements: []string{
@@ -351,9 +351,9 @@ func grantStatements() []narrowWrite {
 		},
 		{
 			name: "IsRefreshTokenFamilyRevoked",
-			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJti}}}},
+			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IsRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJti)
+				return d.IsRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJTI)
 			},
 			answer: true,
 			statements: []string{
@@ -362,9 +362,9 @@ func grantStatements() []narrowWrite {
 		},
 		{
 			name: "IsRefreshTokenFamilyRevoked when the engine folded the match",
-			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJti}}}},
+			rows: []*scriptedRows{{cols: []string{"first_refresh_token_jti"}, values: [][]driver.Value{{grantFamilyJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IsRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJti+" ")
+				return d.IsRefreshTokenFamilyRevoked(ctx, nil, grantFamilyJTI+" ")
 			},
 			answer: false,
 			statements: []string{
@@ -386,7 +386,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "RecordAccessTokenRevoked",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJti, staleBefore)
+				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJTI, staleBefore)
 			},
 			answer: true,
 			statements: []string{
@@ -396,27 +396,27 @@ func grantStatements() []narrowWrite {
 		},
 		{
 			name: "RecordAccessTokenRevoked for a token already revoked",
-			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJti, staleBefore)
+				return d.RecordAccessTokenRevoked(ctx, nil, grantAccessJTI, staleBefore)
 			},
 			answer:     false,
 			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti'"},
 		},
 		{
 			name: "IsAccessTokenRevoked",
-			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJti)
+				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJTI)
 			},
 			answer:     true,
 			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti'"},
 		},
 		{
 			name: "IsAccessTokenRevoked when the engine folded the match",
-			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJti}}}},
+			rows: []*scriptedRows{{cols: []string{"jti"}, values: [][]driver.Value{{grantAccessJTI}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJti+" ")
+				return d.IsAccessTokenRevoked(ctx, nil, grantAccessJTI+" ")
 			},
 			answer:     false,
 			statements: []string{"SELECT jti FROM revoked_access_tokens WHERE jti = 'at-jti '"},
@@ -443,7 +443,7 @@ func grantStatements() []narrowWrite {
 		{
 			name: "ClaimAuthorizeRequest",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.ClaimAuthorizeRequest(ctx, nil, grantCodeId)
+				return d.ClaimAuthorizeRequest(ctx, nil, grantCodeID)
 			},
 			answer:     true,
 			statements: []string{"DELETE FROM authorize_requests WHERE id = 9"},
@@ -452,7 +452,7 @@ func grantStatements() []narrowWrite {
 			name:  "ClaimAuthorizeRequest when another call claimed it",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.ClaimAuthorizeRequest(ctx, nil, grantCodeId)
+				return d.ClaimAuthorizeRequest(ctx, nil, grantCodeID)
 			},
 			answer:     false,
 			statements: []string{"DELETE FROM authorize_requests WHERE id = 9"},

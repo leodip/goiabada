@@ -26,41 +26,41 @@ func TestLowerUserSessionsToPassword_LowersWhatClaimsMoreThanAPassword(t *testin
 
 	user := createTestUser(t)
 	someoneElse := createTestUser(t)
-	seed := func(userId int64, acr record.AcrLevel, methods string, authTime time.Time) *record.UserSession {
-		session := createTestUserSession(t, userId)
-		session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = acr, methods, authTime, passwordAt
+	seed := func(userID int64, acr record.ACRLevel, methods string, authTime time.Time) *record.UserSession {
+		session := createTestUserSession(t, userID)
+		session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = acr, methods, authTime, passwordAt
 		require.NoError(t, database.UpdateUserSession(ctx, nil, session))
 		return session
 	}
 
-	stepUpToLevel3 := seed(user.Id, record.AcrLevel2Mandatory, "pwd otp", codeAt)
-	codeAtLevel2 := seed(user.Id, record.AcrLevel2Optional, "pwd otp", codeAt)
+	stepUpToLevel3 := seed(user.ID, record.ACRLevel2Mandatory, "pwd otp", codeAt)
+	codeAtLevel2 := seed(user.ID, record.ACRLevel2Optional, "pwd otp", codeAt)
 	// auth_time differs from the password's only so a write to it would show.
-	passwordOnly := seed(user.Id, record.AcrLevel2Optional, "pwd", otherAt)
-	levelOne := seed(user.Id, record.AcrLevel1, "pwd", otherAt)
-	notThisUser := seed(someoneElse.Id, record.AcrLevel2Mandatory, "pwd otp", codeAt)
+	passwordOnly := seed(user.ID, record.ACRLevel2Optional, "pwd", otherAt)
+	levelOne := seed(user.ID, record.ACRLevel1, "pwd", otherAt)
+	notThisUser := seed(someoneElse.ID, record.ACRLevel2Mandatory, "pwd otp", codeAt)
 
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.LowerUserSessionsToPassword(ctx, tx, user.Id, "pwd")
+		return database.LowerUserSessionsToPassword(ctx, tx, user.ID, "pwd")
 	}))
 
 	for _, tc := range []struct {
 		name     string
 		session  *record.UserSession
-		acr      record.AcrLevel
+		acr      record.ACRLevel
 		methods  string
 		authTime time.Time
 	}{
-		{"a level 3 session that stepped up with a code", stepUpToLevel3, record.AcrLevel2Optional, "pwd", passwordAt},
-		{"a level 2 session that entered a code", codeAtLevel2, record.AcrLevel2Optional, "pwd", passwordAt},
-		{"a session that claims only the password", passwordOnly, record.AcrLevel2Optional, "pwd", otherAt},
-		{"a level 1 session", levelOne, record.AcrLevel1, "pwd", otherAt},
-		{"another user's session", notThisUser, record.AcrLevel2Mandatory, "pwd otp", codeAt},
+		{"a level 3 session that stepped up with a code", stepUpToLevel3, record.ACRLevel2Optional, "pwd", passwordAt},
+		{"a level 2 session that entered a code", codeAtLevel2, record.ACRLevel2Optional, "pwd", passwordAt},
+		{"a session that claims only the password", passwordOnly, record.ACRLevel2Optional, "pwd", otherAt},
+		{"a level 1 session", levelOne, record.ACRLevel1, "pwd", otherAt},
+		{"another user's session", notThisUser, record.ACRLevel2Mandatory, "pwd otp", codeAt},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			read, err := database.GetUserSessionById(ctx, nil, tc.session.Id)
+			read, err := database.GetUserSessionByID(ctx, nil, tc.session.ID)
 			require.NoError(t, err)
-			assert.Equal(t, tc.acr, read.AcrLevel)
+			assert.Equal(t, tc.acr, read.ACRLevel)
 			assert.Equal(t, tc.methods, read.AuthMethods)
 			assert.Truef(t, read.AuthTime.Equal(tc.authTime), "auth_time %v, want %v", read.AuthTime, tc.authTime)
 			assert.True(t, read.PasswordAuthTime.Equal(passwordAt), "the password's instant never moves")
@@ -84,11 +84,11 @@ func TestRemove_WaitsForABindHoldingTheUserRowAndLowersWhatItWrote(t *testing.T)
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = []byte("the authenticator's seed")
 	require.NoError(t, database.UpdateUser(ctx, nil, user))
-	user, err := database.GetUserById(ctx, nil, user.Id)
+	user, err := database.GetUserByID(ctx, nil, user.ID)
 	require.NoError(t, err)
 
-	session := createTestUserSession(t, user.Id)
-	session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = record.AcrLevel1, "pwd", passwordAt, passwordAt
+	session := createTestUserSession(t, user.ID)
+	session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = record.ACRLevel1, "pwd", passwordAt, passwordAt
 	require.NoError(t, database.UpdateUserSession(ctx, nil, session))
 
 	tx, err := database.BeginTransaction(ctx)
@@ -97,13 +97,13 @@ func TestRemove_WaitsForABindHoldingTheUserRowAndLowersWhatItWrote(t *testing.T)
 
 	// The bind's statements, in BindUserSession's order: the user's row for the claim check, the
 	// session's row, the read, and the step-up written whole.
-	require.NoError(t, database.AcquireUserRow(ctx, tx, user.Id))
+	require.NoError(t, database.AcquireUserRow(ctx, tx, user.ID))
 	live, err := database.AcquireUserSessionRow(ctx, tx, session.SessionIdentifier)
 	require.NoError(t, err)
 	require.True(t, live)
 	bound, err := database.GetUserSessionBySessionIdentifier(ctx, tx, session.SessionIdentifier)
 	require.NoError(t, err)
-	bound.AcrLevel, bound.AuthMethods, bound.AuthTime = record.AcrLevel2Mandatory, "pwd otp", codeAt
+	bound.ACRLevel, bound.AuthMethods, bound.AuthTime = record.ACRLevel2Mandatory, "pwd otp", codeAt
 	require.NoError(t, database.UpdateUserSession(ctx, tx, bound))
 
 	removal := goBlocked(t, "the removal", tx, func(reached func()) error {
@@ -119,9 +119,9 @@ func TestRemove_WaitsForABindHoldingTheUserRowAndLowersWhatItWrote(t *testing.T)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	require.NoError(t, removal.await(t), "the removal waits for the bind and then commits")
 
-	read, err := database.GetUserSessionById(ctx, nil, session.Id)
+	read, err := database.GetUserSessionByID(ctx, nil, session.ID)
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel2Optional, read.AcrLevel, "the bind's level 3 is lowered")
+	assert.Equal(t, record.ACRLevel2Optional, read.ACRLevel, "the bind's level 3 is lowered")
 	assert.Equal(t, "pwd", read.AuthMethods, "the bind's otp is lowered")
 	assert.True(t, read.AuthTime.Equal(passwordAt), "auth_time is the password's again")
 }
@@ -138,19 +138,19 @@ func TestBumpUserSession_WaitsForALoweringHoldingTheRow(t *testing.T) {
 
 	client := createTestClient(t)
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
-	session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = record.AcrLevel2Mandatory, "pwd otp", codeAt, passwordAt
+	session := createTestUserSession(t, user.ID)
+	session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime = record.ACRLevel2Mandatory, "pwd otp", codeAt, passwordAt
 	require.NoError(t, database.UpdateUserSession(ctx, nil, session))
 
 	tx, err := database.BeginTransaction(ctx)
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(ctx, tx) }()
-	require.NoError(t, database.LowerUserSessionsToPassword(ctx, tx, user.Id, "pwd"))
+	require.NoError(t, database.LowerUserSessionsToPassword(ctx, tx, user.ID, "pwd"))
 
 	manager := usersession.NewManager(other)
 	bump := goBlocked(t, "the bump", tx, func(reached func()) error {
 		reached()
-		_, bumpErr := manager.BumpUserSession(ctx, session.SessionIdentifier, client.Id, "", "", "")
+		_, bumpErr := manager.BumpUserSession(ctx, session.SessionIdentifier, client.ID, "", "", "")
 		return bumpErr
 	})
 	bump.requireBlocked(t)
@@ -158,9 +158,9 @@ func TestBumpUserSession_WaitsForALoweringHoldingTheRow(t *testing.T) {
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	require.NoError(t, bump.await(t))
 
-	read, err := database.GetUserSessionById(ctx, nil, session.Id)
+	read, err := database.GetUserSessionByID(ctx, nil, session.ID)
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel2Optional, read.AcrLevel, "the bump does not put level 3 back")
+	assert.Equal(t, record.ACRLevel2Optional, read.ACRLevel, "the bump does not put level 3 back")
 	assert.Equal(t, "pwd", read.AuthMethods, "the bump does not put otp back")
 	assert.True(t, read.AuthTime.Equal(passwordAt), "the bump does not put the code's auth_time back")
 }

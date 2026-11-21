@@ -25,7 +25,7 @@ func passwordNoticeUser(t *testing.T, locale string, verified bool) (string, *re
 	t.Helper()
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 	givePassword(t, u, passwordNoticeCurrent)
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	stored.Locale = locale
 	stored.EmailVerified = verified

@@ -26,10 +26,10 @@ type connectedClientsDatabase interface {
 	revocation.Database
 
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetConsentByUserIDAndClientIDForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
+	GetLiveGrantsByUserID(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
 }
 
 // accountConnectedClientsDatabase is what the account's connected clients need: the caller, beside
@@ -56,32 +56,32 @@ type connectedClient struct {
 func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, userId int64,
 	now time.Time) ([]connectedClient, error) {
 
-	consents, err := database.GetConsentsByUserId(ctx, nil, userId)
+	consents, err := database.GetConsentsByUserID(ctx, nil, userId)
 	if err != nil {
 		return nil, err
 	}
-	grants, err := database.GetLiveGrantsByUserId(ctx, nil, userId, now)
+	grants, err := database.GetLiveGrantsByUserID(ctx, nil, userId, now)
 	if err != nil {
 		return nil, err
 	}
 
 	consentOf := map[int64]*record.UserConsent{}
 	for i := range consents {
-		if _, seen := consentOf[consents[i].ClientId]; !seen {
-			consentOf[consents[i].ClientId] = &consents[i]
+		if _, seen := consentOf[consents[i].ClientID]; !seen {
+			consentOf[consents[i].ClientID] = &consents[i]
 		}
 	}
-	sort.Slice(grants, func(i, j int) bool { return grants[i].RefreshTokenId < grants[j].RefreshTokenId })
+	sort.Slice(grants, func(i, j int) bool { return grants[i].RefreshTokenID < grants[j].RefreshTokenID })
 	scopesOf := map[int64][]string{}
 	for _, grant := range grants {
 		for _, scope := range strings.Fields(grant.Scope) {
-			if !slices.Contains(scopesOf[grant.ClientId], scope) {
-				scopesOf[grant.ClientId] = append(scopesOf[grant.ClientId], scope)
+			if !slices.Contains(scopesOf[grant.ClientID], scope) {
+				scopesOf[grant.ClientID] = append(scopesOf[grant.ClientID], scope)
 			}
 		}
-		if _, listed := scopesOf[grant.ClientId]; !listed {
+		if _, listed := scopesOf[grant.ClientID]; !listed {
 			// A live grant recording no scope still connects its client.
-			scopesOf[grant.ClientId] = []string{}
+			scopesOf[grant.ClientID] = []string{}
 		}
 	}
 
@@ -96,13 +96,13 @@ func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, 
 	}
 	sort.Slice(clientIds, func(i, j int) bool { return clientIds[i] < clientIds[j] })
 
-	clients, err := database.GetClientsByIds(ctx, nil, clientIds)
+	clients, err := database.GetClientsByIDs(ctx, nil, clientIds)
 	if err != nil {
 		return nil, err
 	}
 	clientOf := map[int64]*record.Client{}
 	for i := range clients {
-		clientOf[clients[i].Id] = &clients[i]
+		clientOf[clients[i].ID] = &clients[i]
 	}
 
 	connected := make([]connectedClient, 0, len(clientIds))
@@ -136,12 +136,12 @@ func disconnectClient(ctx context.Context, database connectedClientsDatabase, us
 	result, err := revocation.DisconnectClientTx(ctx, database, userId, clientId,
 		sessionLive(settings), func(tx *sql.Tx) (bool, error) {
 			consentId = 0
-			consent, getErr := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userId, clientId)
+			consent, getErr := database.GetConsentByUserIDAndClientIDForUpdate(ctx, tx, userId, clientId)
 			if getErr != nil || consent == nil {
 				return false, getErr
 			}
-			consentId = consent.Id
-			return database.DeleteUserConsent(ctx, tx, consent.Id)
+			consentId = consent.ID
+			return database.DeleteUserConsent(ctx, tx, consent.ID)
 		})
 	if err != nil || !result.ConsentDeleted {
 		consentId = 0
@@ -173,7 +173,7 @@ func HandleAccountConnectedClientsGet(
 			return
 		}
 
-		connected, err := connectedClientsOf(r.Context(), database, user.Id, time.Now().UTC())
+		connected, err := connectedClientsOf(r.Context(), database, user.ID, time.Now().UTC())
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -228,7 +228,7 @@ func HandleAccountConnectedClientDelete(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -244,7 +244,7 @@ func HandleAccountConnectedClientDelete(
 			return
 		}
 
-		result, consentId, err := disconnectClient(r.Context(), database, user.Id, client.Id, settings)
+		result, consentId, err := disconnectClient(r.Context(), database, user.ID, client.ID, settings)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -259,12 +259,12 @@ func HandleAccountConnectedClientDelete(
 
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedOwnUserConsent, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"consent_id":     consentId,
 				"logged_in_user": subject,
 			})
 		}
-		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.Id, client.Id, subject, result)
+		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.ID, client.ID, subject, result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})

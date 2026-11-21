@@ -150,7 +150,7 @@ func TestDCR_Refusal_UnresolvedClientIsNotRedirectedEither(t *testing.T) {
 
 	// The ceremony still holds the redirect URI, the state and everything else the redirect would
 	// be built from. Only the client row is gone, which is all provenance is read from.
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 
 	resp := postConsent(t, httpClient, consentURL, consentPage, []int{})
 	_ = consentPage.Body.Close()

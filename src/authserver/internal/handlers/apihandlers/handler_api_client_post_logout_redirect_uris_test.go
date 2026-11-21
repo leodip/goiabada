@@ -50,12 +50,12 @@ func postLogoutRedirectURIsPutRequest(t *testing.T, id string, body string) *htt
 
 // expectPostLogoutRedirectURIsClient registers the client read the save makes before it validates.
 func expectPostLogoutRedirectURIsClient(database *datamocks.Database, client *record.Client) {
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 }
 
 // codeFlowClient is client 7 with its authorization code flow on, so the flow gate lets it through.
 func codeFlowClient() *record.Client {
-	return &record.Client{Id: 7, AuthorizationCodeEnabled: true}
+	return &record.Client{ID: 7, AuthorizationCodeEnabled: true}
 }
 
 // expectStoredPostLogoutRedirectURIs registers the read of the stored list on the save's
@@ -88,9 +88,9 @@ func TestHandleClientPostLogoutRedirectURIsPut_SavesTheExactPlanInOneTransaction
 	note := func(edge string) { order = append(order, edge) }
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredPostLogoutRedirectURIs(database,
-		record.PostLogoutRedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/bye"},
-		record.PostLogoutRedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/bye"},
-		record.PostLogoutRedirectURI{Id: 13, ClientId: 7, URI: "https://keep.example.com/bye"},
+		record.PostLogoutRedirectURI{ID: 11, ClientID: 7, URI: "https://old.example.com/bye"},
+		record.PostLogoutRedirectURI{ID: 12, ClientID: 7, URI: "https://keep.example.com/bye"},
+		record.PostLogoutRedirectURI{ID: 13, ClientID: 7, URI: "https://keep.example.com/bye"},
 	)
 	var deleted []int64
 	database.On("DeletePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
@@ -102,7 +102,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_SavesTheExactPlanInOneTransaction
 	database.On("CreatePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			row := args.Get(2).(*record.PostLogoutRedirectURI)
-			assert.Equal(t, int64(7), row.ClientId)
+			assert.Equal(t, int64(7), row.ClientID)
 			created = append(created, row.URI)
 			order = append(order, "insert")
 		}).Return(nil).Once()
@@ -112,8 +112,8 @@ func TestHandleClientPostLogoutRedirectURIsPut_SavesTheExactPlanInOneTransaction
 	database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).PostLogoutRedirectURIs = []record.PostLogoutRedirectURI{
-				{Id: 12, ClientId: 7, URI: "https://keep.example.com/bye", CreatedAt: sql.NullTime{Time: createdAt, Valid: true}},
-				{Id: 14, ClientId: 7, URI: "https://new.example.com/bye"},
+				{ID: 12, ClientID: 7, URI: "https://keep.example.com/bye", CreatedAt: sql.NullTime{Time: createdAt, Valid: true}},
+				{ID: 14, ClientID: 7, URI: "https://new.example.com/bye"},
 			}
 		}).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
@@ -180,7 +180,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_AFailedWriteCommitsNothing(t *tes
 
 	expectPostLogoutRedirectURIsClient(database, codeFlowClient())
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredPostLogoutRedirectURIs(database, record.PostLogoutRedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/bye"})
+	expectStoredPostLogoutRedirectURIs(database, record.PostLogoutRedirectURI{ID: 11, ClientID: 7, URI: "https://old.example.com/bye"})
 	database.On("DeletePostLogoutRedirectURI", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
 	database.On("CreatePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -275,8 +275,8 @@ func TestHandleClientPostLogoutRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *
 	expectPostLogoutRedirectURIsClient(database, codeFlowClient())
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredPostLogoutRedirectURIs(database,
-		record.PostLogoutRedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/bye"},
-		record.PostLogoutRedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/bye"},
+		record.PostLogoutRedirectURI{ID: 11, ClientID: 7, URI: "https://a.example.com/bye"},
+		record.PostLogoutRedirectURI{ID: 12, ClientID: 7, URI: "https://added-meanwhile.example.com/bye"},
 	)
 
 	rr := servePostLogoutRedirectURIsSave(t, database, auditLogger, postLogoutRedirectURIsBody(t,
@@ -302,8 +302,8 @@ func TestHandleClientPostLogoutRedirectURIsPut_ALoadedListEqualAsASetProceeds(t 
 		{
 			name: "another order, a repeat and surrounding spaces",
 			stored: []record.PostLogoutRedirectURI{
-				{Id: 11, ClientId: 7, URI: "https://a.example.com/bye"},
-				{Id: 12, ClientId: 7, URI: "https://b.example.com/bye"},
+				{ID: 11, ClientID: 7, URI: "https://a.example.com/bye"},
+				{ID: 12, ClientID: 7, URI: "https://b.example.com/bye"},
 			},
 			expected: []string{"https://b.example.com/bye", " https://a.example.com/bye ", "https://b.example.com/bye"},
 		},
@@ -319,7 +319,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_ALoadedListEqualAsASetProceeds(t 
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			expectStoredPostLogoutRedirectURIs(database, test.stored...)
 			for _, row := range test.stored {
-				database.On("DeletePostLogoutRedirectURI", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
+				database.On("DeletePostLogoutRedirectURI", mock.Anything, clientUpdateTx, row.ID).Return(nil).Once()
 			}
 			database.On("CreatePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			stubClientResponseLoads(database)
@@ -551,7 +551,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_TheRedirectFlowGate(t *testing.T)
 	t.Run("neither flow is refused before anything is read", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		expectPostLogoutRedirectURIsClient(database, &record.Client{Id: 7, ClientCredentialsEnabled: true, ImplicitGrantEnabled: &implicitOff})
+		expectPostLogoutRedirectURIsClient(database, &record.Client{ID: 7, ClientCredentialsEnabled: true, ImplicitGrantEnabled: &implicitOff})
 
 		rr := servePostLogoutRedirectURIsSave(t, database, auditLogger,
 			postLogoutRedirectURIsBody(t, []string{"https://app.example.com/bye"}, []string{}))
@@ -567,7 +567,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_TheRedirectFlowGate(t *testing.T)
 	t.Run("the implicit flow alone is let through", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		expectPostLogoutRedirectURIsClient(database, &record.Client{Id: 7, ImplicitGrantEnabled: &implicitOn})
+		expectPostLogoutRedirectURIsClient(database, &record.Client{ID: 7, ImplicitGrantEnabled: &implicitOn})
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 		expectStoredPostLogoutRedirectURIs(database)
 		database.On("CreatePostLogoutRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
@@ -597,7 +597,7 @@ func TestHandleClientPostLogoutRedirectURIsPut_TheRequestsOwnRefusals(t *testing
 
 	t.Run("a client that does not exist", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, nil).Once()
 		rr := servePostLogoutRedirectURIsSave(t, database, handlersmocks.NewAuditLogger(t), postLogoutRedirectURIsBody(t, []string{}, []string{}))
 		assert.Equal(t, http.StatusNotFound, rr.Code)
 		code, _ := decodeErrorEnvelope(t, rr)

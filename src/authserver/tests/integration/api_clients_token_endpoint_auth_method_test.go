@@ -53,7 +53,7 @@ func selfRegisteredClientId(t *testing.T, clientIdentifier string) int64 {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	return client.Id
+	return client.ID
 }
 
 // The admin API's client response carries the method a self-registered confidential client is

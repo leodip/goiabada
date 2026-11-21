@@ -33,13 +33,13 @@ import (
 func TestHandlePermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	system := &record.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
+	system := &record.Resource{ID: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	stored := []record.Permission{
-		{Id: 10, PermissionIdentifier: "userinfo", ResourceId: 1, Description: "Created by an administrator"},
-		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
-		{Id: 12, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceId: 1, Description: "Manage"},
+		{ID: 10, PermissionIdentifier: "userinfo", ResourceID: 1, Description: "Created by an administrator"},
+		{ID: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceID: 1, Description: "Manage account"},
+		{ID: 12, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceID: 1, Description: "Manage"},
 	}
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
 	database.On("PermissionsLoadResources", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) {
 			for i := range args.Get(2).([]record.Permission) {
@@ -76,28 +76,28 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 
 	// System-level resource (authserver)
 	resource := &record.Resource{
-		Id:                 1,
+		ID:                 1,
 		ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 	}
 
 	// Return existing permissions that are MISSING the "manage" built-in permission
 	existingPerms := []record.Permission{
-		{Id: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
+		{ID: 11, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier, ResourceID: 1, Description: "Manage account"},
 		// "manage" is intentionally missing
-		{Id: 13, PermissionIdentifier: builtin.AdminReadPermissionIdentifier, ResourceId: 1, Description: "Admin read"},
-		{Id: 14, PermissionIdentifier: builtin.ManageUsersPermissionIdentifier, ResourceId: 1, Description: "Manage users"},
-		{Id: 15, PermissionIdentifier: builtin.ManageClientsPermissionIdentifier, ResourceId: 1, Description: "Manage clients"},
-		{Id: 16, PermissionIdentifier: builtin.ManageSettingsPermissionIdentifier, ResourceId: 1, Description: "Manage settings"},
+		{ID: 13, PermissionIdentifier: builtin.AdminReadPermissionIdentifier, ResourceID: 1, Description: "Admin read"},
+		{ID: 14, PermissionIdentifier: builtin.ManageUsersPermissionIdentifier, ResourceID: 1, Description: "Manage users"},
+		{ID: 15, PermissionIdentifier: builtin.ManageClientsPermissionIdentifier, ResourceID: 1, Description: "Manage clients"},
+		{ID: 16, PermissionIdentifier: builtin.ManageSettingsPermissionIdentifier, ResourceID: 1, Description: "Manage settings"},
 	}
 
-	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(resource, nil)
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(existingPerms, nil)
+	database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(resource, nil)
+	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(existingPerms, nil)
 
 	// Build a valid request body that includes all the permissions we have
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			ID:                   p.Id,
+			ID:                   p.ID,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -141,9 +141,9 @@ const resourcePermsId = int64(7)
 // resourcePermsStored is the resource's stored permissions in the cases below: read, write, admin.
 func resourcePermsStored() []record.Permission {
 	return []record.Permission{
-		{Id: 31, ResourceId: resourcePermsId, PermissionIdentifier: "read", Description: "Read"},
-		{Id: 32, ResourceId: resourcePermsId, PermissionIdentifier: "write", Description: "Write"},
-		{Id: 33, ResourceId: resourcePermsId, PermissionIdentifier: "admin", Description: "Admin"},
+		{ID: 31, ResourceID: resourcePermsId, PermissionIdentifier: "read", Description: "Read"},
+		{ID: 32, ResourceID: resourcePermsId, PermissionIdentifier: "write", Description: "Write"},
+		{ID: 33, ResourceID: resourcePermsId, PermissionIdentifier: "admin", Description: "Admin"},
 	}
 }
 
@@ -151,7 +151,7 @@ func resourcePermsStored() []record.Permission {
 func loadedEntries(permissions []record.Permission) []api.ResourcePermissionUpsert {
 	out := make([]api.ResourcePermissionUpsert, 0, len(permissions))
 	for _, p := range permissions {
-		out = append(out, api.ResourcePermissionUpsert{ID: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		out = append(out, api.ResourcePermissionUpsert{ID: p.ID, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 	}
 	return out
 }
@@ -184,19 +184,19 @@ func serveResourcePerms(database *datamocks.Database, auditLogger *handlersmocks
 
 // expectResourcePermsResource registers the resource read the save makes first.
 func expectResourcePermsResource(database *datamocks.Database, resourceIdentifier string) {
-	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), resourcePermsId).
-		Return(&record.Resource{Id: resourcePermsId, ResourceIdentifier: resourceIdentifier}, nil).Once()
+	database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), resourcePermsId).
+		Return(&record.Resource{ID: resourcePermsId, ResourceIdentifier: resourceIdentifier}, nil).Once()
 }
 
 // expectResourcePermsChecked registers the read of the stored rows step 1 refuses against,
 // outside the transaction.
 func expectResourcePermsChecked(database *datamocks.Database, stored []record.Permission) {
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), resourcePermsId).Return(stored, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), resourcePermsId).Return(stored, nil).Once()
 }
 
 // expectResourcePermsRead registers the read of the stored rows on the save's transaction.
 func expectResourcePermsRead(database *datamocks.Database, stored []record.Permission) {
-	database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(stored, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, resourcePermsTx, resourcePermsId).Return(stored, nil).Once()
 }
 
 // expectResourcePermsAudit accepts the one consolidated event and counts it.
@@ -249,11 +249,11 @@ func TestHandleResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testi
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	require.NoError(t, stub.BodyErr)
 	require.Len(t, updated, 1, "the re-described row, and not the unchanged one")
-	assert.Equal(t, int64(31), updated[0].Id)
+	assert.Equal(t, int64(31), updated[0].ID)
 	assert.Equal(t, "read", updated[0].PermissionIdentifier)
 	assert.Equal(t, "Read everything", updated[0].Description)
 	require.Len(t, created, 1)
-	assert.Equal(t, record.Permission{ResourceId: resourcePermsId, PermissionIdentifier: "audit", Description: "Audit"}, created[0])
+	assert.Equal(t, record.Permission{ResourceID: resourcePermsId, PermissionIdentifier: "audit", Description: "Audit"}, created[0])
 	assert.Equal(t, 1, *audits)
 	assert.Equal(t, []string{"begin", "delete", "update", "create", "commit", "audit"}, order)
 	database.AssertExpectations(t)
@@ -270,7 +270,7 @@ func TestHandleResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 	expectResourcePermsRead(database, stored)
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.MatchedBy(func(p *record.Permission) bool {
-		return p.Id == 33 && p.PermissionIdentifier == "manage" && p.Description == "Admin"
+		return p.ID == 33 && p.PermissionIdentifier == "manage" && p.Description == "Admin"
 	})).Return(nil).Once()
 	expectResourcePermsAudit(t, auditLogger, nil)
 
@@ -359,7 +359,7 @@ func TestHandleResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 			expectResourcePermsChecked(database, variant.checked)
 			stub := datamocks.ExpectRunInTransaction(database, resourcePermsTx)
 			loadErr := errors.New("the read failed")
-			database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(nil, loadErr).Once()
+			database.On("GetPermissionsByResourceID", mock.Anything, resourcePermsTx, resourcePermsId).Return(nil, loadErr).Once()
 
 			rr := serveResourcePerms(database, auditLogger, resourcePermsBody(t, []api.ResourcePermissionUpsert{}, variant.expected))
 
@@ -399,7 +399,7 @@ func TestHandleResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testi
 		}
 	}).Once()
 
-	database.On("GetPermissionsByResourceId", mock.Anything, resourcePermsTx, resourcePermsId).Return(resourcePermsStored(), nil).Twice()
+	database.On("GetPermissionsByResourceID", mock.Anything, resourcePermsTx, resourcePermsId).Return(resourcePermsStored(), nil).Twice()
 	database.On("DeletePermission", mock.Anything, resourcePermsTx, int64(33)).Return(nil).Twice()
 	database.On("UpdatePermission", mock.Anything, resourcePermsTx, mock.Anything).Return(nil).Twice()
 	// The first create is the deadlock victim; the second lands.
@@ -443,7 +443,7 @@ func TestHandleResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T
 		stored func() []record.Permission
 	}{
 		{name: "another save added a permission", stored: func() []record.Permission {
-			return append(resourcePermsStored(), record.Permission{Id: 34, ResourceId: resourcePermsId, PermissionIdentifier: "export", Description: "Export"})
+			return append(resourcePermsStored(), record.Permission{ID: 34, ResourceID: resourcePermsId, PermissionIdentifier: "export", Description: "Export"})
 		}},
 		{name: "another save dropped a permission", stored: func() []record.Permission {
 			return resourcePermsStored()[:2]
@@ -537,7 +537,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 
 	builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		builtIns = append(builtIns, record.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		builtIns = append(builtIns, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
 	}
 	without := func(i int) []api.ResourcePermissionUpsert {
 		wanted := loadedEntries(builtIns)

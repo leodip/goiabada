@@ -27,26 +27,26 @@ type Database interface {
 
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
+	GetRefreshTokensByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByCodeID(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByFirstRefreshTokenJTI(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
-	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
-	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
-	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
-	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
-	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionClientsByUserSessionIDs(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
+	GetUsableRefreshTokenClientIDsByUserID(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
+	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
-	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	RevokeCodesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
-	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
+	RevokeUnusedCodesByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 }
@@ -73,7 +73,7 @@ func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx,
 		if err := db.UpdateRefreshToken(ctx, tx, rt); err != nil {
 			return nil, err
 		}
-		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+		revokedJtis = append(revokedJtis, rt.RefreshTokenJTI)
 	}
 	return revokedJtis, nil
 }
@@ -99,13 +99,13 @@ func markRefreshTokensRevoked(ctx context.Context, db refreshTokenMarker, tx *sq
 		if rt.Revoked {
 			continue
 		}
-		marked, err := db.MarkRefreshTokenAsRevoked(ctx, tx, rt.Id)
+		marked, err := db.MarkRefreshTokenAsRevoked(ctx, tx, rt.ID)
 		if err != nil {
 			return nil, err
 		}
 		if marked {
 			rt.Revoked = true
-			revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+			revokedJtis = append(revokedJtis, rt.RefreshTokenJTI)
 		}
 	}
 	return revokedJtis, nil
@@ -235,7 +235,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// which both take the session row before any grant.
 	//
 	// The two refresh-token reads below are unaffected by running after these deletes.
-	// GetRefreshTokensByUserId unions a codes join with refresh_tokens.user_id and
+	// GetRefreshTokensByUserID unions a codes join with refresh_tokens.user_id and
 	// GetRefreshTokensBySessionIdentifier joins refresh_tokens to codes; neither reads
 	// user_sessions, and codes carries no foreign key to it.
 	//
@@ -243,7 +243,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// operation: the codes carry auth_state_generation, so advancing it is what invalidates
 	// them, and a sweep that ran first would leave a gap in which a code issued under the old
 	// generation is still valid.
-	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
 	if err != nil {
 		return result, err
 	}
@@ -252,7 +252,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// carries no ORDER BY of its own, so two transactions of this shape could otherwise take
 	// the same two rows in opposite orders and deadlock on nothing but the order the engine
 	// returned them in (#139).
-	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
 
 	// The apps to tell, read before the deletions below cascade the sessions' apps away and before the
 	// token sweep revokes the grants. Each session's row is taken in the same id order the deletions
@@ -274,13 +274,13 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	for i := range sessions {
 		session := sessions[i]
 		if exceptSid != "" && session.SessionIdentifier == exceptSid {
-			if promoteErr := db.PromoteUserSessionGeneration(ctx, tx, session.Id, newGeneration); promoteErr != nil {
+			if promoteErr := db.PromoteUserSessionGeneration(ctx, tx, session.ID, newGeneration); promoteErr != nil {
 				return result, promoteErr
 			}
 			preservedSessionFound = true
 			continue
 		}
-		if deleteUserSessionErr := db.DeleteUserSession(ctx, tx, session.Id); deleteUserSessionErr != nil {
+		if deleteUserSessionErr := db.DeleteUserSession(ctx, tx, session.ID); deleteUserSessionErr != nil {
 			return result, deleteUserSessionErr
 		}
 		result.TerminatedSessionIdentifiers = append(result.TerminatedSessionIdentifiers,
@@ -303,7 +303,7 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	// never worse, and on some engines better, but it does NOT close the race: a child
 	// committed outside this transaction's view keeps the old generation and is rejected on
 	// next use. Fail-closed, accepted as a residual in decision 16, tracked in #131.
-	tokens, err := db.GetRefreshTokensByUserId(ctx, tx, userId)
+	tokens, err := db.GetRefreshTokensByUserID(ctx, tx, userId)
 	if err != nil {
 		return result, err
 	}
@@ -324,17 +324,17 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 			return result, getRefreshTokensErr
 		}
 		for _, rt := range preservedTokens {
-			preservedIds[rt.Id] = true
+			preservedIds[rt.ID] = true
 			// Promote from THIS query's rows, not from the intersection with the
 			// user-scoped ones. A child committed between the two queries appears only
 			// here, and promoting it is the whole point of querying in this order.
-			promoteIds = append(promoteIds, rt.Id)
+			promoteIds = append(promoteIds, rt.ID)
 		}
 	}
 
 	toRevoke := make([]*record.RefreshToken, 0, len(tokens))
 	for _, rt := range tokens {
-		if preservedIds[rt.Id] {
+		if preservedIds[rt.ID] {
 			continue
 		}
 		toRevoke = append(toRevoke, rt)
@@ -479,11 +479,11 @@ func UserWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 	if subject == "" {
 		return nil, nil
 	}
-	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
 	return userWideDeliveries(ctx, db, tx, userId, sessions, "", LogoutNotice{Subject: subject, UserWide: true, Live: live})
 }
 
@@ -511,7 +511,7 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 				continue
 			}
 			if !client.BackchannelLogoutSessionRequired {
-				subOnly[client.Id] = client
+				subOnly[client.ID] = client
 				continue
 			}
 			// An app requiring sid is told of each session it was on that was still valid, and of
@@ -526,7 +526,7 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 
 	// The apps holding a grant that still works, read before the sweep revokes it. A grant alone tells
 	// an app requiring sid nothing, since no session of its ended.
-	holderIds, err := db.GetUsableRefreshTokenClientIdsByUserId(ctx, tx, userId, time.Now().UTC())
+	holderIds, err := db.GetUsableRefreshTokenClientIDsByUserID(ctx, tx, userId, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -537,13 +537,13 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 		}
 	}
 	if len(unread) > 0 {
-		holders, err := db.GetClientsByIds(ctx, tx, unread)
+		holders, err := db.GetClientsByIDs(ctx, tx, unread)
 		if err != nil {
 			return nil, err
 		}
 		for _, client := range holders {
 			if client.BackchannelLogoutURI != "" && !client.BackchannelLogoutSessionRequired {
-				subOnly[client.Id] = client
+				subOnly[client.ID] = client
 			}
 		}
 	}
@@ -556,7 +556,7 @@ func userWideDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int
 	for _, clientId := range clientIds {
 		client := subOnly[clientId]
 		deliveries = append(deliveries, backchannel.Delivery{
-			ClientId:         client.Id,
+			ClientId:         client.ID,
 			ClientIdentifier: client.ClientIdentifier,
 			URI:              client.BackchannelLogoutURI,
 			IsPublic:         client.IsPublic,
@@ -605,7 +605,7 @@ func heldSessionClients(ctx context.Context, db Database, tx *sql.Tx, session *r
 	}
 	// As last committed: on MySQL an ordinary read answers the snapshot from before the row was
 	// taken, without an app a sign-in added to the session meanwhile.
-	return db.GetCommittedUserSessionClients(ctx, tx, session.Id)
+	return db.GetCommittedUserSessionClients(ctx, tx, session.ID)
 }
 
 // TerminationResult reports what terminating one session actually did. It carries exactly what
@@ -721,7 +721,7 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 
 	subject := ""
 	if live {
-		user, err := db.GetUserById(ctx, nil, userSession.UserId)
+		user, err := db.GetUserByID(ctx, nil, userSession.UserID)
 		if err != nil {
 			return TerminationResult{}, err
 		}
@@ -756,7 +756,7 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 		// Write 1 of the doc comment above, and the reason it comes before the sweeps: it takes the
 		// session row, when the read above has not, which is what orders this transaction against
 		// a ceremony minting a code for the session it is ending (#139).
-		if err := db.DeleteUserSession(ctx, tx, userSession.Id); err != nil {
+		if err := db.DeleteUserSession(ctx, tx, userSession.ID); err != nil {
 			return err
 		}
 
@@ -803,10 +803,10 @@ type ClientPartDatabase interface {
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
-	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
 		clientId int64) ([]*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+	RevokeUnusedCodesBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
 		clientId int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -884,7 +884,7 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 		if !held {
 			return nil
 		}
-		sessionClients, readErr := db.GetCommittedUserSessionClients(ctx, tx, session.Id)
+		sessionClients, readErr := db.GetCommittedUserSessionClients(ctx, tx, session.ID)
 		if readErr != nil {
 			return readErr
 		}
@@ -892,11 +892,11 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 			if sessionClients[i].Client.ClientIdentifier != clientIdentifier {
 				continue
 			}
-			if deleteErr := db.DeleteUserSessionClient(ctx, tx, sessionClients[i].Id); deleteErr != nil {
+			if deleteErr := db.DeleteUserSessionClient(ctx, tx, sessionClients[i].ID); deleteErr != nil {
 				return deleteErr
 			}
 			if len(sessionClients) == 1 {
-				if deleteErr := db.DeleteUserSession(ctx, tx, session.Id); deleteErr != nil {
+				if deleteErr := db.DeleteUserSession(ctx, tx, session.ID); deleteErr != nil {
 					return deleteErr
 				}
 				sessionDeleted = true
@@ -904,7 +904,7 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 			found := sessionClients[i]
 
 			var sweepErr error
-			revokedCodeCount, revokedJtis, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.Id)
+			revokedCodeCount, revokedJtis, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.ID)
 			if sweepErr != nil {
 				return sweepErr
 			}
@@ -927,11 +927,11 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx, sessionIdentifier string,
 	clientId int64) (int64, []string, error) {
 
-	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientId)
 	if err != nil {
 		return 0, nil, err
 	}
-	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx, tx, sessionIdentifier, clientId)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1033,8 +1033,8 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 		// a future change ever produces a session-less auth code, fall back to revoking only the
 		// refresh tokens directly linked to this code so reuse still has teeth.
 		slog.WarnContext(ctx, "auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
-			"code_id", code.Id)
-		refreshTokens, err = db.GetRefreshTokensByCodeId(ctx, tx, code.Id)
+			"code_id", code.ID)
+		refreshTokens, err = db.GetRefreshTokensByCodeID(ctx, tx, code.ID)
 	}
 	if err != nil {
 		return AuthCodeReuseResult{}, err
@@ -1082,13 +1082,13 @@ func RevokeOnAuthCodeReuse(ctx context.Context, db Database, tx *sql.Tx, code *r
 			// The apps to tell, before the deletion takes their rows. The session row is held since
 			// the first statement, so an app a ceremony adds to it meanwhile is either here or the
 			// ceremony finds the session gone.
-			if live != nil && live(session) && code.User.Id == code.UserId && code.User.Subject != "" {
+			if live != nil && live(session) && code.User.ID == code.UserID && code.User.Subject != "" {
 				deliveries, err = backchannel.SessionDeliveries(ctx, db, tx, session, code.User.Subject)
 				if err != nil {
 					return AuthCodeReuseResult{}, err
 				}
 			}
-			if err := db.DeleteUserSession(ctx, tx, session.Id); err != nil {
+			if err := db.DeleteUserSession(ctx, tx, session.ID); err != nil {
 				return AuthCodeReuseResult{}, err
 			}
 		}
@@ -1155,7 +1155,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 //     caller must not be able to end up revoked without the withdrawal that asked for it
 //     (RevokeUserAuthStateTx's write-then-sweep shape). It reports whether it deleted the
 //     row, which another request may have deleted first.
-//  2. RevokeUnusedCodesByUserIdAndClientId, before the sweep as RevokeClientGrants marks
+//  2. RevokeUnusedCodesByUserIDAndClientID, before the sweep as RevokeClientGrants marks
 //     its codes first. A code issued before the disconnect can still be redeemed for its
 //     60 seconds, redemption consults no stored consent, and the grant it would start has
 //     no refresh token yet for the sweep to reach. Marked, it is refused at redemption.
@@ -1180,7 +1180,7 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // read, of the client below, fixes the REPEATABLE READ snapshot every later ordinary read
 // answers, and a grant or a consent committed in between would be left in place by a
 // disconnect that reported success. So the caller reads the consent with
-// GetConsentByUserIdAndClientIdForUpdate, and GetRefreshTokensByUserIdAndClientId is a locking
+// GetConsentByUserIDAndClientIDForUpdate, and GetRefreshTokensByUserIDAndClientID is a locking
 // read on MySQL; the code mark is an UPDATE, which reads current rows on every engine. The
 // tokens are flipped by a conditional write, so a token an overlapping disconnect revoked first
 // is not reported twice.
@@ -1244,12 +1244,12 @@ func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId
 			consentDeleted = deleted
 		}
 
-		revokedCodeCount, err := db.RevokeUnusedCodesByUserIdAndClientId(ctx, tx, userId, clientId)
+		revokedCodeCount, err := db.RevokeUnusedCodesByUserIDAndClientID(ctx, tx, userId, clientId)
 		if err != nil {
 			return err
 		}
 
-		tokens, err := db.GetRefreshTokensByUserIdAndClientId(ctx, tx, userId, clientId)
+		tokens, err := db.GetRefreshTokensByUserIDAndClientID(ctx, tx, userId, clientId)
 		if err != nil {
 			return err
 		}
@@ -1327,7 +1327,7 @@ type DisconnectResult struct {
 func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, clientId int64,
 	live SessionLive) ([]backchannel.Delivery, error) {
 
-	clients, err := db.GetClientsByIds(ctx, tx, []int64{clientId})
+	clients, err := db.GetClientsByIDs(ctx, tx, []int64{clientId})
 	if err != nil {
 		return nil, err
 	}
@@ -1337,14 +1337,14 @@ func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId i
 	client := &clients[0]
 
 	// The user's sub, which every logout token names. A user being deleted tells their apps itself.
-	user, err := db.GetUserById(ctx, tx, userId)
+	user, err := db.GetUserByID(ctx, tx, userId)
 	if err != nil || user == nil {
 		return nil, err
 	}
 
 	if !client.BackchannelLogoutSessionRequired {
 		return []backchannel.Delivery{{
-			ClientId:         client.Id,
+			ClientId:         client.ID,
 			ClientIdentifier: client.ClientIdentifier,
 			URI:              client.BackchannelLogoutURI,
 			IsPublic:         client.IsPublic,
@@ -1357,35 +1357,35 @@ func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId i
 	if live == nil {
 		return nil, nil
 	}
-	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	sessions, err := db.GetUserSessionsByUserID(ctx, tx, userId)
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
 	liveSessionIds := make([]int64, 0, len(sessions))
 	for i := range sessions {
 		if live(&sessions[i]) {
-			liveSessionIds = append(liveSessionIds, sessions[i].Id)
+			liveSessionIds = append(liveSessionIds, sessions[i].ID)
 		}
 	}
 	if len(liveSessionIds) == 0 {
 		return nil, nil
 	}
-	sessionClients, err := db.GetUserSessionClientsByUserSessionIds(ctx, tx, liveSessionIds)
+	sessionClients, err := db.GetUserSessionClientsByUserSessionIDs(ctx, tx, liveSessionIds)
 	if err != nil {
 		return nil, err
 	}
 	onSession := map[int64]bool{}
 	for _, sessionClient := range sessionClients {
-		if sessionClient.ClientId == clientId {
-			onSession[sessionClient.UserSessionId] = true
+		if sessionClient.ClientID == clientId {
+			onSession[sessionClient.UserSessionID] = true
 		}
 	}
 
 	var deliveries []backchannel.Delivery
 	for i := range sessions {
 		session := &sessions[i]
-		if !onSession[session.Id] {
+		if !onSession[session.ID] {
 			continue
 		}
 		if delivery, tells := backchannel.SessionClientDelivery(client, session, user.Subject); tells {
@@ -1438,7 +1438,7 @@ type ClientGrantResult struct {
 //
 // The two writes, in this order:
 //
-//  1. RevokeCodesByClientId marks every not-yet-revoked code of the client revoked. This is the
+//  1. RevokeCodesByClientID marks every not-yet-revoked code of the client revoked. This is the
 //     write that SURVIVES, and the only one that is a boundary. A sweep on its own is
 //     point-in-time: rotation claims the presented token and inserts its replacement in two
 //     separate autocommit operations, so a refresh that validated before this transaction began
@@ -1447,7 +1447,7 @@ type ClientGrantResult struct {
 //     revoked-code check, and that child is born already rejected because the fact predates its
 //     existence.
 //  2. The client-scoped refresh-token sweep. Still owed rather than redundant, for two reasons:
-//     GetRefreshTokensByClientId reaches the ROPC linkage shape, which has no code for step 1 to
+//     GetRefreshTokensByClientID reaches the ROPC linkage shape, which has no code for step 1 to
 //     mark, and it is what gives the audit event actual JTIs rather than a count.
 //
 // It deliberately does NOT advance any user's authentication generation and does NOT delete any
@@ -1475,12 +1475,12 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 		return result, errs.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable")
 	}
 
-	revokedCodeCount, err := db.RevokeCodesByClientId(ctx, tx, clientId)
+	revokedCodeCount, err := db.RevokeCodesByClientID(ctx, tx, clientId)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
 
-	tokens, err := db.GetRefreshTokensByClientId(ctx, tx, clientId)
+	tokens, err := db.GetRefreshTokensByClientID(ctx, tx, clientId)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
@@ -1526,7 +1526,7 @@ func recordNewFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, token
 	recorded := 0
 	seen := make(map[string]struct{}, len(tokens))
 	for _, rt := range tokens {
-		jti := rt.FirstRefreshTokenJti
+		jti := rt.FirstRefreshTokenJTI
 		if jti == "" {
 			continue
 		}
@@ -1666,7 +1666,7 @@ func RevokeGrantTx(ctx context.Context, db Database, grantId string) (GrantRevoc
 			return err
 		}
 
-		members, err := db.GetRefreshTokensByFirstRefreshTokenJti(ctx, tx, grantId)
+		members, err := db.GetRefreshTokensByFirstRefreshTokenJTI(ctx, tx, grantId)
 		if err != nil {
 			return err
 		}
@@ -1758,9 +1758,9 @@ func LogDisconnectedClient(ctx context.Context, auditLogger AuditLogger, userId 
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogRevokedSignOutGrants(ctx context.Context, auditLogger AuditLogger, end ClientPartEnd) {
 	auditLogger.Log(ctx, audit.EventRevokedSignOutGrants, map[string]interface{}{
-		"user_id":            end.Session.UserId,
-		"client_id":          end.Ended.Client.Id,
-		"user_session_id":    end.Session.Id,
+		"user_id":            end.Session.UserID,
+		"client_id":          end.Ended.Client.ID,
+		"user_session_id":    end.Session.ID,
 		"session_identifier": end.Session.SessionIdentifier,
 		"logged_in_user":     "",
 		// What this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
@@ -1826,9 +1826,9 @@ func revokedUserAuthStateDetails(userId int64, reason string, loggedInUser strin
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
 func LogAuthCodeReuse(ctx context.Context, auditLogger AuditLogger, code *record.Code, result AuthCodeReuseResult) {
 	auditLogger.Log(ctx, audit.EventAuthCodeReuseDetected, map[string]interface{}{
-		"client_id":          code.ClientId,
-		"user_id":            code.UserId,
-		"code_id":            code.Id,
+		"client_id":          code.ClientID,
+		"user_id":            code.UserID,
+		"code_id":            code.ID,
 		"session_identifier": code.SessionIdentifier,
 		// Always a list rather than null: AuthCodeReuseResult initialises it on the success path.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
@@ -1853,8 +1853,8 @@ func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, user
 	loggedInUser string, result TerminationResult) {
 
 	auditLogger.Log(ctx, audit.EventTerminatedUserSession, map[string]interface{}{
-		"user_id":            userSession.UserId,
-		"user_session_id":    userSession.Id,
+		"user_id":            userSession.UserID,
+		"user_session_id":    userSession.ID,
 		"session_identifier": userSession.SessionIdentifier,
 		"logged_in_user":     loggedInUser,
 		// What this call TRANSITIONED, not what the session had. A second termination of the same

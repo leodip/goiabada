@@ -30,7 +30,7 @@ func TestBrand_CustomCSSReadsBackWhatWasWritten(t *testing.T) {
 	brand.CustomCSS = sampleCustomCSS
 	require.NoError(t, database.CreateBrand(ctx, nil, &brand))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equalf(t, sampleCustomCSS, stored.CustomCSS, "the CSS byte for byte on %s", dbType())
@@ -39,7 +39,7 @@ func TestBrand_CustomCSSReadsBackWhatWasWritten(t *testing.T) {
 	require.NoError(t, err)
 	var listed *record.Brand
 	for i := range all {
-		if all[i].Id == brand.Id {
+		if all[i].ID == brand.ID {
 			listed = &all[i]
 		}
 	}
@@ -53,7 +53,7 @@ func TestBrand_CustomCSSReadsBackWhatWasWritten(t *testing.T) {
 	edit := *stored
 	edit.CustomCSS = largest
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
-	updated, err := database.GetBrandById(ctx, nil, brand.Id)
+	updated, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	assert.Equalf(t, largest, updated.CustomCSS, "64 KB of CSS reads back whole on %s", dbType())
@@ -62,7 +62,7 @@ func TestBrand_CustomCSSReadsBackWhatWasWritten(t *testing.T) {
 	edit = *updated
 	edit.CustomCSS = ""
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
-	cleared, err := database.GetBrandById(ctx, nil, brand.Id)
+	cleared, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	assert.Empty(t, cleared.CustomCSS, "a brand saved with no CSS reads with none")
@@ -82,7 +82,7 @@ func TestBrand_NoCustomCSSIsStoredAsEmpty(t *testing.T) {
 
 	var empty int
 	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT COUNT(*) FROM brands WHERE id = %d AND custom_css = ''", brand.Id)).Scan(&empty))
+		"SELECT COUNT(*) FROM brands WHERE id = %d AND custom_css = ''", brand.ID)).Scan(&empty))
 	assert.Equalf(t, 1, empty, "a brand with no custom CSS stores '' on %s", dbType())
 }
 
@@ -104,17 +104,17 @@ func TestBrand_TheDefaultAndAClientsPageBrandReadTheCustomCSS(t *testing.T) {
 	drawnIn, err := h.DB.GetClientPageBrand(ctx, nil, following.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, drawnIn)
-	assert.Equal(t, def.Id, drawnIn.Id)
+	assert.Equal(t, def.ID, drawnIn.ID)
 	assert.Equal(t, ".auth-card { border-width: 3px; }", drawnIn.CustomCSS)
 
 	own := record.NewBrand("Own", "light", "plum")
 	own.CustomCSS = ".auth-title { letter-spacing: 0.05em; }"
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &own))
 	given := createIsolatedClient(t, h)
-	setBrand(t, h, given.Id, brandId(own.Id))
+	setBrand(t, h, given.ID, brandID(own.ID))
 	drawnIn, err = h.DB.GetClientPageBrand(ctx, nil, given.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, drawnIn)
-	assert.Equal(t, own.Id, drawnIn.Id)
+	assert.Equal(t, own.ID, drawnIn.ID)
 	assert.Equal(t, ".auth-title { letter-spacing: 0.05em; }", drawnIn.CustomCSS)
 }

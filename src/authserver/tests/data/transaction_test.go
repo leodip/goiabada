@@ -55,11 +55,11 @@ func TestTransaction_CommitPersists(t *testing.T) {
 	group := newTestGroup()
 
 	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
-	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
+	require.NotZero(t, group.ID, "expected an id to be assigned inside the transaction")
 	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
-	committed, err := database.GetGroupById(context.Background(), nil, group.Id)
-	require.NoError(t, err, "GetGroupById after commit")
+	committed, err := database.GetGroupByID(context.Background(), nil, group.ID)
+	require.NoError(t, err, "GetGroupByID after commit")
 	require.NotNil(t, committed, "a committed row must be visible outside the transaction")
 	assert.Equal(t, group.GroupIdentifier, committed.GroupIdentifier)
 }
@@ -73,11 +73,11 @@ func TestTransaction_RollbackDiscards(t *testing.T) {
 	group := newTestGroup()
 
 	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
-	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
+	require.NotZero(t, group.ID, "expected an id to be assigned inside the transaction")
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
-	rolledBack, err := database.GetGroupById(context.Background(), nil, group.Id)
-	require.NoError(t, err, "GetGroupById after rollback")
+	rolledBack, err := database.GetGroupByID(context.Background(), nil, group.ID)
+	require.NoError(t, err, "GetGroupByID after rollback")
 	assert.Nil(t, rolledBack, "a rolled-back row must not exist")
 }
 
@@ -89,8 +89,8 @@ func TestTransaction_ReadYourWritesInsideTransaction(t *testing.T) {
 
 	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
 
-	found, err := database.GetGroupById(context.Background(), tx, group.Id)
-	require.NoError(t, err, "GetGroupById through the same transaction")
+	found, err := database.GetGroupByID(context.Background(), tx, group.ID)
+	require.NoError(t, err, "GetGroupByID through the same transaction")
 	require.NotNil(t, found, "the transaction must see its own uncommitted write")
 	assert.Equal(t, group.GroupIdentifier, found.GroupIdentifier)
 
@@ -120,10 +120,10 @@ func TestTransaction_UncommittedWriteIsNotVisibleOutside(t *testing.T) {
 	group := newTestGroup()
 
 	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
-	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
+	require.NotZero(t, group.ID, "expected an id to be assigned inside the transaction")
 
-	outside, err := database.GetGroupById(context.Background(), nil, group.Id)
-	require.NoError(t, err, "GetGroupById outside the transaction")
+	outside, err := database.GetGroupByID(context.Background(), nil, group.ID)
+	require.NoError(t, err, "GetGroupByID outside the transaction")
 	assert.Nil(t, outside, "an uncommitted row must not be visible outside its transaction")
 
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
@@ -137,24 +137,24 @@ func TestTransaction_UncommittedWriteIsNotVisibleOutside(t *testing.T) {
 func TestTransaction_RollbackUndoesMultiStatementDelete(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
+	refreshToken := createROPCRefreshToken(t, user.ID, client.ID)
 
 	tx := beginTx(t)
-	require.NoError(t, database.DeleteUser(context.Background(), tx, user.Id), "DeleteUser in a transaction")
+	require.NoError(t, database.DeleteUser(context.Background(), tx, user.ID), "DeleteUser in a transaction")
 
 	// Gone as far as this transaction is concerned.
-	deletedInTx, err := database.GetUserById(context.Background(), tx, user.Id)
-	require.NoError(t, err, "GetUserById through the transaction")
+	deletedInTx, err := database.GetUserByID(context.Background(), tx, user.ID)
+	require.NoError(t, err, "GetUserByID through the transaction")
 	require.Nil(t, deletedInTx, "the transaction must see its own delete")
 
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
-	restoredUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserById after rollback")
+	restoredUser, err := database.GetUserByID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserByID after rollback")
 	assert.NotNil(t, restoredUser, "the user must survive a rolled-back delete")
 
-	restoredToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
-	require.NoError(t, err, "GetRefreshTokenById after rollback")
+	restoredToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
+	require.NoError(t, err, "GetRefreshTokenByID after rollback")
 	assert.NotNil(t, restoredToken,
 		"the refresh token deleted by the same call must survive the rollback too")
 }
@@ -164,17 +164,17 @@ func TestTransaction_RollbackUndoesMultiStatementDelete(t *testing.T) {
 func TestTransaction_CommitAppliesMultiStatementDelete(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
+	refreshToken := createROPCRefreshToken(t, user.ID, client.ID)
 
 	tx := beginTx(t)
-	require.NoError(t, database.DeleteUser(context.Background(), tx, user.Id), "DeleteUser in a transaction")
+	require.NoError(t, database.DeleteUser(context.Background(), tx, user.ID), "DeleteUser in a transaction")
 	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
-	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserById after commit")
+	deletedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserByID after commit")
 	assert.Nil(t, deletedUser, "the user must be gone after the commit")
 
-	deletedToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
-	require.NoError(t, err, "GetRefreshTokenById after commit")
+	deletedToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
+	require.NoError(t, err, "GetRefreshTokenByID after commit")
 	assert.Nil(t, deletedToken, "the refresh token must be gone after the commit")
 }

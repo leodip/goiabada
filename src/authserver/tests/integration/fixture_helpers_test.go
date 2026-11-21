@@ -68,7 +68,7 @@ func createResourceWithId(t *testing.T, resourceIdentifier string) *record.Resou
 func createPermission(t *testing.T, resourceId int64) *record.Permission {
 	permission := &record.Permission{
 		PermissionIdentifier: "perm-" + fake.LetterN(8),
-		ResourceId:           resourceId,
+		ResourceID:           resourceId,
 	}
 	err := database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -80,7 +80,7 @@ func createPermission(t *testing.T, resourceId int64) *record.Permission {
 func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier string) *record.Permission {
 	permission := &record.Permission{
 		PermissionIdentifier: permissionIdentifier,
-		ResourceId:           resourceId,
+		ResourceID:           resourceId,
 	}
 	err := database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -91,8 +91,8 @@ func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier
 
 func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 	userPermission := &record.UserPermission{
-		UserId:       userId,
-		PermissionId: permissionId,
+		UserID:       userId,
+		PermissionID: permissionId,
 	}
 	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
@@ -107,7 +107,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -116,7 +116,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -200,10 +200,10 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *record.Client, *re
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
@@ -217,7 +217,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -226,7 +226,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -314,10 +314,10 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *record.Cli
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 
@@ -331,7 +331,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -340,7 +340,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -441,10 +441,10 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *record.Cl
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 
@@ -502,7 +502,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 opt.isPublic,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		PKCERequired:             opt.pkceRequired,
 	}
@@ -518,7 +518,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -620,7 +620,7 @@ func registerSignOutRedirectURI(t *testing.T, clientId int64) string {
 	t.Helper()
 	uri := "https://" + strings.ToLower(fake.LetterN(10)) + ".example.com/signed-out"
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientId: clientId, URI: uri}))
+		&record.PostLogoutRedirectURI{ClientID: clientId, URI: uri}))
 	return uri
 }
 
@@ -643,7 +643,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		AuthorizationCodeEnabled:    true,
 		IsPublic:                    false,
 		ConsentRequired:             false,
-		DefaultAcrLevel:             record.AcrLevel2Optional,
+		DefaultACRLevel:             record.ACRLevel2Optional,
 		ClientSecretEncrypted:       clientSecretEncrypted,
 		AdministrativeScopesAllowed: administrative,
 	}
@@ -653,7 +653,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
@@ -677,7 +677,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	// through this fixture are about what the token does, not about how consent is obtained (#509).
 	if slices.Contains(strings.Split(scope, " "), "authserver:manage-account") {
 		err = database.CreateUserConsent(context.Background(), nil, &record.UserConsent{
-			UserId: user.Id, ClientId: client.Id, Scope: scope,
+			UserID: user.ID, ClientID: client.ID, Scope: scope,
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		})
 		require.NoError(t, err)
@@ -703,7 +703,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 			t.Fatalf("resource not found: %s", resourceIdentifier)
 		}
 
-		perms, grantErr := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+		perms, grantErr := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 		if grantErr != nil {
 			t.Fatal(grantErr)
 		}
@@ -717,7 +717,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		if sel == nil {
 			t.Fatalf("permission not found: %s:%s", resourceIdentifier, permissionIdentifier)
 		}
-		grantErr = database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: user.Id, PermissionId: sel.Id})
+		grantErr = database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: user.ID, PermissionID: sel.ID})
 		if grantErr != nil {
 			t.Fatal(grantErr)
 		}
@@ -803,8 +803,8 @@ func deleteTestUsers(t *testing.T, users []*record.User) {
 		if user == nil {
 			continue
 		}
-		assert.NotZero(t, user.Id, "fixture user %q was never created, so cleanup cannot delete it", user.Email)
-		assert.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "unable to delete fixture user %q", user.Email)
+		assert.NotZero(t, user.ID, "fixture user %q was never created, so cleanup cannot delete it", user.Email)
+		assert.NoError(t, database.DeleteUser(context.Background(), nil, user.ID), "unable to delete fixture user %q", user.Email)
 	}
 }
 
@@ -858,7 +858,7 @@ func createTestGroup(t *testing.T) *record.Group {
 	group := &record.Group{
 		GroupIdentifier:      "test-group-" + fake.UUID()[:8],
 		Description:          "Test Group",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, group)
@@ -869,7 +869,7 @@ func createTestGroup(t *testing.T) *record.Group {
 // Helper function to create a test permission
 func createTestPermission(t *testing.T, resourceId int64, identifier, description string) *record.Permission {
 	permission := &record.Permission{
-		ResourceId:           resourceId,
+		ResourceID:           resourceId,
 		PermissionIdentifier: identifier,
 		Description:          description,
 	}
@@ -898,7 +898,7 @@ type ClientDisplaySettings struct {
 	ShowWebsiteURL    bool
 	UploadLogo        bool // Whether to actually upload a logo
 	ConsentRequired   bool
-	DefaultAcrLevel   record.AcrLevel
+	DefaultAcrLevel   record.ACRLevel
 }
 
 // createClientWithDisplaySettings creates a client with specified display settings
@@ -918,7 +918,7 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          settings.ConsentRequired,
-		DefaultAcrLevel:          settings.DefaultAcrLevel,
+		DefaultACRLevel:          settings.DefaultAcrLevel,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -942,7 +942,7 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 		}
 
 		clientLogo := &record.ClientLogo{
-			ClientId: client.Id,
+			ClientID: client.ID,
 			Logo:     logoData,
 		}
 

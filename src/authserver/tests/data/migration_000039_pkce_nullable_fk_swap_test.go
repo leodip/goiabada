@@ -198,27 +198,27 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 	code := seedCode000039(t, h, client, user, sql.NullString{String: "challenge-value", Valid: true})
 
 	// The two shapes a refresh token comes in, which are also the two variant E used: one
-	// issued through the authorization code flow, carrying a CodeId and no user or client,
-	// and one ROPC-shaped, carrying a UserId and ClientId and no code.
+	// issued through the authorization code flow, carrying a CodeID and no user or client,
+	// and one ROPC-shaped, carrying a UserID and ClientID and no code.
 	authCodeToken := seedRefreshToken000039(t, h, record.RefreshToken{
-		CodeId: sql.NullInt64{Int64: code.Id, Valid: true},
+		CodeID: sql.NullInt64{Int64: code.ID, Valid: true},
 	})
 	ropcToken := seedRefreshToken000039(t, h, record.RefreshToken{
-		UserId:   sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:   sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID: sql.NullInt64{Int64: client.ID, Valid: true},
 	})
 
-	baselineCode := readCode000039(t, h, code.Id)
-	baselineAuth := readRefreshToken000039(t, h, authCodeToken.Id)
-	baselineRopc := readRefreshToken000039(t, h, ropcToken.Id)
+	baselineCode := readCode000039(t, h, code.ID)
+	baselineAuth := readRefreshToken000039(t, h, authCodeToken.ID)
+	baselineRopc := readRefreshToken000039(t, h, ropcToken.ID)
 
 	assertRows000039 := func(phase string) {
 		t.Helper()
-		assert.Equalf(t, baselineCode, readCode000039(t, h, code.Id),
+		assert.Equalf(t, baselineCode, readCode000039(t, h, code.ID),
 			"[%s] every codes column must still hold its own value on %s", phase, dbType())
-		assert.Equalf(t, baselineAuth, readRefreshToken000039(t, h, authCodeToken.Id),
+		assert.Equalf(t, baselineAuth, readRefreshToken000039(t, h, authCodeToken.ID),
 			"[%s] every refresh_tokens column must still hold its own value (auth code shape) on %s", phase, dbType())
-		assert.Equalf(t, baselineRopc, readRefreshToken000039(t, h, ropcToken.Id),
+		assert.Equalf(t, baselineRopc, readRefreshToken000039(t, h, ropcToken.ID),
 			"[%s] every refresh_tokens column must still hold its own value (ROPC shape) on %s", phase, dbType())
 	}
 
@@ -275,7 +275,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 	var applied record.Code
 	require.NoErrorf(t, createChallengelessCode000039(t, h, client, user, &applied),
 		"a challenge-less code must be storable on %s after 000039 (goal 3)", dbType())
-	stored := readCode000039(t, h, applied.Id)
+	stored := readCode000039(t, h, applied.ID)
 	assert.False(t, stored.CodeChallenge.Valid, "the stored challenge must be NULL, not an empty string")
 	assert.False(t, stored.CodeChallengeMethod.Valid, "the stored method must be NULL, not an empty string")
 
@@ -286,7 +286,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 		// survives the rollback as '' rather than blocking it. Lossless for every reader,
 		// since all three tests in ValidateTokenRequest's downgrade mitigation treat ''
 		// and NULL alike.
-		afterDown := readCode000039(t, h, applied.Id)
+		afterDown := readCode000039(t, h, applied.ID)
 		assert.True(t, afterDown.CodeChallenge.Valid, "the down converts NULL to '' rather than losing the row")
 		assert.Empty(t, afterDown.CodeChallenge.String, "the down writes an empty string")
 		assert.True(t, afterDown.CodeChallengeMethod.Valid, "the down converts the method column too")
@@ -329,12 +329,12 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 		// assertion after the apply mean the migration did something.
 		doomed := seedUser000039(t, h)
 		token := seedRefreshToken000039(t, h, record.RefreshToken{
-			UserId:   sql.NullInt64{Int64: doomed.Id, Valid: true},
-			ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
+			UserID:   sql.NullInt64{Int64: doomed.ID, Valid: true},
+			ClientID: sql.NullInt64{Int64: client.ID, Valid: true},
 		})
-		_, err := h.SQL.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %d", doomed.Id))
+		_, err := h.SQL.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %d", doomed.ID))
 		require.NoErrorf(t, err, "at %06d the cascade lets a raw user delete through on %s", pred, dbType())
-		assert.Zerof(t, countRefreshTokens000039(t, h, token.Id),
+		assert.Zerof(t, countRefreshTokens000039(t, h, token.ID),
 			"at %06d the cascade removes the token with its user on %s", pred, dbType())
 
 		require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
@@ -342,14 +342,14 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 
 	user := seedUser000039(t, h)
 	token := seedRefreshToken000039(t, h, record.RefreshToken{
-		UserId:   sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId: sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:   sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID: sql.NullInt64{Int64: client.ID, Valid: true},
 	})
 
-	_, err := h.SQL.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %d", user.Id))
+	_, err := h.SQL.Exec(fmt.Sprintf("DELETE FROM users WHERE id = %d", user.ID))
 	require.Errorf(t, err,
 		"a raw user delete must be REFUSED on %s once refresh_tokens.user_id is NO ACTION (goal 6)", dbType())
-	assert.Equalf(t, 1, countRefreshTokens000039(t, h, token.Id),
+	assert.Equalf(t, 1, countRefreshTokens000039(t, h, token.ID),
 		"the refused delete must leave the token in place on %s", dbType())
 
 	// The Go layer is exercised at the HEAD schema rather than at this migration's, because
@@ -363,9 +363,9 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	// And the invariant that makes all of this unobservable: DeleteUser clears the
 	// user's refresh tokens inside the same transaction, so the supported path still
 	// works. cascade_delete_test.go asserts the same thing across every dependent table.
-	require.NoErrorf(t, h.DB.DeleteUser(context.Background(), nil, user.Id),
+	require.NoErrorf(t, h.DB.DeleteUser(context.Background(), nil, user.ID),
 		"DeleteUser clears refresh tokens first, so it must still succeed on %s", dbType())
-	assert.Zerof(t, countRefreshTokens000039(t, h, token.Id),
+	assert.Zerof(t, countRefreshTokens000039(t, h, token.ID),
 		"DeleteUser must have removed the token on %s", dbType())
 }
 
@@ -385,12 +385,12 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
 	identifier := "c-" + fake.UUID()[:8]
-	return &record.Client{Id: seedClient(t, h, identifier), ClientIdentifier: identifier}
+	return &record.Client{ID: seedClient(t, h, identifier), ClientIdentifier: identifier}
 }
 
 func seedUser000039(t *testing.T, h *isolatedDB) *record.User {
 	t.Helper()
-	return &record.User{Id: seedUser(t, h, userSeed{Enabled: true})}
+	return &record.User{ID: seedUser(t, h, userSeed{Enabled: true})}
 }
 
 // seedCode000039 gives every column its own recognisable value, so a copy that crossed two
@@ -402,20 +402,20 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *re
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	code := &record.Code{
 		CodeHash:            "hash-" + fake.UUID(),
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		CodeChallenge:       challenge,
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: challenge.Valid},
 		Scope:               "openid profile scope-value",
 		State:               "state-value",
 		Nonce:               "nonce-value",
 		RedirectURI:         "https://example.com/redirect-uri-value",
-		IpAddress:           "203.0.113.7",
+		IPAddress:           "203.0.113.7",
 		UserAgent:           "user-agent-value",
 		ResponseMode:        "form_post",
 		AuthenticatedAt:     now.Add(-3 * time.Minute),
 		SessionIdentifier:   "session-identifier-value",
-		AcrLevel:            "urn:goiabada:level2_mandatory",
+		ACRLevel:            "urn:goiabada:level2_mandatory",
 		AuthMethods:         "pwd otp",
 		Used:                true,
 		Revoked:             true,
@@ -439,10 +439,10 @@ var codeColumns000039 = []string{
 // codeFields000039 are code's fields in codeColumns000039's order, as scan targets.
 func codeFields000039(code *record.Code) []any {
 	return []any{
-		&code.CreatedAt, &code.UpdatedAt, &code.CodeHash, &code.ClientId, &code.CodeChallenge,
-		&code.CodeChallengeMethod, &code.Scope, &code.State, &code.Nonce, &code.RedirectURI, &code.UserId,
-		&code.IpAddress, &code.UserAgent, &code.ResponseMode, &code.AuthenticatedAt, &code.SessionIdentifier,
-		&code.AcrLevel, &code.AuthMethods, &code.Used, &code.Revoked, &code.AuthStateGeneration,
+		&code.CreatedAt, &code.UpdatedAt, &code.CodeHash, &code.ClientID, &code.CodeChallenge,
+		&code.CodeChallengeMethod, &code.Scope, &code.State, &code.Nonce, &code.RedirectURI, &code.UserID,
+		&code.IPAddress, &code.UserAgent, &code.ResponseMode, &code.AuthenticatedAt, &code.SessionIdentifier,
+		&code.ACRLevel, &code.AuthMethods, &code.Used, &code.Revoked, &code.AuthStateGeneration,
 	}
 }
 
@@ -463,7 +463,7 @@ func insertCode000039(h *isolatedDB, code *record.Code) error {
 		return err
 	}
 	return h.SQL.QueryRowContext(context.Background(),
-		"SELECT id FROM codes WHERE code_hash = "+seedBindAt(1), code.CodeHash).Scan(&code.Id)
+		"SELECT id FROM codes WHERE code_hash = "+seedBindAt(1), code.CodeHash).Scan(&code.ID)
 }
 
 // refreshTokenColumns000039 are the refresh_tokens columns as 000039 leaves them, and the order
@@ -480,8 +480,8 @@ var refreshTokenColumns000039 = []string{
 // refreshTokenFields000039 are token's fields in refreshTokenColumns000039's order, as scan targets.
 func refreshTokenFields000039(token *record.RefreshToken) []any {
 	return []any{
-		&token.CreatedAt, &token.UpdatedAt, &token.CodeId, &token.UserId, &token.ClientId,
-		&token.RefreshTokenJti, &token.PreviousRefreshTokenJti, &token.FirstRefreshTokenJti,
+		&token.CreatedAt, &token.UpdatedAt, &token.CodeID, &token.UserID, &token.ClientID,
+		&token.RefreshTokenJTI, &token.PreviousRefreshTokenJTI, &token.FirstRefreshTokenJTI,
 		&token.SessionIdentifier, &token.RefreshTokenType, &token.Scope, &token.IssuedAt,
 		&token.ExpiresAt, &token.MaxLifetime, &token.Revoked, &token.AuthStateGeneration,
 	}
@@ -498,9 +498,9 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshTok
 	token := shape
 	token.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	token.UpdatedAt = sql.NullTime{Time: now, Valid: true}
-	token.RefreshTokenJti = "jti-" + fake.UUID()
-	token.PreviousRefreshTokenJti = "previous-jti-value"
-	token.FirstRefreshTokenJti = "first-jti-value"
+	token.RefreshTokenJTI = "jti-" + fake.UUID()
+	token.PreviousRefreshTokenJTI = "previous-jti-value"
+	token.FirstRefreshTokenJTI = "first-jti-value"
 	token.SessionIdentifier = "session-identifier-value"
 	token.RefreshTokenType = "Offline"
 	token.Scope = "openid offline_access"
@@ -521,7 +521,7 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshTok
 
 	require.NoError(t, h.SQL.QueryRowContext(context.Background(),
 		"SELECT id FROM refresh_tokens WHERE refresh_token_jti = "+seedBindAt(1),
-		token.RefreshTokenJti).Scan(&token.Id),
+		token.RefreshTokenJTI).Scan(&token.ID),
 		"read back the seeded refresh token's id")
 	return &token
 }
@@ -536,8 +536,8 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 
 	code := &record.Code{
 		CodeHash:            "hash-" + fake.UUID(),
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		CodeChallenge:       sql.NullString{},
 		CodeChallengeMethod: sql.NullString{},
 		Scope:               "openid",
@@ -545,7 +545,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   fake.UUID(),
-		AcrLevel:            "urn:goiabada:level1",
+		ACRLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 	}
 	err := insertCode000039(h, code)
@@ -557,7 +557,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 
 func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 	t.Helper()
-	code := &record.Code{Id: id}
+	code := &record.Code{ID: id}
 	read := "SELECT " + strings.Join(codeColumns000039, ", ") + " FROM codes WHERE id = " + seedBindAt(1)
 	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), read, id).Scan(codeFields000039(code)...),
 		"read code %d back", id)
@@ -566,7 +566,7 @@ func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 
 func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *record.RefreshToken {
 	t.Helper()
-	token := &record.RefreshToken{Id: id}
+	token := &record.RefreshToken{ID: id}
 	read := "SELECT " + strings.Join(refreshTokenColumns000039, ", ") + " FROM refresh_tokens WHERE id = " +
 		seedBindAt(1)
 	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), read, id).Scan(refreshTokenFields000039(token)...),

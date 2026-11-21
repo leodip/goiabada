@@ -150,14 +150,14 @@ func TestRegisterRoutes_TheListedRoutesCarryNoBrowserSession(t *testing.T) {
 	} {
 		t.Run(route.name+" "+route.method, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.Settings{Id: 1, Issuer: "https://issuer.example"}, nil).Maybe()
+			database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.Settings{ID: 1, Issuer: "https://issuer.example"}, nil).Maybe()
 			database.On("GetAllSigningKeys", mock.Anything, mock.Anything).
 				Return([]record.KeyPair{currentSigningKey()}, nil).Maybe()
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "shop").
-				Return(&record.Client{Id: 3, ClientIdentifier: "shop"}, nil).Maybe()
-			database.On("GetClientLogoByClientId", mock.Anything, mock.Anything, int64(3)).
-				Return(&record.ClientLogo{ClientId: 3, Logo: logo, ContentType: "image/png"}, nil).Maybe()
+				Return(&record.Client{ID: 3, ClientIdentifier: "shop"}, nil).Maybe()
+			database.On("GetClientLogoByClientID", mock.Anything, mock.Anything, int64(3)).
+				Return(&record.ClientLogo{ClientID: 3, Logo: logo, ContentType: "image/png"}, nil).Maybe()
 			// The pointer dangles: the user session it names is gone. A lookup would find nothing.
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, endedUserSession).
 				Return(nil, nil).Maybe()
@@ -246,9 +246,9 @@ const guardIssuer = "https://issuer.example"
 // answerEveryOtherCallWithNothing, whose nothing would refuse it.
 func armGuardBearerToken(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
-		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+		Return(&record.Client{ID: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
-		Return(&record.User{Id: 7, Subject: routesTestSubject, Enabled: true}, nil).Maybe()
+		Return(&record.User{ID: 7, Subject: routesTestSubject, Enabled: true}, nil).Maybe()
 }
 
 // guardRequest is the request the guard sends a route, by the method and the name the walk gives it.
@@ -305,8 +305,8 @@ func (rr *routeReached) last() string {
 // static files' a file that exists.
 func TestRegisterRoutes_NoRouteOutsideThePageBranchSendsACookie(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "Goiabada", Issuer: guardIssuer}, nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "Goiabada", Issuer: guardIssuer}, nil).Maybe()
 	armGuardBearerToken(database)
 	answerEveryOtherCallWithNothing(database)
 	reached := &routeReached{}

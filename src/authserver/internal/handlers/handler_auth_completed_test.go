@@ -75,36 +75,36 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "203.0.113.7").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "203.0.113.7").Return(userSession, nil)
 
 		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -177,12 +177,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, crossUserTerminateTx, userSession.SessionIdentifier).
 			Return(tokens, nil).Once()
 		for i := range tokens {
-			jti := tokens[i].RefreshTokenJti
+			jti := tokens[i].RefreshTokenJTI
 			database.On("UpdateRefreshToken", mock.Anything, crossUserTerminateTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-				return rt.RefreshTokenJti == jti
+				return rt.RefreshTokenJTI == jti
 			})).Return(nil).Once()
 		}
-		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, userSession.Id).Return(nil).Once()
+		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, userSession.ID).Return(nil).Once()
 	}
 
 	t.Run("Valid session belonging to another user is terminated and replaced", func(t *testing.T) {
@@ -238,10 +238,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		})).Return(authContext, nil)
 
 		foreignSession := &record.UserSession{
-			Id:                7,
-			UserId:            1,
+			ID:                7,
+			UserID:            1,
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          record.AcrLevel2Mandatory,
+			ACRLevel:          record.ACRLevel2Mandatory,
 			AuthMethods:       "pwd otp",
 			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
 		}
@@ -249,10 +249,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -268,7 +268,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		var sequence []string
 
 		stubCrossUserTermination(database, foreignSession, 2, []*record.RefreshToken{
-			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
+			{ID: 11, RefreshTokenJTI: "rt-of-user-1"},
 		}, func(step string) { sequence = append(sequence, step) })
 
 		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
@@ -302,21 +302,21 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:                8,
+			ID:                8,
 			SessionIdentifier: "new-session-of-user-2",
-			UserId:            2,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            2,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          newAuthTime,
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
+			signedInAs(int64(2), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
 			Run(func(mock.Arguments) { sequence = append(sequence, "session-created") }).
 			Return(newSession, nil, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 2, "new-session-of-user-2")
 
-		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
+		user := &record.User{ID: 2, Enabled: true, AuthStateGeneration: 3}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -324,7 +324,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// level2_mandatory. This is the assertion the higher ambient ACR above exists for.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.AcrLevel1 &&
+				ac.AcrLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -446,10 +446,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		})).Return(authContext, nil)
 
 		foreignSession := &record.UserSession{
-			Id:                7,
-			UserId:            1,
+			ID:                7,
+			UserID:            1,
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          record.AcrLevel2Mandatory,
+			ACRLevel:          record.ACRLevel2Mandatory,
 			AuthMethods:       "pwd otp",
 			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
 		}
@@ -457,10 +457,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -479,25 +479,25 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:                8,
+			ID:                8,
 			SessionIdentifier: "new-session-of-user-2",
-			UserId:            2,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            2,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          newAuthTime,
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
+			signedInAs(int64(2), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 2, "new-session-of-user-2")
 
-		user := &record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
+		user := &record.User{ID: 2, Enabled: true, AuthStateGeneration: 3}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.AcrLevel1 &&
+				ac.AcrLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -570,10 +570,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		})).Return(authContext, nil)
 
 		ownSession := &record.UserSession{
-			Id:                7,
-			UserId:            1,
+			ID:                7,
+			UserID:            1,
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          record.AcrLevel2Mandatory,
+			ACRLevel:          record.ACRLevel2Mandatory,
 			AuthMethods:       "pwd otp",
 			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
 		}
@@ -581,10 +581,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, ownSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -608,20 +608,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		newAuthTime := time.Now().UTC()
 		newSession := &record.UserSession{
-			Id:                8,
+			ID:                8,
 			SessionIdentifier: "new-session-of-user-1",
-			UserId:            1,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            1,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          newAuthTime,
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-			signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
+			signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 			Return(newSession, []usersession.Removal{{Session: *ownSession, Reason: "replaced_by_sign_in"}}, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
-		user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true, AuthStateGeneration: 3}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -629,7 +629,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the acr of a token bound to the level1 session this ceremony just created.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.AcrLevel1 &&
+				ac.AcrLevel == record.ACRLevel1 &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
 
@@ -668,10 +668,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		{
 			name: "a replacement failure after the commit audits the rows it removed and answers 500",
 			removed: []usersession.Removal{
-				{Session: record.UserSession{Id: 7, UserId: 1}, Reason: "replaced_by_sign_in"},
+				{Session: record.UserSession{ID: 7, UserID: 1}, Reason: "replaced_by_sign_in"},
 				// Another user's session on the same device: the event names its own user, not the
 				// one signing in (#780 decision 5).
-				{Session: record.UserSession{Id: 9, UserId: 5}, Reason: "same_device"},
+				{Session: record.UserSession{ID: 9, UserID: 5}, Reason: "same_device"},
 			},
 			events: []string{audit.EventDeletedUserSession, audit.EventDeletedUserSession},
 		},
@@ -722,15 +722,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-			ownSession := &record.UserSession{Id: 7, UserId: 1, SessionIdentifier: sessionIdentifier}
+			ownSession := &record.UserSession{ID: 7, UserID: 1, SessionIdentifier: sessionIdentifier}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(ownSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, ownSession).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
-				Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, AuthorizationCodeEnabled: true,
+				ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1, AuthorizationCodeEnabled: true,
 			}, nil)
 			userSessionManager.On("HasValidUserSession", ownSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true, AuthStateGeneration: 3}, nil)
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true, AuthStateGeneration: 3}, nil)
 
 			var events []string
 			var auditedIds []int64
@@ -746,10 +746,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			}).Return().Maybe()
 
 			startError := errors.New("unable to rotate the browser session identifier")
-			started := &record.UserSession{Id: 10, SessionIdentifier: "new-session-of-user-1", UserId: 1}
+			started := &record.UserSession{ID: 10, SessionIdentifier: "new-session-of-user-1", UserID: 1}
 			var minted string
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-				signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
+				signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "203.0.113.7", ownSession, testSessionLimits).
 				Return(started, tc.removed, nil)
 			rotateError := errors.New("the backend refused the write")
 			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1", (*bool)(nil)).
@@ -771,7 +771,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			wantIds := []int64(nil)
 			wantReasons := []interface{}(nil)
 			for _, removal := range tc.removed {
-				wantIds = append(wantIds, removal.Session.Id)
+				wantIds = append(wantIds, removal.Session.ID)
 				wantReasons = append(wantReasons, removal.Reason)
 			}
 			assert.Equal(t, wantIds, auditedIds)
@@ -843,10 +843,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		})).Return(authContext, nil)
 
 		foreignSession := &record.UserSession{
-			Id:                7,
-			UserId:            1,
+			ID:                7,
+			UserID:            1,
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          record.AcrLevel2Mandatory,
+			ACRLevel:          record.ACRLevel2Mandatory,
 			AuthMethods:       "pwd otp",
 			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
 		}
@@ -854,17 +854,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).
-			Return(&record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(2)).
+			Return(&record.User{ID: 2, Enabled: true, AuthStateGeneration: 3}, nil)
 
 		// The deletion fails, which since #139 is the FIRST write inside the transaction: it is the
 		// statement that takes the session row, and the two sweeps follow it. So the deferred
@@ -872,7 +872,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		deleteError := errors.New("the session delete failed")
 		stub := datamocks.ExpectRunInTransaction(database, crossUserTerminateTx)
 		expectForeignSessionApps(database, crossUserTerminateTx, foreignSession)
-		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, foreignSession.Id).
+		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, foreignSession.ID).
 			Return(deleteError).Once()
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -967,10 +967,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		})).Return(authContext, nil)
 
 		foreignSession := &record.UserSession{
-			Id:                7,
-			UserId:            1,
+			ID:                7,
+			UserID:            1,
 			SessionIdentifier: sessionIdentifier,
-			AcrLevel:          record.AcrLevel2Mandatory,
+			ACRLevel:          record.ACRLevel2Mandatory,
 			AuthMethods:       "pwd otp",
 			AuthTime:          time.Now().UTC().Add(-10 * time.Minute),
 		}
@@ -978,21 +978,21 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).
-			Return(&record.User{Id: 2, Enabled: true, AuthStateGeneration: 3}, nil).Once()
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(2)).
+			Return(&record.User{ID: 2, Enabled: true, AuthStateGeneration: 3}, nil).Once()
 
 		var sequence []string
 		stubCrossUserTermination(database, foreignSession, 2, []*record.RefreshToken{
-			{Id: 11, RefreshTokenJti: "rt-of-user-1"},
+			{ID: 11, RefreshTokenJTI: "rt-of-user-1"},
 		}, func(step string) { sequence = append(sequence, step) })
 
 		recordEvent := func(args mock.Arguments) { sequence = append(sequence, args.Get(1).(string)) }
@@ -1006,7 +1006,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		startError := errors.New("the replacement session could not be created")
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-			signedInAs(int64(2), "pwd", record.AcrLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(nil, nil, startError)
+			signedInAs(int64(2), "pwd", record.ACRLevel1, &pwdAuthTime), int64(3), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(nil, nil, startError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == startError.Error()
@@ -1099,19 +1099,19 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// was written with the captured instant" are distinguishable.
 		oldAuthTime := time.Now().UTC().Add(-4 * time.Hour)
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: oldAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1127,17 +1127,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// itself, so it raises the session rather than replacing its authentication.
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			mock.MatchedBy(func(a usersession.Authentication) bool {
-				return a.AcrLevel == record.AcrLevel1 && a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
+				return a.AcrLevel == record.ACRLevel1 && a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
 					a.PasswordAuthTime == nil
 			}), false, "").Return(&refreshed, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1206,15 +1206,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:          1,
-			UserId:      1,
-			AcrLevel:    record.AcrLevel2Mandatory,
+			ID:          1,
+			UserID:      1,
+			ACRLevel:    record.ACRLevel2Mandatory,
 			AuthMethods: "pwd otp",
 			AuthTime:    time.Now().UTC().Add(-3 * time.Hour),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
-		client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, AuthorizationCodeEnabled: true}
+		client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1, AuthorizationCodeEnabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
@@ -1222,10 +1222,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// bind replaces the session's authentication with this one, its password's instant
 		// included, and answers the row as it wrote it (#542).
 		replaced := *userSession
-		replaced.AcrLevel, replaced.AuthMethods, replaced.AuthTime = record.AcrLevel1, "pwd", pwdAuthTime
+		replaced.ACRLevel, replaced.AuthMethods, replaced.AuthTime = record.ACRLevel1, "pwd", pwdAuthTime
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 			mock.MatchedBy(func(a usersession.Authentication) bool {
-				return a.UserId == 1 && a.AcrLevel == record.AcrLevel1 && a.AuthMethods == "pwd" &&
+				return a.UserId == 1 && a.AcrLevel == record.ACRLevel1 && a.AuthMethods == "pwd" &&
 					a.AuthTime != nil && a.AuthTime.Equal(pwdAuthTime) &&
 					a.PasswordAuthTime != nil && a.PasswordAuthTime.Equal(pwdAuthTime)
 			}), true, "").Return(&replaced, nil).Once()
@@ -1234,15 +1234,15 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// answer (#743).
 		ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyId, (*bool)(nil)).Return(nil).Once()
 
-		user := &record.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", user).Return("openid", nil)
 
 		// The code /auth/issue mints carries these: acr level 1, amr ["pwd"], auth_time the
 		// password's instant, all three about the same authentication.
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
-				ac.AcrLevel == record.AcrLevel1 && ac.AuthMethods == "pwd" &&
+				ac.AcrLevel == record.ACRLevel1 && ac.AuthMethods == "pwd" &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(pwdAuthTime)
 		})).Return(nil)
 
@@ -1308,26 +1308,26 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		// No UpdateUserSession expectation: a zero timestamp is not authentication, so
 		// AuthTime must not be refreshed. Reaching it fails the case on the strict mock.
@@ -1335,10 +1335,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1422,10 +1422,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1436,24 +1436,24 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// Expect StartNewUserSession to be called instead of BumpUserSession
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "new-session-of-user-1",
-			UserId:            1,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            1,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          sessionAuthTime,
 		}
 		var minted string
-		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:                  1,
+			ID:                  1,
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1537,20 +1537,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:                  9,
-			UserId:              1,
-			AcrLevel:            record.AcrLevel2Optional,
+			ID:                  9,
+			UserID:              1,
+			ACRLevel:            record.ACRLevel2Optional,
 			AuthTime:            sessionAuthTime,
-			OtpConfigGeneration: 3,
+			OTPConfigGeneration: 3,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel2Optional,
+			DefaultACRLevel:          record.ACRLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1566,16 +1566,16 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
+			boundWith("pwd otp", record.ACRLevel2Optional), mock.Anything, "").Return(userSession, nil)
 
 		// The bound session's id, not the user's, and the captured value, not the user's
 		// current counter, which this handler never reads.
-		database.On("PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, int64(9), int64(4)).Return(nil)
+		database.On("PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, int64(9), int64(4)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1587,7 +1587,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
-		assert.EqualValues(t, 4, userSession.OtpConfigGeneration,
+		assert.EqualValues(t, 4, userSession.OTPConfigGeneration,
 			"the in-memory session must carry what was written, since the ACR below is taken against it")
 
 		pageRenderer.AssertExpectations(t)
@@ -1647,20 +1647,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:                  9,
-			UserId:              1,
-			AcrLevel:            record.AcrLevel1,
+			ID:                  9,
+			UserID:              1,
+			ACRLevel:            record.ACRLevel1,
 			AuthTime:            sessionAuthTime,
-			OtpConfigGeneration: 3,
+			OTPConfigGeneration: 3,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1676,12 +1676,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("pwd", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("pwd", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1692,8 +1692,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		assert.EqualValues(t, 3, userSession.OtpConfigGeneration,
+		database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		assert.EqualValues(t, 3, userSession.OTPConfigGeneration,
 			"the session must still owe its level 2 re-prompt")
 
 		pageRenderer.AssertExpectations(t)
@@ -1754,20 +1754,20 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:                  9,
-			UserId:              1,
-			AcrLevel:            record.AcrLevel2Optional,
+			ID:                  9,
+			UserID:              1,
+			ACRLevel:            record.ACRLevel2Optional,
 			AuthTime:            sessionAuthTime,
-			OtpConfigGeneration: 3,
+			OTPConfigGeneration: 3,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel2Optional,
+			DefaultACRLevel:          record.ACRLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1783,12 +1783,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("pwd otp", record.AcrLevel2Optional), mock.Anything, "").Return(userSession, nil)
+			boundWith("pwd otp", record.ACRLevel2Optional), mock.Anything, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 3}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 3}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1799,7 +1799,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -1865,10 +1865,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel2Optional,
+			DefaultACRLevel:          record.ACRLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -1876,17 +1876,17 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		newUserSession := &record.UserSession{
-			Id:                  1,
+			ID:                  1,
 			SessionIdentifier:   "new-session-of-user-1",
-			UserId:              1,
-			AcrLevel:            record.AcrLevel2Optional,
+			UserID:              1,
+			ACRLevel:            record.ACRLevel2Optional,
 			AuthTime:            time.Now().UTC(),
-			OtpConfigGeneration: 4,
+			OTPConfigGeneration: 4,
 		}
 		var minted string
 		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
 			signedInWith(usersession.Authentication{
-				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional,
+				UserId: 1, AuthMethods: "pwd otp", AcrLevel: record.ACRLevel2Optional,
 				AuthTime: &pwdAuthTime, PasswordAuthTime: &pwdAuthTime,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &captured},
 			}), int64(7), &captured, aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
@@ -1894,8 +1894,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
-		user := &record.User{Id: 1, Enabled: true, OTPEnabled: true, AuthStateGeneration: 7, OtpConfigGeneration: 4}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		user := &record.User{ID: 1, Enabled: true, OTPEnabled: true, AuthStateGeneration: 7, OTPConfigGeneration: 4}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -1912,7 +1912,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		// The create arm never calls the promote: StartNewUserSession writes the column on
 		// insert, and a second write would be a no-op at best and a race at worst.
-		database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 		pageRenderer.AssertExpectations(t)
 		ceremonyStore.AssertExpectations(t)
@@ -2088,19 +2088,19 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2108,10 +2108,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": int64(1),
@@ -2193,18 +2193,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2212,10 +2212,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": int64(1),
@@ -2293,18 +2293,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2312,10 +2312,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": int64(1),
@@ -2389,18 +2389,18 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2408,10 +2408,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 			"user_id": int64(1),
@@ -2482,36 +2482,36 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC().Add(-5 * time.Minute)
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: sessionAuthTime,
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		// SSO reuse: no UpdateUserSession call (AuthTime is NOT refreshed)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		// Simulate the scope being filtered to an empty string
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
@@ -2589,33 +2589,33 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
@@ -2684,33 +2684,33 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
@@ -2777,33 +2777,33 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		userSession := &record.UserSession{
-			Id:       1,
-			UserId:   1,
-			AcrLevel: record.AcrLevel1,
+			ID:       1,
+			UserID:   1,
+			ACRLevel: record.ACRLevel1,
 			AuthTime: time.Now().UTC().Add(-5 * time.Minute),
 		}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-			boundWith("", record.AcrLevel1), mock.Anything, "").Return(userSession, nil)
+			boundWith("", record.ACRLevel1), mock.Anything, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:      1,
+			ID:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
@@ -2883,10 +2883,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          true,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -2895,24 +2895,24 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "new-session-of-user-1",
-			UserId:            1,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            1,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          sessionAuthTime,
 		}
 		var minted string
-		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:                  1,
+			ID:                  1,
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
@@ -2991,10 +2991,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false, // Note: This is false, but consent should still be required due to offline_access
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -3003,24 +3003,24 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "new-session-of-user-1",
-			UserId:            1,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            1,
+			ACRLevel:          record.ACRLevel1,
 			AuthTime:          sessionAuthTime,
 		}
 		var minted string
-		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.AcrLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
+		userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), signedInAs(int64(1), "pwd", record.ACRLevel1, &pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).Return(newUserSession, nil, nil)
 		expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 
 		auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
 
 		user := &record.User{
-			Id:                  1,
+			ID:                  1,
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile offline_access", user).Return("openid profile offline_access", nil)
 
@@ -3111,10 +3111,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -3191,10 +3191,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			ConsentRequired:          false,
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -3282,15 +3282,15 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-			userSession := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel1, AuthMethods: "pwd"}
+			userSession := &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel1, AuthMethods: "pwd"}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(true)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil).Once()
 
 			failure := errors.New("write failed")
 			errAt := func(step int) error {
@@ -3302,7 +3302,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 
 			// The check is handed the authentication the bind would be, and finds nothing newer.
 			userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier,
-				boundWith("pwd otp", record.AcrLevel2Optional)).Return(false, errAt(precheck)).Once()
+				boundWith("pwd otp", record.ACRLevel2Optional)).Return(false, errAt(precheck)).Once()
 			if tc.failedAt > precheck {
 				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(errAt(regenerate)).Once()
 			}
@@ -3313,10 +3313,10 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 					bound = userSession
 				}
 				userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
-					boundWith("pwd otp", record.AcrLevel2Optional), false, "").Return(bound, bindErr).Once()
+					boundWith("pwd otp", record.ACRLevel2Optional), false, "").Return(bound, bindErr).Once()
 			}
 			if tc.failedAt > bind {
-				database.On("PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, int64(9), int64(4)).
+				database.On("PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, int64(9), int64(4)).
 					Return(errAt(promote)).Once()
 			}
 			pageRenderer.On("InternalServerError", rr, req, failure).Return().Once()
@@ -3334,7 +3334,7 @@ func TestHandleAuthCompletedGet_ReuseArmFailures(t *testing.T) {
 					mock.Anything, mock.Anything, mock.Anything)
 			}
 			if tc.failedAt < promote {
-				database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything,
+				database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything,
 					mock.Anything, mock.Anything)
 			}
 		})
@@ -3366,7 +3366,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 	}{
 		{
 			name:    "reuse arm",
-			session: &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel1, AuthMethods: "pwd"},
+			session: &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel1, AuthMethods: "pwd"},
 			valid:   true,
 		},
 		{
@@ -3375,7 +3375,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 		},
 		{
 			name: "create arm with another user's session to end",
-			session: &record.UserSession{Id: 9, UserId: 2, SessionIdentifier: "test-session", AcrLevel: record.AcrLevel1,
+			session: &record.UserSession{ID: 9, UserID: 2, SessionIdentifier: "test-session", ACRLevel: record.ACRLevel1,
 				AuthMethods: "pwd"},
 			valid:              true,
 			level1Completed:    true,
@@ -3386,7 +3386,7 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 			// in hand, which a refusal leaves as it is: only another user's session is ended (#133).
 			// The identifier lets a wrong termination reach the strict database mock.
 			name: "create arm with the user's own session no longer reusable",
-			session: &record.UserSession{Id: 9, UserId: 1, SessionIdentifier: "test-session", AcrLevel: record.AcrLevel1,
+			session: &record.UserSession{ID: 9, UserID: 1, SessionIdentifier: "test-session", ACRLevel: record.ACRLevel1,
 				AuthMethods: "pwd"},
 			valid:           false,
 			level1Completed: true,
@@ -3403,29 +3403,29 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 		hint     string
 		clearErr error
 	}{
-		{name: "a disabled user", user: &record.User{Id: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration}},
+		{name: "a disabled user", user: &record.User{ID: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration}},
 		{name: "a disabled user whose generation also moved on",
-			user: &record.User{Id: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration + 1}},
-		{name: "a moved-on generation", user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration + 1}},
+			user: &record.User{ID: 1, Enabled: false, AuthStateGeneration: ceremonyGeneration + 1}},
+		{name: "a moved-on generation", user: &record.User{ID: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration + 1}},
 		// The ceremony names a code and the user's authenticator was removed while it was in
 		// flight: binding would put otp back on the session the removal lowered (#542 decision 1).
 		{name: "an authenticator removed since the ceremony named its code",
-			user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration}, methods: "pwd otp"},
+			user: &record.User{ID: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration}, methods: "pwd otp"},
 		// Removed and another set up: the code still came from the one removed (#542 review).
 		{name: "an authenticator replaced since the ceremony named its code",
-			user: &record.User{Id: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration, OTPEnabled: true,
-				OtpConfigGeneration: claimGeneration + 2}, methods: "pwd otp"},
+			user: &record.User{ID: 1, Enabled: true, AuthStateGeneration: ceremonyGeneration, OTPEnabled: true,
+				OTPConfigGeneration: claimGeneration + 2}, methods: "pwd otp"},
 		{name: "a missing user"},
 		{name: "a user who is not the id_token_hint's",
-			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			user: &record.User{ID: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
 			hint: "the-hint"},
 		// A clear the store fails answers server_error in place of login_required, and one finding
 		// the ceremony replaced the "no longer active" page, with nothing to the client (#141, #579).
 		{name: "a user who is not the id_token_hint's, and a failing clear",
-			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			user: &record.User{ID: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
 			hint: "the-hint", clearErr: errors.New("the session store is unreachable")},
 		{name: "a user who is not the id_token_hint's, and a clear finding the ceremony replaced",
-			user: &record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
+			user: &record.User{ID: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: ceremonyGeneration},
 			hint: "the-hint", clearErr: ceremony.ErrCeremonyReplaced},
 	}
 
@@ -3478,12 +3478,12 @@ func TestHandleAuthCompletedGet_DecidesOnTheUserBeforeBinding(t *testing.T) {
 
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(arm.session, nil)
 				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, arm.session).Return(nil)
-				client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
+				client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1,
 					AuthorizationCodeEnabled: true}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 				userSessionManager.On("HasValidUserSession", arm.session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 					mock.AnythingOfType("*int64")).Return(arm.valid)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(u.user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(u.user, nil)
 
 				switch {
 				case u.user == nil:
@@ -3616,18 +3616,18 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-			foreignSession := &record.UserSession{Id: 9, UserId: 2, SessionIdentifier: sessionIdentifier,
-				AcrLevel: record.AcrLevel1, AuthMethods: "pwd"}
+			foreignSession := &record.UserSession{ID: 9, UserID: 2, SessionIdentifier: sessionIdentifier,
+				ACRLevel: record.ACRLevel1, AuthMethods: "pwd"}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 				Return(foreignSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, foreignSession).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1,
 				AuthorizationCodeEnabled: true}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(true)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: 7}, nil)
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Subject: "someone-else", Enabled: true, AuthStateGeneration: 7}, nil)
 
 			switch {
 			case errors.Is(tc.confirmErr, ceremony.ErrCeremonyReplaced):
@@ -3669,10 +3669,10 @@ func TestHandleAuthCompletedGet_AHintRefusalEndsTheForeignSessionOnlyWhileItHold
 // has a back-channel logout URI. Maybe, since a foreign session past its lifetime reads none of
 // them; which sessions tell their apps is revocation_test.go's and the integration tier's to show.
 func expectForeignSessionApps(database *datamocks.Database, tx *sql.Tx, foreignSession *record.UserSession) {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), foreignSession.UserId).
-		Return(&record.User{Id: foreignSession.UserId, Subject: "previous-user"}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), foreignSession.UserID).
+		Return(&record.User{ID: foreignSession.UserID, Subject: "previous-user"}, nil).Maybe()
 	database.On("AcquireUserSessionRow", mock.Anything, tx, foreignSession.SessionIdentifier).Return(true, nil).Maybe()
-	database.On("GetCommittedUserSessionClients", mock.Anything, tx, foreignSession.Id).
+	database.On("GetCommittedUserSessionClients", mock.Anything, tx, foreignSession.ID).
 		Return([]record.UserSessionClient{}, nil).Maybe()
 }
 
@@ -3689,30 +3689,30 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 	tx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(database, tx)
 	expectForeignSessionApps(database, tx, foreignSession)
-	database.On("DeleteUserSession", mock.Anything, tx, foreignSession.Id).Return(nil).Once()
+	database.On("DeleteUserSession", mock.Anything, tx, foreignSession.ID).Return(nil).Once()
 	database.On("RevokeCodesBySessionIdentifier", mock.Anything, tx, foreignSession.SessionIdentifier).
 		Return(int64(1), nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, foreignSession.SessionIdentifier).
-		Return([]*record.RefreshToken{{Id: 11, RefreshTokenJti: "rt-of-the-previous-user"}}, nil).Once()
+		Return([]*record.RefreshToken{{ID: 11, RefreshTokenJTI: "rt-of-the-previous-user"}}, nil).Once()
 	database.On("UpdateRefreshToken", mock.Anything, tx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-		return rt.RefreshTokenJti == "rt-of-the-previous-user" && rt.Revoked
+		return rt.RefreshTokenJTI == "rt-of-the-previous-user" && rt.Revoked
 	})).Return(nil).Once()
 
 	auditLogger.On("Log", mock.Anything, audit.EventCrossUserSessionReplaced, map[string]interface{}{
 		"user_id":                     int64(1),
-		"previous_user_id":            foreignSession.UserId,
+		"previous_user_id":            foreignSession.UserID,
 		"previous_session_identifier": foreignSession.SessionIdentifier,
 		"client_id":                   int64(1),
 	}).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
-		"user_session_id": foreignSession.Id,
-		"user_id":         foreignSession.UserId,
+		"user_session_id": foreignSession.ID,
+		"user_id":         foreignSession.UserID,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 	}).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventTerminatedUserSession, map[string]interface{}{
-		"user_id":                    foreignSession.UserId,
-		"user_session_id":            foreignSession.Id,
+		"user_id":                    foreignSession.UserID,
+		"user_session_id":            foreignSession.ID,
 		"session_identifier":         foreignSession.SessionIdentifier,
 		"logged_in_user":             "",
 		"revoked_code_count":         int64(1),
@@ -3722,7 +3722,7 @@ func expectForeignSessionEnded(ceremonyStore *handlersmocks.CeremonyStore, datab
 
 // signedInAs is what /auth/completed hands the session manager for a sign-in by userId that entered
 // a password at at and no code after it, so the password's instant is the credential's.
-func signedInAs(userId int64, methods string, acr record.AcrLevel, at *time.Time) interface{} {
+func signedInAs(userId int64, methods string, acr record.ACRLevel, at *time.Time) interface{} {
 	return signedInWith(usersession.Authentication{UserId: userId, AuthMethods: methods, AcrLevel: acr, AuthTime: at,
 		PasswordAuthTime: at})
 }
@@ -3736,7 +3736,7 @@ func signedInWith(want usersession.Authentication) interface{} {
 
 // boundWith matches the authentication /auth/completed binds a reused session with, on its methods
 // and level.
-func boundWith(methods string, acr record.AcrLevel) interface{} {
+func boundWith(methods string, acr record.ACRLevel) interface{} {
 	return mock.MatchedBy(func(a usersession.Authentication) bool { return a.AuthMethods == methods && a.AcrLevel == acr })
 }
 
@@ -3793,18 +3793,18 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 
 			var session *record.UserSession
 			if !create {
-				session = &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
-					OtpConfigGeneration: generation}
+				session = &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel2Mandatory, AuthMethods: "pwd otp",
+					OTPConfigGeneration: generation}
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Mandatory}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Mandatory}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(!create)
 			// The check before binding still sees the authenticator the code came from.
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: generation}, nil).Once()
 
 			removed := errs.WithStack(otpcredential.ErrAuthenticatorRemoved)
 			claimed := mock.MatchedBy(func(a usersession.Authentication) bool {
@@ -3830,7 +3830,7 @@ func TestHandleAuthCompletedGet_AnAuthenticatorRemovedAtTheWriteRestarts(t *test
 			require.Equal(t, http.StatusFound, rr.Code)
 			assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
 		})
@@ -3922,16 +3922,16 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 
 			// A level 3 session holding pwd otp, at a level 1 client, so neither case raises a
 			// privilege and the identifier is not rotated before the bind.
-			session := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel2Mandatory, AuthMethods: "pwd otp",
-				OtpConfigGeneration: generation}
+			session := &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel2Mandatory, AuthMethods: "pwd otp",
+				OTPConfigGeneration: generation}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(true)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: generation}, nil).Once()
 
 			userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1),
 				mock.MatchedBy(tc.handed), tc.replace, "").
@@ -3944,7 +3944,7 @@ func TestHandleAuthCompletedGet_AStaleBindAtTheWriteIsAnsweredAsReplaced(t *test
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "PromoteUserSessionOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "PromoteUserSessionOTPConfigGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything)
 		})
@@ -4010,16 +4010,16 @@ func TestHandleAuthCompletedGet_AStaleCeremonyIsRefusedBeforeItRotates(t *testin
 			}
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-			session := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel1, AuthMethods: "pwd",
-				AuthTime: adopted, OtpConfigGeneration: generation}
+			session := &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel1, AuthMethods: "pwd",
+				AuthTime: adopted, OTPConfigGeneration: generation}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(session, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, session).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Mandatory}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Mandatory}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 				mock.AnythingOfType("*int64")).Return(true)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: generation}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: generation}, nil).Once()
 
 			// The check is handed the authentication the bind would be: the adopted instant and the
 			// code's.
@@ -4102,20 +4102,20 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
-				Id:                       1,
+				ID:                       1,
 				ClientIdentifier:         "test-client",
 				ConsentRequired:          tc.consentRequired,
-				DefaultAcrLevel:          record.AcrLevel1,
+				DefaultACRLevel:          record.ACRLevel1,
 				AuthorizationCodeEnabled: true,
 			}, nil)
 			userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 			var minted string
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1), mock.Anything, int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "", (*record.UserSession)(nil), testSessionLimits).
-				Return(&record.UserSession{Id: 1, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1, AuthTime: time.Now().UTC()}, nil, nil)
+				Return(&record.UserSession{ID: 1, SessionIdentifier: "new-session-of-user-1", UserID: 1, ACRLevel: record.ACRLevel1, AuthTime: time.Now().UTC()}, nil, nil)
 			expectNewSessionBound(ceremonyStore, rr, req, 1, "new-session-of-user-1")
 			auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()
-			user := &record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+			user := &record.User{ID: 1, Enabled: true, AuthStateGeneration: 7}
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
@@ -4173,9 +4173,9 @@ func TestHandleAuthCompletedGet_ASaveFindingItsCeremonyReplacedAnswersNoLongerAc
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(&record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
-			DefaultAcrLevel:          record.AcrLevel1,
+			DefaultACRLevel:          record.ACRLevel1,
 			AuthorizationCodeEnabled: true,
 		}, nil)
 		userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)

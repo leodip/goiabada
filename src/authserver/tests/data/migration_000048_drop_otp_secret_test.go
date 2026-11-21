@@ -15,11 +15,11 @@ import (
 // because unlike 000047 nothing in production code names this number: the drop has no pre-flight
 // and no Go-side gate, which is decision 8 of #359 and is the whole of what ships with it.
 const (
-	beforeDropOtpSecret000048 = 47
-	dropOtpSecret000048       = 48
+	beforeDropOTPSecret000048 = 47
+	dropOTPSecret000048       = 48
 )
 
-// TestMigration000048_DropOtpSecret exercises the migration that removes users.otp_secret, the
+// TestMigration000048_DropOTPSecret exercises the migration that removes users.otp_secret, the
 // plaintext TOTP seed column (#98, #262), against a REAL engine of the configured dialect (see
 // migration_testdb_helper_test.go).
 //
@@ -47,8 +47,8 @@ const (
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000048_DropOtpSecret
-func TestMigration000048_DropOtpSecret(t *testing.T) {
+//	--run TestMigration000048_DropOTPSecret
+func TestMigration000048_DropOTPSecret(t *testing.T) {
 	t.Parallel()
 
 	h := newIsolatedDB(t)
@@ -65,7 +65,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	// 000047 for a reason this migration does not own (#510). otp_secret_encrypted is bound as
 	// bytes, the one value no engine-neutral literal can carry; record.User carries no
 	// OTPSecret field since #98.
-	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048),
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOTPSecret000048),
 		"migrate an empty database up to 000047 on %s", dbType())
 
 	// 3, first half: the shape 000047 leaves the column in, which is what a roll back has to
@@ -79,7 +79,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	encrypted, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
 
-	user := &record.User{Id: seedUser(t, h, userSeed{
+	user := &record.User{ID: seedUser(t, h, userSeed{
 		Enabled:            true,
 		Subject:            "00000000-0000-0000-0000-000000048001",
 		Username:           "mig48user",
@@ -89,7 +89,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		OTPSecretEncrypted: encrypted,
 	})}
 
-	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOtpSecret000048), "apply 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOTPSecret000048), "apply 000048 on %s", dbType())
 
 	// 1. Gone from the catalog.
 	afterDrop := schemadump.TableShape(dumpTable(t, h, "users"))
@@ -110,9 +110,9 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	// declares, so a read at 000048 would fail on the next column any migration adds to users, for
 	// a reason this migration does not own (#510). The dropped column stays dropped on the way.
 	require.NoErrorf(t, h.Migrator.Up(context.Background()), "migrate to head on %s", dbType())
-	got, err := h.DB.GetUserById(context.Background(), nil, user.Id)
-	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
-	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.Id)
+	got, err := h.DB.GetUserByID(context.Background(), nil, user.ID)
+	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.ID, dbType())
+	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.ID)
 	assert.Truef(t, got.OTPEnabled, "the drop must not disturb otp_enabled on %s", dbType())
 
 	decrypted, err := dataCipher.Decrypt(got.OTPSecretEncrypted)
@@ -123,7 +123,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 
 	// 3, second half. The down statement restores the shape, verbatim, and nothing else about the
 	// table moves.
-	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048), "roll back 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOTPSecret000048), "roll back 000048 on %s", dbType())
 
 	restored, ok := schemadump.TableShape(dumpTable(t, h, "users")).Column("otp_secret")
 	require.Truef(t, ok, "000048's down must re-add users.otp_secret on %s", dbType())
@@ -144,7 +144,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	// since the database is at 000047, below head, where the ORM's read is not this test's to make.
 	var rolledBack []byte
 	require.NoError(t, h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
-		"SELECT otp_secret_encrypted FROM users WHERE id = %d", user.Id)).Scan(&rolledBack),
+		"SELECT otp_secret_encrypted FROM users WHERE id = %d", user.ID)).Scan(&rolledBack),
 		"read the encrypted seed back after the roll back")
 	stillDecrypts, err := dataCipher.Decrypt(rolledBack)
 	require.NoErrorf(t, err, "the encrypted seed is untouched by the roll back on %s", dbType())
@@ -152,7 +152,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		"a down migration that restores a shape must not disturb the column that actually carries the seed")
 
 	// And forward again, which is what an operator who rolled back and retried does.
-	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOtpSecret000048), "re-apply 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOTPSecret000048), "re-apply 000048 on %s", dbType())
 	_, thereAgain := schemadump.TableShape(dumpTable(t, h, "users")).Column("otp_secret")
 	assert.Falsef(t, thereAgain, "000048 must be re-appliable after a down/up round trip on %s", dbType())
 }

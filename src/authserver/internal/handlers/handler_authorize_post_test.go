@@ -298,7 +298,7 @@ func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed boo
 	tx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(e.database, tx)
 	e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, hashutil.HashString(handle), mock.Anything).
-		Return(&record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
+		Return(&record.AuthorizeRequest{ID: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
 			ExpiresAt: time.Now().UTC().Add(time.Minute)}, nil).Once()
 	e.database.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(claimed, nil).Once()
 }

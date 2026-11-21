@@ -37,7 +37,7 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 		// answered as such a request is (#710 decision 5). The answer says nothing of the rename, so
 		// the record says it.
 		slog.WarnContext(r.Context(), "password grant refused: the client no longer holds the identifier the request named",
-			"client_id", grant.Client.Id)
+			"client_id", grant.Client.ID)
 		tr.refuse(w, r, oidc.GrantTypePassword, clientauth.ClientDoesNotExist())
 		return
 	}
@@ -47,8 +47,8 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 	}
 
 	tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedROPCResponse, map[string]interface{}{
-		"user_id":   grant.User.Id,
-		"client_id": grant.Client.Id,
+		"user_id":   grant.User.ID,
+		"client_id": grant.Client.ID,
 	})
 
 	tr.writeTokenResponse(w, r, oidc.GrantTypePassword, tokenResponse)

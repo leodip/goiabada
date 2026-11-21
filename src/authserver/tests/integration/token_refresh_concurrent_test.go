@@ -131,26 +131,26 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	assert.Equal(t, 1, successes, "exactly one concurrent presentation may succeed")
 
 	// The presented parent must be durably consumed.
-	storedParent, err := database.GetRefreshTokenByJti(context.Background(), nil, parentJti)
+	storedParent, err := database.GetRefreshTokenByJTI(context.Background(), nil, parentJti)
 	require.NoError(t, err)
 	require.NotNil(t, storedParent, "the presented refresh token row must still exist")
 	assert.True(t, storedParent.Revoked, "the presented refresh token must be revoked after the race")
 
 	// Every descendant of this grant hangs off the same authorization code, so this is
 	// the whole family plus the parent.
-	family, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	family, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 
 	children := make([]*record.RefreshToken, 0, len(family))
 	live := make([]*record.RefreshToken, 0, len(family))
 	for _, rt := range family {
-		if rt.PreviousRefreshTokenJti == parentJti {
+		if rt.PreviousRefreshTokenJTI == parentJti {
 			children = append(children, rt)
 		}
 		if !rt.Revoked {
 			live = append(live, rt)
 		}
-		assert.Equalf(t, storedParent.FirstRefreshTokenJti, rt.FirstRefreshTokenJti,
+		assert.Equalf(t, storedParent.FirstRefreshTokenJTI, rt.FirstRefreshTokenJTI,
 			"every row descending from this code must carry the same family identifier")
 	}
 
@@ -215,7 +215,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -228,14 +228,14 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	grant.refreshToken = childToken
 
 	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
 	// Decision 4's load-bearing property, asserted rather than assumed: the child hangs off the
 	// SAME code as its parent, which is what lets one marker reject a whole grant.
-	require.True(t, childRow.CodeId.Valid, "an auth-code-derived refresh token must carry a code id")
-	require.Equal(t, parentRow.CodeId.Int64, childRow.CodeId.Int64,
+	require.True(t, childRow.CodeID.Valid, "an auth-code-derived refresh token must carry a code id")
+	require.Equal(t, parentRow.CodeID.Int64, childRow.CodeID.Int64,
 		"the rotated child must inherit its parent's code id, or nothing below tests the marker")
 
 	// And the two requirements that stop this being the benign member of its class.
@@ -248,7 +248,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, session, "the ceremony's session must exist before it can be terminated")
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, adminToken, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -278,7 +278,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	//
 	// The window cannot be driven from outside the server, which is why it is reconstructed here
 	// and only approached by the racing case below.
-	swept, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
@@ -286,11 +286,11 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 
 	swept.Revoked = false
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
-	relived, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 
-	familyBefore, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
+	familyBefore, err := database.GetRefreshTokensByCodeID(context.Background(), nil, childRow.CodeID.Int64)
 	require.NoError(t, err)
 
 	// This is the presentation that would succeed without the marker: the row is live, so the
@@ -303,7 +303,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	assert.Empty(t, born["access_token"], "no access token may be issued for a terminated grant")
 	assert.Empty(t, born["refresh_token"], "no replacement may be issued for a terminated grant")
 
-	familyAfter, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
+	familyAfter, err := database.GetRefreshTokensByCodeID(context.Background(), nil, childRow.CodeID.Int64)
 	require.NoError(t, err)
 	assert.Len(t, familyAfter, len(familyBefore),
 		"a refused presentation must mint no descendant")
@@ -341,7 +341,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData := url.Values{
 		"grant_type":    {"refresh_token"},
@@ -441,7 +441,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		// own interleaving, the child the sweep never saw, and then the marker is the only thing
 		// standing between it and a working grant. Read before presenting it, since the refusal
 		// below leaves the row alone.
-		row, rowErr := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, replacement))
+		row, rowErr := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, replacement))
 		require.NoError(t, rowErr)
 		require.NotNil(t, row, "a replacement the server handed out must have a row")
 		if row.Revoked {

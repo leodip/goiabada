@@ -116,7 +116,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 			// user sets a password, and bcrypt refuses an empty hash without doing any work
 			// (#681 decision 3).
 			name:           "account with no password",
-			user:           &record.User{Id: 31, Email: "alice@example.com", PasswordHash: "", Enabled: true},
+			user:           &record.User{ID: 31, Email: "alice@example.com", PasswordHash: "", Enabled: true},
 			email:          "alice@example.com",
 			password:       "a-guessed-password",
 			verifierAnswer: true,
@@ -129,7 +129,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 		},
 		{
 			name: "wrong password",
-			user: &record.User{Id: 31, Email: "alice@example.com",
+			user: &record.User{ID: 31, Email: "alice@example.com",
 				PasswordHash: "$2a$10$abcdefghijklmnopqrstuuVkFBHFf8f6TBkO6PkS5Lg2Y4LZHn8a2", Enabled: true},
 			email:          "alice@example.com",
 			password:       "a-wrong-password",
@@ -188,7 +188,7 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	database := &fakePasswordSubmissionDatabase{
-		user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr", PageLanguage: "pt-BR"},
+		user: &record.User{ID: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr", PageLanguage: "pt-BR"},
 	}
 	auditLogger := &fakeAuditLogger{}
 	browser := &fakePasswordSubmissionBrowser{}
@@ -225,7 +225,7 @@ func TestPasswordSubmission_SavesTheKeepMeSignedInAnswerWithThePassword(t *testi
 	for name, answer := range map[string]*bool{"ticked": &ticked, "unticked": &unticked, "no box": nil} {
 		t.Run(name, func(t *testing.T) {
 			database := &fakePasswordSubmissionDatabase{
-				user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
+				user: &record.User{ID: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
 			}
 			browser := &fakePasswordSubmissionBrowser{}
 			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "ceremony-id"}

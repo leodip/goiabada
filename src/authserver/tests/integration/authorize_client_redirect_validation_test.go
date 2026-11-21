@@ -226,7 +226,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 		t.Fatal(err)
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: nonAbsoluteURI})
+	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientID: client.ID, URI: nonAbsoluteURI})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,11 +322,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPIsRefused(t *test
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 				ImplicitGrantEnabled:     &implicitAllowed,
-				DefaultAcrLevel:          record.AcrLevel1,
+				DefaultACRLevel:          record.ACRLevel1,
 			}
 			require.NoError(t, database.CreateClient(context.Background(), nil, client))
 			require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-				&record.RedirectURI{ClientId: client.Id, URI: tc.stored}))
+				&record.RedirectURI{ClientID: client.ID, URI: tc.stored}))
 
 			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(tc.stored) +
@@ -366,10 +366,10 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesT
 				ClientIdentifier:         "test-client-" + fake.LetterN(8),
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
-				DefaultAcrLevel:          record.AcrLevel1,
+				DefaultACRLevel:          record.ACRLevel1,
 			}
 			require.NoError(t, database.CreateClient(context.Background(), nil, client))
-			require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: stored}))
+			require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientID: client.ID, URI: stored}))
 
 			password := fake.Password(8)
 			passwordHashed, err := passwordhash.Hash(password)

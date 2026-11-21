@@ -29,7 +29,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -37,7 +37,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -129,7 +129,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -137,7 +137,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -160,7 +160,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -284,7 +284,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -295,7 +295,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -437,7 +437,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -448,7 +448,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -595,7 +595,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -606,7 +606,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -754,7 +754,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -765,7 +765,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -904,7 +904,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         true,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -915,7 +915,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -942,8 +942,8 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 
 	// Create consent including offline_access
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile offline_access",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1094,7 +1094,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1105,7 +1105,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -1241,7 +1241,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1252,7 +1252,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)

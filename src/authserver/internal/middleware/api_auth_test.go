@@ -846,11 +846,11 @@ func TestRequireValidSession(t *testing.T) {
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-abc",
-				UserId:            1, // the same user the sub resolves to; see the owner check
+				UserID:            1, // the same user the sub resolves to; see the owner check
 				Started:           now.Add(-1 * time.Hour),
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil)
@@ -883,7 +883,7 @@ func TestRequireValidSession(t *testing.T) {
 		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-deleted").
 			Return(nil, nil)
 
@@ -919,11 +919,11 @@ func TestRequireValidSession(t *testing.T) {
 
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-expired").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-expired",
-				UserId:            1, // owned by the caller, so expiry is what refuses it
+				UserID:            1, // owned by the caller, so expiry is what refuses it
 				Started:           now.Add(-2 * time.Hour),
 				LastAccessed:      now.Add(-2 * time.Hour), // older than 1h idle timeout
 			}, nil)
@@ -962,11 +962,11 @@ func TestRequireValidSession(t *testing.T) {
 		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-no-settings").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-no-settings",
-				UserId:            1, // owned by the caller, so the settings gate is what fails
+				UserID:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC().Add(-100 * time.Hour),
 				LastAccessed:      time.Now().UTC().Add(-100 * time.Hour),
 			}, nil).Maybe()
@@ -1007,11 +1007,11 @@ func TestRequireValidSession(t *testing.T) {
 		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-bad-settings").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-bad-settings",
-				UserId:            1, // owned by the caller, so the settings gate is what fails
+				UserID:            1, // owned by the caller, so the settings gate is what fails
 				Started:           time.Now().UTC(),
 				LastAccessed:      time.Now().UTC(),
 			}, nil).Maybe()
@@ -1045,7 +1045,7 @@ func TestRequireValidSession(t *testing.T) {
 		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-boom").
 			Return(nil, errors.New("connection refused"))
 
@@ -1079,7 +1079,7 @@ func TestRequireValidSession(t *testing.T) {
 		armGuardClient(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Maybe()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-x").
 			Return(nil, nil)
 
@@ -1201,13 +1201,13 @@ func TestRequireValidSession_Table(t *testing.T) {
 		{
 			label:      "disabled user, sid-less branch",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
-			userState:  &record.User{Id: 1, Enabled: false},
+			userState:  &record.User{ID: 1, Enabled: false},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label:      "disabled user, session-bound branch",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
-			userState:  &record.User{Id: 1, Enabled: false},
+			userState:  &record.User{ID: 1, Enabled: false},
 			wantStatus: http.StatusUnauthorized,
 		},
 
@@ -1262,14 +1262,14 @@ func TestRequireValidSession_Table(t *testing.T) {
 		{
 			label:      "session generation behind the user's",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			session:    &sessionSpec{generation: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label:      "session promoted to match the user",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			session:    &sessionSpec{generation: 1},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
@@ -1278,7 +1278,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label: "session-bound, stale token generation claim is IGNORED",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid,
 				"auth_state_generation": float64(0)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			session:    &sessionSpec{generation: 1},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
@@ -1286,7 +1286,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label: "session-bound, malformed token generation claim is IGNORED",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u", "sid": sid,
 				"auth_state_generation": "not-a-number"},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			session:    &sessionSpec{generation: 1},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
@@ -1296,41 +1296,41 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label: "sid-less, claim matches",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(3)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 3},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
 		{
 			label: "sid-less, claim behind",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(2)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 3},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, claim ahead",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(4)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 3},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 3},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			// KEEP. The legacy-token row: see the note above the function.
 			label:      "sid-less, absent claim passes while the user is at 0",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
 		{
 			label:      "sid-less, absent claim rejected once the user has advanced",
 			claims:     map[string]interface{}{"auth_time": float64(1), "sub": "u"},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, explicit float64 zero while the user is at 0",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(0)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusOK, wantNext: true,
 		},
 
@@ -1340,42 +1340,42 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label: "sid-less, malformed claim: string",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": "0"},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, malformed claim: bool",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": true},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, malformed claim: nil",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": nil},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, malformed claim: non-integral",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(1.5)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 1},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, malformed claim: negative",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(-1)},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			label: "sid-less, malformed claim: beyond exact float64 integer range",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": float64(1<<53) + 2},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: 0},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: 0},
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
@@ -1391,7 +1391,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 			label: "sid-less, malformed claim cannot collide with a persisted -1",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "u",
 				"auth_state_generation": "-1"},
-			userState:  &record.User{Id: 1, Enabled: true, AuthStateGeneration: -1},
+			userState:  &record.User{ID: 1, Enabled: true, AuthStateGeneration: -1},
 			wantStatus: http.StatusUnauthorized,
 		},
 	}
@@ -1414,7 +1414,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 				default:
 					user := tc.userState
 					if user == nil {
-						user = &record.User{Id: 1, Enabled: true}
+						user = &record.User{ID: 1, Enabled: true}
 					}
 					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).Return(user, nil)
 				}
@@ -1440,9 +1440,9 @@ func TestRequireValidSession_Table(t *testing.T) {
 					}
 					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 						Return(&record.UserSession{
-							Id:                  9,
+							ID:                  9,
 							SessionIdentifier:   sid,
-							UserId:              owner,
+							UserID:              owner,
 							Started:             now.Add(-1 * time.Hour),
 							LastAccessed:        lastAccessed,
 							AuthStateGeneration: tc.session.generation,
@@ -1648,7 +1648,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	mockDB := datamocks.NewDatabase(t)
 	armGuardClient(mockDB)
 	mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
-		Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
+		Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-boom").
 		Return(nil, errors.New("the database is down"))
 
@@ -1705,18 +1705,18 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 	theRequestsContext := mock.MatchedBy(func(ctx context.Context) bool {
 		return requestid.FromContext(ctx) == requestId
 	})
-	enabledClient := &record.Client{Id: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}
+	enabledClient := &record.Client{ID: 7, ClientIdentifier: guardClientIdentifier, Enabled: true}
 
 	t.Run("a user token reads the subject under the request's own context", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 
 		now := time.Now().UTC()
 		mockDB.On("GetClientByClientIdentifier", theRequestsContext, mock.Anything, guardClientIdentifier).Return(enabledClient, nil).Once()
-		mockDB.On("GetUserBySubject", theRequestsContext, mock.Anything, "user-1").Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+		mockDB.On("GetUserBySubject", theRequestsContext, mock.Anything, "user-1").Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&record.UserSession{
 				SessionIdentifier: "sid-abc",
-				UserId:            1,
+				UserID:            1,
 				Started:           now.Add(-1 * time.Hour),
 				LastAccessed:      now.Add(-5 * time.Minute),
 			}, nil).Once()

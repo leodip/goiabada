@@ -42,7 +42,7 @@ func (b *testEmailBrands) GetClientPageBrand(context.Context, *sql.Tx, string) (
 	return &brand, nil
 }
 
-func (b *testEmailBrands) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
+func (b *testEmailBrands) GetBrandAssetsByIDs(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
 	return nil, nil
 }
 

@@ -20,11 +20,11 @@ var clientPermissionColumns = columnList{
 // scanClientPermission reads one row selected with clientPermissionColumns.
 func scanClientPermission(row rowScanner, clientPermission *record.ClientPermission) error {
 	return row.Scan(
-		&clientPermission.Id,
+		&clientPermission.ID,
 		&clientPermission.CreatedAt,
 		&clientPermission.UpdatedAt,
-		&clientPermission.ClientId,
-		&clientPermission.PermissionId,
+		&clientPermission.ClientID,
+		&clientPermission.PermissionID,
 	)
 }
 
@@ -43,21 +43,21 @@ var updateClientPermission = statement{
 	mssql:    "UPDATE clients_permissions SET updated_at = @p1, client_id = @p2, permission_id = @p3 WHERE id = @p4",
 }
 
-var selectClientPermissionById = statement{
+var selectClientPermissionByID = statement{
 	sqlite:   "SELECT " + clientPermissionColumns.sqlite + " FROM clients_permissions WHERE id = ?",
 	mysql:    "SELECT " + clientPermissionColumns.mysql + " FROM clients_permissions WHERE id = ?",
 	postgres: "SELECT " + clientPermissionColumns.postgres + " FROM clients_permissions WHERE id = $1",
 	mssql:    "SELECT " + clientPermissionColumns.mssql + " FROM clients_permissions WHERE id = @p1",
 }
 
-var selectClientPermissionByClientIdAndPermissionId = statement{
+var selectClientPermissionByClientIDAndPermissionID = statement{
 	sqlite:   "SELECT " + clientPermissionColumns.sqlite + " FROM clients_permissions WHERE client_id = ? AND permission_id = ?",
 	mysql:    "SELECT " + clientPermissionColumns.mysql + " FROM clients_permissions WHERE client_id = ? AND permission_id = ?",
 	postgres: "SELECT " + clientPermissionColumns.postgres + " FROM clients_permissions WHERE client_id = $1 AND permission_id = $2",
 	mssql:    "SELECT " + clientPermissionColumns.mssql + " FROM clients_permissions WHERE client_id = @p1 AND permission_id = @p2",
 }
 
-var selectClientPermissionsByClientId = statement{
+var selectClientPermissionsByClientID = statement{
 	sqlite:   "SELECT " + clientPermissionColumns.sqlite + " FROM clients_permissions WHERE client_id = ?",
 	mysql:    "SELECT " + clientPermissionColumns.mysql + " FROM clients_permissions WHERE client_id = ?",
 	postgres: "SELECT " + clientPermissionColumns.postgres + " FROM clients_permissions WHERE client_id = $1",
@@ -73,11 +73,11 @@ var deleteClientPermission = statement{
 
 func (d *Database) CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error {
 
-	if clientPermission.ClientId == 0 {
+	if clientPermission.ClientID == 0 {
 		return errs.New("can't create clientPermission with client_id 0")
 	}
 
-	if clientPermission.PermissionId == 0 {
+	if clientPermission.PermissionID == 0 {
 		return errs.New("can't create clientPermission with permission_id 0")
 	}
 
@@ -89,20 +89,20 @@ func (d *Database) CreateClientPermission(ctx context.Context, tx *sql.Tx, clien
 	clientPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertClientPermission, "clientPermission",
-		clientPermission.CreatedAt, clientPermission.UpdatedAt, clientPermission.ClientId, clientPermission.PermissionId)
+		clientPermission.CreatedAt, clientPermission.UpdatedAt, clientPermission.ClientID, clientPermission.PermissionID)
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	clientPermission.Id = id
+	clientPermission.ID = id
 	return nil
 }
 
 func (d *Database) UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error {
 
-	if clientPermission.Id == 0 {
+	if clientPermission.ID == 0 {
 		return errs.New("can't update clientPermission with id 0")
 	}
 
@@ -110,8 +110,8 @@ func (d *Database) UpdateClientPermission(ctx context.Context, tx *sql.Tx, clien
 	clientPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateClientPermission.text(d.Dialect),
-		clientPermission.UpdatedAt, clientPermission.ClientId, clientPermission.PermissionId,
-		clientPermission.Id)
+		clientPermission.UpdatedAt, clientPermission.ClientID, clientPermission.PermissionID,
+		clientPermission.ID)
 	if err != nil {
 		clientPermission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update clientPermission")
@@ -120,24 +120,24 @@ func (d *Database) UpdateClientPermission(ctx context.Context, tx *sql.Tx, clien
 	return nil
 }
 
-func (d *Database) GetClientPermissionById(ctx context.Context, tx *sql.Tx, clientPermissionId int64) (*record.ClientPermission, error) {
-	return queryOne(ctx, d, tx, selectClientPermissionById.text(d.Dialect), []any{clientPermissionId},
+func (d *Database) GetClientPermissionByID(ctx context.Context, tx *sql.Tx, clientPermissionID int64) (*record.ClientPermission, error) {
+	return queryOne(ctx, d, tx, selectClientPermissionByID.text(d.Dialect), []any{clientPermissionID},
 		scanClientPermission, "clientPermission")
 }
 
-func (d *Database) GetClientPermissionByClientIdAndPermissionId(ctx context.Context, tx *sql.Tx, clientId, permissionId int64) (*record.ClientPermission, error) {
-	return queryOne(ctx, d, tx, selectClientPermissionByClientIdAndPermissionId.text(d.Dialect),
-		[]any{clientId, permissionId}, scanClientPermission, "clientPermission")
+func (d *Database) GetClientPermissionByClientIDAndPermissionID(ctx context.Context, tx *sql.Tx, clientID, permissionID int64) (*record.ClientPermission, error) {
+	return queryOne(ctx, d, tx, selectClientPermissionByClientIDAndPermissionID.text(d.Dialect),
+		[]any{clientID, permissionID}, scanClientPermission, "clientPermission")
 }
 
-func (d *Database) GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error) {
-	return queryAll(ctx, d, tx, nil, selectClientPermissionsByClientId.text(d.Dialect), []any{clientId},
+func (d *Database) GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientPermission, error) {
+	return queryAll(ctx, d, tx, nil, selectClientPermissionsByClientID.text(d.Dialect), []any{clientID},
 		scanClientPermission, "clientPermission")
 }
 
-func (d *Database) DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error {
+func (d *Database) DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteClientPermission.text(d.Dialect), clientPermissionId)
+	_, err := d.ExecSQL(ctx, tx, deleteClientPermission.text(d.Dialect), clientPermissionID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete clientPermission")
 	}

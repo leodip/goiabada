@@ -18,7 +18,7 @@ import (
 )
 
 // ============================================================================
-// IncludeOpenIDConnectClaimsInIdToken setting tests
+// IncludeOpenIDConnectClaimsInIDToken setting tests
 // These tests verify the behavior of the setting that controls whether
 // OIDC scope-based claims (email, profile, address, phone) are included
 // in the ID token or only available via /userinfo endpoint
@@ -26,7 +26,7 @@ import (
 
 func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	// Disable the global setting
-	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -102,7 +102,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 	// Ensure the global setting is enabled
-	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -146,18 +146,18 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	// Disable the global setting
-	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	// Set client-level override to "on"
-	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
-	code.Client.IncludeOpenIDConnectClaimsInIdToken = "on"
+	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIDToken
+	code.Client.IncludeOpenIDConnectClaimsInIDToken = "on"
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	require.NoError(t, err)
 	defer func() {
-		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
+		code.Client.IncludeOpenIDConnectClaimsInIDToken = originalClientSetting
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
@@ -191,18 +191,18 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	// Enable the global setting
-	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
 	// Set client-level override to "off"
-	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
-	code.Client.IncludeOpenIDConnectClaimsInIdToken = "off"
+	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIDToken
+	code.Client.IncludeOpenIDConnectClaimsInIDToken = "off"
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	require.NoError(t, err)
 	defer func() {
-		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
+		code.Client.IncludeOpenIDConnectClaimsInIDToken = originalClientSetting
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
@@ -245,7 +245,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
@@ -255,7 +255,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 

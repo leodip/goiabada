@@ -24,10 +24,10 @@ type groupPermissionsDatabase interface {
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
 	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
-	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupPermission, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupPermissionsByGroupID(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
 	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -48,7 +48,7 @@ func HandleGroupPermissionsGet(
 			return
 		}
 
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for permissions"), "group_id", id)
 			return
@@ -60,15 +60,15 @@ func HandleGroupPermissionsGet(
 
 		err = database.GroupLoadPermissions(r.Context(), nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading group permissions"), "group_id", group.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading group permissions"), "group_id", group.ID)
 			return
 		}
 
 		// Load resource information for each permission
 		for i := range group.Permissions {
-			resource, getResourceErr := database.GetResourceById(r.Context(), nil, group.Permissions[i].ResourceId)
+			resource, getResourceErr := database.GetResourceByID(r.Context(), nil, group.Permissions[i].ResourceID)
 			if getResourceErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getResourceErr, "database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceId, "group_id", group.Id)
+				writeInternalServerError(w, r, errs.Wrap(getResourceErr, "database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceID, "group_id", group.ID)
 				return
 			}
 			if resource != nil {
@@ -83,7 +83,7 @@ func HandleGroupPermissionsGet(
 		}
 
 		response := api.GetGroupPermissionsResponse{
-			Group:       *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
+			Group:       *apimapping.ToGroupResponse(group, memberCounts[group.ID]),
 			Permissions: apimapping.ToPermissionResponses(group.Permissions),
 		}
 
@@ -108,7 +108,7 @@ func HandleGroupPermissionsPut(
 			return
 		}
 
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for permissions update"), "group_id", id)
 			return
@@ -136,9 +136,9 @@ func HandleGroupPermissionsPut(
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionById(r.Context(), nil, permissionId)
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionId)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.Id)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.ID)
 				return
 			}
 			if permission == nil {
@@ -150,18 +150,18 @@ func HandleGroupPermissionsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage grants or revokes an administrative permission. What it read is
 		// what the save's administrative_permission_changed records are written from (#402).
-		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindGroup, group.Id, wanted, request.ExpectedPermissionIDs)
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindGroup, group.ID, wanted, request.ExpectedPermissionIDs)
 		if !allowed {
 			return
 		}
 
 		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
-		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.ID) {
 			return
 		}
 
-		grantKey := func(gp record.GroupPermission) int64 { return gp.PermissionId }
-		grantId := func(gp record.GroupPermission) int64 { return gp.Id }
+		grantKey := func(gp record.GroupPermission) int64 { return gp.PermissionID }
+		grantId := func(gp record.GroupPermission) int64 { return gp.ID }
 
 		// One transaction, as the user permission save: a failure part way through commits
 		// nothing, overlapping saves merge item by item with no row lock (group_permissions has no
@@ -171,7 +171,7 @@ func HandleGroupPermissionsPut(
 		//
 		// The rows are read once, on the transaction, and deleted by the ids that read returned,
 		// so neither of the two nil results #425 guarded is left to arrive: the second "get one"
-		// lookup a revocation made, and the second GetPermissionById a grant made, are both gone.
+		// lookup a revocation made, and the second GetPermissionByID a grant made, are both gone.
 		// A permission deleted after the validation above read it fails the insert's foreign key,
 		// which undoes the whole save as one 500 (#406).
 		//
@@ -186,7 +186,7 @@ func HandleGroupPermissionsPut(
 				return lockErr
 			}
 
-			stored, loadErr := database.GetGroupPermissionsByGroupId(r.Context(), tx, group.Id)
+			stored, loadErr := database.GetGroupPermissionsByGroupID(r.Context(), tx, group.ID)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading group permissions before update")
 			}
@@ -206,8 +206,8 @@ func HandleGroupPermissionsPut(
 			}
 			for _, permissionId := range insert {
 				if createErr := database.CreateGroupPermission(r.Context(), tx, &record.GroupPermission{
-					GroupId:      group.Id,
-					PermissionId: permissionId,
+					GroupID:      group.ID,
+					PermissionID: permissionId,
 				}); createErr != nil {
 					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
@@ -223,7 +223,7 @@ func HandleGroupPermissionsPut(
 			return
 		}
 		if err != nil {
-			writeListSaveFailure(w, r, err, "group_id", group.Id)
+			writeListSaveFailure(w, r, err, "group_id", group.ID)
 			return
 		}
 
@@ -231,19 +231,19 @@ func HandleGroupPermissionsPut(
 		// from the plan of the attempt that committed (#428).
 		for _, permissionId := range granted {
 			auditLogger.Log(r.Context(), audit.EventAddedGroupPermission, map[string]interface{}{
-				"group_id":       group.Id,
+				"group_id":       group.ID,
 				"permission_id":  permissionId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
 		for _, permissionId := range revoked {
 			auditLogger.Log(r.Context(), audit.EventDeletedGroupPermission, map[string]interface{}{
-				"group_id":       group.Id,
+				"group_id":       group.ID,
 				"permission_id":  permissionId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
-		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindGroup, group.Id, granted, revoked)
+		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindGroup, group.ID, granted, revoked)
 
 		// Return success response
 		response := api.SuccessResponse{Success: true}

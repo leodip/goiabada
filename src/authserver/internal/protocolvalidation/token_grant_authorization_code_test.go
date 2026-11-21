@@ -364,7 +364,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 				ClientIdentifier: "client1",
 			},
 			User: record.User{
-				Id:      53,
+				ID:      53,
 				Enabled: false,
 			},
 		}
@@ -528,7 +528,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "non_public_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -538,11 +538,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			ClientId:    1,
+			ClientID:    1,
 			Client:      *client,
-			UserId:      1,
+			UserID:      1,
 			User: record.User{
-				Id:      1,
+				ID:      1,
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -593,7 +593,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -604,11 +604,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			ClientId:    1,
+			ClientID:    1,
 			Client:      *client,
-			UserId:      1,
+			UserID:      1,
 			User: record.User{
-				Id:      1,
+				ID:      1,
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -656,7 +656,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "public_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -666,11 +666,11 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		codeEntity := &record.Code{
 			CodeHash:    "hash_of_valid_code",
 			RedirectURI: "https://example.com/callback",
-			ClientId:    1,
+			ClientID:    1,
 			Client:      *client,
-			UserId:      1,
+			UserID:      1,
 			User: record.User{
-				Id:      1,
+				ID:      1,
 				Enabled: true,
 			},
 			CreatedAt: sql.NullTime{
@@ -824,14 +824,14 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 	// the auth gate runs against it.
 	reusedCodeFixture := func(client *record.Client, withPKCE bool) *record.Code {
 		c := &record.Code{
-			Id:          42,
+			ID:          42,
 			CodeHash:    "hash_of_reused_code",
 			RedirectURI: "https://example.com/callback",
-			ClientId:    client.Id,
+			ClientID:    client.ID,
 			Client:      *client,
-			UserId:      1,
+			UserID:      1,
 			User: record.User{
-				Id:      1,
+				ID:      1,
 				Enabled: true,
 			},
 			// Intentionally older than the 60s expiration window so we can
@@ -871,7 +871,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		}
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -894,7 +894,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		ok := errors.As(err, &reused)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
 		assert.NotNil(t, reused.Code)
-		assert.Equal(t, codeEntity.Id, reused.Code.Id)
+		assert.Equal(t, codeEntity.ID, reused.Code.ID)
 		assert.Equal(t, "session-abc", reused.Code.SessionIdentifier)
 		assert.NotNil(t, reused.Detail)
 		assert.Equal(t, "invalid_grant", reused.Detail.Code())
@@ -917,7 +917,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -948,7 +948,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		var reused *AuthCodeReusedError
 		ok := errors.As(err, &reused)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
-		assert.Equal(t, codeEntity.Id, reused.Code.Id)
+		assert.Equal(t, codeEntity.ID, reused.Code.ID)
 	})
 
 	t.Run("Reuse with a disabled, superseded user still returns sentinel (account state read below the reuse return)", func(t *testing.T) {
@@ -970,7 +970,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		}
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1011,14 +1011,14 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		// Attacker's client_id matches what they're submitting, but the code
 		// was issued to a different client.
 		attackerClient := &record.Client{
-			Id:                       2,
+			ID:                       2,
 			ClientIdentifier:         "attacker_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
 			IsPublic:                 true,
 		}
 		victimClient := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "victim_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1064,7 +1064,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		ctx := context.Background()
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1112,7 +1112,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1162,7 +1162,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "confidential_client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1208,7 +1208,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		ctx := context.Background()
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1254,7 +1254,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		ctx := context.Background()
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1699,7 +1699,7 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	settings := &record.Settings{}
 
 	client := &record.Client{
-		Id:                       1,
+		ID:                       1,
 		ClientIdentifier:         "client1",
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -1709,10 +1709,10 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	codeEntity := &record.Code{
 		CodeHash:      "hash_of_valid_code",
 		RedirectURI:   "https://example.com/callback",
-		ClientId:      1,
+		ClientID:      1,
 		CodeChallenge: storedChallenge,
 		Client:        record.Client{ClientIdentifier: "client1"},
-		User:          record.User{Id: 7, Enabled: true},
+		User:          record.User{ID: 7, Enabled: true},
 		CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 
@@ -1815,7 +1815,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1829,9 +1829,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			SessionIdentifier: sid,
 			// Both sides of the comparison are non-zero, so the accept row is a real match
 			// rather than the zero-to-zero one an incomplete fixture would give.
-			UserId: grantUserId,
+			UserID: grantUserId,
 			Client: record.Client{ClientIdentifier: "client1"},
-			User:   record.User{Id: grantUserId, Enabled: true},
+			User:   record.User{ID: grantUserId, Enabled: true},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),
 				Valid: true,
@@ -1852,7 +1852,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, nil).Once()
 		default:
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
-				Return(&record.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
+				Return(&record.UserSession{SessionIdentifier: sid, UserID: *sessionOwner}, nil).Once()
 		}
 
 		input := &ValidateTokenRequestInput{
@@ -1959,7 +1959,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		require.NoError(t, err)
 
 		client := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "client1",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1971,9 +1971,9 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 			CodeHash:          "hash_of_valid_code",
 			RedirectURI:       codeRedirectURI,
 			SessionIdentifier: "",
-			UserId:            grantUserId,
+			UserID:            grantUserId,
 			Client:            record.Client{ClientIdentifier: "client1"},
-			User:              record.User{Id: grantUserId, Enabled: true},
+			User:              record.User{ID: grantUserId, Enabled: true},
 			CodeChallenge:     sql.NullString{String: codeChallenge, Valid: codeChallenge != ""},
 			CreatedAt: sql.NullTime{
 				Time:  time.Now().UTC(),

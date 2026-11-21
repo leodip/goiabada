@@ -49,7 +49,7 @@ func TestPasswordProof_RecordsThePasswordRotatesAndThenSaves(t *testing.T) {
 		CeremonyId: "the-sign-in",
 		ClientId:   "shop",
 	}
-	user := &record.User{Id: 57, Email: "new@example.com", Enabled: true, AuthStateGeneration: 3, OtpConfigGeneration: 2}
+	user := &record.User{ID: 57, Email: "new@example.com", Enabled: true, AuthStateGeneration: 3, OTPConfigGeneration: 2}
 
 	before := time.Now().UTC()
 	result := NewPasswordProof(auditLogger).Record(context.Background(), browser, authContext, user, nil)
@@ -80,7 +80,7 @@ func TestPasswordProof_AFailedRotationIsNeverFollowedByTheSave(t *testing.T) {
 	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
-		&record.User{Id: 57, Enabled: true}, nil)
+		&record.User{ID: 57, Enabled: true}, nil)
 
 	require.ErrorIs(t, result.SaveErr, ceremony.ErrCeremonyReplaced)
 	assert.Equal(t, []string{"rotate"}, browser.steps)
@@ -91,7 +91,7 @@ func TestPasswordProof_AFailedSaveIsAnswered(t *testing.T) {
 	authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
 
 	result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
-		&record.User{Id: 57, Enabled: true}, nil)
+		&record.User{ID: 57, Enabled: true}, nil)
 
 	require.ErrorIs(t, result.SaveErr, ceremony.ErrCeremonyReplaced)
 	assert.Equal(t, []string{"rotate", "save"}, browser.steps)
@@ -107,7 +107,7 @@ func TestPasswordProof_RecordsTheKeepMeSignedInAnswer(t *testing.T) {
 			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "the-sign-in"}
 
 			result := NewPasswordProof(&fakeAuditLogger{}).Record(context.Background(), browser, authContext,
-				&record.User{Id: 57, Enabled: true}, answer)
+				&record.User{ID: 57, Enabled: true}, answer)
 
 			require.NoError(t, result.SaveErr)
 			require.NotNil(t, browser.saved)

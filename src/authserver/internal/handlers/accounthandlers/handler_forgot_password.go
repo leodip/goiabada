@@ -250,15 +250,15 @@ func finishForgotPassword(
 		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, 0, recoveryOutcomeUnknownAddress)
 		return
 	case !canRecoverPassword(user):
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, ineligibleRecoveryOutcome(user))
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, ineligibleRecoveryOutcome(user))
 		return
 	}
 
 	verificationCode := securerandom.String(32)
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.Id, "error", err)
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
+		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.ID, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeServerError)
 		return
 	}
 
@@ -271,18 +271,18 @@ func finishForgotPassword(
 	// enabled and would re-enable an account an administrator disabled meanwhile. The store takes
 	// effect only while the account is still enabled and its address still verified and still the
 	// one looked up; when it declines, nothing is mailed (#404 decision 2).
-	stored, err := database.TryStoreForgotPasswordCode(ctx, nil, user.Id, user.Email,
+	stored, err := database.TryStoreForgotPasswordCode(ctx, nil, user.ID, user.Email,
 		verificationCodeEncrypted, verificationCodeHash, time.Now().UTC())
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to store the password reset code", "user_id", user.Id, "error", err)
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
+		slog.ErrorContext(ctx, "unable to store the password reset code", "user_id", user.ID, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeServerError)
 		return
 	}
 	if !stored {
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeAccountChanged)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeAccountChanged)
 		return
 	}
-	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeCodeIssued)
+	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeCodeIssued)
 
 	// The link names the sign-in this page's URL named, when the id is well formed, so a reset in
 	// the browser holding it carries it on (#812 decision 9). The id is echoed, never looked up: the
@@ -298,13 +298,13 @@ func finishForgotPassword(
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.PasswordResetLink, values)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.ID, "error", err)
 		return
 	}
 
 	settings, ok := reqctx.SettingsFrom(ctx)
 	if !ok {
-		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", reqctx.ErrNoSettings)
+		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.ID, "error", reqctx.ErrNoSettings)
 		return
 	}
 	input := &emaildelivery.SendEmailInput{
@@ -313,7 +313,7 @@ func finishForgotPassword(
 		HtmlBody: message.HTML,
 	}
 	if _, err := emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
-		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.ID, "error", err)
 	}
 }
 

@@ -133,7 +133,7 @@ func TestSessionIdentifier(t *testing.T) {
 		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.SessionIdentifier: "valid-session-id"})
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").
-			Return(&record.UserSession{UserId: 42}, nil).Once()
+			Return(&record.UserSession{UserID: 42}, nil).Once()
 
 		middleware := SessionIdentifier(store, mockDB, PageFaults())
 

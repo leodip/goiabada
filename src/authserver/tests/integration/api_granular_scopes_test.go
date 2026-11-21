@@ -45,7 +45,7 @@ func createClientWithGranularScopeAndSecret(t *testing.T, permissionIdentifier s
 	require.NoError(t, err)
 
 	// Find the specified permission
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authServerResource.ID)
 	require.NoError(t, err)
 
 	var targetPermission *record.Permission
@@ -59,8 +59,8 @@ func createClientWithGranularScopeAndSecret(t *testing.T, permissionIdentifier s
 
 	// Assign permission to client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: targetPermission.Id,
+		ClientID:     client.ID,
+		PermissionID: targetPermission.ID,
 	})
 	require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test user for the tests
@@ -102,7 +102,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -113,12 +113,12 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should be able to read user details
-	resp = makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/users/%d", baseURL, testUser.Id), accessToken, nil)
+	resp = makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/users/%d", baseURL, testUser.ID), accessToken, nil)
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "admin-read should access user details")
 	_ = resp.Body.Close()
 
 	// Test: Should NOT be able to update user profile (PUT)
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.Id), accessToken, map[string]string{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.ID), accessToken, map[string]string{
 		"givenName": "Updated",
 	})
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT update user profile")
@@ -132,7 +132,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should NOT be able to delete user (DELETE)
-	resp = makeAPIRequest(t, "DELETE", fmt.Sprintf("%s/api/v1/admin/users/%d", baseURL, testUser.Id), accessToken, nil)
+	resp = makeAPIRequest(t, "DELETE", fmt.Sprintf("%s/api/v1/admin/users/%d", baseURL, testUser.ID), accessToken, nil)
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT delete user")
 	_ = resp.Body.Close()
 }
@@ -143,7 +143,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test client for the tests
@@ -154,7 +154,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -165,12 +165,12 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should be able to read client details
-	resp = makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.Id), accessToken, nil)
+	resp = makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.ID), accessToken, nil)
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "admin-read should access client details")
 	_ = resp.Body.Close()
 
 	// Test: Should NOT be able to update client (PUT)
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.Id), accessToken, map[string]string{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.ID), accessToken, map[string]string{
 		"description": "Updated",
 	})
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT update client")
@@ -184,7 +184,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should NOT be able to delete client (DELETE)
-	resp = makeAPIRequest(t, "DELETE", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.Id), accessToken, nil)
+	resp = makeAPIRequest(t, "DELETE", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.ID), accessToken, nil)
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode, "admin-read should NOT delete client")
 	_ = resp.Body.Close()
 }
@@ -197,7 +197,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -238,7 +238,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	// Create client with manage-users scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test user for the tests
@@ -251,7 +251,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Create a test client
@@ -262,7 +262,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -273,7 +273,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should be able to update user profile (PUT)
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.Id), accessToken, map[string]interface{}{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.ID), accessToken, map[string]interface{}{
 		"givenName":  "UpdatedName",
 		"familyName": "",
 	})
@@ -297,7 +297,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	// Create client with manage-clients scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test user
@@ -310,7 +310,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Create a test client
@@ -321,7 +321,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	err = database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -332,7 +332,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	_ = resp.Body.Close()
 
 	// Test: Should be able to update client (PUT)
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.Id), accessToken, map[string]interface{}{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.ID), accessToken, map[string]interface{}{
 		"clientIdentifier": testClient.ClientIdentifier,
 		"description":      "Updated description",
 	})
@@ -356,7 +356,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 	// Create client with manage-settings scope only
 	accessToken, client := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test user
@@ -369,7 +369,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -401,7 +401,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	// Create client with manage scope (full access)
 	accessToken, client := createAdminClientWithToken(t)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	// Create a test user
@@ -414,7 +414,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Create a test client
@@ -425,7 +425,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -436,7 +436,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should be able to update user profile
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.Id), accessToken, map[string]interface{}{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/users/%d/profile", baseURL, testUser.ID), accessToken, map[string]interface{}{
 		"givenName":  "UpdatedName",
 		"familyName": "",
 	})
@@ -449,7 +449,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// Test: Should be able to update client
-	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.Id), accessToken, map[string]interface{}{
+	resp = makeAPIRequest(t, "PUT", fmt.Sprintf("%s/api/v1/admin/clients/%d", baseURL, testClient.ID), accessToken, map[string]interface{}{
 		"clientIdentifier": testClient.ClientIdentifier,
 		"description":      "Updated description",
 	})
@@ -518,7 +518,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(context.Background(), nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
 
 			resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/phone-countries", accessToken, nil)
@@ -547,7 +547,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 	// Create a test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -567,7 +567,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(context.Background(), nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
 
 			// Test reading groups
@@ -599,7 +599,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(context.Background(), nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
 
 			// Test reading resources
@@ -624,7 +624,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -644,11 +644,11 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(context.Background(), nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
 
 			// Test reading user permissions
-			resp := makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", baseURL, testUser.Id), accessToken, nil)
+			resp := makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", baseURL, testUser.ID), accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedReadStatus, resp.StatusCode, "%s should have status %d for user permissions GET", tc.name, tc.expectedReadStatus)
@@ -667,7 +667,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	baseURL := appConfig.AuthServer.BaseURL
@@ -687,11 +687,11 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(context.Background(), nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
 
 			// Test reading client permissions
-			resp := makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/clients/%d/permissions", baseURL, testClient.Id), accessToken, nil)
+			resp := makeAPIRequest(t, "GET", fmt.Sprintf("%s/api/v1/admin/clients/%d/permissions", baseURL, testClient.ID), accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedReadStatus, resp.StatusCode, "%s should have status %d for client permissions GET", tc.name, tc.expectedReadStatus)
@@ -707,13 +707,13 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 	// Create admin-read client (read-only)
 	readOnlyToken, readOnlyClient := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, readOnlyClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, readOnlyClient.ID)
 	}()
 
 	// Create manage-users client (full user access)
 	usersToken, usersClient := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, usersClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, usersClient.ID)
 	}()
 
 	// Test user creation

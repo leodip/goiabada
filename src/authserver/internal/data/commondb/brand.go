@@ -55,7 +55,7 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 		var footerLinks string
 		var storedPalette sql.NullString
 		err := row.Scan(
-			&brand.Id,
+			&brand.ID,
 			&brand.CreatedAt,
 			&brand.UpdatedAt,
 			&brand.Name,
@@ -65,12 +65,12 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 			&brand.Font,
 			&brand.BackgroundFit,
 			&brand.HideAppName,
-			&brand.LogoAssetId,
-			&brand.DarkLogoAssetId,
-			&brand.FaviconAssetId,
-			&brand.BackgroundAssetId,
-			&brand.RegularFontAssetId,
-			&brand.BoldFontAssetId,
+			&brand.LogoAssetID,
+			&brand.DarkLogoAssetID,
+			&brand.FaviconAssetID,
+			&brand.BackgroundAssetID,
+			&brand.RegularFontAssetID,
+			&brand.BoldFontAssetID,
 			&brand.SupportEmail,
 			&brand.SupportURL,
 			&brand.SupportPhone,
@@ -84,7 +84,7 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 		links, err := record.ParseBrandFooterLinks(footerLinks)
 		if err != nil {
 			slog.WarnContext(ctx, "brand footer links do not parse and are read as none",
-				"brand_id", brand.Id, "error", err)
+				"brand_id", brand.ID, "error", err)
 		}
 		brand.FooterLinks = links
 		brand.Palette = nil
@@ -92,7 +92,7 @@ func scanBrand(ctx context.Context) func(rowScanner, *record.Brand) error {
 			palette, err := parseBrandPalette(storedPalette.String)
 			if err != nil {
 				slog.WarnContext(ctx, "brand palette does not parse and is read as none",
-					"brand_id", brand.Id, "error", err)
+					"brand_id", brand.ID, "error", err)
 			}
 			brand.Palette = palette
 		}
@@ -135,7 +135,7 @@ var updateBrand = statement{
 		"support_email = @p15, support_url = @p16, support_phone = @p17, footer_links = @p18, palette = @p19, custom_css = @p20 WHERE id = @p21",
 }
 
-var selectBrandById = statement{
+var selectBrandByID = statement{
 	sqlite:   "SELECT " + brandColumns.sqlite + " FROM brands WHERE id = ?",
 	mysql:    "SELECT " + brandColumns.mysql + " FROM brands WHERE id = ?",
 	postgres: "SELECT " + brandColumns.postgres + " FROM brands WHERE id = $1",
@@ -161,15 +161,15 @@ var selectDefaultBrand = statement{
 		"INNER JOIN settings ON settings.default_brand_id = brands.id WHERE settings.id = @p1",
 }
 
-var selectDefaultBrandId = statement{
+var selectDefaultBrandID = statement{
 	sqlite:   "SELECT default_brand_id FROM settings WHERE id = ?",
 	mysql:    "SELECT default_brand_id FROM settings WHERE id = ?",
 	postgres: "SELECT default_brand_id FROM settings WHERE id = $1",
 	mssql:    "SELECT default_brand_id FROM settings WHERE id = @p1",
 }
 
-// updateDefaultBrandId binds the pointer, the time, then the settings row's id.
-var updateDefaultBrandId = statement{
+// updateDefaultBrandID binds the pointer, the time, then the settings row's id.
+var updateDefaultBrandID = statement{
 	sqlite:   "UPDATE settings SET default_brand_id = ?, updated_at = ? WHERE id = ?",
 	mysql:    "UPDATE settings SET default_brand_id = ?, updated_at = ? WHERE id = ?",
 	postgres: "UPDATE settings SET default_brand_id = $1, updated_at = $2 WHERE id = $3",
@@ -199,8 +199,8 @@ func (d *Database) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 	id, err := d.insert(ctx, tx, insertBrand, "brand",
 		brand.CreatedAt, brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme,
 		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
-		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
-		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId,
+		brand.LogoAssetID, brand.DarkLogoAssetID, brand.FaviconAssetID,
+		brand.BackgroundAssetID, brand.RegularFontAssetID, brand.BoldFontAssetID,
 		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks, brand.Palette, brand.CustomCSS)
 	if err != nil {
 		brand.CreatedAt = originalCreatedAt
@@ -208,13 +208,13 @@ func (d *Database) CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 		return err
 	}
 
-	brand.Id = id
+	brand.ID = id
 	return nil
 }
 
 func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error {
 
-	if brand.Id == 0 {
+	if brand.ID == 0 {
 		return errs.New("can't update brand with id 0")
 	}
 
@@ -228,10 +228,10 @@ func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 	_, err := d.ExecSQL(ctx, tx, updateBrand.text(d.Dialect),
 		brand.UpdatedAt, brand.Name, brand.Appearance, brand.Theme,
 		brand.Corners, brand.Font, brand.BackgroundFit, brand.HideAppName,
-		brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
-		brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId,
+		brand.LogoAssetID, brand.DarkLogoAssetID, brand.FaviconAssetID,
+		brand.BackgroundAssetID, brand.RegularFontAssetID, brand.BoldFontAssetID,
 		brand.SupportEmail, brand.SupportURL, brand.SupportPhone, brand.FooterLinks, brand.Palette, brand.CustomCSS,
-		brand.Id)
+		brand.ID)
 	if err != nil {
 		brand.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update brand")
@@ -240,8 +240,8 @@ func (d *Database) UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Br
 	return nil
 }
 
-func (d *Database) GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error) {
-	return queryOne(ctx, d, tx, selectBrandById.text(d.Dialect), []any{brandId}, scanBrand(ctx), "brand")
+func (d *Database) GetBrandByID(ctx context.Context, tx *sql.Tx, brandID int64) (*record.Brand, error) {
+	return queryOne(ctx, d, tx, selectBrandByID.text(d.Dialect), []any{brandID}, scanBrand(ctx), "brand")
 }
 
 func (d *Database) GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand, error) {
@@ -249,10 +249,10 @@ func (d *Database) GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand
 }
 
 func (d *Database) GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error) {
-	return queryOne(ctx, d, tx, selectDefaultBrand.text(d.Dialect), []any{int64(initialSettingsId)}, scanBrand(ctx), "brand")
+	return queryOne(ctx, d, tx, selectDefaultBrand.text(d.Dialect), []any{int64(initialSettingsID)}, scanBrand(ctx), "brand")
 }
 
-// MakeBrandDefault moves the settings row's pointer to brandId, under the settings row's lock (#810
+// MakeBrandDefault moves the settings row's pointer to brandID, under the settings row's lock (#810
 // decision 1).
 //
 // WHAT THE LOCK BUYS. DeleteBrand reads the pointer under the same lock before it deletes, so a
@@ -265,25 +265,25 @@ func (d *Database) GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Bra
 //
 // The pointer is read on the row this transaction has just written, so it is the committed one on
 // every engine, MySQL's REPEATABLE READ included.
-func (d *Database) MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (int64, error) {
+func (d *Database) MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandID int64) (int64, error) {
 
 	if tx == nil {
 		return 0, errs.New("making a brand the default requires a transaction: the settings row's lock lasts as long as it does")
 	}
 
-	if err := d.AcquireSettingsRow(ctx, tx, initialSettingsId); err != nil {
+	if err := d.AcquireSettingsRow(ctx, tx, initialSettingsID); err != nil {
 		return 0, err
 	}
 
-	current, err := d.readDefaultBrandId(ctx, tx)
+	current, err := d.readDefaultBrandID(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
-	if current.Valid && current.Int64 == brandId {
-		return brandId, nil
+	if current.Valid && current.Int64 == brandID {
+		return brandID, nil
 	}
 
-	brand, err := d.GetBrandById(ctx, tx, brandId)
+	brand, err := d.GetBrandByID(ctx, tx, brandID)
 	if err != nil {
 		return 0, err
 	}
@@ -291,8 +291,8 @@ func (d *Database) MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int
 		return 0, errs.WithStack(data.ErrBrandNotFound)
 	}
 
-	result, err := d.ExecSQL(ctx, tx, updateDefaultBrandId.text(d.Dialect),
-		brandId, time.Now().UTC(), initialSettingsId)
+	result, err := d.ExecSQL(ctx, tx, updateDefaultBrandID.text(d.Dialect),
+		brandID, time.Now().UTC(), initialSettingsID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to make the brand the default")
 	}
@@ -315,30 +315,30 @@ func (d *Database) MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int
 // brand either committed before and is moved and counted here, or comes after and finds the brand
 // gone. The default brand is refused before any client is touched. A brand that is not there moves
 // no client, since the foreign key lets none name it.
-func (d *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (int, error) {
+func (d *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandID int64) (int, error) {
 
 	if tx == nil {
 		return 0, errs.New("deleting a brand requires a transaction: the settings row's lock lasts as long as it does")
 	}
 
-	if err := d.AcquireSettingsRow(ctx, tx, initialSettingsId); err != nil {
+	if err := d.AcquireSettingsRow(ctx, tx, initialSettingsID); err != nil {
 		return 0, err
 	}
 
-	current, err := d.readDefaultBrandId(ctx, tx)
+	current, err := d.readDefaultBrandID(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
-	if current.Valid && current.Int64 == brandId {
+	if current.Valid && current.Int64 == brandID {
 		return 0, errs.WithStack(data.ErrDefaultBrandNotDeletable)
 	}
 
-	moved, err := d.clearBrandFromClients(ctx, tx, brandId)
+	moved, err := d.clearBrandFromClients(ctx, tx, brandID)
 	if err != nil {
 		return 0, err
 	}
 
-	result, err := d.ExecSQL(ctx, tx, deleteBrand.text(d.Dialect), brandId)
+	result, err := d.ExecSQL(ctx, tx, deleteBrand.text(d.Dialect), brandID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete brand")
 	}
@@ -353,11 +353,11 @@ func (d *Database) DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (
 	return moved, nil
 }
 
-// readDefaultBrandId reads the settings row's pointer. A missing row reads as an empty pointer:
+// readDefaultBrandID reads the settings row's pointer. A missing row reads as an empty pointer:
 // there is no default to move from or to protect.
-func (d *Database) readDefaultBrandId(ctx context.Context, tx *sql.Tx) (sql.NullInt64, error) {
+func (d *Database) readDefaultBrandID(ctx context.Context, tx *sql.Tx) (sql.NullInt64, error) {
 	var id sql.NullInt64
-	rows, err := d.QuerySQL(ctx, tx, selectDefaultBrandId.text(d.Dialect), int64(initialSettingsId))
+	rows, err := d.QuerySQL(ctx, tx, selectDefaultBrandID.text(d.Dialect), int64(initialSettingsID))
 	if err != nil {
 		return id, errs.Wrap(err, "unable to read the default brand")
 	}

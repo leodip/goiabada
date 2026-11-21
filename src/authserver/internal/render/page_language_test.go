@@ -34,7 +34,7 @@ func TestRender_LayoutsAreMarkedWithTheCatalogLanguage(t *testing.T) {
 				req.Header.Set("Accept-Language", acceptLanguage)
 				req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
 				req = req.WithContext(i18n.ResolveRequestLocale(req.Context(), req))
-				brands := &defaultBrandStub{brand: &record.Brand{Id: 1, Appearance: record.BrandAppearanceDark, Theme: "blueberry"}}
+				brands := &defaultBrandStub{brand: &record.Brand{ID: 1, Appearance: record.BrandAppearanceDark, Theme: "blueberry"}}
 
 				buf, err := New(web.TemplateFS(), web.StaticFS(), brands).RenderTemplateToBuffer(req, tc.layout, tc.page,
 					map[string]interface{}{})

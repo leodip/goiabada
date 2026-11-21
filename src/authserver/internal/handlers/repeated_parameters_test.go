@@ -81,7 +81,7 @@ func (e *authorizeEndpoint) expectsPage(message string) {
 func (e *authorizeEndpoint) passesDeliveryChecks() {
 	e.validator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil)
 	stubRegisteredRedirectURI(e.database, "https://example.com")
 }
 

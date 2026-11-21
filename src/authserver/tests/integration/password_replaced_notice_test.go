@@ -76,7 +76,7 @@ func adminNoticeUser(t *testing.T, locale string, passwordHash string) *record.U
 		PasswordHash:  passwordHash,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
@@ -107,7 +107,7 @@ func TestAPIUserPasswordPut_TellsTheUserAnAdministratorChangedIt(t *testing.T) {
 		t.Run(tc.locale, func(t *testing.T) {
 			user := adminNoticeUser(t, tc.locale, "the-old-hash")
 
-			password := setPasswordAsAdministrator(t, accessToken, user.Id)
+			password := setPasswordAsAdministrator(t, accessToken, user.ID)
 
 			messages := awaitMailTo(t, user.Email)
 			require.Len(t, messages, 1, "the account's address is told exactly once")
@@ -132,8 +132,8 @@ func TestAPIUserPasswordPut_AFirstPasswordSendsNothing(t *testing.T) {
 	first := adminNoticeUser(t, "en", "")
 	replaced := adminNoticeUser(t, "en", "the-old-hash")
 
-	setPasswordAsAdministrator(t, accessToken, first.Id)
-	setPasswordAsAdministrator(t, accessToken, replaced.Id)
+	setPasswordAsAdministrator(t, accessToken, first.ID)
+	setPasswordAsAdministrator(t, accessToken, replaced.ID)
 
 	require.Len(t, awaitMailWithSubject(t, replaced.Email, adminChangedSubjectEn, 1), 1,
 		"the account that had a password is told, so mail was on")
@@ -181,7 +181,7 @@ func TestResetPassword_TellsTheUserTheirPasswordWasReset(t *testing.T) {
 		t.Run(tc.locale, func(t *testing.T) {
 			email := plusAddress()
 			user, _ := createResetTestUser(t, email)
-			stored, err := database.GetUserById(context.Background(), nil, user.Id)
+			stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			stored.Locale = tc.locale
 			require.NoError(t, database.UpdateUser(context.Background(), nil, stored))

@@ -138,7 +138,7 @@ func accountEmailPutRequest(t *testing.T) *http.Request {
 func stubAccountEmailUpdate(t *testing.T, database *datamocks.Database, updateErr error) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+		Return(&record.User{ID: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
 			PasswordHash: accountEmailTestPasswordHash(t)}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
 	database.On("TrySetUserEmail", mock.Anything, mock.Anything, emailTestUserId, "old@example.com", false, emailTestAddress).
@@ -155,7 +155,7 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
-			Id:                             emailTestUserId,
+			ID:                             emailTestUserId,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
 			Email:                          "old@example.com",
@@ -275,7 +275,7 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-				Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+				Return(&record.User{ID: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
 					PasswordHash: accountEmailTestPasswordHash(t)}, nil).Once()
 			credentials := &countingCredentials{}
 
@@ -306,7 +306,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
-			Id:                             emailTestUserId,
+			ID:                             emailTestUserId,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
 			Email:                          "same@example.com",
@@ -340,7 +340,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 func changingUser(t *testing.T, locale string) *record.User {
 	t.Helper()
 	return &record.User{
-		Id:            emailTestUserId,
+		ID:            emailTestUserId,
 		Subject:       emailTestSubject,
 		Enabled:       true,
 		GivenName:     "Ana",

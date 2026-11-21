@@ -122,20 +122,20 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	cases := repairCases000034(t)
 	ids := make([]int64, len(cases))
 	for i, c := range cases {
-		ids[i] = seedWebOrigin000034(t, h, clientA.Id, c.raw)
+		ids[i] = seedWebOrigin000034(t, h, clientA.ID, c.raw)
 	}
 
 	// 4. The collisions canonicalizing creates. Three rows for one client rather
 	// than two, so a dedupe that only collapsed pairs would still leave a
 	// duplicate behind and fail the index below.
-	dupIds := []int64{
-		seedWebOrigin000034(t, h, clientA.Id, "https://dup.example.com"),
-		seedWebOrigin000034(t, h, clientA.Id, "https://dup.example.com/"),
-		seedWebOrigin000034(t, h, clientA.Id, "https://DUP.example.com/x?y=1"),
+	dupIDs := []int64{
+		seedWebOrigin000034(t, h, clientA.ID, "https://dup.example.com"),
+		seedWebOrigin000034(t, h, clientA.ID, "https://dup.example.com/"),
+		seedWebOrigin000034(t, h, clientA.ID, "https://DUP.example.com/x?y=1"),
 	}
 	// The same origin against a second client. It must survive: client_id is a
 	// label, not a boundary, so two clients may each list an origin.
-	otherClientDup := seedWebOrigin000034(t, h, clientB.Id, "https://dup.example.com/")
+	otherClientDup := seedWebOrigin000034(t, h, clientB.ID, "https://dup.example.com/")
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "apply 000034")
 
@@ -154,13 +154,13 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 
 	// 4, continued.
 	survivors := 0
-	for _, id := range dupIds {
+	for _, id := range dupIDs {
 		origin, found := webOrigin000034(t, h, id)
 		if found {
 			survivors++
 			assert.Equal(t, "https://dup.example.com", origin,
 				"the surviving duplicate must carry the canonical value")
-			assert.Equalf(t, dupIds[0], id,
+			assert.Equalf(t, dupIDs[0], id,
 				"the dedupe must keep MIN(id), the earliest registration, since the survivors are byte-identical and created_at is all that distinguishes them")
 		}
 	}
@@ -173,7 +173,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	}
 
 	// 5 and 6.
-	assertWebOriginsIndex000034(t, h, clientA.Id, clientB.Id, "after apply")
+	assertWebOriginsIndex000034(t, h, clientA.ID, clientB.ID, "after apply")
 
 	// 7. Down, then up again.
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 33), "roll back 000034")
@@ -181,7 +181,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 		"%s must be gone after rolling back to 000033", webOriginsIndex000034)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "re-apply 000034")
-	assertWebOriginsIndex000034(t, h, clientA.Id, clientB.Id, "after down/up round trip")
+	assertWebOriginsIndex000034(t, h, clientA.ID, clientB.ID, "after down/up round trip")
 }
 
 // repairCases000034 is the table, plus the assertion that ties it to the write
@@ -298,7 +298,7 @@ func repairCases000034(t *testing.T) []repair000034 {
 
 // assertWebOriginsIndex000034 checks the index's shape in the catalog and then
 // checks that the engine actually enforces it.
-func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientBId int64, phase string) {
+func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAID, clientBID int64, phase string) {
 	t.Helper()
 
 	shape := describeIndex(t, h, "web_origins", webOriginsIndex000034)
@@ -316,13 +316,13 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 	// here and the record is incidental (#510), so the write names only the columns the
 	// 000033 schema carries, and a refusal any other fault produced fails the assertion.
 	_, dupErr := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO web_origins (origin, client_id) VALUES ('https://dup.example.com', %d)", clientAId))
+		"INSERT INTO web_origins (origin, client_id) VALUES ('https://dup.example.com', %d)", clientAID))
 	assertUniqueRefusal(t, dupErr, "web_origins.origin, web_origins.client_id", webOriginsIndex000034,
 		fmt.Sprintf("[%s] a second row with the same origin for the same client must be refused", phase))
 
 	// And enforced no more widely than that.
-	spareId := seedWebOrigin(t, h, clientBId, "https://spare.example.com")
-	require.NoError(t, h.DB.DeleteWebOrigin(context.Background(), nil, spareId), "[%s] clean up the spare row", phase)
+	spareID := seedWebOrigin(t, h, clientBID, "https://spare.example.com")
+	require.NoError(t, h.DB.DeleteWebOrigin(context.Background(), nil, spareID), "[%s] clean up the spare row", phase)
 }
 
 // seedClient000034 writes the client in SQL rather than through the ORM: the database is at 000033,
@@ -330,21 +330,21 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 // among them.
 func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *record.Client {
 	t.Helper()
-	return &record.Client{Id: seedClient(t, h, identifier), ClientIdentifier: identifier}
+	return &record.Client{ID: seedClient(t, h, identifier), ClientIdentifier: identifier}
 }
 
 // seedWebOrigin000034 stores raw verbatim and returns its id, through the shared SQL seed
 // (#510): the database is at 000033 and the record follows the head schema. The seed binds raw,
 // so the row holds exactly the fixture on every engine -- the validation this migration exists
 // to backfill has only ever lived in the API handler.
-func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string) int64 {
+func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientID int64, raw string) int64 {
 	t.Helper()
 
-	return seedWebOrigin(t, h, clientId, raw)
+	return seedWebOrigin(t, h, clientID, raw)
 }
 
 // webOrigin000034 reads one row's origin back by id, and whether the row is there at all. In SQL
-// rather than through GetWebOriginById, for the seeds' reason: the read runs at 000034, below
+// rather than through GetWebOriginByID, for the seeds' reason: the read runs at 000034, below
 // head, and the ORM's SELECT names every column the record declares, so the next column any
 // migration adds to web_origins would fail it for a reason this migration does not own (#510).
 func webOrigin000034(t *testing.T, h *isolatedDB, id int64) (origin string, found bool) {

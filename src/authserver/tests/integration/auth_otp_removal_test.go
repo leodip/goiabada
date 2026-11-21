@@ -40,10 +40,10 @@ func signInAtLevel3(t *testing.T) (*http.Client, *record.Client, *record.Redirec
 	resp = loadPage(t, httpClient, location)
 	_ = resp.Body.Close()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	require.Equal(t, record.AcrLevel2Mandatory, sessions[0].AcrLevel, "the sign-in leaves a level 3 session")
+	require.Equal(t, record.ACRLevel2Mandatory, sessions[0].ACRLevel, "the sign-in leaves a level 3 session")
 	require.Equal(t, "pwd otp", sessions[0].AuthMethods)
 	return httpClient, client, redirectUri, user
 }
@@ -94,31 +94,31 @@ func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 		AuthTime:          passwordAt.Add(30 * time.Minute),
 		PasswordAuthTime:  passwordAt,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          record.AcrLevel2Mandatory,
-		IpAddress:         "192.0.2.10",
-		UserId:            user.Id,
+		ACRLevel:          record.ACRLevel2Mandatory,
+		IPAddress:         "192.0.2.10",
+		UserID:            user.ID,
 	}
 	require.NoError(t, database.CreateUserSession(context.Background(), nil, other))
-	before, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	before, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, before, 2)
 	passwordTimes := map[int64]time.Time{}
 	for _, session := range before {
 		require.True(t, session.AuthTime.After(session.PasswordAuthTime),
-			"session %d's auth_time is its code's, entered after its password", session.Id)
-		passwordTimes[session.Id] = session.PasswordAuthTime
+			"session %d's auth_time is its code's, entered after its password", session.ID)
+		passwordTimes[session.ID] = session.PasswordAuthTime
 	}
 
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
-	after, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	after, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, after, 2, "nobody is signed out")
 	for _, session := range after {
-		assert.Equal(t, record.AcrLevel2Optional, session.AcrLevel, "session %d is lowered to level 2 optional", session.Id)
-		assert.Equal(t, "pwd", session.AuthMethods, "session %d no longer names the code", session.Id)
-		assert.True(t, passwordTimes[session.Id].Equal(session.AuthTime),
-			"session %d's auth_time is when its password was entered, which amr \"pwd\" now describes", session.Id)
+		assert.Equal(t, record.ACRLevel2Optional, session.ACRLevel, "session %d is lowered to level 2 optional", session.ID)
+		assert.Equal(t, "pwd", session.AuthMethods, "session %d no longer names the code", session.ID)
+		assert.True(t, passwordTimes[session.ID].Equal(session.AuthTime),
+			"session %d's auth_time is when its password was entered, which amr \"pwd\" now describes", session.ID)
 	}
 
 	level1Client, level1RedirectUri := createLevel1Client(t, false)
@@ -127,11 +127,11 @@ func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 	require.Equal(t, "/auth/issue", where, "SSO at a level 1 client goes straight through")
 
 	code := issuedCode(t, page)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel, "the code's acr is what the session now holds")
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel, "the code's acr is what the session now holds")
 	assert.Equal(t, "pwd", code.AuthMethods, "the code names no code from the removed authenticator")
 	var signedIn record.UserSession
 	for _, session := range after {
-		if session.Id != other.Id {
+		if session.ID != other.ID {
 			signedIn = session
 		}
 	}
@@ -163,16 +163,16 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *t
 	_ = resp.Body.Close()
 
 	// The removal lands while the browser is between /auth/level1completed and /auth/completed.
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
 	resp = loadPage(t, httpClient, completedLocation)
 	assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel2Optional, sessions[0].AcrLevel, "the ceremony did not raise the lowered session")
+	assert.Equal(t, record.ACRLevel2Optional, sessions[0].ACRLevel, "the ceremony did not raise the lowered session")
 	assert.Equal(t, "pwd", sessions[0].AuthMethods, "the ceremony did not put otp back on the lowered session")
 }
 
@@ -181,13 +181,13 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *t
 func setUpAnotherAuthenticator(t *testing.T, user *record.User) {
 	t.Helper()
 
-	fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+	fresh, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.False(t, fresh.OTPEnabled, "the user has no authenticator to replace")
 	fresh.OTPEnabled = true
 	fresh.OTPSecretEncrypted = []byte("another authenticator's seed")
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 }
 
 // TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver: as above, but the user sets
@@ -225,17 +225,17 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *
 				_ = resp.Body.Close()
 			}
 
-			removeAuthenticatorAsAdministrator(t, user.Id)
+			removeAuthenticatorAsAdministrator(t, user.ID)
 			setUpAnotherAuthenticator(t, user)
 
 			resp = loadPage(t, httpClient, next)
 			assertRedirect(t, resp, "/auth/level1")
 			_ = resp.Body.Close()
 
-			sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+			sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			require.Len(t, sessions, 1)
-			assert.Equal(t, record.AcrLevel2Optional, sessions[0].AcrLevel, "the sign-in did not raise the lowered session")
+			assert.Equal(t, record.ACRLevel2Optional, sessions[0].ACRLevel, "the sign-in did not raise the lowered session")
 			assert.Equal(t, "pwd", sessions[0].AuthMethods, "the sign-in did not put otp back on the lowered session")
 		})
 	}
@@ -255,8 +255,8 @@ func TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain(t *tes
 	user.OTPEnabled = false
 	user.OTPSecretEncrypted = nil
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	require.NoError(t, database.ResetUserOTPStep(context.Background(), nil, user.Id))
-	advanceOtpConfigGeneration(t, user.Id)
+	require.NoError(t, database.ResetUserOTPStep(context.Background(), nil, user.ID))
+	advanceOtpConfigGeneration(t, user.ID)
 
 	level1Client, level1RedirectUri := createLevel1Client(t, false)
 

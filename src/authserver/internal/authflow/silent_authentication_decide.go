@@ -37,7 +37,7 @@ const (
 type silentAuthenticationFacts struct {
 	MaxAgeRequested bool
 	HintSubject     string
-	Target          record.AcrLevel
+	Target          record.ACRLevel
 	// ConsentRequired is the client's ConsentRequired.
 	ConsentRequired bool
 	// ClientIdentifier is the client's ClientIdentifier.

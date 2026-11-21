@@ -31,7 +31,7 @@ func moveAccountState(t *testing.T, userId int64, state string) {
 	switch state {
 	case "untouched":
 	case "disabled":
-		user, err := database.GetUserById(context.Background(), nil, userId)
+		user, err := database.GetUserByID(context.Background(), nil, userId)
 		require.NoError(t, err)
 		require.NotNil(t, user)
 		user.Enabled = false
@@ -78,7 +78,7 @@ func TestToken_AuthCode_AccountStateReadAfterPKCE(t *testing.T) {
 		t.Run(tc.state, func(t *testing.T) {
 			clientSecret := fake.Password(32)
 			_, code := createAuthCode(t, clientSecret, "openid")
-			moveAccountState(t, code.UserId, tc.state)
+			moveAccountState(t, code.UserID, tc.state)
 
 			form := func(verifier string) url.Values {
 				return url.Values{
@@ -117,7 +117,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, otherClient))
 
@@ -135,7 +135,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 			httpClient, code := createAuthCode(t, clientSecret, "openid")
 			refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 				code.Code, code.RedirectURI, testCodeVerifier)
-			moveAccountState(t, code.UserId, tc.state)
+			moveAccountState(t, code.UserID, tc.state)
 
 			status, body := postFormToTokenEndpoint(t, url.Values{
 				"grant_type":    {"refresh_token"},

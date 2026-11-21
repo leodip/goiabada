@@ -67,18 +67,18 @@ func TestMigration000072_AdminConsoleSignOutRedirectURI(t *testing.T) {
 		"https://padded.example.com/auth/callback ",
 	}
 	for _, uri := range consoleRows {
-		require.NoError(t, h.DB.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientId: console.Id, URI: uri}))
+		require.NoError(t, h.DB.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientID: console.ID, URI: uri}))
 	}
 	for _, uri := range []string{"https://admin.example.com", "https://admin.example.com/auth/callback"} {
-		require.NoError(t, h.DB.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientId: other.Id, URI: uri}))
+		require.NoError(t, h.DB.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientID: other.ID, URI: uri}))
 	}
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeAdminConsoleSignOutRedirectURI000072), "roll back to 000071 on %s", dbType())
-	unmoved := map[int64][]string{console.Id: consoleRows, other.Id: {"https://admin.example.com", "https://admin.example.com/auth/callback"}}
-	assertAdminConsoleRows000072(t, h, console.Id, other.Id, unmoved, map[int64][]string{}, "at 000071")
+	unmoved := map[int64][]string{console.ID: consoleRows, other.ID: {"https://admin.example.com", "https://admin.example.com/auth/callback"}}
+	assertAdminConsoleRows000072(t, h, console.ID, other.ID, unmoved, map[int64][]string{}, "at 000071")
 
 	moved := map[int64][]string{
-		console.Id: {
+		console.ID: {
 			"https://admin.example.com/auth/callback",
 			"https://old-admin.example.com/auth/callback",
 			"https://admin.example.com/landing",
@@ -87,43 +87,43 @@ func TestMigration000072_AdminConsoleSignOutRedirectURI(t *testing.T) {
 			"https://padded.example.com",
 			"https://padded.example.com/auth/callback ",
 		},
-		other.Id: {"https://admin.example.com", "https://admin.example.com/auth/callback"},
+		other.ID: {"https://admin.example.com", "https://admin.example.com/auth/callback"},
 	}
-	signOut := map[int64][]string{console.Id: {"https://admin.example.com", "https://old-admin.example.com"}}
+	signOut := map[int64][]string{console.ID: {"https://admin.example.com", "https://old-admin.example.com"}}
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, adminConsoleSignOutRedirectURI000072), "apply 000072 on %s", dbType())
-	assertAdminConsoleRows000072(t, h, console.Id, other.Id, moved, signOut, "after apply")
+	assertAdminConsoleRows000072(t, h, console.ID, other.ID, moved, signOut, "after apply")
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeAdminConsoleSignOutRedirectURI000072), "roll back to 000071 on %s", dbType())
-	assertAdminConsoleRows000072(t, h, console.Id, other.Id, unmoved, map[int64][]string{}, "after the down migration")
+	assertAdminConsoleRows000072(t, h, console.ID, other.ID, unmoved, map[int64][]string{}, "after the down migration")
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, adminConsoleSignOutRedirectURI000072), "re-apply 000072 on %s", dbType())
-	assertAdminConsoleRows000072(t, h, console.Id, other.Id, moved, signOut, "after a down/up round trip")
+	assertAdminConsoleRows000072(t, h, console.ID, other.ID, moved, signOut, "after a down/up round trip")
 }
 
 // assertAdminConsoleRows000072 holds both clients' redirect URIs and sign-out redirect URIs to the
 // lists given, by client id, in any order. A client missing from a map has no rows in that table.
-func assertAdminConsoleRows000072(t *testing.T, h *isolatedDB, consoleId, otherId int64,
+func assertAdminConsoleRows000072(t *testing.T, h *isolatedDB, consoleID, otherID int64,
 	redirectURIs, signOutRedirectURIs map[int64][]string, when string) {
 	t.Helper()
 	ctx := context.Background()
-	for _, clientId := range []int64{consoleId, otherId} {
-		gotRedirect, err := h.DB.GetRedirectURIsByClientId(ctx, nil, clientId)
+	for _, clientID := range []int64{consoleID, otherID} {
+		gotRedirect, err := h.DB.GetRedirectURIsByClientID(ctx, nil, clientID)
 		require.NoError(t, err)
 		uris := []string{}
 		for _, row := range gotRedirect {
 			uris = append(uris, row.URI)
 		}
-		assert.ElementsMatchf(t, append([]string{}, redirectURIs[clientId]...), uris,
-			"client %d's redirect URIs %s on %s", clientId, when, dbType())
+		assert.ElementsMatchf(t, append([]string{}, redirectURIs[clientID]...), uris,
+			"client %d's redirect URIs %s on %s", clientID, when, dbType())
 
-		gotSignOut, err := h.DB.GetPostLogoutRedirectURIsByClientId(ctx, nil, clientId)
+		gotSignOut, err := h.DB.GetPostLogoutRedirectURIsByClientID(ctx, nil, clientID)
 		require.NoError(t, err)
 		uris = []string{}
 		for _, row := range gotSignOut {
 			uris = append(uris, row.URI)
 		}
-		assert.ElementsMatchf(t, append([]string{}, signOutRedirectURIs[clientId]...), uris,
-			"client %d's sign-out redirect URIs %s on %s", clientId, when, dbType())
+		assert.ElementsMatchf(t, append([]string{}, signOutRedirectURIs[clientID]...), uris,
+			"client %d's sign-out redirect URIs %s on %s", clientID, when, dbType())
 	}
 }

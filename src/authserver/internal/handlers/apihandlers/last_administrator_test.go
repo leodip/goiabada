@@ -45,8 +45,8 @@ const adminHoldingManageId = int64(42)
 
 func expectUserHoldsManageDirectly(tx *sql.Tx) func(database *datamocks.Database) {
 	return func(database *datamocks.Database) {
-		database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, tx, adminHoldingManageId, permManage).
-			Return(&record.UserPermission{Id: 77, UserId: adminHoldingManageId, PermissionId: permManage}, nil).Once()
+		database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, tx, adminHoldingManageId, permManage).
+			Return(&record.UserPermission{ID: 77, UserID: adminHoldingManageId, PermissionID: permManage}, nil).Once()
 	}
 }
 
@@ -59,8 +59,8 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 			expectAuthServerPermissions(database)
 		},
 		expectDecision: func(database *datamocks.Database) {
-			database.On("GetUserPermissionsByUserId", mock.Anything, grantsTx, grantOwnerId).
-				Return([]record.UserPermission{{Id: 21, UserId: grantOwnerId, PermissionId: permManage}}, nil).Once()
+			database.On("GetUserPermissionsByUserID", mock.Anything, grantsTx, grantOwnerId).
+				Return([]record.UserPermission{{ID: 21, UserID: grantOwnerId, PermissionID: permManage}}, nil).Once()
 		},
 		expectWrite: func(database *datamocks.Database) {
 			database.On("DeleteUserPermission", mock.Anything, grantsTx, int64(21)).Return(nil).Once()
@@ -77,8 +77,8 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 			expectAuthServerPermissions(database)
 		},
 		expectDecision: func(database *datamocks.Database) {
-			database.On("GetGroupPermissionsByGroupId", mock.Anything, grantsTx, grantOwnerId).
-				Return([]record.GroupPermission{{Id: 21, GroupId: grantOwnerId, PermissionId: permManage}}, nil).Once()
+			database.On("GetGroupPermissionsByGroupID", mock.Anything, grantsTx, grantOwnerId).
+				Return([]record.GroupPermission{{ID: 21, GroupID: grantOwnerId, PermissionID: permManage}}, nil).Once()
 		},
 		expectWrite: func(database *datamocks.Database) {
 			database.On("DeleteGroupPermission", mock.Anything, grantsTx, int64(21)).Return(nil).Once()
@@ -141,12 +141,12 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 		name: "PUT /users/{id}/enabled disabling",
 		tx:   apiRevokeTx,
 		expectBeforeTheTransaction: func(database *datamocks.Database) {
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
-				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
+				Return(&record.User{ID: adminHoldingManageId, Enabled: true}, nil).Once()
 		},
 		expectDecision: func(database *datamocks.Database) {
-			database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, adminHoldingManageId).
-				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, adminHoldingManageId).
+				Return(&record.User{ID: adminHoldingManageId, Enabled: true}, nil).Once()
 			expectUserHoldsManageDirectly(apiRevokeTx)(database)
 		},
 		expectWrite: func(database *datamocks.Database) {
@@ -163,12 +163,12 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 		name: "DELETE /users/{id}",
 		tx:   guardTx,
 		expectBeforeTheTransaction: func(database *datamocks.Database) {
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
-				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
+				Return(&record.User{ID: adminHoldingManageId, Enabled: true}, nil).Once()
 		},
 		expectDecision: func(database *datamocks.Database) {
-			database.On("GetUserByIdForUpdate", mock.Anything, guardTx, adminHoldingManageId).
-				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			database.On("GetUserByIDForUpdate", mock.Anything, guardTx, adminHoldingManageId).
+				Return(&record.User{ID: adminHoldingManageId, Enabled: true}, nil).Once()
 			expectUserHoldsManageDirectly(guardTx)(database)
 		},
 		expectWrite: func(database *datamocks.Database) {

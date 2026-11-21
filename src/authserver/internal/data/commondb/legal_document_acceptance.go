@@ -24,10 +24,10 @@ var legalDocumentAcceptanceColumns = columnList{
 // scanLegalDocumentAcceptance reads one row selected with legalDocumentAcceptanceColumns.
 func scanLegalDocumentAcceptance(row rowScanner, acceptance *record.LegalDocumentAcceptance) error {
 	return row.Scan(
-		&acceptance.Id,
+		&acceptance.ID,
 		&acceptance.AcceptedAt,
-		&acceptance.UserId,
-		&acceptance.LegalDocumentVersionId,
+		&acceptance.UserID,
+		&acceptance.LegalDocumentVersionID,
 	)
 }
 
@@ -38,7 +38,7 @@ var insertLegalDocumentAcceptance = statement{
 	mssql:    "INSERT INTO legal_document_acceptances (accepted_at, user_id, legal_document_version_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
 }
 
-var selectLegalDocumentAcceptancesByUserId = statement{
+var selectLegalDocumentAcceptancesByUserID = statement{
 	sqlite:   "SELECT " + legalDocumentAcceptanceColumns.sqlite + " FROM legal_document_acceptances WHERE user_id = ? ORDER BY id",
 	mysql:    "SELECT " + legalDocumentAcceptanceColumns.mysql + " FROM legal_document_acceptances WHERE user_id = ? ORDER BY id",
 	postgres: "SELECT " + legalDocumentAcceptanceColumns.postgres + " FROM legal_document_acceptances WHERE user_id = $1 ORDER BY id",
@@ -48,11 +48,11 @@ var selectLegalDocumentAcceptancesByUserId = statement{
 func (d *Database) CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx,
 	acceptance *record.LegalDocumentAcceptance) error {
 
-	if acceptance.UserId == 0 {
+	if acceptance.UserID == 0 {
 		return errs.New("can't create legal document acceptance with user_id 0")
 	}
 
-	if acceptance.LegalDocumentVersionId == 0 {
+	if acceptance.LegalDocumentVersionID == 0 {
 		return errs.New("can't create legal document acceptance with legal_document_version_id 0")
 	}
 
@@ -61,17 +61,17 @@ func (d *Database) CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx
 	}
 
 	id, err := d.insert(ctx, tx, insertLegalDocumentAcceptance, "legal document acceptance",
-		acceptance.AcceptedAt, acceptance.UserId, acceptance.LegalDocumentVersionId)
+		acceptance.AcceptedAt, acceptance.UserID, acceptance.LegalDocumentVersionID)
 	if err != nil {
 		return err
 	}
 
-	acceptance.Id = id
+	acceptance.ID = id
 	return nil
 }
 
-func (d *Database) GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx,
-	userId int64) ([]record.LegalDocumentAcceptance, error) {
-	return queryAll(ctx, d, tx, nil, selectLegalDocumentAcceptancesByUserId.text(d.Dialect),
-		[]any{userId}, scanLegalDocumentAcceptance, "legal document acceptance")
+func (d *Database) GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx,
+	userID int64) ([]record.LegalDocumentAcceptance, error) {
+	return queryAll(ctx, d, tx, nil, selectLegalDocumentAcceptancesByUserID.text(d.Dialect),
+		[]any{userID}, scanLegalDocumentAcceptance, "legal document acceptance")
 }

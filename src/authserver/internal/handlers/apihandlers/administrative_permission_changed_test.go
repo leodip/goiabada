@@ -212,7 +212,7 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 		details := clientRecord(t, *records)
 		assert.Equal(t, []int64{}, details["granted_permission_ids"])
 		assert.Equal(t, []int64{}, details["revoked_permission_ids"])
-		assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+		assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 	})
 }
 
@@ -317,8 +317,8 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
-		Return([]record.Group{{Id: ordinaryGroupId}, {Id: administrativeGroupId}}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
+		Return([]record.Group{{ID: ordinaryGroupId}, {ID: administrativeGroupId}}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
 	expectStoredMemberships(database, membershipRow{id: ceilingMembershipRowId, groupId: adminReadGroupId})
@@ -370,14 +370,14 @@ func TestAdministrativePermissionChanged_AFailedReadInTheUserGroupsSaveCommitsNo
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
-		Return([]record.Group{{Id: administrativeGroupId}}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
+		Return([]record.Group{{ID: administrativeGroupId}}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
 	expectStoredMemberships(database)
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	readErr := errors.New("the read failed")
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, []int64{administrativeGroupId}).Return(nil, readErr).Once()
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, userGroupsTx, []int64{administrativeGroupId}).Return(nil, readErr).Once()
 
 	body := `{"groupIds":[7],"expectedGroupIds":[]}`
 	r := membershipRequest(http.MethodPut, "/api/v1/admin/users/42/groups", body, "authserver:manage", map[string]string{"id": "42"})

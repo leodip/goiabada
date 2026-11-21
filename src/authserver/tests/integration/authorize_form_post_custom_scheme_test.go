@@ -46,12 +46,12 @@ func newFormPostClient(t *testing.T) *record.Client {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     &implicit,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	for _, uri := range []string{formPostCustomSchemeURI, formPostRFC8252URI, formPostHTTPSURI} {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-			&record.RedirectURI{ClientId: client.Id, URI: uri}))
+			&record.RedirectURI{ClientID: client.ID, URI: uri}))
 	}
 	return client
 }

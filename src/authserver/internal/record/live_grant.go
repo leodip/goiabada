@@ -6,7 +6,7 @@ package record
 // decision 4). A projection rather than a table, like EmailCaseRow: nothing writes a LiveGrant
 // back.
 type LiveGrant struct {
-	RefreshTokenId int64
-	ClientId       int64
+	RefreshTokenID int64
+	ClientID       int64
 	Scope          string
 }

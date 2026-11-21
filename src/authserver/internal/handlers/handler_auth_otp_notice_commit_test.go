@@ -45,14 +45,14 @@ func TestHandleAuthOtpPost_TellsTheLockoutWhenTheRefusalCannotBeShown(t *testing
 		notifier:      accountnotice.New(pageRenderer, emailSender, jobs),
 	})
 	user := enrolledNoticeUser(t, "en")
-	user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+	user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 	req := otpCodeNoticeRequest(t, "000000")
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
-	database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil).Once()
 	expectOTPWriteTransactions(database)
 	expectUserRowLocked(database, user)
-	database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, otpWriteTx, user.Id, user.OtpConfigGeneration).
+	database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, otpWriteTx, user.ID, user.OTPConfigGeneration).
 		Return(true, nil).Once()
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return((*record.Client)(nil), errors.New("client read unavailable")).Once()
@@ -77,7 +77,7 @@ func answerSignInLockedRead(t *testing.T, database *datamocks.Database, current 
 	t.Helper()
 	found := false
 	for _, call := range database.ExpectedCalls {
-		if call.Method == "GetUserByIdForUpdate" {
+		if call.Method == "GetUserByIDForUpdate" {
 			call.ReturnArguments = mock.Arguments{current, nil}
 			found = true
 		}
@@ -121,7 +121,7 @@ func TestHandleAuthOtpPost_NoticesGoToTheRowTheChangeCommittedBeside(t *testing.
 			name: "the refusal that disabled the authenticator", email: emailtemplate.OTPLockout,
 			user: func(t *testing.T) *record.User {
 				user := enrolledNoticeUser(t, "en")
-				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+				user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 				return user
 			},
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,

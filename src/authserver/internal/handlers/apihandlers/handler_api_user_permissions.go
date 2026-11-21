@@ -23,10 +23,10 @@ type userPermissionsDatabase interface {
 	lastAdministratorDatabase
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -47,7 +47,7 @@ func HandleUserPermissionsGet(
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to get user by ID"), "user_id", id)
 			return
@@ -59,15 +59,15 @@ func HandleUserPermissionsGet(
 
 		err = database.UserLoadPermissions(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "failed to load user permissions"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to load user permissions"), "user_id", user.ID)
 			return
 		}
 
 		// Load resource information for each permission
 		for i := range user.Permissions {
-			resource, err := database.GetResourceById(r.Context(), nil, user.Permissions[i].ResourceId)
+			resource, err := database.GetResourceByID(r.Context(), nil, user.Permissions[i].ResourceID)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to load resource information"), "user_id", user.Id, "resource_id", user.Permissions[i].ResourceId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to load resource information"), "user_id", user.ID, "resource_id", user.Permissions[i].ResourceID)
 				return
 			}
 			if resource != nil {
@@ -101,7 +101,7 @@ func HandleUserPermissionsPut(
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to get user by ID"), "user_id", id)
 			return
@@ -131,9 +131,9 @@ func HandleUserPermissionsPut(
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionById(r.Context(), nil, permissionId)
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionId)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "failed to get permission by ID during validation"), "user_id", user.Id, "permission_id", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "failed to get permission by ID during validation"), "user_id", user.ID, "permission_id", permissionId)
 				return
 			}
 			if permission == nil {
@@ -145,18 +145,18 @@ func HandleUserPermissionsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage grants or revokes an administrative permission. What it read is
 		// what the save's administrative_permission_changed records are written from (#402).
-		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIDs)
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.ID, wanted, request.ExpectedPermissionIDs)
 		if !allowed {
 			return
 		}
 
 		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
-		grantKey := func(up record.UserPermission) int64 { return up.PermissionId }
-		grantId := func(up record.UserPermission) int64 { return up.Id }
+		grantKey := func(up record.UserPermission) int64 { return up.PermissionID }
+		grantId := func(up record.UserPermission) int64 { return up.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator revoking one permission and granting another ends with both changes or
@@ -183,7 +183,7 @@ func HandleUserPermissionsPut(
 				return lockErr
 			}
 
-			stored, loadErr := database.GetUserPermissionsByUserId(r.Context(), tx, user.Id)
+			stored, loadErr := database.GetUserPermissionsByUserID(r.Context(), tx, user.ID)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user permissions before update")
 			}
@@ -203,8 +203,8 @@ func HandleUserPermissionsPut(
 			}
 			for _, permissionId := range insert {
 				if createErr := database.CreateUserPermission(r.Context(), tx, &record.UserPermission{
-					UserId:       user.Id,
-					PermissionId: permissionId,
+					UserID:       user.ID,
+					PermissionID: permissionId,
 				}); createErr != nil {
 					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
@@ -220,7 +220,7 @@ func HandleUserPermissionsPut(
 			return
 		}
 		if err != nil {
-			writeListSaveFailure(w, r, err, "user_id", user.Id)
+			writeListSaveFailure(w, r, err, "user_id", user.ID)
 			return
 		}
 
@@ -228,19 +228,19 @@ func HandleUserPermissionsPut(
 		// from the plan of the attempt that committed (#428).
 		for _, permissionId := range granted {
 			auditLogger.Log(r.Context(), audit.EventAddedUserPermission, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"permission_id":  permissionId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
 		for _, permissionId := range revoked {
 			auditLogger.Log(r.Context(), audit.EventDeletedUserPermission, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"permission_id":  permissionId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
-		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindUser, user.Id, granted, revoked)
+		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindUser, user.ID, granted, revoked)
 
 		// Return success response
 		response := api.SuccessResponse{Success: true}

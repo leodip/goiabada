@@ -24,25 +24,25 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	testGroup1 := &record.Group{
 		GroupIdentifier:      "test-group-1",
 		Description:          "Test Group 1",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup1)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup1.ID)
 	}()
 
 	testGroup2 := &record.Group{
 		GroupIdentifier:      "test-group-2",
 		Description:          "Test Group 2",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: true,
 	}
 	err = database.CreateGroup(context.Background(), nil, testGroup2)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup2.ID)
 	}()
 
 	// Test: Get all groups
@@ -75,7 +75,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 
 	// Assert: Both test groups should be found
 	assert.NotNil(t, foundGroup1)
-	assert.Equal(t, testGroup1.Id, foundGroup1.ID)
+	assert.Equal(t, testGroup1.ID, foundGroup1.ID)
 	assert.Equal(t, "Test Group 1", foundGroup1.Description)
 	assert.True(t, foundGroup1.IncludeInIDToken)
 	assert.False(t, foundGroup1.IncludeInAccessToken)
@@ -84,7 +84,7 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 	assert.GreaterOrEqual(t, foundGroup1.MemberCount, 0, "MemberCount should be non-negative")
 
 	assert.NotNil(t, foundGroup2)
-	assert.Equal(t, testGroup2.Id, foundGroup2.ID)
+	assert.Equal(t, testGroup2.ID, foundGroup2.ID)
 	assert.Equal(t, "Test Group 2", foundGroup2.Description)
 	assert.False(t, foundGroup2.IncludeInIDToken)
 	assert.True(t, foundGroup2.IncludeInAccessToken)
@@ -167,13 +167,13 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	testGroup := &record.Group{
 		GroupIdentifier:      "enhanced-test-group",
 		Description:          "Enhanced Test Group",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Get all groups
@@ -206,7 +206,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	assert.Positive(t, foundGroup.ID, "Id should be a positive integer")
 	assert.Equal(t, "enhanced-test-group", foundGroup.GroupIdentifier)
 	assert.Equal(t, "Enhanced Test Group", foundGroup.Description)
-	assert.True(t, foundGroup.IncludeInIDToken, "IncludeInIdToken should be true")
+	assert.True(t, foundGroup.IncludeInIDToken, "IncludeInIDToken should be true")
 	assert.True(t, foundGroup.IncludeInAccessToken, "IncludeInAccessToken should be true")
 
 	// Assert: Timestamp fields should be present and valid
@@ -247,7 +247,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 		group := &record.Group{
 			GroupIdentifier:      tc.identifier,
 			Description:          "Test Group for " + tc.identifier,
-			IncludeInIdToken:     tc.includeInIdToken,
+			IncludeInIDToken:     tc.includeInIdToken,
 			IncludeInAccessToken: tc.includeInAccessToken,
 		}
 		err := database.CreateGroup(context.Background(), nil, group)
@@ -258,7 +258,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	defer func() {
 		// Cleanup: Delete all created groups
 		for _, group := range createdGroups {
-			_ = database.DeleteGroup(context.Background(), nil, group.Id)
+			_ = database.DeleteGroup(context.Background(), nil, group.ID)
 		}
 	}()
 
@@ -285,7 +285,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 		foundGroup, exists := groupMap[tc.identifier]
 		assert.True(t, exists, "Group %s should be found", tc.identifier)
 		assert.Equal(t, tc.includeInIdToken, foundGroup.IncludeInIDToken,
-			"Group %s IncludeInIdToken should be %v", tc.identifier, tc.includeInIdToken)
+			"Group %s IncludeInIDToken should be %v", tc.identifier, tc.includeInIdToken)
 		assert.Equal(t, tc.includeInAccessToken, foundGroup.IncludeInAccessToken,
 			"Group %s IncludeInAccessToken should be %v", tc.identifier, tc.includeInAccessToken)
 	}
@@ -298,7 +298,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test users
@@ -313,7 +313,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser1)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser1.ID)
 	}()
 
 	testUser2 := &record.User{
@@ -327,28 +327,28 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser2)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser2.ID)
 	}()
 
 	// Setup: Add users to group
 	userGroup1 := &record.UserGroup{
-		UserId:  testUser1.Id,
-		GroupId: testGroup.Id,
+		UserID:  testUser1.ID,
+		GroupID: testGroup.ID,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.ID)
 	}()
 
 	userGroup2 := &record.UserGroup{
-		UserId:  testUser2.Id,
-		GroupId: testGroup.Id,
+		UserID:  testUser2.ID,
+		GroupID: testGroup.ID,
 	}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.ID)
 	}()
 
 	// Test: Get all groups
@@ -367,7 +367,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Find our test group
 	var foundGroup *api.GroupResponse
 	for i := range getResponse.Groups {
-		if getResponse.Groups[i].ID == testGroup.Id {
+		if getResponse.Groups[i].ID == testGroup.ID {
 			foundGroup = &getResponse.Groups[i]
 			break
 		}
@@ -378,7 +378,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	assert.Equal(t, 2, foundGroup.MemberCount, "Group should have 2 members")
 
 	// Test: Remove one member and verify count decreases
-	err = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
+	err = database.DeleteUserGroup(context.Background(), nil, userGroup2.ID)
 	require.NoError(t, err)
 
 	// Test: Get groups again to verify member count updated
@@ -394,7 +394,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Find our test group again
 	var foundGroup2 *api.GroupResponse
 	for i := range getResponse2.Groups {
-		if getResponse2.Groups[i].ID == testGroup.Id {
+		if getResponse2.Groups[i].ID == testGroup.ID {
 			foundGroup2 = &getResponse2.Groups[i]
 			break
 		}

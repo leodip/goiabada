@@ -21,14 +21,14 @@ var userAttributeColumns = columnList{
 // scanUserAttribute reads one row selected with userAttributeColumns.
 func scanUserAttribute(row rowScanner, userAttribute *record.UserAttribute) error {
 	return row.Scan(
-		&userAttribute.Id,
+		&userAttribute.ID,
 		&userAttribute.CreatedAt,
 		&userAttribute.UpdatedAt,
 		&userAttribute.Key,
 		&userAttribute.Value,
-		&userAttribute.IncludeInIdToken,
+		&userAttribute.IncludeInIDToken,
 		&userAttribute.IncludeInAccessToken,
-		&userAttribute.UserId,
+		&userAttribute.UserID,
 	)
 }
 
@@ -55,14 +55,14 @@ var updateUserAttribute = statement{
 		`include_in_access_token = @p5, user_id = @p6 WHERE id = @p7`,
 }
 
-var selectUserAttributeById = statement{
+var selectUserAttributeByID = statement{
 	sqlite:   "SELECT " + userAttributeColumns.sqlite + " FROM user_attributes WHERE id = ?",
 	mysql:    "SELECT " + userAttributeColumns.mysql + " FROM user_attributes WHERE id = ?",
 	postgres: "SELECT " + userAttributeColumns.postgres + " FROM user_attributes WHERE id = $1",
 	mssql:    "SELECT " + userAttributeColumns.mssql + " FROM user_attributes WHERE id = @p1",
 }
 
-var selectUserAttributesByUserId = statement{
+var selectUserAttributesByUserID = statement{
 	sqlite:   "SELECT " + userAttributeColumns.sqlite + " FROM user_attributes WHERE user_id = ?",
 	mysql:    "SELECT " + userAttributeColumns.mysql + " FROM user_attributes WHERE user_id = ?",
 	postgres: "SELECT " + userAttributeColumns.postgres + " FROM user_attributes WHERE user_id = $1",
@@ -78,7 +78,7 @@ var deleteUserAttribute = statement{
 
 func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error {
 
-	if userAttribute.UserId == 0 {
+	if userAttribute.UserID == 0 {
 		return errs.New("can't create userAttribute with user_id 0")
 	}
 
@@ -91,20 +91,20 @@ func (d *Database) CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 
 	id, err := d.insert(ctx, tx, insertUserAttribute, "userAttribute",
 		userAttribute.CreatedAt, userAttribute.UpdatedAt, userAttribute.Key, userAttribute.Value,
-		userAttribute.IncludeInIdToken, userAttribute.IncludeInAccessToken, userAttribute.UserId)
+		userAttribute.IncludeInIDToken, userAttribute.IncludeInAccessToken, userAttribute.UserID)
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	userAttribute.Id = id
+	userAttribute.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error {
 
-	if userAttribute.Id == 0 {
+	if userAttribute.ID == 0 {
 		return errs.New("can't update userAttribute with id 0")
 	}
 
@@ -112,9 +112,9 @@ func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 	userAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateUserAttribute.text(d.Dialect),
-		userAttribute.UpdatedAt, userAttribute.Key, userAttribute.Value, userAttribute.IncludeInIdToken,
-		userAttribute.IncludeInAccessToken, userAttribute.UserId,
-		userAttribute.Id)
+		userAttribute.UpdatedAt, userAttribute.Key, userAttribute.Value, userAttribute.IncludeInIDToken,
+		userAttribute.IncludeInAccessToken, userAttribute.UserID,
+		userAttribute.ID)
 	if err != nil {
 		userAttribute.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userAttribute")
@@ -123,19 +123,19 @@ func (d *Database) UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttr
 	return nil
 }
 
-func (d *Database) GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error) {
-	return queryOne(ctx, d, tx, selectUserAttributeById.text(d.Dialect), []any{userAttributeId},
+func (d *Database) GetUserAttributeByID(ctx context.Context, tx *sql.Tx, userAttributeID int64) (*record.UserAttribute, error) {
+	return queryOne(ctx, d, tx, selectUserAttributeByID.text(d.Dialect), []any{userAttributeID},
 		scanUserAttribute, "userAttribute")
 }
 
-func (d *Database) GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error) {
-	return queryAll(ctx, d, tx, nil, selectUserAttributesByUserId.text(d.Dialect), []any{userId},
+func (d *Database) GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserAttribute, error) {
+	return queryAll(ctx, d, tx, nil, selectUserAttributesByUserID.text(d.Dialect), []any{userID},
 		scanUserAttribute, "userAttribute")
 }
 
-func (d *Database) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error {
+func (d *Database) DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteUserAttribute.text(d.Dialect), userAttributeId)
+	_, err := d.ExecSQL(ctx, tx, deleteUserAttribute.text(d.Dialect), userAttributeID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userAttribute")
 	}

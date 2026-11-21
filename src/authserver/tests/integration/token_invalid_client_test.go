@@ -64,7 +64,7 @@ func TestToken_InvalidClient_OneShapeOverBothTransports(t *testing.T) {
 			ClientIdentifier:         "invalid-client-" + fake.LetterN(8),
 			Enabled:                  enabled,
 			ClientCredentialsEnabled: true,
-			DefaultAcrLevel:          record.AcrLevel2Optional,
+			DefaultACRLevel:          record.ACRLevel2Optional,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))

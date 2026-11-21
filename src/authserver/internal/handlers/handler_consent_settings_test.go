@@ -66,7 +66,7 @@ func TestMissingSettings_ConsentAnswersBeforeReadingItsCeremony(t *testing.T) {
 			ceremonyStore.AssertNotCalled(t, "GetAuthContext", req)
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 			ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 			permissionChecker.AssertNotCalled(t, "FilterOutScopesWhereUserIsNotAuthorized",
 				mock.Anything, mock.Anything, mock.Anything)

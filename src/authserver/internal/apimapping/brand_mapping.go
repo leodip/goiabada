@@ -25,7 +25,7 @@ func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string
 		return &answer
 	}
 	resp := api.BrandResponse{
-		ID:            brand.Id,
+		ID:            brand.ID,
 		Name:          brand.Name,
 		Appearance:    string(brand.Appearance),
 		Theme:         brand.Theme,
@@ -92,7 +92,7 @@ func ToBrandThemeResponses(presets []brandthemes.Preset) []api.BrandThemeRespons
 // absolute on baseURL.
 func ToBrandAssetResponse(asset *record.BrandAsset, baseURL string) api.BrandAssetResponse {
 	return api.BrandAssetResponse{
-		ID:          asset.Id,
+		ID:          asset.ID,
 		Kind:        string(asset.Kind),
 		URL:         baseURL + brandasset.Path(asset),
 		ContentType: asset.ContentType,

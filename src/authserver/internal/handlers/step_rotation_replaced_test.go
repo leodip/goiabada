@@ -79,7 +79,7 @@ func TestHandleAuthPwdPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		ClientId:   "test-client",
 	}, nil)
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
+		ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
 	}, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
 	// mock.Anything for the request: the handler refines the localizer onto a fresh *http.Request
@@ -123,8 +123,8 @@ func TestHandleAuthOtpPost_ARotationFindingItsCeremonyReplacedAnswersNoLongerAct
 		UserId:     1,
 		ClientId:   "test-client",
 	}, nil)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-		Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, otpSecret), OtpConfigGeneration: 3,
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+		ID: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, otpSecret), OTPConfigGeneration: 3,
 	}, nil)
 	database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
 		Return(true, nil)
@@ -179,17 +179,17 @@ func TestHandleAuthCompletedGet_AReuseArmRotationFindingItsCeremonyReplacedAnswe
 		OtpConfigGeneration: &captured,
 		OtpClaimGeneration:  &captured,
 	}, nil)
-	userSession := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel1, AuthMethods: "pwd"}
+	userSession := &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel1, AuthMethods: "pwd"}
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil)
 	userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 		mock.AnythingOfType("*int64")).Return(true)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil).Once()
 	userSessionManager.On("AuthenticationIsStale", mock.Anything, sessionIdentifier,
-		boundWith("pwd otp", record.AcrLevel2Optional)).Return(false, nil).Once()
+		boundWith("pwd otp", record.ACRLevel2Optional)).Return(false, nil).Once()
 	expectRotationReplaced(ceremonyStore, rr, req)
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 
@@ -214,8 +214,8 @@ type createArmCase struct {
 }
 
 var createArmCases = []createArmCase{
-	{name: "over another user's session", session: &record.UserSession{Id: 7, UserId: 2, SessionIdentifier: "the-browser-session"}, valid: true},
-	{name: "over this user's expired session", session: &record.UserSession{Id: 7, UserId: 1, SessionIdentifier: "the-browser-session"}},
+	{name: "over another user's session", session: &record.UserSession{ID: 7, UserID: 2, SessionIdentifier: "the-browser-session"}, valid: true},
+	{name: "over this user's expired session", session: &record.UserSession{ID: 7, UserID: 1, SessionIdentifier: "the-browser-session"}},
 	{name: "with no session", session: nil},
 }
 
@@ -243,11 +243,11 @@ func armCreateArm(t *testing.T, tc createArmCase, ceremonyStore *handlersmocks.C
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-browser-session").Return(tc.session, nil)
 	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, tc.session).Return(nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, AuthorizationCodeEnabled: true}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1, AuthorizationCodeEnabled: true}, nil)
 	userSessionManager.On("HasValidUserSession", tc.session, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 		mock.AnythingOfType("*int64")).Return(tc.valid)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, AuthStateGeneration: 7}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, AuthStateGeneration: 7}, nil)
 	return req, &pwdAuthTime
 }
 
@@ -327,11 +327,11 @@ func TestHandleAuthCompletedGet_ACreateArmRotationFindingItsCeremonyReplacedAnsw
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("ConfirmCeremony", rr, req, testCeremonyId).Return(nil).Once()
-			removed := []usersession.Removal{{Session: record.UserSession{Id: 42}, Reason: audit.DeletedUserSessionSameDevice}}
-			started := &record.UserSession{Id: 43, SessionIdentifier: "the-new-user-session", UserId: 1}
+			removed := []usersession.Removal{{Session: record.UserSession{ID: 42}, Reason: audit.DeletedUserSessionSameDevice}}
+			started := &record.UserSession{ID: 43, SessionIdentifier: "the-new-user-session", UserID: 1}
 			var minted string
 			userSessionManager.On("StartNewUserSession", theContextOf(req), int64(1),
-				signedInAs(int64(1), "pwd", record.AcrLevel1, pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "",
+				signedInAs(int64(1), "pwd", record.ACRLevel1, pwdAuthTime), int64(7), (*int64)(nil), aNewDeviceOf(req, &minted), "",
 				(*record.UserSession)(nil), testSessionLimits).Return(started, removed, nil).Once()
 			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "the-new-user-session", (*bool)(nil)).
 				Return(failure.err).Once()
@@ -403,7 +403,7 @@ func TestHandleAuthPwdPost_ARotationResumingAfterANewerAuthorize(t *testing.T) {
 			databaseA.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Run(func(mock.Arguments) {
 				close(reached)
 				<-release
-			}).Return(&record.User{Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+			}).Return(&record.User{ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
 			auditLoggerA.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
 
 			form := url.Values{}

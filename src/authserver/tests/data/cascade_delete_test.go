@@ -31,13 +31,13 @@ import (
 // reference". This shape is the reason these tests exist: the auth-code flow
 // instead sets only code_id, so those rows are swept up by the codes cascade and
 // never exercise the users/clients foreign keys directly.
-func createROPCRefreshToken(t *testing.T, userId, clientId int64) *record.RefreshToken {
+func createROPCRefreshToken(t *testing.T, userID, clientID int64) *record.RefreshToken {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	refreshToken := &record.RefreshToken{
-		UserId:            sql.NullInt64{Int64: userId, Valid: true},
-		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
+		UserID:            sql.NullInt64{Int64: userID, Valid: true},
+		ClientID:          sql.NullInt64{Int64: clientID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
 		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Offline",
 		Scope:             "openid profile offline_access",
@@ -47,18 +47,18 @@ func createROPCRefreshToken(t *testing.T, userId, clientId int64) *record.Refres
 		Revoked:           false,
 	}
 	require.NoError(t, database.CreateRefreshToken(context.Background(), nil, refreshToken), "CreateRefreshToken")
-	require.False(t, refreshToken.CodeId.Valid, "code_id must stay NULL for a ROPC-shaped token")
+	require.False(t, refreshToken.CodeID.Valid, "code_id must stay NULL for a ROPC-shaped token")
 	return refreshToken
 }
 
 // createCodeLinkedRefreshToken mirrors the auth-code flow: code_id set, user_id
 // and client_id left NULL.
-func createCodeLinkedRefreshToken(t *testing.T, codeId int64) *record.RefreshToken {
+func createCodeLinkedRefreshToken(t *testing.T, codeID int64) *record.RefreshToken {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	refreshToken := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
+		CodeID:            sql.NullInt64{Int64: codeID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
 		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
@@ -73,8 +73,8 @@ func createCodeLinkedRefreshToken(t *testing.T, codeId int64) *record.RefreshTok
 
 func refreshTokenExists(t *testing.T, id int64) bool {
 	t.Helper()
-	refreshToken, err := database.GetRefreshTokenById(context.Background(), nil, id)
-	require.NoError(t, err, "GetRefreshTokenById")
+	refreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, id)
+	require.NoError(t, err, "GetRefreshTokenByID")
 	return refreshToken != nil
 }
 
@@ -89,28 +89,28 @@ func refreshTokenExists(t *testing.T, id int64) bool {
 func TestDeleteUser_ROPCRefreshTokenDoesNotBlockDeletion(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
+	refreshToken := createROPCRefreshToken(t, user.ID, client.ID)
 
-	require.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "DeleteUser with a ROPC-issued refresh token")
+	require.NoError(t, database.DeleteUser(context.Background(), nil, user.ID), "DeleteUser with a ROPC-issued refresh token")
 
-	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserById")
+	deletedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserByID")
 	assert.Nil(t, deletedUser, "user must be gone")
-	assert.False(t, refreshTokenExists(t, refreshToken.Id),
+	assert.False(t, refreshTokenExists(t, refreshToken.ID),
 		"the ROPC refresh token must be removed with its user")
 }
 
 func TestDeleteClient_ROPCRefreshTokenDoesNotBlockDeletion(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
+	refreshToken := createROPCRefreshToken(t, user.ID, client.ID)
 
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id), "DeleteClient with a ROPC-issued refresh token")
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID), "DeleteClient with a ROPC-issued refresh token")
 
-	deletedClient, err := database.GetClientById(context.Background(), nil, client.Id)
-	require.NoError(t, err, "GetClientById")
+	deletedClient, err := database.GetClientByID(context.Background(), nil, client.ID)
+	require.NoError(t, err, "GetClientByID")
 	assert.Nil(t, deletedClient, "client must be gone")
-	assert.False(t, refreshTokenExists(t, refreshToken.Id),
+	assert.False(t, refreshTokenExists(t, refreshToken.ID),
 		"the ROPC refresh token must be removed with its client")
 }
 
@@ -126,108 +126,108 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	client := createTestClient(t)
 
 	// Direct children of users.
-	code := createTestCode(t, client.Id, user.Id)
-	ropcToken := createROPCRefreshToken(t, user.Id, client.Id)
-	attribute := createTestUserAttribute(t, user.Id)
-	consent := createTestUserConsentForUser(t, user.Id)
-	session := createTestUserSessionWithClient(t, user.Id, client.Id)
+	code := createTestCode(t, client.ID, user.ID)
+	ropcToken := createROPCRefreshToken(t, user.ID, client.ID)
+	attribute := createTestUserAttribute(t, user.ID)
+	consent := createTestUserConsentForUser(t, user.ID)
+	session := createTestUserSessionWithClient(t, user.ID, client.ID)
 	group := createTestGroup(t)
-	userGroup := createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
+	userGroup := createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
-	userPermission := createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
-	profilePicture := createTestUserProfilePicture(t, user.Id)
+	userPermission := createTestUserPermissionWithUserAndPermission(t, user.ID, permission.ID)
+	profilePicture := createTestUserProfilePicture(t, user.ID)
 	legalDocument := createLegalDocument(t, record.LegalDocumentKindMustAccept)
-	acceptedVersion := publishVersion(t, legalDocument.Id, 1, "Terms of use", "Be nice.")
-	acceptLegalDocumentVersion(t, user.Id, acceptedVersion.Id)
+	acceptedVersion := publishVersion(t, legalDocument.ID, 1, "Terms of use", "Be nice.")
+	acceptLegalDocumentVersion(t, user.ID, acceptedVersion.ID)
 	recoveryCodes := recoveryCodeHashes(3)
-	replaceRecoveryCodes(t, user.Id, recoveryCodes)
-	require.True(t, useRecoveryCode(t, user.Id, recoveryCodes[0]), "sanity: one code of the set is used")
-	require.Equal(t, 2, unusedRecoveryCodes(t, user.Id), "sanity: the other two codes are unused")
+	replaceRecoveryCodes(t, user.ID, recoveryCodes)
+	require.True(t, useRecoveryCode(t, user.ID, recoveryCodes[0]), "sanity: one code of the set is used")
+	require.Equal(t, 2, unusedRecoveryCodes(t, user.ID), "sanity: the other two codes are unused")
 
 	// Second hop: a refresh token under the code, and the session's client row.
-	codeLinkedToken := createCodeLinkedRefreshToken(t, code.Id)
-	sessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, session.Id)
-	require.NoError(t, err, "GetUserSessionClientsByUserSessionId")
+	codeLinkedToken := createCodeLinkedRefreshToken(t, code.ID)
+	sessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, session.ID)
+	require.NoError(t, err, "GetUserSessionClientsByUserSessionID")
 	require.Len(t, sessionClients, 1, "expected the session to have one client row")
-	sessionClientId := sessionClients[0].Id
+	sessionClientID := sessionClients[0].ID
 
-	require.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "DeleteUser")
+	require.NoError(t, database.DeleteUser(context.Background(), nil, user.ID), "DeleteUser")
 
-	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserById")
+	deletedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserByID")
 	require.Nil(t, deletedUser, "user must be gone")
 
 	// codes
-	deletedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	require.NoError(t, err, "GetCodeById")
+	deletedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
+	require.NoError(t, err, "GetCodeByID")
 	assert.Nil(t, deletedCode, "codes must cascade from users")
 
 	// refresh_tokens, both shapes
-	assert.False(t, refreshTokenExists(t, ropcToken.Id),
+	assert.False(t, refreshTokenExists(t, ropcToken.ID),
 		"refresh_tokens must cascade from users (ROPC-shaped, code_id NULL)")
-	assert.False(t, refreshTokenExists(t, codeLinkedToken.Id),
+	assert.False(t, refreshTokenExists(t, codeLinkedToken.ID),
 		"refresh_tokens must cascade from codes (auth-code-shaped)")
 
 	// user_attributes
-	deletedAttribute, err := database.GetUserAttributeById(context.Background(), nil, attribute.Id)
-	require.NoError(t, err, "GetUserAttributeById")
+	deletedAttribute, err := database.GetUserAttributeByID(context.Background(), nil, attribute.ID)
+	require.NoError(t, err, "GetUserAttributeByID")
 	assert.Nil(t, deletedAttribute, "user_attributes must cascade from users")
 
 	// user_consents
-	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	require.NoError(t, err, "GetUserConsentById")
+	deletedConsent, err := database.GetUserConsentByID(context.Background(), nil, consent.ID)
+	require.NoError(t, err, "GetUserConsentByID")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from users")
 
 	// user_sessions
-	deletedSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	require.NoError(t, err, "GetUserSessionById")
+	deletedSession, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
+	require.NoError(t, err, "GetUserSessionByID")
 	assert.Nil(t, deletedSession, "user_sessions must cascade from users")
 
 	// user_session_clients (second hop, under user_sessions)
-	deletedSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, sessionClientId)
-	require.NoError(t, err, "GetUserSessionClientById")
+	deletedSessionClient, err := database.GetUserSessionClientByID(context.Background(), nil, sessionClientID)
+	require.NoError(t, err, "GetUserSessionClientByID")
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from user_sessions")
 
 	// users_groups
-	deletedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
-	require.NoError(t, err, "GetUserGroupById")
+	deletedUserGroup, err := database.GetUserGroupByID(context.Background(), nil, userGroup.ID)
+	require.NoError(t, err, "GetUserGroupByID")
 	assert.Nil(t, deletedUserGroup, "users_groups must cascade from users")
 
 	// users_permissions
-	deletedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
-	require.NoError(t, err, "GetUserPermissionById")
+	deletedUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, userPermission.ID)
+	require.NoError(t, err, "GetUserPermissionByID")
 	assert.Nil(t, deletedUserPermission, "users_permissions must cascade from users")
 
 	// user_profile_pictures
-	deletedPicture, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserProfilePictureByUserId")
+	deletedPicture, err := database.GetUserProfilePictureByUserID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserProfilePictureByUserID")
 	assert.Nil(t, deletedPicture, "user_profile_pictures must cascade from users")
-	assert.NotZero(t, profilePicture.Id, "sanity: the fixture was created")
+	assert.NotZero(t, profilePicture.ID, "sanity: the fixture was created")
 
 	// legal_document_acceptances
-	assert.Empty(t, acceptedVersionIds(t, user.Id), "legal_document_acceptances must cascade from users")
+	assert.Empty(t, acceptedVersionIDs(t, user.ID), "legal_document_acceptances must cascade from users")
 
 	// user_recovery_codes, the used code and the unused ones alike
 	for i, codeHash := range recoveryCodes {
-		exists, existsErr := database.UserRecoveryCodeExists(context.Background(), nil, user.Id, codeHash)
+		exists, existsErr := database.UserRecoveryCodeExists(context.Background(), nil, user.ID, codeHash)
 		require.NoError(t, existsErr, "UserRecoveryCodeExists")
 		assert.False(t, exists, "user_recovery_codes must cascade from users (code %d)", i)
 	}
-	assert.Zero(t, unusedRecoveryCodes(t, user.Id), "no unused recovery code may outlive its user")
+	assert.Zero(t, unusedRecoveryCodes(t, user.ID), "no unused recovery code may outlive its user")
 
 	// The group, resource and permission are independent of the user and must
 	// survive: cascade must not travel up an association table.
-	survivingGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
-	require.NoError(t, err, "GetGroupById")
+	survivingGroup, err := database.GetGroupByID(context.Background(), nil, group.ID)
+	require.NoError(t, err, "GetGroupByID")
 	assert.NotNil(t, survivingGroup, "deleting a user must not delete the group")
-	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
-	require.NoError(t, err, "GetPermissionById")
+	survivingPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
+	require.NoError(t, err, "GetPermissionByID")
 	assert.NotNil(t, survivingPermission, "deleting a user must not delete the permission")
-	survivingClient, err := database.GetClientById(context.Background(), nil, client.Id)
-	require.NoError(t, err, "GetClientById")
+	survivingClient, err := database.GetClientByID(context.Background(), nil, client.ID)
+	require.NoError(t, err, "GetClientByID")
 	assert.NotNil(t, survivingClient, "deleting a user must not delete the client")
-	survivingVersion, err := database.GetLegalDocumentVersion(context.Background(), nil, legalDocument.Id, 1)
+	survivingVersion, err := database.GetLegalDocumentVersion(context.Background(), nil, legalDocument.ID, 1)
 	require.NoError(t, err, "GetLegalDocumentVersion")
 	assert.NotNil(t, survivingVersion, "deleting a user must not delete the version they accepted")
 }
@@ -238,96 +238,96 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
 
-	code := createTestCode(t, client.Id, user.Id)
-	ropcToken := createROPCRefreshToken(t, user.Id, client.Id)
-	redirectURI := createTestRedirectURI(t, client.Id)
-	webOrigin := createTestWebOrigin(t, client.Id)
-	logo := createTestClientLogo(t, client.Id)
+	code := createTestCode(t, client.ID, user.ID)
+	ropcToken := createROPCRefreshToken(t, user.ID, client.ID)
+	redirectURI := createTestRedirectURI(t, client.ID)
+	webOrigin := createTestWebOrigin(t, client.ID)
+	logo := createTestClientLogo(t, client.ID)
 
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission), "CreateClientPermission")
 
 	consent := &record.UserConsent{
-		UserId:   user.Id,
-		ClientId: client.Id,
+		UserID:   user.ID,
+		ClientID: client.ID,
 		Scope:    "openid profile",
 	}
 	require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent), "CreateUserConsent")
 
-	session := createTestUserSessionWithClient(t, user.Id, client.Id)
-	sessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, session.Id)
-	require.NoError(t, err, "GetUserSessionClientsByUserSessionId")
+	session := createTestUserSessionWithClient(t, user.ID, client.ID)
+	sessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, session.ID)
+	require.NoError(t, err, "GetUserSessionClientsByUserSessionID")
 	require.Len(t, sessionClients, 1, "expected the session to have one client row")
-	sessionClientId := sessionClients[0].Id
+	sessionClientID := sessionClients[0].ID
 
 	legalDocument := createLegalDocument(t, record.LegalDocumentKindMustAccept)
-	linkDocumentToClient(t, legalDocument.Id, client.Id)
+	linkDocumentToClient(t, legalDocument.ID, client.ID)
 
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id), "DeleteClient")
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID), "DeleteClient")
 
-	deletedClient, err := database.GetClientById(context.Background(), nil, client.Id)
-	require.NoError(t, err, "GetClientById")
+	deletedClient, err := database.GetClientByID(context.Background(), nil, client.ID)
+	require.NoError(t, err, "GetClientByID")
 	require.Nil(t, deletedClient, "client must be gone")
 
 	// codes
-	deletedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
-	require.NoError(t, err, "GetCodeById")
+	deletedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
+	require.NoError(t, err, "GetCodeByID")
 	assert.Nil(t, deletedCode, "codes must cascade from clients")
 
 	// refresh_tokens
-	assert.False(t, refreshTokenExists(t, ropcToken.Id),
+	assert.False(t, refreshTokenExists(t, ropcToken.ID),
 		"refresh_tokens must cascade from clients (ROPC-shaped, code_id NULL)")
 
 	// redirect_uris
-	deletedRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
-	require.NoError(t, err, "GetRedirectURIById")
+	deletedRedirectURI, err := database.GetRedirectURIByID(context.Background(), nil, redirectURI.ID)
+	require.NoError(t, err, "GetRedirectURIByID")
 	assert.Nil(t, deletedRedirectURI, "redirect_uris must cascade from clients")
 
 	// web_origins
-	deletedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
-	require.NoError(t, err, "GetWebOriginById")
+	deletedWebOrigin, err := database.GetWebOriginByID(context.Background(), nil, webOrigin.ID)
+	require.NoError(t, err, "GetWebOriginByID")
 	assert.Nil(t, deletedWebOrigin, "web_origins must cascade from clients")
 
 	// client_logos
-	deletedLogo, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
-	require.NoError(t, err, "GetClientLogoByClientId")
+	deletedLogo, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
+	require.NoError(t, err, "GetClientLogoByClientID")
 	assert.Nil(t, deletedLogo, "client_logos must cascade from clients")
-	assert.NotZero(t, logo.Id, "sanity: the fixture was created")
+	assert.NotZero(t, logo.ID, "sanity: the fixture was created")
 
 	// clients_permissions
-	deletedClientPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id)
-	require.NoError(t, err, "GetClientPermissionById")
+	deletedClientPermission, err := database.GetClientPermissionByID(context.Background(), nil, clientPermission.ID)
+	require.NoError(t, err, "GetClientPermissionByID")
 	assert.Nil(t, deletedClientPermission, "clients_permissions must cascade from clients")
 
 	// user_consents
-	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
-	require.NoError(t, err, "GetUserConsentById")
+	deletedConsent, err := database.GetUserConsentByID(context.Background(), nil, consent.ID)
+	require.NoError(t, err, "GetUserConsentByID")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from clients")
 
 	// user_session_clients
-	deletedSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, sessionClientId)
-	require.NoError(t, err, "GetUserSessionClientById")
+	deletedSessionClient, err := database.GetUserSessionClientByID(context.Background(), nil, sessionClientID)
+	require.NoError(t, err, "GetUserSessionClientByID")
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from clients")
 
 	// legal_documents_clients
-	assert.Empty(t, linkedClientIds(t, legalDocument.Id), "legal_documents_clients must cascade from clients")
+	assert.Empty(t, linkedClientIDs(t, legalDocument.ID), "legal_documents_clients must cascade from clients")
 
 	// The user, its session, the permission and the legal document are independent of the client.
-	survivingUser, err := database.GetUserById(context.Background(), nil, user.Id)
-	require.NoError(t, err, "GetUserById")
+	survivingUser, err := database.GetUserByID(context.Background(), nil, user.ID)
+	require.NoError(t, err, "GetUserByID")
 	assert.NotNil(t, survivingUser, "deleting a client must not delete the user")
-	survivingSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
-	require.NoError(t, err, "GetUserSessionById")
+	survivingSession, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
+	require.NoError(t, err, "GetUserSessionByID")
 	assert.NotNil(t, survivingSession, "deleting a client must not delete the user session")
-	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
-	require.NoError(t, err, "GetPermissionById")
+	survivingPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
+	require.NoError(t, err, "GetPermissionByID")
 	assert.NotNil(t, survivingPermission, "deleting a client must not delete the permission")
-	survivingDocument, err := database.GetLegalDocumentById(context.Background(), nil, legalDocument.Id)
-	require.NoError(t, err, "GetLegalDocumentById")
+	survivingDocument, err := database.GetLegalDocumentByID(context.Background(), nil, legalDocument.ID)
+	require.NoError(t, err, "GetLegalDocumentByID")
 	assert.NotNil(t, survivingDocument, "deleting a client must not delete a legal document it was listed on")
 }

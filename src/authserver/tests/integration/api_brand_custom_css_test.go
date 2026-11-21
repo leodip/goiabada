@@ -37,7 +37,7 @@ func TestAPIBrandCustomCSS_StoredReadListedAndWrittenBack(t *testing.T) {
 	*created = append(*created, id)
 	assert.Equal(t, storedCustomCSS, answer["brand"].(map[string]any)["customCss"])
 
-	stored, err := database.GetBrandById(context.Background(), nil, id)
+	stored, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, storedCustomCSS, stored.CustomCSS, "stored with its line endings made uniform")
@@ -74,7 +74,7 @@ func TestAPIBrandCustomCSS_StoredReadListedAndWrittenBack(t *testing.T) {
 			want = storedCustomCSS
 		}
 		assert.Equal(t, want, answer["brand"].(map[string]any)["customCss"])
-		stored, err = database.GetBrandById(context.Background(), nil, id)
+		stored, err = database.GetBrandByID(context.Background(), nil, id)
 		require.NoError(t, err)
 		assert.Equal(t, want, stored.CustomCSS)
 	}
@@ -116,7 +116,7 @@ func TestAPIBrandCustomCSS_Refusals(t *testing.T) {
 		}
 	}
 
-	stored, err := database.GetBrandById(context.Background(), nil, other)
+	stored, err := database.GetBrandByID(context.Background(), nil, other)
 	require.NoError(t, err)
 	assert.Equal(t, "blueberry", stored.Theme, "no refused update wrote the brand")
 	assert.Empty(t, stored.CustomCSS)

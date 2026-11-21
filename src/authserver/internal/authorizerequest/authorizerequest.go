@@ -122,7 +122,7 @@ func Consume(ctx context.Context, db Consuming, handle string) (url.Values, bool
 			return nil
 		}
 
-		claimed, err := db.ClaimAuthorizeRequest(ctx, tx, found.Id)
+		claimed, err := db.ClaimAuthorizeRequest(ctx, tx, found.ID)
 		if err != nil {
 			return errs.Wrap(err, "unable to claim the authorize request")
 		}

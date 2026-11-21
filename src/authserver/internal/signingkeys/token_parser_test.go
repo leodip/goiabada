@@ -228,8 +228,8 @@ func TestDecodeAndValidateTokenString_AcceptsATokenSignedByAFallbackKey(t *testi
 	tp := NewTokenParser(mockDB)
 
 	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
-		{Id: 1, State: record.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
-		{Id: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+		{ID: 1, State: record.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
+		{ID: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
 	}, nil).Once()
 
 	token := createTestToken(previousKey, map[string]interface{}{"sub": "user123"}, time.Now().Add(time.Hour))
@@ -325,9 +325,9 @@ func TestDecodeAndValidateTokenString_AnExpiredTokenSignedByAFallbackKeyIsExpire
 	tp := NewTokenParser(mockDB)
 
 	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
-		{Id: 1, State: record.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
-		{Id: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
-		{Id: 3, State: record.KeyStateNext.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&unrelatedKey.PublicKey))},
+		{ID: 1, State: record.KeyStateCurrent.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))},
+		{ID: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+		{ID: 3, State: record.KeyStateNext.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&unrelatedKey.PublicKey))},
 	}, nil).Once()
 
 	token := createTestToken(previousKey, map[string]interface{}{"sub": "user123"}, time.Now().Add(-time.Hour))
@@ -346,9 +346,9 @@ func TestDecodeAndValidateTokenString_AnExpiredTokenSignedByAFallbackKeyIsExpire
 func TestDecodeAndValidateTokenString_AKeyItCouldNotReadOrDecodeIsNotARefusal(t *testing.T) {
 	currentKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	previousKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	currentKeyPair := record.KeyPair{Id: 1, State: record.KeyStateCurrent.String(),
+	currentKeyPair := record.KeyPair{ID: 1, State: record.KeyStateCurrent.String(),
 		PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&currentKey.PublicKey))}
-	undecodableKeyPair := record.KeyPair{Id: 2, State: record.KeyStatePrevious.String(),
+	undecodableKeyPair := record.KeyPair{ID: 2, State: record.KeyStatePrevious.String(),
 		PublicKeyPEM: []byte("not a key")}
 
 	t.Run("the current key cannot be read", func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestDecodeAndValidateTokenString_AKeyItCouldNotReadOrDecodeIsNotARefusal(t 
 		mockDB := currentKeyDatabase(t, currentKey)
 		mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
 			undecodableKeyPair,
-			{Id: 3, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+			{ID: 3, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
 		}, nil).Once()
 		tp := NewTokenParser(mockDB)
 		token := createTestToken(previousKey, map[string]interface{}{"sub": "user123"}, time.Now().Add(time.Hour))
@@ -486,7 +486,7 @@ func TestDecodeAndValidateTokenString_ReturnsTheHeader(t *testing.T) {
 		previousKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 		mockDB := currentKeyDatabase(t, currentKey)
 		mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{
-			{Id: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
+			{ID: 2, State: record.KeyStatePrevious.String(), PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&previousKey.PublicKey))},
 		}, nil).Once()
 
 		result, err := NewTokenParser(mockDB).DecodeAndValidateTokenString(context.Background(), signed(t, previousKey), true)

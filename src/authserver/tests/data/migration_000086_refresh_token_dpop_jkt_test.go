@@ -99,8 +99,8 @@ func seedPreMigration000086RefreshToken(t *testing.T, h *isolatedDB) string {
 	t.Helper()
 	random := fake.LetterN(6)
 
-	clientId := seedClient(t, h, "mig86_client_"+random)
-	userId := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig86_" + random})
+	clientID := seedClient(t, h, "mig86_client_"+random)
+	userID := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig86_" + random})
 
 	falseLit, _ := boolLiterals000031()
 	jti := fake.UUID()
@@ -108,7 +108,7 @@ func seedPreMigration000086RefreshToken(t *testing.T, h *isolatedDB) string {
 		(user_id, client_id, refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti,
 		 session_identifier, refresh_token_type, scope, revoked)
 		VALUES (%d, %d, '%s', '', '%s', '', 'Offline', 'openid', %s)`,
-		userId, clientId, jti, jti, falseLit))
+		userID, clientID, jti, jti, falseLit))
 	require.NoError(t, err, "seed a pre-000086 refresh token")
 	return jti
 }

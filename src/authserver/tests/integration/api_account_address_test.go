@@ -44,7 +44,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.ID)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 	assert.Equal(t, reqBody.AddressLine1, updateResp.User.AddressLine1)
 	assert.Equal(t, reqBody.AddressLine2, updateResp.User.AddressLine2)
 	assert.Equal(t, reqBody.AddressLocality, updateResp.User.AddressLocality)
@@ -53,7 +53,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 	assert.Equal(t, reqBody.AddressCountry, updateResp.User.AddressCountry)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, reqBody.AddressLine1, updatedUser.AddressLine1)

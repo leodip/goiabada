@@ -17,10 +17,10 @@ func TestSettings(t *testing.T) {
 	t.Run("Successful retrieval of settings", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		expectedSettings := &record.Settings{
-			Id:      1,
+			ID:      1,
 			AppName: "TestApp",
 		}
-		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(expectedSettings, nil)
+		mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(expectedSettings, nil)
 
 		middleware := Settings(mockDB, PageFaults())
 
@@ -38,7 +38,7 @@ func TestSettings(t *testing.T) {
 
 	t.Run("Database error", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
-		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
+		mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 		middleware := Settings(mockDB, PageFaults())
 

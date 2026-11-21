@@ -99,7 +99,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		ClientSecretEncrypted:    clientSecretEncrypted,
@@ -275,7 +275,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	clientSecret := fake.Password(32)
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -373,7 +373,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, wrongClient)
@@ -418,10 +418,10 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	resourceIdentifier := "additional-resource-" + fake.LetterN(8)
 	permissionIdentifier := "read-" + fake.LetterN(8)
 	resource := createResourceWithId(t, resourceIdentifier)
-	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
+	permission := createPermissionWithId(t, resource.ID, permissionIdentifier)
 
 	// Assign the new permission to the user
-	assignPermissionToUser(t, code.UserId, permission.Id)
+	assignPermissionToUser(t, code.UserID, permission.ID)
 
 	// Now, attempt to refresh the token with an additional scope
 	newScope := fmt.Sprintf("%s:%s", resourceIdentifier, permissionIdentifier)
@@ -465,7 +465,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
@@ -473,7 +473,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Create a redirect URI for the client
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -494,8 +494,8 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Create a resource and permission, and assign it to the user
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	// Set up the request scope
 	requestScope := "openid profile email " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
@@ -567,11 +567,11 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	refreshToken := tokenResp["refresh_token"].(string)
 
 	// Remove the consent
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, consent)
 
-	_, err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
+	_, err = database.DeleteUserConsent(context.Background(), nil, consent.ID)
 	require.NoError(t, err)
 
 	// Attempt to use the refresh token
@@ -599,14 +599,14 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -625,8 +625,8 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	require.NoError(t, err)
 
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	initialScope := "openid profile email"
 	additionalScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
@@ -770,7 +770,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	}
 
 	// Verify that the original refresh token is now marked as used (revoked)
-	revokedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
+	revokedRefreshToken, err := database.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	assert.NotNil(t, revokedRefreshToken)
 	assert.True(t, revokedRefreshToken.Revoked, "The original refresh token should be marked as revoked after use")
@@ -803,9 +803,9 @@ func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
 		code.Code, code.RedirectURI, testCodeVerifier)
 
 	row := refreshTokenRowByJti(t, refreshToken)
-	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.Id))
+	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.ID))
 
-	gone, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	gone, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	require.Nil(t, gone, "the fixture must actually remove the row")
 

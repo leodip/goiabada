@@ -78,7 +78,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
 		f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-			&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
+			&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil)
 		f.authorizeValidator.On("ValidateUnsupportedRequestParameters",
 			mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 		stubRegisteredRedirectURI(f.database, redirectURI)
@@ -95,7 +95,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 	t.Run("a session holder's malformed max_age is refused at once, the session judged without it", func(t *testing.T) {
 		f := arrange(t, "max_age=abc")
 
-		userSession := &record.UserSession{Id: 7, UserId: 1}
+		userSession := &record.UserSession{ID: 7, UserID: 1}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 			Return(userSession, nil)
 		// nil, not 0: a value ValidateRequest is about to refuse must not decide the session, and
@@ -159,8 +159,8 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		f.authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		f.authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		userSession := &record.UserSession{Id: 7, UserId: 1, AcrLevel: record.AcrLevel1,
-			User: record.User{Id: 1, Enabled: true}}
+		userSession := &record.UserSession{ID: 7, UserID: 1, ACRLevel: record.ACRLevel1,
+			User: record.User{ID: 1, Enabled: true}}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
 			Return(userSession, nil)
 		f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)

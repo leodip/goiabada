@@ -100,7 +100,7 @@ func TestAPIAccountRecoveryCodesPost_ReplacesTheSet(t *testing.T) {
 	oldCodes := enableOTPForRecoveryCodesTest(t, accessToken, userId)
 	require.True(t, claimRecoveryCodeForTest(t, userId, oldCodes[0]))
 
-	before, err := database.GetUserById(context.Background(), nil, userId)
+	before, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	extra := seedExtraSessionForOTPTest(t, userId)
 
@@ -118,14 +118,14 @@ func TestAPIAccountRecoveryCodesPost_ReplacesTheSet(t *testing.T) {
 	assert.False(t, claimRecoveryCodeForTest(t, userId, oldCodes[1]), "an unused code of the old set stops working")
 	assert.True(t, claimRecoveryCodeForTest(t, userId, created.RecoveryCodes[3]), "a code of the new set works")
 
-	after, err := database.GetUserById(context.Background(), nil, userId)
+	after, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
-	assert.Equal(t, before.OtpConfigGeneration, after.OtpConfigGeneration, "a new set moves no generation")
+	assert.Equal(t, before.OTPConfigGeneration, after.OTPConfigGeneration, "a new set moves no generation")
 	assert.True(t, after.OTPEnabled, "the authenticator is left as it is")
-	reloaded, err := database.GetUserSessionById(context.Background(), nil, extra.Id)
+	reloaded, err := database.GetUserSessionByID(context.Background(), nil, extra.ID)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded, "a new set ends no session")
-	assert.Equal(t, after.OtpConfigGeneration, reloaded.OtpConfigGeneration, "the session owes no re-prompt")
+	assert.Equal(t, after.OTPConfigGeneration, reloaded.OTPConfigGeneration, "the session owes no re-prompt")
 	assert.Equal(t, "pwd otp", reloaded.AuthMethods, "the session keeps its second factor")
 	assert.Equal(t, 9, getRecoveryCodesRemaining(t, accessToken), "the caller's own token still works")
 }

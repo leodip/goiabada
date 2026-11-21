@@ -53,13 +53,13 @@ func newImplicitFixture(t *testing.T) *implicitFixture {
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: true,
-			IncludeOpenIDConnectClaimsInIdToken:     true,
+			IncludeOpenIDConnectClaimsInIDToken:     true,
 		},
 		input: &ImplicitGrantInput{
-			Client:              &record.Client{Id: 1, ClientIdentifier: "implicit-client"},
-			User:                &record.User{Id: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
+			Client:              &record.Client{ID: 1, ClientIdentifier: "implicit-client"},
+			User:                &record.User{ID: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
 			Scope:               "openid profile",
-			AcrLevel:            record.AcrLevel1,
+			AcrLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			SessionIdentifier:   "sid-implicit",
 			Nonce:               "implicit-nonce",
@@ -80,7 +80,7 @@ func (f *implicitFixture) expectEveryRead(order *[]string, hasPicture bool) {
 	f.mockDB.On("UserLoadGroups", mock.Anything, issueTx, f.input.User).Run(note("groups")).Return(nil).Once()
 	f.mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, f.input.User.Groups).Run(note("group attributes")).Return(nil).Once()
 	f.mockDB.On("UserLoadAttributes", mock.Anything, issueTx, f.input.User).Run(note("user attributes")).Return(nil).Once()
-	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.Id).Run(note("picture")).Return(hasPicture, nil).Twice()
+	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.ID).Run(note("picture")).Return(hasPicture, nil).Twice()
 }
 
 // The whole sequence, in order, on one transaction: begin, the session row, then every read the
@@ -276,7 +276,7 @@ func TestIssueImplicitTx_ARerunBodySignsAgainFromScratch(t *testing.T) {
 	f.mockDB.On("UserLoadGroups", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
 	f.mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
 	f.mockDB.On("UserLoadAttributes", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
-	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.Id).Return(false, nil).Times(4)
+	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.ID).Return(false, nil).Times(4)
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 

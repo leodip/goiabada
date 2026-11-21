@@ -50,7 +50,7 @@ type AuthContext struct {
 	Nonce                         string          `json:"Nonce"`
 	UserAgent                     string          `json:"UserAgent"`
 	IpAddress                     string          `json:"IpAddress"`
-	AcrLevel                      record.AcrLevel `json:"AcrLevel"`
+	AcrLevel                      record.ACRLevel `json:"AcrLevel"`
 	AuthMethods                   string          `json:"AuthMethods"`
 	UserId                        int64           `json:"UserId"`
 	AuthState                     AuthState       `json:"AuthState"`
@@ -318,9 +318,9 @@ func (ac *AuthContext) ParkDeferredError(code, description string) {
 //   - KeepSignedIn is the answer keepSignedIn the password was entered with, replacing any earlier
 //     one: true or false when the page asked Keep me signed in, nil when it showed no box (#743).
 func (ac *AuthContext) RecordPasswordVerified(user *record.User, now time.Time, keepSignedIn *bool) {
-	ac.UserId = user.Id
+	ac.UserId = user.ID
 	ac.AuthStateGeneration = user.AuthStateGeneration
-	otpConfigGeneration := user.OtpConfigGeneration
+	otpConfigGeneration := user.OTPConfigGeneration
 	ac.OtpConfigGeneration = &otpConfigGeneration
 	ac.AddAuthMethod(oidc.AuthMethodPassword)
 	authenticatedAt := now.UTC()
@@ -388,11 +388,11 @@ func (ac *AuthContext) recordSecondFactor(now time.Time, generation int64, metho
 // password handler, and reading the user's current generation here would launder an old session
 // into a newer one (#106 decision 11(d)).
 func (ac *AuthContext) AdoptSession(userSession *record.UserSession) {
-	ac.UserId = userSession.UserId
-	ac.AcrLevel = userSession.AcrLevel
+	ac.UserId = userSession.UserID
+	ac.AcrLevel = userSession.ACRLevel
 	ac.AuthMethods = userSession.AuthMethods
 	ac.AuthStateGeneration = userSession.AuthStateGeneration
-	otpClaimGeneration := userSession.OtpConfigGeneration
+	otpClaimGeneration := userSession.OTPConfigGeneration
 	ac.OtpClaimGeneration = &otpClaimGeneration
 	// The authentication this ceremony was built on: the ordering rule of the reuse bind (#538)
 	// compares it with the row the bind locks, so a session a newer sign-in has reached since the
@@ -489,8 +489,8 @@ func namesSecondFactor(authMethods string) bool {
 // and migration 000097 lowered every one of them to level 1. /auth/issue refuses to issue a code or
 // implicit tokens for a ceremony breaking it, so a bug that writes the pair again is refused there
 // rather than carried into a grant (#199).
-func LevelClaimsUnnamedFactor(acrLevel record.AcrLevel, authMethods string) bool {
-	if acrLevel != record.AcrLevel2Mandatory {
+func LevelClaimsUnnamedFactor(acrLevel record.ACRLevel, authMethods string) bool {
+	if acrLevel != record.ACRLevel2Mandatory {
 		return false
 	}
 	methods := strings.Split(authMethods, " ")
@@ -520,20 +520,20 @@ func (ac *AuthContext) RequestedMaxAge() *int64 {
 // existing session. The effective ACR is the maximum of the target and session ACR,
 // ensuring we never downgrade the authentication level within a session.
 //
-// Uses record.AcrMax() as the single source of truth for ACR comparison.
-func (ac *AuthContext) SetAcrLevel(targetAcrLevel record.AcrLevel, userSession *record.UserSession) error {
+// Uses record.ACRMax() as the single source of truth for ACR comparison.
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel record.ACRLevel, userSession *record.UserSession) error {
 	if userSession == nil {
 		ac.AcrLevel = targetAcrLevel
 		return nil
 	}
 
-	userSessionAcrLevel, err := record.AcrLevelFromString(userSession.AcrLevel.String())
+	userSessionAcrLevel, err := record.ACRLevelFromString(userSession.ACRLevel.String())
 	if err != nil {
 		return err
 	}
 
 	// Use the higher of the two ACR levels (never downgrade)
-	ac.AcrLevel = record.AcrMax(targetAcrLevel, userSessionAcrLevel)
+	ac.AcrLevel = record.ACRMax(targetAcrLevel, userSessionAcrLevel)
 	return nil
 }
 
@@ -548,7 +548,7 @@ func (ac *AuthContext) SetAcrLevel(targetAcrLevel record.AcrLevel, userSession *
 // particular stops a future auth state reaching a call site before the user is known and matching
 // an unsaved session by accident, since two zeros are not a match (#133).
 func (ac *AuthContext) OwnsSession(userSession *record.UserSession) bool {
-	return userSession != nil && ac.UserId != 0 && userSession.UserId == ac.UserId
+	return userSession != nil && ac.UserId != 0 && userSession.UserID == ac.UserId
 }
 
 // parseAcrValuesFromAuthorizeRequest reads acr_values, which OIDC Core 1.0 section 3.1.2.1 defines
@@ -561,13 +561,13 @@ func (ac *AuthContext) OwnsSession(userSession *record.UserSession) bool {
 // can only leave the target at the client's default, the floor computeTargetAcrLevel sets. A level
 // padded with a tab or a no-break space is not recognised either, where a trim used to admit it
 // (#244, #436).
-func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []record.AcrLevel {
-	arr := []record.AcrLevel{}
+func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []record.ACRLevel {
+	arr := []record.ACRLevel{}
 	if !oauth.IsWellFormedSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
 		return arr
 	}
 	for _, v := range oauth.SplitSpaceDelimited(ac.AcrValuesFromAuthorizeRequest) {
-		acr, err := record.AcrLevelFromString(v)
+		acr, err := record.ACRLevelFromString(v)
 		if err == nil && !slices.Contains(arr, acr) {
 			arr = append(arr, acr)
 		}
@@ -579,7 +579,7 @@ func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []record.AcrLevel {
 // authorization request is accepted, because a target recomputed later is a target an
 // administrator can move underneath a ceremony that is already in progress. See TargetAcrLevel
 // for what that costs (#240).
-func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) {
+func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient record.ACRLevel) {
 	ac.TargetAcrLevel = ac.computeTargetAcrLevel(defaultAcrLevelFromClient).String()
 }
 
@@ -588,9 +588,9 @@ func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLev
 // client's current default. It stays the only way a caller obtains a target, so no handler can
 // compute one another way and be missed. See TargetAcrLevel for why the fallback is the safe
 // direction.
-func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) record.AcrLevel {
+func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient record.ACRLevel) record.ACRLevel {
 	if ac.TargetAcrLevel != "" {
-		acr, err := record.AcrLevelFromString(ac.TargetAcrLevel)
+		acr, err := record.ACRLevelFromString(ac.TargetAcrLevel)
 		if err == nil {
 			return acr
 		}
@@ -608,12 +608,12 @@ func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient record.AcrLev
 // which is what makes this a floor rather than the client default always winning, and dropping
 // that half would leave step-up broken while every clamp case still passed.
 //
-// record.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
+// record.ACRMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
 // the same never-downgrade rule against a session's ACR (#240).
-func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient record.AcrLevel) record.AcrLevel {
+func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient record.ACRLevel) record.ACRLevel {
 	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
 	if len(acrValuesFromAuthorizeRequest) > 0 {
-		return record.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
+		return record.ACRMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
 	}
 	return defaultAcrLevelFromClient
 }

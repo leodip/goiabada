@@ -29,13 +29,13 @@ func TestIssueAuthCodeTx_ChecksTheOTPClaimUnderTheUserRowFirst(t *testing.T) {
 	}
 	datamocks.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 	mockDB.On("AcquireUserRow", mock.Anything, issueTx, int64(123)).Run(note("user row")).Return(nil).Once()
-	mockDB.On("GetUserById", mock.Anything, issueTx, int64(123)).Run(note("user")).
-		Return(&record.User{Id: 123, OTPEnabled: true, OtpConfigGeneration: 4}, nil).Once()
+	mockDB.On("GetUserByID", mock.Anything, issueTx, int64(123)).Run(note("user")).
+		Return(&record.User{ID: 123, OTPEnabled: true, OTPConfigGeneration: 4}, nil).Once()
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-	mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, int64(1)).Run(note("client lock")).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, int64(1)).Run(note("client lock")).
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Run(note("insert")).
 		Return(nil).Once()
 
@@ -53,8 +53,8 @@ func TestIssueAuthCodeTx_AClaimThatNoLongerStandsWritesNoCode(t *testing.T) {
 		name string
 		user *record.User
 	}{
-		{"the authenticator removed", &record.User{Id: 123, OtpConfigGeneration: 5}},
-		{"the authenticator removed and another set up", &record.User{Id: 123, OTPEnabled: true, OtpConfigGeneration: 6}},
+		{"the authenticator removed", &record.User{ID: 123, OTPConfigGeneration: 5}},
+		{"the authenticator removed and another set up", &record.User{ID: 123, OTPEnabled: true, OTPConfigGeneration: 6}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
@@ -66,7 +66,7 @@ func TestIssueAuthCodeTx_AClaimThatNoLongerStandsWritesNoCode(t *testing.T) {
 			var order []string
 			stub := datamocks.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 			mockDB.On("AcquireUserRow", mock.Anything, issueTx, int64(123)).Return(nil).Once()
-			mockDB.On("GetUserById", mock.Anything, issueTx, int64(123)).Return(tc.user, nil).Once()
+			mockDB.On("GetUserByID", mock.Anything, issueTx, int64(123)).Return(tc.user, nil).Once()
 
 			code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), input)
 			order = append(order, "returned")
@@ -90,9 +90,9 @@ func TestIssueImplicitTx_AClaimThatNoLongerStandsSignsNothing(t *testing.T) {
 	f.input.OTPClaim = otpcredential.OTPClaim{Claimed: true, Generation: &generation}
 
 	stub := datamocks.ExpectRunInTransaction(f.mockDB, issueTx)
-	f.mockDB.On("AcquireUserRow", mock.Anything, issueTx, f.input.User.Id).Return(nil).Once()
-	f.mockDB.On("GetUserById", mock.Anything, issueTx, f.input.User.Id).
-		Return(&record.User{Id: f.input.User.Id, OtpConfigGeneration: 5}, nil).Once()
+	f.mockDB.On("AcquireUserRow", mock.Anything, issueTx, f.input.User.ID).Return(nil).Once()
+	f.mockDB.On("GetUserByID", mock.Anything, issueTx, f.input.User.ID).
+		Return(&record.User{ID: f.input.User.ID, OTPConfigGeneration: 5}, nil).Once()
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 
@@ -113,11 +113,11 @@ func TestIssueImplicitTx_ChecksTheOTPClaimUnderTheUserRowFirst(t *testing.T) {
 
 	var order []string
 	datamocks.ExpectRunInTransaction(f.mockDB, issueTx, func(edge string) { order = append(order, edge) })
-	f.mockDB.On("AcquireUserRow", mock.Anything, issueTx, f.input.User.Id).
+	f.mockDB.On("AcquireUserRow", mock.Anything, issueTx, f.input.User.ID).
 		Run(func(mock.Arguments) { order = append(order, "user row") }).Return(nil).Once()
-	f.mockDB.On("GetUserById", mock.Anything, issueTx, f.input.User.Id).
+	f.mockDB.On("GetUserByID", mock.Anything, issueTx, f.input.User.ID).
 		Run(func(mock.Arguments) { order = append(order, "user") }).
-		Return(&record.User{Id: f.input.User.Id, OTPEnabled: true, OtpConfigGeneration: 4}, nil).Once()
+		Return(&record.User{ID: f.input.User.ID, OTPEnabled: true, OTPConfigGeneration: 4}, nil).Once()
 	f.mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, "sid-implicit").
 		Run(func(mock.Arguments) { order = append(order, "session row") }).Return(true, nil).Once()
 	f.expectEveryRead(&order, true)

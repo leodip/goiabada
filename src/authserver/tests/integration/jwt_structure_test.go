@@ -67,7 +67,7 @@ func TestJWTStructure_APaddedAccessTokenIsRefusedAsMalformed(t *testing.T) {
 // token verified and each of the three accepted it.
 func TestJWTStructure_ATokenWithALineBreakIsRefusedAsMalformed(t *testing.T) {
 	data, code, httpClient, clientSecret := userTokenResponseWithScope(t, "openid profile", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	refreshToken := data["refresh_token"].(string)
 	require.NotEmpty(t, refreshToken)

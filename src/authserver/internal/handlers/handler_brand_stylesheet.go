@@ -14,7 +14,7 @@ import (
 // brandStylesheetDatabase is what a brand's stylesheet needs: the brand, and the assets its slots
 // name, without their bytes, which the full one draws its background and font from.
 type brandStylesheetDatabase interface {
-	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
 	brandasset.SlotsReader
 }
 
@@ -94,7 +94,7 @@ func serveBrandStylesheet(pageRenderer PageRenderer, database brandStylesheetDat
 			return
 		}
 
-		brand, err := database.GetBrandById(r.Context(), nil, brandId)
+		brand, err := database.GetBrandByID(r.Context(), nil, brandId)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

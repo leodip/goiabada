@@ -32,7 +32,7 @@ func createLevel2MandatoryClient(t *testing.T) (*record.Client, *record.Redirect
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -40,7 +40,7 @@ func createLevel2MandatoryClient(t *testing.T) (*record.Client, *record.Redirect
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -306,7 +306,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
+	enrolled, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +339,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 // nothing crossed the boundary.
 func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
-	setUserPasswordForOTP(t, user.Id, "Correct1!")
+	setUserPasswordForOTP(t, user.ID, "Correct1!")
 
 	keyURL, secret := newOTPKeyURLForTest(t, user.Email)
 
@@ -350,7 +350,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	// a pending enrollment first: the API enrolls the one the server issued and no longer accepts
 	// one named in the request, and this case needs to know the secret in advance so the browser
 	// prompt below can be driven against it (#247).
-	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
+	installPendingEnrollmentForTest(t, user.ID, keyURL, time.Now().UTC())
 
 	enableUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{
@@ -365,7 +365,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
+	enrolled, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestOtpCeremony_AcrValuesLevel1CannotSkipMandatoryOtp(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password,
-		"&acr_values="+url.QueryEscape(record.AcrLevel1.String()))
+		"&acr_values="+url.QueryEscape(record.ACRLevel1.String()))
 	defer func() { _ = otpPage.Body.Close() }()
 
 	assert.NotNil(t, httpClient)

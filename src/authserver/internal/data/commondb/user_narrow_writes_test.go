@@ -33,8 +33,8 @@ import (
 // The data tier shows what the statements do to a real row on each engine. This shows, in seconds,
 // what each engine is asked to do.
 
-// narrowUserId is the user every narrow write here addresses.
-const narrowUserId = 7
+// narrowUserID is the user every narrow write here addresses.
+const narrowUserID = 7
 
 var (
 	issuedAt       = time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -76,7 +76,7 @@ func inTx(ctx context.Context, d *Database, write func(tx *sql.Tx) (any, error))
 // column and in columns of the other groups, which the write must leave alone.
 func narrowProfileUser() *record.User {
 	return &record.User{
-		Id: narrowUserId, Username: "u-name", GivenName: "g-name", MiddleName: "m-name",
+		ID: narrowUserID, Username: "u-name", GivenName: "g-name", MiddleName: "m-name",
 		FamilyName: "f-name", Nickname: "n-name", Website: "w-site", Gender: "gen",
 		BirthDate:           sql.NullTime{Time: issuedAt, Valid: true},
 		ZoneInfoCountryName: "z-country", ZoneInfo: "z-info", Locale: "loc", PageLanguage: "p-lang",
@@ -85,14 +85,14 @@ func narrowProfileUser() *record.User {
 }
 
 func narrowWrites() []narrowWrite {
-	limit := record.OtpConsecutiveFailureLimit
+	limit := record.OTPConsecutiveFailureLimit
 	return []narrowWrite{
 		{
 			name: "IncrementUserAuthStateGeneration",
 			rows: []*scriptedRows{{cols: []string{"auth_state_generation"}, values: [][]driver.Value{{int64(12)}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return inTx(ctx, d, func(tx *sql.Tx) (any, error) {
-					return d.IncrementUserAuthStateGeneration(ctx, tx, narrowUserId)
+					return d.IncrementUserAuthStateGeneration(ctx, tx, narrowUserID)
 				})
 			},
 			answer: int64(12),
@@ -102,11 +102,11 @@ func narrowWrites() []narrowWrite {
 			},
 		},
 		{
-			name: "IncrementUserOtpConfigGeneration",
+			name: "IncrementUserOTPConfigGeneration",
 			rows: []*scriptedRows{{cols: []string{"otp_config_generation"}, values: [][]driver.Value{{int64(13)}}}},
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return inTx(ctx, d, func(tx *sql.Tx) (any, error) {
-					return d.IncrementUserOtpConfigGeneration(ctx, tx, narrowUserId)
+					return d.IncrementUserOTPConfigGeneration(ctx, tx, narrowUserID)
 				})
 			},
 			answer: int64(13),
@@ -118,7 +118,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "SetUserPasswordHash",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.SetUserPasswordHash(ctx, nil, narrowUserId, "new-hash")
+				return nil, d.SetUserPasswordHash(ctx, nil, narrowUserID, "new-hash")
 			},
 			statements: []string{
 				"UPDATE users SET password_hash = 'new-hash', forgot_password_code_encrypted = NULL, " +
@@ -155,7 +155,7 @@ func narrowWrites() []narrowWrite {
 			name: "SetUserAddress",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return nil, d.SetUserAddress(ctx, nil, &record.User{
-					Id: narrowUserId, AddressLine1: "line-1", AddressLine2: "line-2", AddressLocality: "loc",
+					ID: narrowUserID, AddressLine1: "line-1", AddressLine2: "line-2", AddressLocality: "loc",
 					AddressRegion: "reg", AddressPostalCode: "post", AddressCountry: "ctry",
 					Enabled: true, Username: "untouched",
 				})
@@ -170,7 +170,7 @@ func narrowWrites() []narrowWrite {
 			name: "SetUserPhone",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return nil, d.SetUserPhone(ctx, nil, &record.User{
-					Id: narrowUserId, PhoneNumberCountryUniqueId: "BRA_0", PhoneNumberCountryCallingCode: "+55",
+					ID: narrowUserID, PhoneNumberCountryUniqueID: "BRA_0", PhoneNumberCountryCallingCode: "+55",
 					PhoneNumber: "555", PhoneNumberVerified: true,
 					Enabled: true, EmailVerified: true,
 				})
@@ -184,7 +184,7 @@ func narrowWrites() []narrowWrite {
 			name: "SetUserEmail",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return nil, d.SetUserEmail(ctx, nil, &record.User{
-					Id: narrowUserId, Email: "to@example.com", EmailVerified: true,
+					ID: narrowUserID, Email: "to@example.com", EmailVerified: true,
 					Enabled: true, PhoneNumberVerified: true,
 				})
 			},
@@ -202,7 +202,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TrySetUserEmail",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TrySetUserEmail(ctx, nil, narrowUserId, "from@example.com", true, "to@example.com")
+				return d.TrySetUserEmail(ctx, nil, narrowUserID, "from@example.com", true, "to@example.com")
 			},
 			answer: true,
 			statements: []string{
@@ -214,7 +214,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryStoreEmailVerificationCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryStoreEmailVerificationCode(ctx, nil, narrowUserId, "at@example.com",
+				return d.TryStoreEmailVerificationCode(ctx, nil, narrowUserID, "at@example.com",
 					[]byte("cipher"), issuedAt, issuedNotAfter)
 			},
 			answer: true,
@@ -228,7 +228,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryIssueEmailVerificationCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryIssueEmailVerificationCode(ctx, nil, narrowUserId, "at@example.com", []byte("cipher"), issuedAt)
+				return d.TryIssueEmailVerificationCode(ctx, nil, narrowUserID, "at@example.com", []byte("cipher"), issuedAt)
 			},
 			answer: true,
 			statements: []string{
@@ -240,7 +240,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryVerifyUserEmail",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryVerifyUserEmail(ctx, nil, narrowUserId, "at@example.com", []byte("cipher"))
+				return d.TryVerifyUserEmail(ctx, nil, narrowUserID, "at@example.com", []byte("cipher"))
 			},
 			answer: true,
 			statements: []string{
@@ -252,7 +252,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryConsumeForgotPasswordCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryConsumeForgotPasswordCode(ctx, nil, narrowUserId, "code-hash", "new-hash")
+				return d.TryConsumeForgotPasswordCode(ctx, nil, narrowUserID, "code-hash", "new-hash")
 			},
 			answer: true,
 			statements: []string{
@@ -265,7 +265,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryStoreForgotPasswordCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryStoreForgotPasswordCode(ctx, nil, narrowUserId, "at@example.com",
+				return d.TryStoreForgotPasswordCode(ctx, nil, narrowUserID, "at@example.com",
 					[]byte("cipher"), "code-hash", issuedAt)
 			},
 			answer: true,
@@ -278,7 +278,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TrySetUserEnabled",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TrySetUserEnabled(ctx, nil, narrowUserId, true, false)
+				return d.TrySetUserEnabled(ctx, nil, narrowUserID, true, false)
 			},
 			answer: true,
 			statements: []string{
@@ -288,7 +288,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryConsumeUserOTPStep",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryConsumeUserOTPStep(ctx, nil, narrowUserId, 5000)
+				return d.TryConsumeUserOTPStep(ctx, nil, narrowUserID, 5000)
 			},
 			answer: true,
 			statements: []string{
@@ -298,7 +298,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryConsumeEnrolledUserOTPStep",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryConsumeEnrolledUserOTPStep(ctx, nil, narrowUserId, 5000, 3)
+				return d.TryConsumeEnrolledUserOTPStep(ctx, nil, narrowUserID, 5000, 3)
 			},
 			answer: true,
 			statements: []string{
@@ -310,16 +310,16 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "ResetUserOTPStep",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.ResetUserOTPStep(ctx, nil, narrowUserId)
+				return nil, d.ResetUserOTPStep(ctx, nil, narrowUserID)
 			},
 			statements: []string{
 				"UPDATE users SET last_otp_step = 0, updated_at = <now> WHERE id = 7",
 			},
 		},
 		{
-			name: "IncrementUserOtpConsecutiveFailures short of the limit",
+			name: "IncrementUserOTPConsecutiveFailures short of the limit",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IncrementUserOtpConsecutiveFailures(ctx, nil, narrowUserId, 3)
+				return d.IncrementUserOTPConsecutiveFailures(ctx, nil, narrowUserID, 3)
 			},
 			// The count advanced, and did not reach the limit: this call disabled nothing.
 			answer: false,
@@ -330,10 +330,10 @@ func narrowWrites() []narrowWrite {
 			},
 		},
 		{
-			name:  "IncrementUserOtpConsecutiveFailures to the limit",
+			name:  "IncrementUserOTPConsecutiveFailures to the limit",
 			execs: []*scriptedExec{{rowsAffected: 0}, {rowsAffected: 1}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.IncrementUserOtpConsecutiveFailures(ctx, nil, narrowUserId, 3)
+				return d.IncrementUserOTPConsecutiveFailures(ctx, nil, narrowUserID, 3)
 			},
 			answer: true,
 			statements: []string{
@@ -346,10 +346,10 @@ func narrowWrites() []narrowWrite {
 			},
 		},
 		{
-			name: "ClearUserOtpConsecutiveFailures",
+			name: "ClearUserOTPConsecutiveFailures",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return inTx(ctx, d, func(tx *sql.Tx) (any, error) {
-					return nil, d.ClearUserOtpConsecutiveFailures(ctx, tx, narrowUserId)
+					return nil, d.ClearUserOTPConsecutiveFailures(ctx, tx, narrowUserID)
 				})
 			},
 			statements: []string{
@@ -359,7 +359,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryInstallPendingOTPEnrollment",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryInstallPendingOTPEnrollment(ctx, nil, narrowUserId, []byte("seed"), issuedAt, staleBefore)
+				return d.TryInstallPendingOTPEnrollment(ctx, nil, narrowUserID, []byte("seed"), issuedAt, staleBefore)
 			},
 			answer: true,
 			statements: []string{
@@ -372,7 +372,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "ClearPendingOTPEnrollment",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.ClearPendingOTPEnrollment(ctx, nil, narrowUserId)
+				return nil, d.ClearPendingOTPEnrollment(ctx, nil, narrowUserID)
 			},
 			statements: []string{
 				"UPDATE users SET otp_enrollment_secret_encrypted = NULL, otp_enrollment_issued_at = NULL, " +
@@ -382,7 +382,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryEstablishUserOTP",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryEstablishUserOTP(ctx, nil, narrowUserId, 3, []byte("seed"))
+				return d.TryEstablishUserOTP(ctx, nil, narrowUserID, 3, []byte("seed"))
 			},
 			answer: true,
 			statements: []string{
@@ -393,7 +393,7 @@ func narrowWrites() []narrowWrite {
 		{
 			name: "TryRemoveUserOTP",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryRemoveUserOTP(ctx, nil, narrowUserId, 3)
+				return d.TryRemoveUserOTP(ctx, nil, narrowUserID, 3)
 			},
 			answer: true,
 			statements: []string{

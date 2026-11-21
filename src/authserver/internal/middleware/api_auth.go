@@ -170,7 +170,7 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 				// audit logger records as its logged_in_user_id; a client credentials token has
 				// none (#780 decision 2).
 				if verdict.User != nil {
-					r = r.WithContext(reqctx.WithActingUserId(r.Context(), verdict.User.Id))
+					r = r.WithContext(reqctx.WithActingUserId(r.Context(), verdict.User.ID))
 				}
 				next.ServeHTTP(w, r)
 				return
@@ -211,25 +211,25 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			case liveness.UserNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
 			case liveness.UserDisabled:
-				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", verdict.User.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", verdict.User.ID)
 			case liveness.TokenGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
-					"user_id", verdict.User.Id)
+					"user_id", verdict.User.ID)
 			case liveness.SessionNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has been terminated",
 					"session_identifier", sid)
 			case liveness.SessionOfAnotherUser:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session belongs to a different user",
-					"session_identifier", sid, "session_id", verdict.Session.Id,
-					"session_user_id", verdict.Session.UserId, "user_id", verdict.User.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID,
+					"session_user_id", verdict.Session.UserID, "user_id", verdict.User.ID)
 			case liveness.SessionExpired:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
-					"session_identifier", sid, "session_id", verdict.Session.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID)
 				m.refusals.invalidToken(w, r, "Session has expired", schemesOf(r.Context()))
 				return
 			case liveness.SessionGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
-					"session_identifier", sid, "session_id", verdict.Session.Id, "user_id", verdict.User.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID, "user_id", verdict.User.ID)
 			default:
 				slog.WarnContext(r.Context(), "rejecting bearer token: liveness check refused it", "refusal", int(verdict.Refusal))
 			}

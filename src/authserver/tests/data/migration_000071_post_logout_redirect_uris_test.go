@@ -87,9 +87,9 @@ func assertPostLogoutRedirectURIsShape(t *testing.T, h *isolatedDB, redirectURIs
 	assert.Falsef(t, uri.Nullable, "uri is NOT NULL %s", when)
 	assert.Equalf(t, uriCollation[engine], uri.Collation, "uri compares case-sensitively %s", when)
 
-	clientId := shape.column(t, "client_id")
-	assert.Equalf(t, idType[engine], clientId.Type, "client_id has the type of the id it names %s", when)
-	assert.Falsef(t, clientId.Nullable, "client_id is NOT NULL %s", when)
+	clientID := shape.column(t, "client_id")
+	assert.Equalf(t, idType[engine], clientID.Type, "client_id has the type of the id it names %s", when)
+	assert.Falsef(t, clientID.Nullable, "client_id is NOT NULL %s", when)
 
 	fk := shape.foreignKey(t, "client_id")
 	assert.Equalf(t, "clients", fk.RefTable, "client_id references clients %s", when)
@@ -142,20 +142,20 @@ func assertPostLogoutRedirectURIsBehaviour(t *testing.T, h *isolatedDB, when str
 		_, err := h.SQL.ExecContext(ctx, fmt.Sprintf(query, args...))
 		return err
 	}
-	client := &record.Client{Id: seedClient(t, h, "signout-client-"+fake.LetterN(8))}
+	client := &record.Client{ID: seedClient(t, h, "signout-client-"+fake.LetterN(8))}
 	count := func() int64 {
 		var n int64
 		require.NoError(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf(
-			"SELECT COUNT(*) FROM post_logout_redirect_uris WHERE client_id = %d", client.Id)).Scan(&n))
+			"SELECT COUNT(*) FROM post_logout_redirect_uris WHERE client_id = %d", client.ID)).Scan(&n))
 		return n
 	}
 
 	row := "INSERT INTO post_logout_redirect_uris (uri, client_id) VALUES ('https://app.example/bye', %d)"
-	require.NoErrorf(t, exec(row, client.Id), "the first row is accepted %s", when)
-	require.NoErrorf(t, exec(row, client.Id), "and so is a duplicate: no unique index %s", when)
+	require.NoErrorf(t, exec(row, client.ID), "the first row is accepted %s", when)
+	require.NoErrorf(t, exec(row, client.ID), "and so is a duplicate: no unique index %s", when)
 	assert.Equalf(t, int64(2), count(), "two rows %s", when)
-	require.Errorf(t, exec(row, client.Id+1_000_000), "a row naming no client is refused %s", when)
+	require.Errorf(t, exec(row, client.ID+1_000_000), "a row naming no client is refused %s", when)
 
-	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", client.Id))
+	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", client.ID))
 	assert.Equalf(t, int64(0), count(), "deleting the client removed its rows %s", when)
 }

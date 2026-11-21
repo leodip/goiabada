@@ -107,7 +107,7 @@ func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLo
 		DeferredErrorDescription: "Invalid scope format: 'bogus'.",
 	}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
@@ -117,7 +117,7 @@ func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLo
 	assertReplacedAnsweredAtWarn(t, logged)
 	pageRenderer.AssertExpectations(t)
 	ceremonyStore.AssertExpectations(t)
-	database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, int64(1))
+	database.AssertNotCalled(t, "GetRedirectURIsByClientID", mock.Anything, mock.Anything, int64(1))
 }
 
 // lastComparisonBackend is the in-memory backend with a turn for the test before every conditional
@@ -265,7 +265,7 @@ func TestHandleIssueGet_WhatIsMintedForAReplacedCeremonyIsNotDelivered(t *testin
 	t.Run("a code", func(t *testing.T) {
 		f := newRecheckFixture(t, "code", "")
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		expectStepClearReplaced(t, f.ceremonyStore, f.pageRenderer, f.rr, f.req)
@@ -330,8 +330,8 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 		OTPKeyURL:  otpTestKeyURL(otpSecret),
 	}, nil)
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)

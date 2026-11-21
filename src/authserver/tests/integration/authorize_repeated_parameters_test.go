@@ -196,15 +196,15 @@ func TestToken_RepeatedParameters(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	resource := createResourceWithId(t, "repeated-svc-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}))
 
 	post := func(t *testing.T, form url.Values) (int, map[string]interface{}) {

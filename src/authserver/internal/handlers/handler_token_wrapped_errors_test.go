@@ -156,7 +156,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
-		Code: &record.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
+		Code: &record.Code{ID: 7, ClientID: 3, UserID: 11, SessionIdentifier: "sid-reused"},
 	}
 
 	jsonWriter, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,

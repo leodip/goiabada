@@ -34,7 +34,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
@@ -43,7 +43,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	// Registered without a port, which is all a native app can know up front.
 	registeredURI := "http://127.0.0.1/callback"
 	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      registeredURI,
 	})
 	require.NoError(t, err)
@@ -162,7 +162,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	assert.Equal(t, "Bearer", data["token_type"])
 	assert.NotNil(t, data["id_token"])
 
-	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
+	usedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }

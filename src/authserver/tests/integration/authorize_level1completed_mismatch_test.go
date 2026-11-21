@@ -22,7 +22,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -31,7 +31,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -113,5 +113,5 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }

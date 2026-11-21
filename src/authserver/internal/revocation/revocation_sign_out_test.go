@@ -27,13 +27,13 @@ var signOutTx = &sql.Tx{}
 
 // signOutSession is a session two clients share, the departing one first.
 func signOutSession() *record.UserSession {
-	return &record.UserSession{Id: 71, UserId: 17, SessionIdentifier: signOutSid}
+	return &record.UserSession{ID: 71, UserID: 17, SessionIdentifier: signOutSid}
 }
 
 func signOutSessionClients() []record.UserSessionClient {
 	return []record.UserSessionClient{
-		{Id: 1, ClientId: signOutClientId, Client: record.Client{Id: signOutClientId, ClientIdentifier: "departing"}},
-		{Id: 2, ClientId: 6262, Client: record.Client{Id: 6262, ClientIdentifier: "staying"}},
+		{ID: 1, ClientID: signOutClientId, Client: record.Client{ID: signOutClientId, ClientIdentifier: "departing"}},
+		{ID: 2, ClientID: 6262, Client: record.Client{ID: 6262, ClientIdentifier: "staying"}},
 	}
 }
 
@@ -54,22 +54,22 @@ func TestEndClientPartTx_RevokesInTheSameTransaction(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectClientPartRemoval(db)
 	tokens := []*record.RefreshToken{
-		{Id: 1, RefreshTokenJti: "rt-rotated", FirstRefreshTokenJti: "fam-a", Revoked: true},
-		{Id: 2, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "fam-a"},
+		{ID: 1, RefreshTokenJTI: "rt-rotated", FirstRefreshTokenJTI: "fam-a", Revoked: true},
+		{ID: 2, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: "fam-a"},
 	}
-	db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid, signOutClientId).
+	db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid, signOutClientId).
 		Return(int64(3), nil).Once()
-	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 		signOutClientId).Return(tokens, nil).Once()
 	recorded := db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, signOutTx, "fam-a", "client_signed_out").
 		Return(true, nil).Once()
-	db.On("MarkRefreshTokenAsRevoked", mock.Anything, signOutTx, tokens[1].Id).Return(true, nil).Once().NotBefore(recorded)
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, signOutTx, tokens[1].ID).Return(true, nil).Once().NotBefore(recorded)
 
 	end, err := EndClientPartTx(context.Background(), db, signOutSid, "departing")
 
 	require.NoError(t, err)
 	require.NotNil(t, end.Ended)
-	assert.Equal(t, signOutClientId, end.Ended.Client.Id)
+	assert.Equal(t, signOutClientId, end.Ended.Client.ID)
 	assert.False(t, end.SessionDeleted)
 	assert.Equal(t, int64(3), end.RevokedCodeCount)
 	assert.Equal(t, []string{"rt-live"}, end.RevokedRefreshTokenJtis)
@@ -80,9 +80,9 @@ func TestEndClientPartTx_RevokesInTheSameTransaction(t *testing.T) {
 func TestEndClientPartTx_NothingToRevokeReportsAnEmptyList(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectClientPartRemoval(db)
-	db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid, signOutClientId).
+	db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid, signOutClientId).
 		Return(int64(0), nil).Once()
-	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 		signOutClientId).Return([]*record.RefreshToken(nil), nil).Once()
 
 	end, err := EndClientPartTx(context.Background(), db, signOutSid, "departing")
@@ -100,12 +100,12 @@ func TestEndClientPartTx_NothingToRevokeReportsAnEmptyList(t *testing.T) {
 func TestEndClientPartTx_ATokenRevokedMeanwhileIsNotReported(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectClientPartRemoval(db)
-	db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid, signOutClientId).
+	db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid, signOutClientId).
 		Return(int64(0), nil).Once()
-	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 		signOutClientId).Return([]*record.RefreshToken{
-		{Id: 3, RefreshTokenJti: "rt-revoked-meanwhile", FirstRefreshTokenJti: "fam-b"},
-		{Id: 4, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "fam-b"},
+		{ID: 3, RefreshTokenJTI: "rt-revoked-meanwhile", FirstRefreshTokenJTI: "fam-b"},
+		{ID: 4, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: "fam-b"},
 	}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, signOutTx, "fam-b", ReasonClientSignedOut).
 		Return(false, nil).Once()
@@ -128,20 +128,20 @@ func TestEndClientPartTx_ASweepFailureYieldsTheZeroResult(t *testing.T) {
 		expect func(db *datamocks.Database)
 	}{
 		{"the code mark", func(db *datamocks.Database) {
-			db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+			db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 				signOutClientId).Return(int64(0), boom).Once()
 		}},
 		{"the token read", func(db *datamocks.Database) {
-			db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+			db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 				signOutClientId).Return(int64(1), nil).Once()
-			db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+			db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 				signOutClientId).Return([]*record.RefreshToken(nil), boom).Once()
 		}},
 		{"the family record", func(db *datamocks.Database) {
-			db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+			db.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
 				signOutClientId).Return(int64(1), nil).Once()
-			db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
-				signOutClientId).Return([]*record.RefreshToken{{Id: 2, RefreshTokenJti: "rt", FirstRefreshTokenJti: "fam"}}, nil).Once()
+			db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, signOutTx, signOutSid,
+				signOutClientId).Return([]*record.RefreshToken{{ID: 2, RefreshTokenJTI: "rt", FirstRefreshTokenJTI: "fam"}}, nil).Once()
 			db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, signOutTx, "fam", ReasonClientSignedOut).
 				Return(false, boom).Once()
 		}},

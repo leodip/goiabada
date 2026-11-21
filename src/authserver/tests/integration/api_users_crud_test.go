@@ -33,11 +33,11 @@ func TestAPIUserGet_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Get user by ID
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -110,11 +110,11 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
@@ -179,7 +179,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 	}()
 
 	// Verify user was actually created in database
-	createdUser, err := database.GetUserById(context.Background(), nil, createResponse.User.ID)
+	createdUser, err := database.GetUserByID(context.Background(), nil, createResponse.User.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, createdUser)
 	assert.Equal(t, createReq.Email, createdUser.Email)
@@ -203,7 +203,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, existingUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, existingUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, existingUser.ID)
 	}()
 
 	// Test: Try to create user with same email
@@ -331,7 +331,7 @@ func TestAPIUserCreatePost_AddressLengths(t *testing.T) {
 
 			require.Equal(t, http.StatusCreated, resp.StatusCode, refusal.ErrorDescription)
 			assert.Equal(t, tc.email, created.User.Email)
-			stored, err := database.GetUserById(context.Background(), nil, created.User.ID)
+			stored, err := database.GetUserByID(context.Background(), nil, created.User.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			assert.Equal(t, tc.email, stored.Email)
@@ -426,7 +426,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Disable user
@@ -434,7 +434,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 		Enabled: false,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -452,7 +452,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	assert.Equal(t, testUser.Email, updateResponse.User.Email)
 
 	// Verify in database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.False(t, updatedUser.Enabled)
 }
@@ -473,7 +473,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Enable user
@@ -481,7 +481,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 		Enabled: true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -548,11 +548,11 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/enabled"
 	req, err := http.NewRequest("PUT", url, bytes.NewReader([]byte("invalid json")))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -585,7 +585,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test: Delete user
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -602,7 +602,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify user was actually deleted from database
-	deletedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	deletedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.Nil(t, deletedUser)
 }
@@ -658,11 +658,11 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
@@ -675,7 +675,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify user was not deleted
-	stillExists, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	stillExists, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }

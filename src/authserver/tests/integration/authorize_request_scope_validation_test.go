@@ -26,7 +26,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -72,7 +72,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -120,7 +120,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -168,7 +168,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -216,7 +216,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -275,7 +275,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 		}
 
 		redirectUri := &record.RedirectURI{
-			ClientId: client.Id,
+			ClientID: client.ID,
 			URI:      fake.URL(),
 		}
 
@@ -334,7 +334,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -393,7 +393,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -452,7 +452,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -502,7 +502,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -554,7 +554,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -607,7 +607,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -663,7 +663,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -714,7 +714,7 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -769,7 +769,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -838,7 +838,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -892,7 +892,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 

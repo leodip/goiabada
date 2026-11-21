@@ -54,8 +54,8 @@ func hashTestSessionId(id string) string {
 func createBrowserSessionFixture(t *testing.T, owner, id string, expiresAt time.Time) {
 	err := database.CreateBrowserSession(context.Background(), nil, &record.BrowserSession{
 		Owner:         owner,
-		SessionId:     id,
-		SessionIdHash: hashTestSessionId(id),
+		SessionID:     id,
+		SessionIDHash: hashTestSessionId(id),
 		Data:          "fixture-ciphertext",
 		LastAccessed:  time.Now().UTC(),
 		ExpiresAt:     expiresAt,
@@ -96,7 +96,7 @@ func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
@@ -114,7 +114,7 @@ func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 func TestAPISessions_RoundTrip(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	id := newTestSessionId(t)
@@ -161,7 +161,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 
 	// Read the settings rather than assuming the defaults: other tests in this package
 	// write them, and the claim is that the endpoint follows whatever they say.
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	expectedExpiry := time.Now().UTC().Add(time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second)
 	if absolute := time.Now().UTC().Add(time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second); absolute.Before(expectedExpiry) {
@@ -191,7 +191,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	id := newTestSessionId(t)
@@ -215,7 +215,7 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	id := newTestSessionId(t)
@@ -240,7 +240,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil,
 		sessionkeys.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
 	require.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")
@@ -255,7 +255,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
@@ -270,7 +270,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 	newClient := func(t *testing.T) (string, *record.Client, string) {
 		accessToken, client, clientSecret := createClientWithGranularScopeAndSecret(t, builtin.BrowserSessionsPermissionIdentifier)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 		assertSessionsAdmitToken(t, accessToken)
 		return accessToken, client, clientSecret
 	}
@@ -296,13 +296,13 @@ func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 	t.Run("a disabled or deleted client's token", func(t *testing.T) {
 		accessToken, client, _ := newClient(t)
 
-		setClientEnabled(t, client.Id, false)
+		setClientEnabled(t, client.ID, false)
 		assertSessionsRefuseToken(t, accessToken)
 
-		setClientEnabled(t, client.Id, true)
+		setClientEnabled(t, client.ID, true)
 		assertSessionsAdmitToken(t, accessToken)
 
-		require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+		require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 		assertSessionsRefuseToken(t, accessToken)
 	})
 
@@ -351,7 +351,7 @@ func assertSessionsRefuseToken(t *testing.T, accessToken string) {
 func TestAPISessions_BadRequests(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	req, err := http.NewRequest("POST", sessionEndpointURL("load"), bytes.NewReader([]byte("not json")))

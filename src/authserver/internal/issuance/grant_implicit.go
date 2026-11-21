@@ -18,7 +18,7 @@ type ImplicitGrantInput struct {
 	User   *record.User
 	Scope  string
 	// AcrLevel and AuthMethods are what the tokens' acr and amr claims are written from.
-	AcrLevel    record.AcrLevel
+	AcrLevel    record.ACRLevel
 	AuthMethods string
 	// SessionIdentifier is the session the tokens are bound to, through their sid claim, and the
 	// row IssueImplicit takes before it signs anything. An identifier with no row is refused
@@ -109,7 +109,7 @@ func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *r
 	// caller a few statements ago, and the only thing this narrower question misses is an idle
 	// timeout elapsing in the microseconds between the two (#139 decision 7).
 	// The code claim recheck IssueAuthCode makes, for the tokens signed here (#542).
-	if err := input.OTPClaim.Recheck(ctx, t.database, tx, input.User.Id); err != nil {
+	if err := input.OTPClaim.Recheck(ctx, t.database, tx, input.User.ID); err != nil {
 		return nil, err
 	}
 

@@ -63,15 +63,15 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	resp = loadPage(t, httpClient, location)
 	level3Code := issuedCode(t, resp)
 	_ = resp.Body.Close()
-	codesBefore := storedCodeIds(t, user.Id)
-	require.Equal(t, []int64{level3Code.Id}, codesBefore, "the level 3 sign-in stored one code")
+	codesBefore := storedCodeIds(t, user.ID)
+	require.Equal(t, []int64{level3Code.ID}, codesBefore, "the level 3 sign-in stored one code")
 
 	// The session's methods lose the code, its level kept.
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	session := sessions[0]
-	require.Equal(t, record.AcrLevel2Mandatory, session.AcrLevel)
+	require.Equal(t, record.ACRLevel2Mandatory, session.ACRLevel)
 	session.AuthMethods = "pwd"
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, &session))
 
@@ -100,14 +100,14 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	assert.Equal(t, "login_required", answer.Query().Get("error"))
 	assert.Equal(t, state, answer.Query().Get("state"))
 	assert.Empty(t, answer.Query().Get("code"), "no code")
-	assert.Equal(t, codesBefore, storedCodeIds(t, user.Id), "the silent refusal stored no code")
+	assert.Equal(t, codesBefore, storedCodeIds(t, user.ID), "the silent refusal stored no code")
 
 	// Interactive: the single sign-on reaches /auth/issue too, and is sent back to the password step.
 	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectUri)
 	require.Equal(t, "/auth/issue", where, "nothing before issuance refuses the sign-on")
 	location = assertRedirect(t, page, "/auth/level1")
 	_ = page.Body.Close()
-	assert.Equal(t, codesBefore, storedCodeIds(t, user.Id), "the interactive refusal stored no code")
+	assert.Equal(t, codesBefore, storedCodeIds(t, user.ID), "the interactive refusal stored no code")
 	resp = loadPage(t, httpClient, location)
 	location = assertRedirect(t, resp, "/auth/pwd")
 	_ = resp.Body.Close()
@@ -127,15 +127,15 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	resp = loadPage(t, httpClient, location)
 	code := issuedCode(t, resp)
 	_ = resp.Body.Close()
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel, "the level a password alone earns")
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel, "the level a password alone earns")
 	assert.Equal(t, "pwd", code.AuthMethods)
-	assert.Equal(t, []int64{level3Code.Id, code.Id}, storedCodeIds(t, user.Id),
+	assert.Equal(t, []int64{level3Code.ID, code.ID}, storedCodeIds(t, user.ID),
 		"the level 3 sign-in's code and the restarted one's are the only two stored")
 
 	// The session behind it now claims what its methods name.
 	repaired, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, session.SessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, repaired, "the sign-in that started over kept the browser's session")
-	assert.Equal(t, record.AcrLevel1, repaired.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, repaired.ACRLevel)
 	assert.Equal(t, "pwd", repaired.AuthMethods)
 }

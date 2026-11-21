@@ -82,8 +82,8 @@ type Database interface {
 	// byte from the one the row holds, and reports whether it did: false for the row's own
 	// identifier, which leaves the row untouched, and for a client that is not there. It is the
 	// column's one writer after creation: UpdateClient never writes it (#710 decision 4). A
-	// transaction is required, as for GetClientByIdForUpdate.
-	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (changed bool, err error)
+	// transaction is required, as for GetClientByIDForUpdate.
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientID int64, clientIdentifier string) (changed bool, err error)
 	// SetClientPublic makes one client public and reports whether THIS call performed
 	// the confidential-to-public transition, which is the write that removes the
 	// client's obligation to authenticate and so the one that must revoke its
@@ -94,29 +94,29 @@ type Database interface {
 	// themselves rather than by a read the caller compares against, because a read and
 	// the write after it can straddle another writer's commit, and a classification
 	// taken from the stale side leaves the grants alive.
-	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	SetClientPublic(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
 	// SetClientAdministrativeScopesAllowed writes whether a client may request the administrative
 	// authserver scopes. It is that column's one writer: UpdateClient never writes it (#499).
-	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
+	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientID int64, allowed bool) error
 	// SetClientRememberConsent writes a client's Remember consent, and nothing else but updated_at.
 	// UpdateClient never writes the column: only this, CreateClient and SetClientPublic's transition
 	// do (#711 decision 5).
-	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
+	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientID int64, remember bool) error
 	// SetClientBackchannelLogout writes a client's back-channel logout URI and whether it requires
 	// the session identifier, and nothing else but updated_at. UpdateClient never writes either
 	// column: only this and CreateClient do (#784 decisions 14 and 15).
-	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
+	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientID int64, uri string, sessionRequired bool) error
 	// SetClientDPoPBoundAccessTokens writes whether a client requires DPoP for its token requests,
 	// and nothing else but updated_at. UpdateClient never writes the column: only this and
 	// CreateClient do (#42 decision 12).
-	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
-	// SetClientBrand gives a client a brand of its own, or with an empty brandId puts it back on the
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientID int64, required bool) error
+	// SetClientBrand gives a client a brand of its own, or with an empty brandID puts it back on the
 	// default, and nothing else but updated_at. It takes the settings row's lock first, as the
 	// brand deletion that clears the column does, and answers ErrBrandNotFound, writing nothing, for
 	// a brand that is not there. It answers whether it wrote: false for a client that already has
 	// that brand, or is not there. UpdateClient never writes the column (#812 decision 1). A
 	// transaction is required, as for AcquireSettingsRow.
-	SetClientBrand(ctx context.Context, tx *sql.Tx, clientId int64, brandId sql.NullInt64) (changed bool, err error)
+	SetClientBrand(ctx context.Context, tx *sql.Tx, clientID int64, brandID sql.NullInt64) (changed bool, err error)
 	// GetClientPageBrand answers the brand the pages of the client with this identifier are drawn
 	// in: its own brand, or the default brand when it has none. It answers nil when there is no
 	// such client, or when it has no brand of its own and there is no default (#812 decision 1).
@@ -133,26 +133,26 @@ type Database interface {
 	//
 	// A transaction is required: without one the statement autocommits and the row is
 	// released before the read even runs.
-	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	// GetClientByIdForUpdate reads the client as last committed and takes its row until the
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	// GetClientByIDForUpdate reads the client as last committed and takes its row until the
 	// transaction ends, writing nothing: a writer of the row, a rename among them, waits for that
 	// transaction, and this read waits for a writer's. The initial password grant reads its client
 	// so before it writes its first refresh token (#710 decision 5). A transaction is required.
-	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row
+	GetClientByIDForUpdate(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	// GetClientByIDForShare reads the client as last committed and holds a shared lock on its row
 	// until the transaction ends, writing nothing: a rename or a deletion of the client waits for
 	// that transaction, and this read waits for theirs. On MySQL, PostgreSQL and SQL Server two such
 	// readers do not wait for each other; SQLite's is a plain read, its pool's one connection running
 	// one transaction at a time. Code issuance reads its client so before it inserts the code (#866).
 	// A transaction is required.
-	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
+	GetClientByIDForShare(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
 	// DeleteClient deletes the client, its refresh tokens and, by cascade, every row referencing it,
 	// and records its identifier as deleted, in one transaction (#676 decision 6).
-	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientID int64) error
 	// GetDeletedClientByClientIdentifier returns the latest deletion of a client with this
 	// identifier, or nil when none was deleted. An empty identifier is an error.
 	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
@@ -163,13 +163,13 @@ type Database interface {
 
 	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	// GetUserByIdForUpdate reads the user as last committed and takes the row until the
-	// transaction ends. Unlike GetUserById it answers what committed while the caller waited on a
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	// GetUserByIDForUpdate reads the user as last committed and takes the row until the
+	// transaction ends. Unlike GetUserByID it answers what committed while the caller waited on a
 	// lock even after an earlier read in the same transaction, which on MySQL fixes the snapshot
 	// every later consistent read answers from (#498). A transaction is required.
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUsersByIDs(ctx context.Context, tx *sql.Tx, userIDs []int64) (map[int64]record.User, error)
 	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
@@ -180,7 +180,7 @@ type Database interface {
 	// code outstanding, so a query would match one of them.
 	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.User, error)
 	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error)
-	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error
 	// AcquireUserRow takes the user's row inside the caller's transaction and holds it until
 	// that transaction ends, the third of its kind beside AcquireUserSessionRow and
 	// AcquireClientRow. A refresh rotation takes it first, and a credential change takes the same
@@ -194,7 +194,7 @@ type Database interface {
 	//
 	// A transaction is required: without one the statement autocommits and the row is released
 	// before the caller can use it.
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
 	// IncrementUserAuthStateGeneration advances the user's authentication generation
 	// and returns the new value. Separate from UpdateUser because the column is tagged
 	// dont-update: credential handlers used to write the whole user back, so an ordinary
@@ -205,8 +205,8 @@ type Database interface {
 	// cannot be one statement portably across the four engines, so outside a
 	// transaction a concurrent increment can land between them and this caller would
 	// return the other caller's generation.
-	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
-	// IncrementUserOtpConfigGeneration advances the user's OTP configuration generation
+	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error)
+	// IncrementUserOTPConfigGeneration advances the user's OTP configuration generation
 	// and returns the new value. Called at every site that establishes or removes an
 	// authenticator, inside the same transaction as the write that changed it, so there
 	// is no state in which the authenticator has changed and no session knows (#242).
@@ -219,11 +219,11 @@ type Database interface {
 	// value at /auth/completed, leaving a session that just enrolled and verified owing
 	// another prompt at once. Computing the successor in Go instead is what the
 	// read-back exists to refuse.
-	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	IncrementUserOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error)
 	// SetUserPasswordHash writes a password hash and clears any outstanding
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
 	// SetUserProfile writes the user's eleven profile columns (username, the four names,
 	// website, gender, birth date, the zone's country and zone, and locale) from user, the page
 	// language too when withPageLanguage is set, and updated_at, and no other column; it sets
@@ -246,7 +246,7 @@ type Database interface {
 	// full-row update, so the self-service email change cannot undo a concurrent admin disable,
 	// password change or OTP change. A taken address is ErrUniqueViolation, as on UpdateUser
 	// (#404). The reset code goes because it belongs to the address it was mailed to (#471).
-	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
+	TrySetUserEmail(ctx context.Context, tx *sql.Tx, userID int64, fromEmail string, fromVerified bool, toEmail string) (bool, error)
 	// SetUserEmail writes the administrator's email change: the address and verified flag from
 	// user, a cleared verification code and issued-at, a reset code cleared when the row held
 	// another address, and updated_at, and no other column; it sets user.UpdatedAt to what it stored. Unconditional, so the last
@@ -256,21 +256,21 @@ type Database interface {
 	// TryIssueEmailVerificationCode stores the code the administrator generates, encrypted,
 	// issued at issuedAt, and unverifies the address, only while the account still holds email,
 	// the address the request read and reports, and reports whether it did (#471).
-	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		issuedAt time.Time) (bool, error)
 	// TryStoreEmailVerificationCode stores a verification code, encrypted, issued at
 	// issuedAt, only while the account still holds email, unverified, and no code was
 	// issued after issuedNotAfter, and reports whether it did. It is the resend cooldown
 	// as one conditional write: of concurrent sends exactly one claims the code and mails
 	// it, where a read then a write let every one of them pass the check (#404).
-	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		issuedAt time.Time, issuedNotAfter time.Time) (bool, error)
 	// TryVerifyUserEmail marks a user's address verified and clears the code, only while
 	// the account still holds email, unverified, with codeEncrypted still the pending code,
 	// which is the ciphertext the caller compared; the issued-at stays for the resend
 	// cooldown. It reports whether it did. Narrow rather than writing back the row the
 	// request loaded, which could undo a concurrent admin disable or email change (#404).
-	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte) (bool, error)
+	TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte) (bool, error)
 	// TryConsumeForgotPasswordCode writes a password hash, claims the outstanding reset
 	// code and marks the address verified, since redeeming a link sent to it proves it, in
 	// one conditional UPDATE, reporting whether this call is the one that made the
@@ -281,21 +281,21 @@ type Database interface {
 	// Separate from SetUserPasswordHash rather than a fourth parameter on it, because
 	// its other two callers (admin user create, account password change) hold no
 	// outstanding code and would have to pass a meaningless predicate. An empty codeHash
-	// or a zero userId is an error rather than a false: '' is the dormant value on every
+	// or a zero userID is an error rather than a false: '' is the dormant value on every
 	// row with no code outstanding, so an empty predicate would claim one of them (#112).
 	// It claims nothing on a disabled account, so a reset never sets a password there (#404).
-	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
+	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string, passwordHash string) (bool, error)
 	// TryStoreForgotPasswordCode stores a reset code on a user, its encrypted form, its
 	// hash and when it was issued, only while the account is still enabled, its address
 	// is still verified and still the one given, and reports whether it did. Narrow and
 	// conditional rather than a full-row update of the user the request loaded, so a
 	// concurrent admin disable is neither undone by it nor followed by a mail (#404).
-	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		codeHash string, issuedAt time.Time) (bool, error)
 	// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
 	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
 	// The disable direction's return gates the revocation sweep (#106).
-	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
+	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userID int64, expected bool, desired bool) (bool, error)
 	// TryConsumeUserOTPStep records step as the user's most recently consumed TOTP
 	// time step, only if it is strictly newer than what is stored, and reports whether
 	// this call made the transition. Compare-and-set for the same reason MarkCodeAsUsed
@@ -305,7 +305,7 @@ type Database interface {
 	// establish that follows is the compare-and-set on the authenticator (#471). False
 	// means no row transitioned, which is a replay in all but a rare interleaving, never
 	// specifically proof of one.
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64) (bool, error)
 	// TryConsumeEnrolledUserOTPStep is the verification claim: TryConsumeUserOTPStep's
 	// claim, matching only while otp_enabled is on at expectedGeneration, the
 	// otp_config_generation read with the secret the passcode was checked against. A
@@ -314,21 +314,21 @@ type Database interface {
 	// (#111, #144, #471). False carries the same imprecision as TryConsumeUserOTPStep's.
 	//
 	// The same statement also returns otp_consecutive_failures to 0, and refuses while
-	// that count stands at record.OtpConsecutiveFailureLimit: a success disregards the
+	// that count stands at record.OTPConsecutiveFailureLimit: a success disregards the
 	// attempts before it, and an authenticator at the limit is disabled until it is
 	// rebound (NIST SP 800-63B section 3.2.2, #489). Clearing beside the claim is what
 	// keeps the two from being separable -- the verification that succeeded is the one
 	// that moved the count -- and holding the limit in the predicate is what makes the
 	// disable answer the row rather than the caller's snapshot of it.
-	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64,
 		expectedGeneration int64) (bool, error)
 	// ResetUserOTPStep returns the consumed-step marker to 0. Called when OTP is
 	// disabled: the marker belongs to the enrolled authenticator, and it is the only
 	// remedy if a clock jump strands the marker in the future (#111).
-	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
-	// IncrementUserOtpConsecutiveFailures advances the count of consecutive failed
+	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64) error
+	// IncrementUserOTPConsecutiveFailures advances the count of consecutive failed
 	// attempts against the user's enrolled authenticator by one, stopping at
-	// record.OtpConsecutiveFailureLimit, where the authenticator is disabled until it is
+	// record.OTPConsecutiveFailureLimit, where the authenticator is disabled until it is
 	// rebound (NIST SP 800-63B section 3.2.2, #489). Called by otpcredential.VerifyStored
 	// on every failed attempt, the verification whose refusal moved the count: a wrong
 	// code and a replayed one both count, as the otp rate tier already charges both.
@@ -337,14 +337,14 @@ type Database interface {
 	// only while OTP is on at expectedGeneration, so a refusal in flight across a removal
 	// or a replacement charges nothing to the replacement. True means this call moved the
 	// count to the limit, which exactly one call can, so the disable is audited once.
-	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+	IncrementUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64,
 		expectedGeneration int64) (bool, error)
-	// ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0. Called
+	// ClearUserOTPConsecutiveFailures returns the consecutive-failure count to 0. Called
 	// inside the same transaction as the write that binds a fresh authenticator
 	// (otpcredential.Establish), because rebinding is the one path back from the limit,
 	// and a count left standing would refuse the very enrolment that exists to clear it
 	// (#489).
-	ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
+	ClearUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64) error
 	// TryInstallPendingOTPEnrollment records a TOTP enrollment the server has just
 	// issued, only if the user has no live one and no authenticator already, and
 	// reports whether this call installed it. Compare-and-set is what makes the
@@ -353,7 +353,7 @@ type Database interface {
 	// handing out a second QR code that invalidates the one already scanned. An
 	// existing value counts as replaceable when it is absent or was issued before
 	// staleBefore, which keeps the lifetime itself in the handler (#247).
-	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
+	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
 	// TryEstablishUserOTP installs an authenticator: it stores the encrypted seed and turns
 	// otp_enabled on, and writes no other column but updated_at, only while OTP is still off at
@@ -362,38 +362,38 @@ type Database interface {
 	// enable and a disable landed in between is refused rather than installed over them. Narrow
 	// rather than a full-row update, so it cannot undo a concurrent disable or password change
 	// (#144, #471).
-	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
 	// TryRemoveUserOTP removes an authenticator: it clears the seed and turns otp_enabled off,
 	// and writes no other column but updated_at, only while OTP is still on at
 	// expectedGeneration, the otp_config_generation the request read. It reports whether it did,
 	// so a removal read before the authenticator was replaced does not remove the replacement
 	// (#471).
-	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
+	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64) (bool, error)
 	// ClearPendingOTPEnrollment returns the pending enrollment pair to NULL. Called
 	// inside the transaction that establishes the authenticator, so no committed
 	// state has OTP enabled with a live pending seed still installed (#247).
-	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64) error
 	// ReplaceUserRecoveryCodes makes codeHashes the user's set of recovery codes, each unused: it
 	// deletes every code the user had, used or not, and inserts one row per hash. tx is required,
 	// so the old set goes only if the whole new one lands. The hashes are the codes' SHA-256 in
 	// lowercase hex; the data tier never sees a code (#257 decisions 2 and 3).
-	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error
 	// DeleteUserRecoveryCodes deletes every recovery code the user has. Called in the transaction
 	// that removes the authenticator (otpcredential.RemoveTx), so every path that removes one
 	// clears its codes (#257 decision 3).
-	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) error
 	// TryUseUserRecoveryCode marks the user's code with the hash codeHash used, only while it is
 	// unused, and reports whether this call did: one conditional write, so of two submissions of
 	// one code exactly one is accepted. False means the user's set holds no such unused code: a
 	// wrong code, one of a replaced set, or one already used (#257 decision 3).
-	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
 	// UserRecoveryCodeExists reports whether the user's set holds a code with the hash codeHash,
 	// used or not. After a refused claim, true means the code is a used one of the current set,
 	// which the sign-in audits as a replay (#257 decision 10).
-	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
 	// CountUnusedUserRecoveryCodes is how many of the user's recovery codes are unused.
-	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) (int, error)
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error
 	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *record.User) error
@@ -409,37 +409,37 @@ type Database interface {
 	// just before its session was terminated (see #129). False means no row
 	// transitioned, whether used, revoked or missing, and never specifically
 	// reuse: that is the validator's finding, not this one's.
-	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)
+	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeID int64) (bool, error)
 	// RevokeCodesBySessionIdentifier marks every not-yet-revoked code of one session
 	// revoked and reports how many rows it transitioned. Ending a session durably
 	// cuts off the grants that session authorized, and marking the code reaches
 	// every refresh token descended from it, present and future, because a rotated
 	// child inherits its parent's code_id (see #129).
 	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
-	// RevokeCodesByClientId marks every not-yet-revoked code of one client revoked and
+	// RevokeCodesByClientID marks every not-yet-revoked code of one client revoked and
 	// reports how many rows it transitioned. It is the durable half of flipping a
 	// client from confidential to public: marking the code reaches every refresh token
 	// descended from it, present and future, because a rotated child inherits its
 	// parent's code_id, so a token inserted after this statement committed is born
 	// already rejected. The count is what this call transitioned and not what the
 	// client has, so a second flip reports 0 (see #245).
-	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
-	// RevokeUnusedCodesByUserIdAndClientId marks every unused, not-yet-revoked code one
+	RevokeCodesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (int64, error)
+	// RevokeUnusedCodesByUserIDAndClientID marks every unused, not-yet-revoked code one
 	// user holds with one client revoked and reports how many rows it transitioned. A
 	// consent withdrawal marks them, so a code issued before it cannot be redeemed after
 	// it for a grant the withdrawal's sweep never saw. Used codes are left alone: their
 	// grants are the refresh tokens the same withdrawal sweeps (see #622).
-	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
-	// RevokeUnusedCodesBySessionIdentifierAndClientId marks every unused, not-yet-revoked code
+	RevokeUnusedCodesByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (int64, error)
+	// RevokeUnusedCodesBySessionIdentifierAndClientID marks every unused, not-yet-revoked code
 	// one client holds from one session revoked and reports how many rows it transitioned. A
 	// sign-out with a confirmed id_token_hint marks the departing client's, so a code issued
 	// before it cannot start a grant on the session after it. Used codes are left alone: their
 	// grants are the refresh tokens the same sign-out sweeps, and an offline one among them must
 	// survive (see #135 decision 9).
-	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) (int64, error)
-	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
+	RevokeUnusedCodesBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientID int64) (int64, error)
+	GetCodeByID(ctx context.Context, tx *sql.Tx, codeID int64) (*record.Code, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
-	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
+	DeleteCode(ctx context.Context, tx *sql.Tx, codeID int64) error
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	// DeleteCodesWithoutRefreshTokens reaps every code created before createdBefore
@@ -460,8 +460,8 @@ type Database interface {
 
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
-	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
+	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIDs []int64) ([]record.Resource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
 	// GetIdentifiersSharedByClientsAndResources answers every string that is both a client's
@@ -469,14 +469,14 @@ type Database interface {
 	// (#151), so what it answers was stored before that check, or by two overlapping writes, one
 	// per table, which the check cannot see; the startup warning reads it.
 	GetIdentifiersSharedByClientsAndResources(ctx context.Context, tx *sql.Tx) ([]string, error)
-	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
+	DeleteResource(ctx context.Context, tx *sql.Tx, resourceID int64) error
 
 	CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
 	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]record.Permission, error)
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
-	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
+	GetPermissionsByIDs(ctx context.Context, tx *sql.Tx, permissionIDs []int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
+	DeletePermission(ctx context.Context, tx *sql.Tx, permissionID int64) error
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	// AcquireManagePermissionRow takes the authserver resource's manage permission row inside the
 	// caller's transaction, holds it until that transaction ends, and answers that permission's
@@ -501,8 +501,8 @@ type Database interface {
 	//
 	// A false return means no row transitioned, so the caller lost a race or the row is
 	// gone. It is not an error.
-	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
-	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)
+	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairID int64, fromState string, toState string) (bool, error)
+	GetKeyPairByID(ctx context.Context, tx *sql.Tx, keyPairID int64) (*record.KeyPair, error)
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 	// GetCurrentSigningKey returns an error when no key is in the current state, rather
 	// than the (nil, nil) this codebase returns for a lookup that may legitimately miss.
@@ -512,26 +512,26 @@ type Database interface {
 	// here is what makes all of them correct at once, as IncrementUserAuthStateGeneration
 	// rejects a nil transaction rather than tolerating it (#251).
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
-	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairID int64) error
 
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
-	GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*record.RedirectURI, error)
-	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
-	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
+	GetRedirectURIByID(ctx context.Context, tx *sql.Tx, redirectURIID int64) (*record.RedirectURI, error)
+	GetRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.RedirectURI, error)
+	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIID int64) error
 
 	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
-	GetPostLogoutRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.PostLogoutRedirectURI, error)
+	GetPostLogoutRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.PostLogoutRedirectURI, error)
 	// GetClientsByPostLogoutRedirectURI answers the clients whose sign-out redirect URIs hold uri,
 	// matched exactly on every engine, each client once (#147 decision 10).
 	GetClientsByPostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, uri string) ([]record.Client, error)
-	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error
+	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIID int64) error
 
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
-	GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*record.WebOrigin, error)
+	GetWebOriginByID(ctx context.Context, tx *sql.Tx, webOriginID int64) (*record.WebOrigin, error)
 	GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]record.WebOrigin, error)
-	GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.WebOrigin, error)
+	GetWebOriginsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.WebOrigin, error)
 	WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error)
-	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
+	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginID int64) error
 
 	CreateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 	// CreateInitialSettings writes a deployment's one settings row at the id IsEmpty and every
@@ -546,8 +546,8 @@ type Database interface {
 	//
 	// A transaction is required: without one the statement autocommits and the row is released
 	// before the read even runs.
-	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	// TryClaimCleanupRun atomically claims the next background cleanup run via a
 	// conditional update on settings.last_cleanup_at, and reports whether this
 	// caller won it. claimableBefore is the cutoff (pass now minus the interval).
@@ -556,7 +556,7 @@ type Database interface {
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
 	// Brands (#810). A brand is a name, an appearance, a theme and a kit (#813); one is the default,
-	// the brand the settings row's DefaultBrandId points at. CreateBrand and UpdateBrand refuse a
+	// the brand the settings row's DefaultBrandID points at. CreateBrand and UpdateBrand refuse a
 	// name another brand holds with ErrUniqueViolation, and the engine refuses a slot naming no
 	// brand asset with its foreign key.
 	CreateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
@@ -564,23 +564,23 @@ type Database interface {
 	// four choices of its kit and its six slots. An asset a slot named before and names no longer
 	// is left as it is, unattached unless another slot names it.
 	UpdateBrand(ctx context.Context, tx *sql.Tx, brand *record.Brand) error
-	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandID int64) (*record.Brand, error)
 	// GetAllBrands answers every brand, in id order.
 	GetAllBrands(ctx context.Context, tx *sql.Tx) ([]record.Brand, error)
 	// GetDefaultBrand answers the brand the settings row points at, or nil when there is no
 	// settings row or its pointer is empty.
 	GetDefaultBrand(ctx context.Context, tx *sql.Tx) (*record.Brand, error)
-	// MakeBrandDefault moves the settings row's pointer to brandId under the settings row's lock,
-	// and answers the brand it pointed at before, 0 when it was empty. It answers brandId itself,
+	// MakeBrandDefault moves the settings row's pointer to brandID under the settings row's lock,
+	// and answers the brand it pointed at before, 0 when it was empty. It answers brandID itself,
 	// writing nothing, when that brand already is the default, and ErrBrandNotFound, writing
 	// nothing, when there is no such brand. A transaction is required, as for AcquireSettingsRow.
-	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandId int64) (previousDefaultBrandId int64, err error)
+	MakeBrandDefault(ctx context.Context, tx *sql.Tx, brandID int64) (previousDefaultBrandID int64, err error)
 	// DeleteBrand deletes a brand, reading the default under the settings row's lock: it answers
 	// ErrDefaultBrandNotDeletable for the default brand and ErrBrandNotFound for a brand that is not
 	// there, deleting nothing. Under that lock it first puts every client given the brand back on
 	// the default, and answers how many it moved (#812 decision 1). A transaction is required, as
 	// for AcquireSettingsRow.
-	DeleteBrand(ctx context.Context, tx *sql.Tx, brandId int64) (movedClients int, err error)
+	DeleteBrand(ctx context.Context, tx *sql.Tx, brandID int64) (movedClients int, err error)
 	// CountClientsPerBrand answers, by brand id, how many clients are drawn in each brand: those
 	// given it and, for the default brand, those with no brand of their own, so the counts add up
 	// to every client while there is a default. A brand no client is drawn in is absent (#812
@@ -590,86 +590,86 @@ type Database interface {
 	// Brand assets (#813 decision 2): the files of the brands' kits, each stored once and never
 	// changed. CreateBrandAsset stamps created_at and answers the new id on the record.
 	CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error
-	// GetBrandAssetById answers the asset with its bytes, or nil when there is no such asset.
-	GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)
-	// GetBrandAssetsByIds answers the assets of the ids that name one, without their bytes
+	// GetBrandAssetByID answers the asset with its bytes, or nil when there is no such asset.
+	GetBrandAssetByID(ctx context.Context, tx *sql.Tx, assetID int64) (*record.BrandAsset, error)
+	// GetBrandAssetsByIDs answers the assets of the ids that name one, without their bytes
 	// (Content is nil), in no particular order; an id naming none is left out.
-	GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIDs []int64) ([]record.BrandAsset, error)
 	// DeleteUnattachedBrandAssets deletes every asset no brand's slot names that was created before
 	// createdBefore, and answers how many. It is the only thing that deletes an asset.
 	DeleteUnattachedBrandAssets(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error)
 
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
 	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPermissionId int64) (*record.UserPermission, error)
-	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]record.User, int, error)
-	GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*record.UserPermission, error)
-	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
-	GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]record.UserPermission, error)
-	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
+	GetUserPermissionByID(ctx context.Context, tx *sql.Tx, userPermissionID int64) (*record.UserPermission, error)
+	GetUsersByPermissionIDPaginated(ctx context.Context, tx *sql.Tx, permissionID int64, page int, pageSize int) ([]record.User, int, error)
+	GetUserPermissionByUserIDAndPermissionID(ctx context.Context, tx *sql.Tx, userID, permissionID int64) (*record.UserPermission, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserPermission, error)
+	GetUserPermissionsByUserIDs(ctx context.Context, tx *sql.Tx, userIDs []int64) ([]record.UserPermission, error)
+	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionID int64) error
 	// CountEnabledUsersHoldingPermission counts the enabled users holding the permission, directly
 	// or through any of their groups, each once. Read on tx, it counts what the transaction itself
 	// has written. It is what the last-administrator guard counts, under AcquireManagePermissionRow,
 	// before and after a write that can remove a holder of authserver:manage (#402 decision 10).
-	CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error)
+	CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionID int64) (int, error)
 
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
 	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error)
-	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error)
+	GetGroupsByIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.Group, error)
 	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error)
 	GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]record.Group, int, error)
-	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]record.User, int, error)
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
-	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
+	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupID int64, page int, pageSize int) ([]record.User, int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
+	DeleteGroup(ctx context.Context, tx *sql.Tx, groupID int64) error
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *record.Group) error
 
 	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
-	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error)
-	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
-	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
+	GetUserAttributeByID(ctx context.Context, tx *sql.Tx, userAttributeID int64) (*record.UserAttribute, error)
+	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserAttribute, error)
+	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeID int64) error
 
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
 	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
-	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 
 	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
-	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
-	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
-	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.ClientLogo, error)
+	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientID int64) error
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
 
 	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *record.AuditLog) error
 	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, filter record.AuditLogFilter) ([]record.AuditLog, int, error)
-	// GetAuditLogsByUserId answers every audit row about the user or made by them (user_id or
-	// logged_in_user_id is userId), each once, in id order, oldest first, and unpaged, as a
+	// GetAuditLogsByUserID answers every audit row about the user or made by them (user_id or
+	// logged_in_user_id is userID), each once, in id order, oldest first, and unpaged, as a
 	// user's data export lists them (#781 decision 5).
-	GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error)
+	GetAuditLogsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.AuditLog, error)
 
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
 	UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
-	GetClientPermissionById(ctx context.Context, tx *sql.Tx, clientPermissionId int64) (*record.ClientPermission, error)
-	GetClientPermissionByClientIdAndPermissionId(ctx context.Context, tx *sql.Tx, clientId, permissionId int64) (*record.ClientPermission, error)
-	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
-	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
+	GetClientPermissionByID(ctx context.Context, tx *sql.Tx, clientPermissionID int64) (*record.ClientPermission, error)
+	GetClientPermissionByClientIDAndPermissionID(ctx context.Context, tx *sql.Tx, clientID, permissionID int64) (*record.ClientPermission, error)
+	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientPermission, error)
+	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionID int64) error
 
 	// The resources whose tokens a confidential client may introspect, one row per client and
 	// resource, removed with either side (#676 decisions 5 and 14). A second row of one pair is a
 	// unique violation.
 	CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
-	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error
-	// DeleteClientIntrospectionResourcesByClientId clears a client's list, which making the client
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
+	DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceID int64) error
+	// DeleteClientIntrospectionResourcesByClientID clears a client's list, which making the client
 	// public does in the transaction that revokes its grants: a public client cannot authenticate,
 	// so it never introspects.
-	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeleteClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) error
 
 	// Legal documents and their published versions (#622). A second document with a short name
 	// already taken, or a second version of one number in a document, is a unique violation.
@@ -684,39 +684,39 @@ type Database interface {
 	// takes it first and reads the document again under it, so none decides on a copy another
 	// committed over: a publish clears only the draft it froze, a save cannot rename a document
 	// published meanwhile, and a save cannot undo a retirement. The transaction is required.
-	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
-	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
+	GetLegalDocumentByID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) (*record.LegalDocument, error)
 	// GetLegalDocumentByShortName answers the document whose short name is exactly shortName.
 	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
 	// GetAllLegalDocuments answers every document, retired ones included, in id order.
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
-	// GetLegalDocumentVersionsByLegalDocumentId answers a document's versions, the first first.
-	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	// GetLegalDocumentVersionsByLegalDocumentID answers a document's versions, the first first.
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
 	// GetLegalDocumentVersion answers one version of a document by its number, or nil.
-	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentID int64, versionNumber int) (*record.LegalDocumentVersion, error)
 	// UpdateLegalDocumentAppliesToAllApps writes a document's Applies to, which UpdateLegalDocument
 	// leaves alone: true is all apps, false the apps its LegalDocumentClient rows list.
-	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentId int64, appliesToAllApps bool) error
+	UpdateLegalDocumentAppliesToAllApps(ctx context.Context, tx *sql.Tx, legalDocumentID int64, appliesToAllApps bool) error
 
 	// The apps a legal document set to selected apps applies to (#622). A document lists an app
 	// once, and a second row for the same pair is a unique violation. Deleting either the document
 	// or the client removes the row.
 	CreateLegalDocumentClient(ctx context.Context, tx *sql.Tx, link *record.LegalDocumentClient) error
-	// GetLegalDocumentClientsByLegalDocumentId answers a document's apps, in id order.
-	GetLegalDocumentClientsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
-	// GetLegalDocumentClientsByClientId answers the documents that list a client, in id order.
-	GetLegalDocumentClientsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
-	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientId int64) error
+	// GetLegalDocumentClientsByLegalDocumentID answers a document's apps, in id order.
+	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentClient, error)
+	// GetLegalDocumentClientsByClientID answers the documents that list a client, in id order.
+	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.LegalDocumentClient, error)
+	DeleteLegalDocumentClient(ctx context.Context, tx *sql.Tx, legalDocumentClientID int64) error
 
 	// A user's acceptances of legal document versions (#622). A user accepts a version once, and a
 	// second row for the same pair is a unique violation. An acceptance is never rewritten or
 	// removed by hand; deleting the user removes it.
 	CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error
-	// GetLegalDocumentAcceptancesByUserId answers a user's acceptances, in id order.
-	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	// GetLegalDocumentAcceptancesByUserID answers a user's acceptances, in id order.
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error)
 
 	// Email template edits (#818 decision 7): at most one row for an email and a language, holding
 	// only the fields that differ from the built-in text. The email and the language are matched
@@ -741,11 +741,11 @@ type Database interface {
 
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
-	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
+	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionID int64) (*record.UserSession, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	GetUserSessionsByClientIDPaginated(ctx context.Context, tx *sql.Tx, clientID int64, page int, pageSize int) ([]record.UserSession, int, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error
 	// AcquireUserSessionRow takes the session's row inside the caller's transaction and
 	// holds it until that transaction ends, the way AcquireClientRow does for a client
 	// (#245). It keys on the session identifier because that is what a ceremony holds,
@@ -773,8 +773,8 @@ type Database interface {
 	// request and would otherwise undo the promotion (#106). Errors if no row matched:
 	// a caller preserving a session and its tokens together must not have half of that
 	// silently succeed.
-	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
-	// PromoteUserSessionOtpConfigGeneration records that this session has satisfied the
+	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error
+	// PromoteUserSessionOTPConfigGeneration records that this session has satisfied the
 	// level 2 question against the given OTP configuration generation. Narrow for the
 	// reason PromoteUserSessionGeneration is: BumpUserSession writes the whole row on
 	// every request and would otherwise undo the promotion. Errors if no row matched,
@@ -784,12 +784,12 @@ type Database interface {
 	// in the ceremony rather than read live: an authenticator change landing between
 	// /auth/level2 and here must not be discharged by a ceremony that never saw it
 	// (#242, #106 decision 11).
-	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	PromoteUserSessionOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error
 	// LowerUserSessionsToPassword lowers every session of the user that claims more than a password
 	// to what passwordMethods reached: auth_methods becomes passwordMethods, level2_mandatory
 	// becomes level2_optional, and auth_time becomes password_auth_time. One statement, so it
 	// reads each row as it writes it and never writes back a copy read earlier (#542).
-	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
+	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userID int64, passwordMethods string) error
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
@@ -800,11 +800,11 @@ type Database interface {
 	// A browser session is the state the session cookie used to carry. The cookie now
 	// holds an opaque identifier and the row holds everything else (#266).
 	//
-	// Every method is keyed on (owner, sessionIdHash) rather than on the surrogate id,
+	// Every method is keyed on (owner, sessionIDHash) rather than on the surrogate id,
 	// because the store never holds the id: it has an identifier from a cookie and the
 	// name of the application asking. That pair is the table's unique index.
 	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error
-	// GetBrowserSessionByOwnerAndSessionIdHash returns the live session, or nil if there
+	// GetBrowserSessionByOwnerAndSessionIDHash returns the live session, or nil if there
 	// is none. `now` is an active-expiry predicate and not a hint: the statement matches
 	// only expires_at > now, so an expired row reads as absent whether or not the reaper
 	// has reached it. Without that term the idle timeout and the maximum lifetime would
@@ -815,31 +815,31 @@ type Database interface {
 	// such session", which is a fresh session, and an error is "I could not ask", which
 	// is a refused request. Collapsing the second into the first would silently sign
 	// everyone out during any database interruption.
-	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*record.BrowserSession, error)
+	GetBrowserSessionByOwnerAndSessionIDHash(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now time.Time) (*record.BrowserSession, error)
 	// UpdateBrowserSessionData replaces one session's contents and moves its deadlines.
 	// Narrow rather than the house's full-row Update<Model> because it sits on a
 	// per-request path and because the caller holds no id, the reason
-	// PromoteUserSessionOtpConfigGeneration is narrow.
+	// PromoteUserSessionOTPConfigGeneration is narrow.
 	//
 	// It reports whether a row TRANSITIONED, not whether one matched: false means the
 	// session is gone or expired, which is what lets the caller tell "written" from "the
 	// row is no longer there". The expires_at > now term is in the WHERE for the reason
 	// it is in the read, so a write can never touch an expired row back to life.
-	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, data string, now, expiresAt time.Time) (bool, error)
 	// TouchBrowserSession records that a live session was used, and reports whether a row
 	// transitioned. It moves expires_at as well as last_accessed: the idle window is
 	// expressed in expires_at, so a touch that left it alone would never extend the
 	// session and the idle timeout would behave as an absolute one.
-	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
-	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
+	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now, expiresAt time.Time) (bool, error)
+	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string) error
 	// UpdateBrowserSessionDataIfUnchanged is UpdateBrowserSessionData on condition that the
 	// row's data is still expectedData, the value a fresh read returned. false means no row
 	// transitioned: another write changed the data since, or the session is gone or expired. A
 	// touch moves no data, so it never makes this lose (#579).
-	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
 	// DeleteBrowserSessionIfUnchanged removes one live session on the same condition, and
 	// reports whether it did: a rotation removes the row it read and nothing written since (#579).
-	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData string, now time.Time) (bool, error)
+	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData string, now time.Time) (bool, error)
 	// DeleteExpiredBrowserSessions reaps on expires_at alone, across both owners. The
 	// row was already unusable before this ran, by the predicate above; this is what
 	// stops the table growing.
@@ -854,7 +854,7 @@ type Database interface {
 	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*record.AuthorizeRequest, error)
 	// ClaimAuthorizeRequest deletes one request and reports whether THIS call did, the one-winner
 	// claim in MarkCodeAsUsed's shape: only the caller told true may act on what it read.
-	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)
+	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestID int64) (bool, error)
 	// DeleteExpiredAuthorizeRequests reaps on expires_at alone.
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 
@@ -883,21 +883,21 @@ type Database interface {
 
 	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
-	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	// GetConsentByUserIdAndClientIdForUpdate reads the user's consent to the client as last
+	GetUserConsentByID(ctx context.Context, tx *sql.Tx, userConsentID int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
+	// GetConsentByUserIDAndClientIDForUpdate reads the user's consent to the client as last
 	// committed and takes its row until the transaction ends: what a disconnect deletes, read so
 	// that a consent committed after the transaction's first read is not missed on MySQL (#135).
 	// A transaction is required.
-	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
+	GetConsentByUserIDAndClientIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserConsent, error)
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentID int64) (bool, error)
 	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
 
 	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error
 	UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *record.PreRegistration) error
-	GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*record.PreRegistration, error)
+	GetPreRegistrationByID(ctx context.Context, tx *sql.Tx, preRegistrationID int64) (*record.PreRegistration, error)
 	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.PreRegistration, error)
 	// GetPreRegistrationByVerificationCodeHash finds the pre-registration an activation
 	// code belongs to, by an unsalted SHA-256 of that code. This is what lets the
@@ -909,14 +909,14 @@ type Database interface {
 	// the row still holds the dead code the caller read, and reports whether this call did.
 	// Compare-and-set for the same reason MarkCodeAsUsed is: of two repeats racing for one dead
 	// row, exactly one replaces it and sends a link (#207 decision 6).
-	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, deadCodeHash string,
+	TryReplacePreRegistrationCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64, deadCodeHash string,
 		codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error)
-	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
+	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationID int64) error
 	// DeletePreRegistrationHoldingCode deletes a pending registration only while it still holds
 	// the code the caller read, and reports whether this call did. A replacement keeps the row's
 	// id, so a delete by id alone from a caller that read the row before it would take the fresh
 	// link with it (#207 decision 6).
-	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error)
+	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64, codeHash string) (bool, error)
 	// DeleteDeadPreRegistrations sweeps every pending registration whose code was issued before
 	// deadBefore, or never issued, and leaves every other. The caller passes
 	// emaillinks.PreRegistrationDeadBefore, the one definition of a pending registration that can
@@ -926,26 +926,26 @@ type Database interface {
 
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
-	GetUserGroupById(ctx context.Context, tx *sql.Tx, userGroupId int64) (*record.UserGroup, error)
-	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*record.UserGroup, error)
-	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserGroup, error)
-	GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]record.UserGroup, error)
-	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
+	GetUserGroupByID(ctx context.Context, tx *sql.Tx, userGroupID int64) (*record.UserGroup, error)
+	GetUserGroupByUserIDAndGroupID(ctx context.Context, tx *sql.Tx, userID, groupID int64) (*record.UserGroup, error)
+	GetUserGroupsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserGroup, error)
+	GetUserGroupsByUserIDs(ctx context.Context, tx *sql.Tx, userIDs []int64) ([]record.UserGroup, error)
+	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupID int64) error
 
 	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
-	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error)
-	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
-	GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupAttribute, error)
-	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
+	GetGroupAttributeByID(ctx context.Context, tx *sql.Tx, groupAttributeID int64) (*record.GroupAttribute, error)
+	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupAttribute, error)
+	GetGroupAttributesByGroupIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.GroupAttribute, error)
+	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeID int64) error
 
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
 	UpdateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *record.GroupPermission) error
-	GetGroupPermissionById(ctx context.Context, tx *sql.Tx, groupPermissionId int64) (*record.GroupPermission, error)
-	GetGroupPermissionByGroupIdAndPermissionId(ctx context.Context, tx *sql.Tx, groupId, permissionId int64) (*record.GroupPermission, error)
-	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.GroupPermission, error)
-	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupPermission, error)
-	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
+	GetGroupPermissionByID(ctx context.Context, tx *sql.Tx, groupPermissionID int64) (*record.GroupPermission, error)
+	GetGroupPermissionByGroupIDAndPermissionID(ctx context.Context, tx *sql.Tx, groupID, permissionID int64) (*record.GroupPermission, error)
+	GetGroupPermissionsByGroupIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.GroupPermission, error)
+	GetGroupPermissionsByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupPermission, error)
+	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionID int64) error
 
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
@@ -953,25 +953,25 @@ type Database interface {
 	// and reports whether this call is the one that made the transition. It is the
 	// guard against double-spending a single refresh token, for the same reason
 	// MarkCodeAsUsed guards an authorization code (#128).
-	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (bool, error)
 	// RevokeRefreshTokenFamily revokes every currently live member of one rotation
 	// family, identified by the first_refresh_token_jti its members share, and returns
 	// the exact number of rows it moved from live to revoked. An empty identifier is an
 	// error rather than a no-op, since on a revocation path it can only be a caller
 	// bug (#128).
-	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
+	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (int64, error)
 	// RecordRefreshTokenFamilyRevoked writes the durable record that a rotation family is
 	// revoked, and reports whether this call wrote it. A family already recorded is left as it
 	// was. A sweep of live rows cannot catch a child a rotation inserts after the sweep, and a
 	// record outlives every member, so a child born into a recorded family is refused (#132,
 	// #259). Two overlapping first writes of one family lose on the key as ErrUniqueViolation,
 	// and the caller reruns its transaction once.
-	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string, reason string) (bool, error)
 	// IsRefreshTokenFamilyRevoked reports whether a rotation family has a revocation record.
-	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
 	// IsRefreshTokenFamilyLive reports whether a rotation family stands for a live grant: it has no
 	// revocation record and still has a member that is not revoked (#676 decision 1).
-	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
 	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
 	// refresh token left, which is when a record has nothing left to refuse.
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
@@ -994,46 +994,46 @@ type Database interface {
 	// DeleteExpiredDPoPProofs reaps on expires_at alone: past it the proof could no longer be
 	// accepted, so its record has nothing left to refuse.
 	DeleteExpiredDPoPProofs(ctx context.Context, tx *sql.Tx, now time.Time) error
-	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
-	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
-	// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and
+	GetRefreshTokenByID(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (*record.RefreshToken, error)
+	GetRefreshTokenByJTI(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	// GetRefreshTokensByFirstRefreshTokenJTI returns every member of one rotation family, live and
 	// revoked, which is what a client revoking the grant ends (#676 decision 1). An empty identifier
 	// is an error, for the reason RevokeRefreshTokenFamily states.
-	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
-	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByFirstRefreshTokenJTI(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) ([]*record.RefreshToken, error)
+	GetRefreshTokensByCodeID(ctx context.Context, tx *sql.Tx, codeID int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
-	// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound
+	// GetSessionBoundRefreshTokensBySessionIdentifierAndClientID returns the session-bound
 	// refresh tokens one client holds from one session, revoked ones included: the tokens of the
 	// client's codes on the session whose own session identifier is the session's, which an
 	// offline token's is not. A sign-out with a confirmed id_token_hint revokes them and records
 	// their families (see #135 decision 9).
-	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error)
-	// GetRefreshTokensByUserId returns every refresh token belonging to a user,
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientID int64) ([]*record.RefreshToken, error)
+	// GetRefreshTokensByUserID returns every refresh token belonging to a user,
 	// through either linkage shape: codes.user_id for the authorization code flow and
 	// refresh_tokens.user_id for ROPC. GetRefreshTokensBySessionIdentifier cannot
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
-	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error)
-	// GetUsableRefreshTokenClientIdsByUserId answers the clients holding one of the user's refresh
+	GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]*record.RefreshToken, error)
+	// GetUsableRefreshTokenClientIDsByUserID answers the clients holding one of the user's refresh
 	// tokens that is unrevoked and unexpired at now, each once, through either linkage shape. It is
 	// the grants a user-wide end tells (#784 decision 3).
-	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
-	// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, through
+	GetUsableRefreshTokenClientIDsByUserID(ctx context.Context, tx *sql.Tx, userID int64, now time.Time) ([]int64, error)
+	// GetLiveGrantsByUserID answers one row for each live refresh token the user holds, through
 	// either linkage shape, with its client and the scope it records: a token whose row is not
 	// revoked, whose expiry is set and after now, and whose rotation family has no revocation
 	// record. It is what the list of the user's connected clients reads (#135 decision 4).
-	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
-	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
+	GetLiveGrantsByUserID(ctx context.Context, tx *sql.Tx, userID int64, now time.Time) ([]record.LiveGrant, error)
+	// GetRefreshTokensByUserIDAndClientID returns every refresh token one user holds
 	// with one client, through either linkage shape: codes.user_id with codes.client_id
 	// for the authorization code flow, refresh_tokens.user_id with
 	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
-	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
+	// GetRefreshTokensByUserID plus a client filter cannot substitute for it, because
 	// an auth-code token's row carries no client to filter on (#622). Revoked rows are
 	// returned too, on purpose: the withdrawal records the family of every row it reads. The
 	// rows are read as last committed, a locking read on MySQL, so a grant committed after the
 	// transaction's first read is swept too (#135).
-	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
-	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
+	GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) ([]*record.RefreshToken, error)
+	// GetRefreshTokensByClientID returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,
 	// where refresh_tokens.client_id is null, and refresh_tokens.client_id for ROPC,
 	// where there is no code at all. GetRefreshTokensBySessionIdentifier cannot
@@ -1041,11 +1041,11 @@ type Database interface {
 	// query: it joins through codes and so excludes ROPC rows, and it needs a live
 	// session row to supply the identifier. Used by the confidential-to-public flip,
 	// which must reach every grant the client holds however it was issued (#245).
-	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error)
+	GetRefreshTokensByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]*record.RefreshToken, error)
 	// PromoteRefreshTokenGenerations moves the named, unrevoked refresh tokens to a
 	// new authentication generation. An empty id list is a no-op (#106).
-	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
-	DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error
+	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIDs []int64, generation int64) error
+	DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenID int64) error
 	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
@@ -1058,16 +1058,16 @@ type Database interface {
 
 	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
 	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
-	GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*record.UserSessionClient, error)
-	GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]record.UserSessionClient, error)
-	GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
-	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
-	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
+	GetUserSessionClientByID(ctx context.Context, tx *sql.Tx, userSessionClientID int64) (*record.UserSessionClient, error)
+	GetUserSessionsClientByIDs(ctx context.Context, tx *sql.Tx, userSessionClientIDs []int64) ([]record.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionID(ctx context.Context, tx *sql.Tx, userSessionID int64) ([]record.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionIDs(ctx context.Context, tx *sql.Tx, userSessionIDs []int64) ([]record.UserSessionClient, error)
+	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientID int64) error
 	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []record.UserSessionClient) error
 	// GetCommittedUserSessionClients answers a session's apps, each with its client, as last
 	// committed, on the caller's transaction: what an end of the session tells, read under the
 	// session's row (#784).
-	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
+	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionID int64) ([]record.UserSessionClient, error)
 }
 
 // ErrUniqueViolation is what a caller asks about when it wants to know whether a write lost a race

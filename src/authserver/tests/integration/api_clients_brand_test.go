@@ -49,11 +49,11 @@ func newOrdinaryClient(t *testing.T, prefix string) *record.Client {
 		ClientIdentifier:         prefix + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secret,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
@@ -66,7 +66,7 @@ func newBrandInStore(t *testing.T, prefix string) *record.Brand {
 	require.NoError(t, database.CreateBrand(ctx, nil, brand))
 	t.Cleanup(func() {
 		assert.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.ID)
 			if errors.Is(err, data.ErrBrandNotFound) {
 				return nil
 			}
@@ -81,10 +81,10 @@ func storedBrandId(t *testing.T, clientId int64) int64 {
 	t.Helper()
 	client := storedClient(t, clientId)
 	require.NotNil(t, client)
-	if !client.BrandId.Valid {
+	if !client.BrandID.Valid {
 		return 0
 	}
-	return client.BrandId.Int64
+	return client.BrandID.Int64
 }
 
 // readClientBrandId is brandId as GET /clients/{id} answers it: nil for null.
@@ -112,20 +112,20 @@ func TestAPIClientBrand_AssignsAndClearsTheBrand(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 	client := newOrdinaryClient(t, "brand-assign-")
 	brandId := createBrandOverAPI(t, accessToken, created, "Assigned "+fake.LetterN(10), "dark", "guava")
-	brand, err := database.GetBrandById(context.Background(), nil, brandId)
+	brand, err := database.GetBrandByID(context.Background(), nil, brandId)
 	require.NoError(t, err)
 
-	assert.Nil(t, readClientBrandId(t, accessToken, client.Id), "a new client starts on the default")
+	assert.Nil(t, readClientBrandId(t, accessToken, client.ID), "a new client starts on the default")
 
-	status, body, requestId := saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": brandId})
+	status, body, requestId := saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": brandId})
 	require.Equal(t, http.StatusOK, status, body)
 	answered := body["client"].(map[string]any)
-	assert.InDelta(t, float64(client.Id), answered["id"], 0)
+	assert.InDelta(t, float64(client.ID), answered["id"], 0)
 	assert.InDelta(t, float64(brandId), answered["brandId"], 0, "the answer is the client as stored")
-	assert.Equal(t, brandId, storedBrandId(t, client.Id))
-	assert.InDelta(t, float64(brandId), readClientBrandId(t, accessToken, client.Id), 0)
+	assert.Equal(t, brandId, storedBrandId(t, client.ID))
+	assert.InDelta(t, float64(brandId), readClientBrandId(t, accessToken, client.ID), 0)
 	assert.Equal(t, []map[string]any{{
-		"client_id":         float64(client.Id),
+		"client_id":         float64(client.ID),
 		"client_identifier": client.ClientIdentifier,
 		"brand_id":          float64(brandId),
 		"brand_name":        brand.Name,
@@ -140,7 +140,7 @@ func TestAPIClientBrand_AssignsAndClearsTheBrand(t *testing.T) {
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := false
 	for _, listed := range clients.Clients {
-		if listed.ID == client.Id {
+		if listed.ID == client.ID {
 			found = true
 			require.NotNil(t, listed.BrandID)
 			assert.Equal(t, brandId, *listed.BrandID)
@@ -149,27 +149,27 @@ func TestAPIClientBrand_AssignsAndClearsTheBrand(t *testing.T) {
 	assert.True(t, found, "the client is in the listing")
 
 	// The same brand again changes nothing and records nothing.
-	status, body, requestId = saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": brandId})
+	status, body, requestId = saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": brandId})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.InDelta(t, float64(brandId), body["client"].(map[string]any)["brandId"], 0)
 	assert.Empty(t, auditRows(t, accessToken, "updated_client_brand", requestId))
 
 	// null puts it back on the default; the event leaves the brand out.
-	status, body, requestId = saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": nil})
+	status, body, requestId = saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": nil})
 	require.Equal(t, http.StatusOK, status, body)
 	brandIdAnswer, present := body["client"].(map[string]any)["brandId"]
 	assert.True(t, present, "brandId is answered as null, not left out")
 	assert.Nil(t, brandIdAnswer)
-	assert.Equal(t, int64(0), storedBrandId(t, client.Id))
-	assert.Nil(t, readClientBrandId(t, accessToken, client.Id))
+	assert.Equal(t, int64(0), storedBrandId(t, client.ID))
+	assert.Nil(t, readClientBrandId(t, accessToken, client.ID))
 	assert.Equal(t, []map[string]any{{
-		"client_id":         float64(client.Id),
+		"client_id":         float64(client.ID),
 		"client_identifier": client.ClientIdentifier,
 		"logged_in_user":    caller.ClientIdentifier,
 	}}, auditRows(t, accessToken, "updated_client_brand", requestId))
 
 	// null again changes nothing and records nothing.
-	status, _, requestId = saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": nil})
+	status, _, requestId = saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": nil})
 	require.Equal(t, http.StatusOK, status)
 	assert.Empty(t, auditRows(t, accessToken, "updated_client_brand", requestId))
 }
@@ -180,10 +180,10 @@ func TestAPIClientBrand_TheDefaultBrandCanBeGivenExplicitly(t *testing.T) {
 	defaultId, _ := keepDefaultBrand(t)
 	client := newOrdinaryClient(t, "brand-explicit-")
 
-	status, body, _ := saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": defaultId})
+	status, body, _ := saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": defaultId})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.InDelta(t, float64(defaultId), body["client"].(map[string]any)["brandId"], 0)
-	assert.Equal(t, defaultId, storedBrandId(t, client.Id))
+	assert.Equal(t, defaultId, storedBrandId(t, client.ID))
 }
 
 func TestAPIClientBrand_Refusals(t *testing.T) {
@@ -192,15 +192,15 @@ func TestAPIClientBrand_Refusals(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 	client := newOrdinaryClient(t, "brand-refusals-")
 	kept := createBrandOverAPI(t, accessToken, created, brandName("Kept"), "auto", "plum")
-	status, body, _ := saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": kept})
+	status, body, _ := saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": kept})
 	require.Equal(t, http.StatusOK, status, body)
 
 	// The member is required: a body without it is refused, not read as the default.
-	status, body, requestId := saveClientBrand(t, accessToken, client.Id, map[string]any{})
+	status, body, requestId := saveClientBrand(t, accessToken, client.ID, map[string]any{})
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "handler.client_brand.brand_id_required", body["error_code"])
 	assert.Equal(t, "brandId is required: send the id of a brand, or null for the default brand.", body["error_description"])
-	assert.Equal(t, kept, storedBrandId(t, client.Id), "nothing changed")
+	assert.Equal(t, kept, storedBrandId(t, client.ID), "nothing changed")
 	assert.Empty(t, auditRows(t, accessToken, "updated_client_brand", requestId))
 
 	// A brand that is not there, and one deleted since it was read.
@@ -208,21 +208,21 @@ func TestAPIClientBrand_Refusals(t *testing.T) {
 	status, _, _ = brandCall(t, accessToken, http.MethodDelete, brandPath(gone, ""), nil)
 	require.Equal(t, http.StatusOK, status)
 	for _, missing := range []int64{gone, 999999999, 0, -4} {
-		status, body, requestId = saveClientBrand(t, accessToken, client.Id, map[string]any{"brandId": missing})
+		status, body, requestId = saveClientBrand(t, accessToken, client.ID, map[string]any{"brandId": missing})
 		assert.Equalf(t, http.StatusBadRequest, status, "brand %d", missing)
 		assert.Equalf(t, "handler.client_brand.brand_not_found", body["error_code"], "brand %d", missing)
 		assert.Equal(t, "The brand does not exist.", body["error_description"])
-		assert.Equal(t, kept, storedBrandId(t, client.Id), "nothing changed")
+		assert.Equal(t, kept, storedBrandId(t, client.ID), "nothing changed")
 		assert.Empty(t, auditRows(t, accessToken, "updated_client_brand", requestId))
 	}
 
 	// A brandId that is not a number, and a body that is not an object.
 	for _, malformed := range []any{map[string]any{"brandId": "7"}, map[string]any{"brandId": 1.5}, "not an object"} {
-		status, body, _ = saveClientBrand(t, accessToken, client.Id, malformed)
+		status, body, _ = saveClientBrand(t, accessToken, client.ID, malformed)
 		assert.Equalf(t, http.StatusBadRequest, status, "%v", malformed)
 		assert.Equalf(t, "INVALID_REQUEST_BODY", body["error_code"], "%v", malformed)
 	}
-	assert.Equal(t, kept, storedBrandId(t, client.Id), "nothing changed")
+	assert.Equal(t, kept, storedBrandId(t, client.ID), "nothing changed")
 
 	// An unknown client and a malformed id.
 	status, body, _ = saveClientBrand(t, accessToken, 999999999, map[string]any{"brandId": kept})
@@ -242,10 +242,10 @@ func TestAPIClientBrand_Scopes(t *testing.T) {
 	brand := newBrandInStore(t, "Scoped")
 
 	clientsToken, clientsCaller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, clientsCaller.Id) })
-	status, body, _ := saveClientBrand(t, clientsToken, client.Id, map[string]any{"brandId": brand.Id})
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, clientsCaller.ID) })
+	status, body, _ := saveClientBrand(t, clientsToken, client.ID, map[string]any{"brandId": brand.ID})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Equal(t, brand.Id, storedBrandId(t, client.Id))
+	assert.Equal(t, brand.ID, storedBrandId(t, client.ID))
 	status, _, _ = brandCall(t, clientsToken, http.MethodGet, brandsPath, nil)
 	assert.Equal(t, http.StatusForbidden, status, "manage-clients does not list brands")
 
@@ -253,19 +253,19 @@ func TestAPIClientBrand_Scopes(t *testing.T) {
 		builtin.ManageUsersPermissionIdentifier} {
 		t.Run(permission, func(t *testing.T) {
 			token, caller := createClientWithGranularScope(t, permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
-			status, body, _ := saveClientBrand(t, token, client.Id, map[string]any{"brandId": nil})
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
+			status, body, _ := saveClientBrand(t, token, client.ID, map[string]any{"brandId": nil})
 			assert.Equal(t, http.StatusForbidden, status)
 			assert.Equal(t, "INSUFFICIENT_SCOPE", body["error_code"])
-			assert.Equal(t, brand.Id, storedBrandId(t, client.Id), "nothing changed")
+			assert.Equal(t, brand.ID, storedBrandId(t, client.ID), "nothing changed")
 		})
 	}
 
 	readToken, reader := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.Id) })
-	assert.InDelta(t, float64(brand.Id), readClientBrandId(t, readToken, client.Id), 0, "admin-read reads the brand")
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.ID) })
+	assert.InDelta(t, float64(brand.ID), readClientBrandId(t, readToken, client.ID), 0, "admin-read reads the brand")
 
-	req, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+clientBrandPath(client.Id), strings.NewReader(`{"brandId":null}`))
+	req, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+clientBrandPath(client.ID), strings.NewReader(`{"brandId":null}`))
 	require.NoError(t, err)
 	resp, err := createHttpClient(t).Do(req)
 	require.NoError(t, err)
@@ -283,7 +283,7 @@ func TestAPIClientBrand_TheCeilingOnAdministratorClients(t *testing.T) {
 	_, _ = keepDefaultBrand(t)
 	brand := newBrandInStore(t, "Ceiling")
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	route := targetCeilingWrite{name: "PUT clients brand", method: http.MethodPut,
 		route: "/api/v1/admin/clients/{id}/brand", kind: "client"}
 
@@ -317,23 +317,23 @@ func TestAPIClientBrand_TheCeilingOnAdministratorClients(t *testing.T) {
 				}))
 			})
 
-			resp, requestId := sendAdmin(t, granularToken, http.MethodPut, clientBrandPath(f.clientId), map[string]any{"brandId": brand.Id})
+			resp, requestId := sendAdmin(t, granularToken, http.MethodPut, clientBrandPath(f.clientId), map[string]any{"brandId": brand.ID})
 			assertRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, route, f.clientId)
 			assert.Equal(t, before, storedBrandId(t, f.clientId), "the refused request changed nothing")
 			assert.Empty(t, auditRows(t, manageToken, "updated_client_brand", requestId))
 
-			status, body, requestId := saveClientBrand(t, manageToken, f.clientId, map[string]any{"brandId": brand.Id})
+			status, body, requestId := saveClientBrand(t, manageToken, f.clientId, map[string]any{"brandId": brand.ID})
 			require.Equal(t, http.StatusOK, status, body)
-			assert.Equal(t, brand.Id, storedBrandId(t, f.clientId))
+			assert.Equal(t, brand.ID, storedBrandId(t, f.clientId))
 			assert.Empty(t, refusalRows(t, manageToken, requestId))
 		})
 	}
 
 	// The same manage-clients token assigns an ordinary client's brand.
 	ordinary := newOrdinaryClient(t, "brand-ceiling-ordinary-")
-	status, body, requestId := saveClientBrand(t, granularToken, ordinary.Id, map[string]any{"brandId": brand.Id})
+	status, body, requestId := saveClientBrand(t, granularToken, ordinary.ID, map[string]any{"brandId": brand.ID})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Equal(t, brand.Id, storedBrandId(t, ordinary.Id))
+	assert.Equal(t, brand.ID, storedBrandId(t, ordinary.ID))
 	assert.Empty(t, refusalRows(t, manageToken, requestId))
 }
 
@@ -355,10 +355,10 @@ func TestAPIClientBrand_BrandsAnswerHowManyClientsTheyDraw(t *testing.T) {
 	assert.InDelta(t, 0, brandClientCount(t, accessToken, counted), 0)
 
 	for _, c := range []*record.Client{first, second} {
-		status, body, _ = saveClientBrand(t, accessToken, c.Id, map[string]any{"brandId": counted})
+		status, body, _ = saveClientBrand(t, accessToken, c.ID, map[string]any{"brandId": counted})
 		require.Equal(t, http.StatusOK, status, body)
 	}
-	status, body, _ = saveClientBrand(t, accessToken, explicit.Id, map[string]any{"brandId": defaultId})
+	status, body, _ = saveClientBrand(t, accessToken, explicit.ID, map[string]any{"brandId": defaultId})
 	require.Equal(t, http.StatusOK, status, body)
 
 	assert.InDelta(t, 2, brandClientCount(t, accessToken, counted), 0)
@@ -414,26 +414,26 @@ func TestAPIClientBrand_DeletingABrandMovesItsClients(t *testing.T) {
 	name := brandName("Moving")
 	moving := createBrandOverAPI(t, accessToken, created, name, "auto", "avocado")
 	for _, c := range []*record.Client{first, second} {
-		status, body, _ := saveClientBrand(t, accessToken, c.Id, map[string]any{"brandId": moving})
+		status, body, _ := saveClientBrand(t, accessToken, c.ID, map[string]any{"brandId": moving})
 		require.Equal(t, http.StatusOK, status, body)
 	}
 
 	status, body, requestId := brandCall(t, accessToken, http.MethodDelete, brandPath(moving, ""), nil)
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Equal(t, int64(0), storedBrandId(t, first.Id), "moved to the default")
-	assert.Equal(t, int64(0), storedBrandId(t, second.Id), "moved to the default")
-	assert.Nil(t, readClientBrandId(t, accessToken, first.Id))
+	assert.Equal(t, int64(0), storedBrandId(t, first.ID), "moved to the default")
+	assert.Equal(t, int64(0), storedBrandId(t, second.ID), "moved to the default")
+	assert.Nil(t, readClientBrandId(t, accessToken, first.ID))
 	assert.Equal(t, []map[string]any{{"brand_id": float64(moving), "brand_name": name, "client_count": float64(2),
 		"logged_in_user": caller.ClientIdentifier}},
 		auditRows(t, accessToken, "deleted_brand", requestId))
 	assert.Empty(t, auditRows(t, accessToken, "updated_client_brand", requestId), "no event for each client")
 
 	// The default brand, given to a client explicitly, is still refused.
-	status, body, _ = saveClientBrand(t, accessToken, first.Id, map[string]any{"brandId": defaultId})
+	status, body, _ = saveClientBrand(t, accessToken, first.ID, map[string]any{"brandId": defaultId})
 	require.Equal(t, http.StatusOK, status, body)
 	status, body, requestId = brandCall(t, accessToken, http.MethodDelete, brandPath(defaultId, ""), nil)
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "handler.brand.default_delete_not_allowed", body["error_code"])
-	assert.Equal(t, defaultId, storedBrandId(t, first.Id), "the client keeps the default brand given it")
+	assert.Equal(t, defaultId, storedBrandId(t, first.ID), "the client keeps the default brand given it")
 	assert.Empty(t, auditRows(t, accessToken, "deleted_brand", requestId))
 }

@@ -23,12 +23,12 @@ import (
 // (brandsIsolatedDB), because the default pointer is part of every answer and the counts are the
 // installation's.
 
-func brandId(id int64) sql.NullInt64 { return sql.NullInt64{Int64: id, Valid: true} }
+func brandID(id int64) sql.NullInt64 { return sql.NullInt64{Int64: id, Valid: true} }
 
 // createIsolatedClient writes a client as every create path builds one: with no brand of its own.
 func createIsolatedClient(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
-	client := &record.Client{ClientIdentifier: "brand_client_" + fake.LetterN(8), DefaultAcrLevel: record.AcrLevel1}
+	client := &record.Client{ClientIdentifier: "brand_client_" + fake.LetterN(8), DefaultACRLevel: record.ACRLevel1}
 	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client))
 	return client
 }
@@ -40,21 +40,21 @@ func createIsolatedBrand(t *testing.T, h *isolatedDB, name string) *record.Brand
 	return brand
 }
 
-func assignBrand(h *isolatedDB, clientId int64, brand sql.NullInt64) (bool, error) {
+func assignBrand(h *isolatedDB, clientID int64, brand sql.NullInt64) (bool, error) {
 	ctx := context.Background()
 	var changed bool
 	err := h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var err error
-		changed, err = h.DB.SetClientBrand(ctx, tx, clientId, brand)
+		changed, err = h.DB.SetClientBrand(ctx, tx, clientID, brand)
 		return err
 	})
 	return changed, err
 }
 
-func setBrand(t *testing.T, h *isolatedDB, clientId int64, brand sql.NullInt64) bool {
+func setBrand(t *testing.T, h *isolatedDB, clientID int64, brand sql.NullInt64) bool {
 	t.Helper()
-	changed, err := assignBrand(h, clientId, brand)
-	require.NoErrorf(t, err, "give client %d the brand %v on %s", clientId, brand, dbType())
+	changed, err := assignBrand(h, clientID, brand)
+	require.NoErrorf(t, err, "give client %d the brand %v on %s", clientID, brand, dbType())
 	return changed
 }
 
@@ -69,18 +69,18 @@ func deleteBrandMoving(h *isolatedDB, id int64) (int, error) {
 	return moved, err
 }
 
-// clientBrandIdOf reads the column with raw SQL, a second read beside the data layer's.
-func clientBrandIdOf(t *testing.T, h *isolatedDB, clientId int64) sql.NullInt64 {
+// clientBrandIDOf reads the column with raw SQL, a second read beside the data layer's.
+func clientBrandIDOf(t *testing.T, h *isolatedDB, clientID int64) sql.NullInt64 {
 	t.Helper()
 	var id sql.NullInt64
-	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT brand_id FROM clients WHERE id = %d", clientId)).Scan(&id),
+	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT brand_id FROM clients WHERE id = %d", clientID)).Scan(&id),
 		"read clients.brand_id on %s", dbType())
 	return id
 }
 
-func clientUpdatedAtOf(t *testing.T, h *isolatedDB, clientId int64) time.Time {
+func clientUpdatedAtOf(t *testing.T, h *isolatedDB, clientID int64) time.Time {
 	t.Helper()
-	client, err := h.DB.GetClientById(context.Background(), nil, clientId)
+	client, err := h.DB.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.True(t, client.UpdatedAt.Valid)
@@ -98,76 +98,76 @@ func TestSetClientBrand_TheColumnsOneWriter(t *testing.T) {
 	client := createIsolatedClient(t, h)
 	bystander := createIsolatedClient(t, h)
 
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, client.Id), "a new client has no brand of its own")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, client.ID), "a new client has no brand of its own")
 
 	// Assigned, read back by every read of a client.
-	assert.True(t, setBrand(t, h, client.Id, brandId(other.Id)), "an assignment that changes the brand says so")
-	assert.Equal(t, brandId(other.Id), clientBrandIdOf(t, h, client.Id))
-	byId, err := h.DB.GetClientById(ctx, nil, client.Id)
+	assert.True(t, setBrand(t, h, client.ID, brandID(other.ID)), "an assignment that changes the brand says so")
+	assert.Equal(t, brandID(other.ID), clientBrandIDOf(t, h, client.ID))
+	byID, err := h.DB.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
-	assert.Equal(t, brandId(other.Id), byId.BrandId, "GetClientById")
+	assert.Equal(t, brandID(other.ID), byID.BrandID, "GetClientByID")
 	byIdentifier, err := h.DB.GetClientByClientIdentifier(ctx, nil, client.ClientIdentifier)
 	require.NoError(t, err)
-	assert.Equal(t, brandId(other.Id), byIdentifier.BrandId, "GetClientByClientIdentifier")
-	byIds, err := h.DB.GetClientsByIds(ctx, nil, []int64{client.Id, bystander.Id})
+	assert.Equal(t, brandID(other.ID), byIdentifier.BrandID, "GetClientByClientIdentifier")
+	byIDs, err := h.DB.GetClientsByIDs(ctx, nil, []int64{client.ID, bystander.ID})
 	require.NoError(t, err)
-	require.Len(t, byIds, 2)
+	require.Len(t, byIDs, 2)
 	all, err := h.DB.GetAllClients(ctx, nil)
 	require.NoError(t, err)
-	for _, list := range [][]record.Client{byIds, all} {
+	for _, list := range [][]record.Client{byIDs, all} {
 		for _, c := range list {
-			switch c.Id {
-			case client.Id:
-				assert.Equal(t, brandId(other.Id), c.BrandId, "a list read reads the assigned brand")
-			case bystander.Id:
-				assert.Equal(t, sql.NullInt64{}, c.BrandId, "a list read reads no brand for the bystander")
+			switch c.ID {
+			case client.ID:
+				assert.Equal(t, brandID(other.ID), c.BrandID, "a list read reads the assigned brand")
+			case bystander.ID:
+				assert.Equal(t, sql.NullInt64{}, c.BrandID, "a list read reads no brand for the bystander")
 			}
 		}
 	}
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, bystander.Id), "the client not assigned is left as it was")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, bystander.ID), "the client not assigned is left as it was")
 
 	// The same brand again changes nothing and writes nothing.
-	stamped := clientUpdatedAtOf(t, h, client.Id)
+	stamped := clientUpdatedAtOf(t, h, client.ID)
 	time.Sleep(20 * time.Millisecond)
-	assert.False(t, setBrand(t, h, client.Id, brandId(other.Id)), "an assignment of the brand the client has changes nothing")
-	assert.True(t, stamped.Equal(clientUpdatedAtOf(t, h, client.Id)), "and writes nothing")
+	assert.False(t, setBrand(t, h, client.ID, brandID(other.ID)), "an assignment of the brand the client has changes nothing")
+	assert.True(t, stamped.Equal(clientUpdatedAtOf(t, h, client.ID)), "and writes nothing")
 
 	// The default brand, assigned explicitly, is a brand of the client's own.
-	assert.True(t, setBrand(t, h, client.Id, brandId(def.Id)))
-	assert.Equal(t, brandId(def.Id), clientBrandIdOf(t, h, client.Id))
+	assert.True(t, setBrand(t, h, client.ID, brandID(def.ID)))
+	assert.Equal(t, brandID(def.ID), clientBrandIDOf(t, h, client.ID))
 
 	// A brand that is not there is refused and writes nothing.
-	_, err = assignBrand(h, client.Id, brandId(other.Id+1_000))
+	_, err = assignBrand(h, client.ID, brandID(other.ID+1_000))
 	require.ErrorIs(t, err, data.ErrBrandNotFound)
-	assert.Equal(t, brandId(def.Id), clientBrandIdOf(t, h, client.Id), "a refused assignment leaves the brand")
+	assert.Equal(t, brandID(def.ID), clientBrandIDOf(t, h, client.ID), "a refused assignment leaves the brand")
 
 	// Cleared, back on the default; clearing again changes nothing.
-	assert.True(t, setBrand(t, h, client.Id, sql.NullInt64{}), "clearing the brand changes it")
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, client.Id))
-	assert.False(t, setBrand(t, h, client.Id, sql.NullInt64{}), "clearing a client with no brand changes nothing")
+	assert.True(t, setBrand(t, h, client.ID, sql.NullInt64{}), "clearing the brand changes it")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, client.ID))
+	assert.False(t, setBrand(t, h, client.ID, sql.NullInt64{}), "clearing a client with no brand changes nothing")
 
 	// A client that is not there changes nothing.
-	assert.False(t, setBrand(t, h, client.Id+1_000, brandId(other.Id)), "no client, nothing changed")
+	assert.False(t, setBrand(t, h, client.ID+1_000, brandID(other.ID)), "no client, nothing changed")
 
 	// The whole-row save carries it in neither direction: a save made from a copy read earlier would
 	// otherwise write back a brand changed since.
-	setBrand(t, h, client.Id, brandId(other.Id))
-	for _, carried := range []sql.NullInt64{{}, brandId(def.Id)} {
-		read, readErr := h.DB.GetClientById(ctx, nil, client.Id)
+	setBrand(t, h, client.ID, brandID(other.ID))
+	for _, carried := range []sql.NullInt64{{}, brandID(def.ID)} {
+		read, readErr := h.DB.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, readErr)
-		read.BrandId = carried
+		read.BrandID = carried
 		read.Description = "rewritten_" + fake.LetterN(6)
 		require.NoError(t, h.DB.UpdateClient(ctx, nil, read))
-		assert.Equalf(t, brandId(other.Id), clientBrandIdOf(t, h, client.Id), "UpdateClient carrying %v must not write brand_id", carried)
-		saved, readErr := h.DB.GetClientById(ctx, nil, client.Id)
+		assert.Equalf(t, brandID(other.ID), clientBrandIDOf(t, h, client.ID), "UpdateClient carrying %v must not write brand_id", carried)
+		saved, readErr := h.DB.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, readErr)
 		assert.Equal(t, read.Description, saved.Description, "and still writes the ordinary columns")
 	}
 
 	// The writer needs a transaction, as the lock it takes does.
-	_, err = h.DB.SetClientBrand(ctx, nil, client.Id, brandId(def.Id))
+	_, err = h.DB.SetClientBrand(ctx, nil, client.ID, brandID(def.ID))
 	require.Error(t, err, "an assignment without a transaction")
-	assert.Equal(t, brandId(other.Id), clientBrandIdOf(t, h, client.Id))
+	assert.Equal(t, brandID(other.ID), clientBrandIDOf(t, h, client.ID))
 }
 
 // TestDeleteBrand_MovesItsClientsToTheDefault holds the deletion to decisions 1 and 3: a brand that
@@ -183,38 +183,38 @@ func TestDeleteBrand_MovesItsClientsToTheDefault(t *testing.T) {
 
 	onDoomed1, onDoomed2 := createIsolatedClient(t, h), createIsolatedClient(t, h)
 	onKept, onDefault, following := createIsolatedClient(t, h), createIsolatedClient(t, h), createIsolatedClient(t, h)
-	setBrand(t, h, onDoomed1.Id, brandId(doomed.Id))
-	setBrand(t, h, onDoomed2.Id, brandId(doomed.Id))
-	setBrand(t, h, onKept.Id, brandId(kept.Id))
-	setBrand(t, h, onDefault.Id, brandId(def.Id))
+	setBrand(t, h, onDoomed1.ID, brandID(doomed.ID))
+	setBrand(t, h, onDoomed2.ID, brandID(doomed.ID))
+	setBrand(t, h, onKept.ID, brandID(kept.ID))
+	setBrand(t, h, onDefault.ID, brandID(def.ID))
 
-	moved, err := deleteBrandMoving(h, doomed.Id)
+	moved, err := deleteBrandMoving(h, doomed.ID)
 	require.NoError(t, err, "a brand clients use is deleted")
 	assert.Equal(t, 2, moved, "the deletion answers the clients it moved")
-	gone, err := h.DB.GetBrandById(ctx, nil, doomed.Id)
+	gone, err := h.DB.GetBrandByID(ctx, nil, doomed.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the brand is gone")
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, onDoomed1.Id), "its clients are back on the default")
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, onDoomed2.Id), "its clients are back on the default")
-	assert.Equal(t, brandId(kept.Id), clientBrandIdOf(t, h, onKept.Id), "another brand's client stays")
-	assert.Equal(t, brandId(def.Id), clientBrandIdOf(t, h, onDefault.Id), "the default's own client stays")
-	assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, following.Id), "a client following the default stays")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, onDoomed1.ID), "its clients are back on the default")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, onDoomed2.ID), "its clients are back on the default")
+	assert.Equal(t, brandID(kept.ID), clientBrandIDOf(t, h, onKept.ID), "another brand's client stays")
+	assert.Equal(t, brandID(def.ID), clientBrandIDOf(t, h, onDefault.ID), "the default's own client stays")
+	assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, following.ID), "a client following the default stays")
 
-	moved, err = deleteBrandMoving(h, unused.Id)
+	moved, err = deleteBrandMoving(h, unused.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 0, moved, "a brand no client uses moves none")
 
-	moved, err = deleteBrandMoving(h, def.Id)
+	moved, err = deleteBrandMoving(h, def.ID)
 	require.ErrorIs(t, err, data.ErrDefaultBrandNotDeletable, "the default brand is still refused")
 	assert.Equal(t, 0, moved)
-	assert.Equal(t, brandId(def.Id), clientBrandIdOf(t, h, onDefault.Id), "a refused deletion touches none of its clients")
+	assert.Equal(t, brandID(def.ID), clientBrandIDOf(t, h, onDefault.ID), "a refused deletion touches none of its clients")
 
-	_, err = deleteBrandMoving(h, doomed.Id)
+	_, err = deleteBrandMoving(h, doomed.ID)
 	require.ErrorIs(t, err, data.ErrBrandNotFound, "a second deletion finds nothing")
 
-	_, err = h.DB.DeleteBrand(ctx, nil, kept.Id)
+	_, err = h.DB.DeleteBrand(ctx, nil, kept.ID)
 	require.Error(t, err, "a deletion without a transaction")
-	assert.Equal(t, brandId(kept.Id), clientBrandIdOf(t, h, onKept.Id))
+	assert.Equal(t, brandID(kept.ID), clientBrandIDOf(t, h, onKept.ID))
 }
 
 // TestCountClientsPerBrand holds the count to decision 3: a brand counts the clients drawn in it,
@@ -233,29 +233,29 @@ func TestCountClientsPerBrand(t *testing.T) {
 	a, b, c := createIsolatedClient(t, h), createIsolatedClient(t, h), createIsolatedClient(t, h)
 	createIsolatedClient(t, h)
 	createIsolatedClient(t, h)
-	setBrand(t, h, a.Id, brandId(other.Id))
-	setBrand(t, h, b.Id, brandId(other.Id))
-	setBrand(t, h, c.Id, brandId(def.Id))
+	setBrand(t, h, a.ID, brandID(other.ID))
+	setBrand(t, h, b.ID, brandID(other.ID))
+	setBrand(t, h, c.ID, brandID(def.ID))
 
 	counts, err = h.DB.CountClientsPerBrand(ctx, nil)
 	require.NoError(t, err)
-	assert.Equal(t, map[int64]int{def.Id: 3, other.Id: 2}, counts,
+	assert.Equal(t, map[int64]int{def.ID: 3, other.ID: 2}, counts,
 		"the default counts its own client and the two following it; Unused counts none")
-	assert.Zero(t, counts[unused.Id])
+	assert.Zero(t, counts[unused.ID])
 
 	// The clients following the default follow it to another brand; the one assigned stays.
-	_, err = makeDefault(h, other.Id)
+	_, err = makeDefault(h, other.ID)
 	require.NoError(t, err)
 	counts, err = h.DB.CountClientsPerBrand(ctx, nil)
 	require.NoError(t, err)
-	assert.Equal(t, map[int64]int{def.Id: 1, other.Id: 4}, counts)
+	assert.Equal(t, map[int64]int{def.ID: 1, other.ID: 4}, counts)
 
 	// With no default, a client with no brand of its own is drawn in none.
 	_, err = h.SQL.Exec("UPDATE settings SET default_brand_id = NULL WHERE id = 1")
 	require.NoError(t, err)
 	counts, err = h.DB.CountClientsPerBrand(ctx, nil)
 	require.NoError(t, err)
-	assert.Equal(t, map[int64]int{def.Id: 1, other.Id: 2}, counts)
+	assert.Equal(t, map[int64]int{def.ID: 1, other.ID: 2}, counts)
 }
 
 // TestGetClientPageBrand holds the read of the brand a client's pages are drawn in to decision 1:
@@ -270,8 +270,8 @@ func TestGetClientPageBrand(t *testing.T) {
 	own := createIsolatedClient(t, h)
 	onDefault := createIsolatedClient(t, h)
 	following := createIsolatedClient(t, h)
-	setBrand(t, h, own.Id, brandId(other.Id))
-	setBrand(t, h, onDefault.Id, brandId(def.Id))
+	setBrand(t, h, own.ID, brandID(other.ID))
+	setBrand(t, h, onDefault.ID, brandID(def.ID))
 
 	drawnIn := func(identifier string) *record.Brand {
 		t.Helper()
@@ -282,28 +282,28 @@ func TestGetClientPageBrand(t *testing.T) {
 
 	brand := drawnIn(own.ClientIdentifier)
 	require.NotNil(t, brand, "a client with a brand of its own")
-	assert.Equal(t, other.Id, brand.Id)
+	assert.Equal(t, other.ID, brand.ID)
 	assert.Equal(t, "Other", brand.Name)
 	assert.Equal(t, record.BrandAppearance("dark"), brand.Appearance)
 	assert.Equal(t, "plum", brand.Theme)
 	require.NotNil(t, drawnIn(following.ClientIdentifier), "a client following the default")
-	assert.Equal(t, def.Id, drawnIn(following.ClientIdentifier).Id)
+	assert.Equal(t, def.ID, drawnIn(following.ClientIdentifier).ID)
 	assert.Equal(t, "Default", drawnIn(following.ClientIdentifier).Name)
-	assert.Equal(t, def.Id, drawnIn(onDefault.ClientIdentifier).Id)
+	assert.Equal(t, def.ID, drawnIn(onDefault.ClientIdentifier).ID)
 	assert.Nil(t, drawnIn("no_such_client_"+fake.LetterN(6)), "a client that is not there names no brand")
 
 	// The default moves: the client following it follows; an explicit assignment stays.
-	_, err := makeDefault(h, other.Id)
+	_, err := makeDefault(h, other.ID)
 	require.NoError(t, err)
-	assert.Equal(t, other.Id, drawnIn(following.ClientIdentifier).Id, "a client following the default follows it")
-	assert.Equal(t, def.Id, drawnIn(onDefault.ClientIdentifier).Id, "a brand assigned explicitly stays when it stops being the default")
-	assert.Equal(t, other.Id, drawnIn(own.ClientIdentifier).Id)
+	assert.Equal(t, other.ID, drawnIn(following.ClientIdentifier).ID, "a client following the default follows it")
+	assert.Equal(t, def.ID, drawnIn(onDefault.ClientIdentifier).ID, "a brand assigned explicitly stays when it stops being the default")
+	assert.Equal(t, other.ID, drawnIn(own.ClientIdentifier).ID)
 
 	// With no default, a client with no brand of its own is drawn in none.
 	_, err = h.SQL.Exec("UPDATE settings SET default_brand_id = NULL WHERE id = 1")
 	require.NoError(t, err)
 	assert.Nil(t, drawnIn(following.ClientIdentifier), "no brand of its own and no default")
-	assert.Equal(t, other.Id, drawnIn(own.ClientIdentifier).Id, "its own brand needs no default")
+	assert.Equal(t, other.ID, drawnIn(own.ClientIdentifier).ID, "its own brand needs no default")
 }
 
 // An assignment racing a brand's deletion is serialized by the settings row's lock (#812 decision
@@ -340,7 +340,7 @@ func TestClientBrand_AnAssignmentRacingADeletion(t *testing.T) {
 		assignment, err := h.DB.BeginTransaction(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = assignment.Rollback() })
-		changed, err := h.DB.SetClientBrand(ctx, assignment, client.Id, brandId(target.Id))
+		changed, err := h.DB.SetClientBrand(ctx, assignment, client.ID, brandID(target.ID))
 		require.NoError(t, err)
 		require.True(t, changed)
 
@@ -348,7 +348,7 @@ func TestClientBrand_AnAssignmentRacingADeletion(t *testing.T) {
 		done := make(chan error, 1)
 		go func() {
 			var deleteErr error
-			moved, deleteErr = deleteBrandMoving(h, target.Id)
+			moved, deleteErr = deleteBrandMoving(h, target.ID)
 			done <- deleteErr
 		}()
 		awaitBlocked(t, done, "the deletion")
@@ -356,8 +356,8 @@ func TestClientBrand_AnAssignmentRacingADeletion(t *testing.T) {
 		require.NoError(t, h.DB.CommitTransaction(ctx, assignment))
 		require.NoError(t, awaitDone(t, done, "the deletion"), "the deletion moves the client the assignment committed")
 		assert.Equal(t, 1, moved, "and counts it")
-		assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, client.Id), "the client is back on the default")
-		gone, err := h.DB.GetBrandById(ctx, nil, target.Id)
+		assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, client.ID), "the client is back on the default")
+		gone, err := h.DB.GetBrandByID(ctx, nil, target.ID)
 		require.NoError(t, err)
 		assert.Nil(t, gone, "the brand is deleted")
 	})
@@ -369,13 +369,13 @@ func TestClientBrand_AnAssignmentRacingADeletion(t *testing.T) {
 		deletion, err := h.DB.BeginTransaction(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = deletion.Rollback() })
-		moved, err := h.DB.DeleteBrand(ctx, deletion, doomed.Id)
+		moved, err := h.DB.DeleteBrand(ctx, deletion, doomed.ID)
 		require.NoError(t, err)
 		require.Equal(t, 0, moved)
 
 		done := make(chan error, 1)
 		go func() {
-			_, assignErr := assignBrand(h, client.Id, brandId(doomed.Id))
+			_, assignErr := assignBrand(h, client.ID, brandID(doomed.ID))
 			done <- assignErr
 		}()
 		awaitBlocked(t, done, "the assignment")
@@ -383,6 +383,6 @@ func TestClientBrand_AnAssignmentRacingADeletion(t *testing.T) {
 		require.NoError(t, h.DB.CommitTransaction(ctx, deletion))
 		err = awaitDone(t, done, "the assignment")
 		require.ErrorIs(t, err, data.ErrBrandNotFound, "the assignment decides on the committed deletion")
-		assert.Equal(t, sql.NullInt64{}, clientBrandIdOf(t, h, client.Id), "the client keeps following the default")
+		assert.Equal(t, sql.NullInt64{}, clientBrandIDOf(t, h, client.ID), "the client keeps following the default")
 	})
 }

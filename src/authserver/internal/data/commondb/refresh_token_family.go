@@ -83,17 +83,17 @@ var deleteOrphanedRefreshTokenFamilyRevocations = statement{
 // read absent, and the second insert then loses on the key: that is reported as
 // data.ErrUniqueViolation, and a caller reruns its transaction once, because on PostgreSQL the
 // refused insert aborts the transaction it ran in.
-func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string,
+func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string,
 	reason string) (bool, error) {
 
-	if firstRefreshTokenJti == "" {
+	if firstRefreshTokenJTI == "" {
 		return false, errs.New("can't record a revoked refresh token family with an empty first refresh token jti")
 	}
 	if reason == "" {
 		return false, errs.New("can't record a revoked refresh token family without a reason")
 	}
 
-	already, err := d.IsRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJti)
+	already, err := d.IsRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJTI)
 	if err != nil {
 		return false, err
 	}
@@ -102,12 +102,12 @@ func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.
 	}
 
 	revocation := &record.RefreshTokenFamilyRevocation{
-		FirstRefreshTokenJti: firstRefreshTokenJti,
+		FirstRefreshTokenJTI: firstRefreshTokenJTI,
 		Reason:               reason,
 		RevokedAt:            time.Now().UTC(),
 	}
 	_, err = d.ExecSQL(ctx, tx, insertRefreshTokenFamilyRevocation.text(d.Dialect),
-		revocation.FirstRefreshTokenJti, revocation.Reason, revocation.RevokedAt)
+		revocation.FirstRefreshTokenJTI, revocation.Reason, revocation.RevokedAt)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to record revoked refresh token family")
 	}
@@ -124,13 +124,13 @@ func (d *Database) RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.
 // An error and false are different answers: false means the family is not recorded, which lets the
 // token proceed, and an error means the lookup could not be performed, which refuses it. Every
 // failure below propagates, rows.Err() included.
-func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error) {
 
-	if firstRefreshTokenJti == "" {
+	if firstRefreshTokenJTI == "" {
 		return false, errs.New("can't look up a refresh token family with an empty first refresh token jti")
 	}
 
-	rows, err := d.QuerySQL(ctx, tx, selectRefreshTokenFamilyRevocation.text(d.Dialect), firstRefreshTokenJti)
+	rows, err := d.QuerySQL(ctx, tx, selectRefreshTokenFamilyRevocation.text(d.Dialect), firstRefreshTokenJTI)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -141,7 +141,7 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 		if err := rows.Scan(&found); err != nil {
 			return false, errs.Wrap(err, "unable to scan refresh token family revocation")
 		}
-		return !engineFoldedTheMatch(found, firstRefreshTokenJti), nil
+		return !engineFoldedTheMatch(found, firstRefreshTokenJTI), nil
 	}
 	if err := rows.Err(); err != nil {
 		return false, errs.Wrap(err, "unable to read query results")
@@ -165,14 +165,14 @@ func (d *Database) IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, 
 //
 // An error and false are different answers, as for IsRefreshTokenFamilyRevoked: false refuses the
 // token as a dead grant, and an error says the lookup could not be performed.
-func (d *Database) IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error) {
+func (d *Database) IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error) {
 
-	if firstRefreshTokenJti == "" {
+	if firstRefreshTokenJTI == "" {
 		return false, errs.New("can't look up a refresh token family with an empty first refresh token jti")
 	}
 
 	rows, err := d.QuerySQL(ctx, tx, selectRefreshTokenFamilyLiveness.text(d.Dialect),
-		firstRefreshTokenJti, firstRefreshTokenJti, false)
+		firstRefreshTokenJTI, firstRefreshTokenJTI, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -188,10 +188,10 @@ func (d *Database) IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, fir
 	if err := rows.Scan(&recorded, &liveMember); err != nil {
 		return false, errs.Wrap(err, "unable to scan refresh token family liveness")
 	}
-	if recorded.Valid && !engineFoldedTheMatch(recorded.String, firstRefreshTokenJti) {
+	if recorded.Valid && !engineFoldedTheMatch(recorded.String, firstRefreshTokenJTI) {
 		return false, nil
 	}
-	return liveMember.Valid && !engineFoldedTheMatch(liveMember.String, firstRefreshTokenJti), nil
+	return liveMember.Valid && !engineFoldedTheMatch(liveMember.String, firstRefreshTokenJTI), nil
 }
 
 // DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families with no refresh

@@ -15,8 +15,8 @@ import (
 // permissionUsersDatabase is what the permission holders endpoint needs: the permission, and one
 // page of the users holding it.
 type permissionUsersDatabase interface {
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]record.User, int, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetUsersByPermissionIDPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]record.User, int, error)
 }
 
 // HandlePermissionUsersGet
@@ -37,7 +37,7 @@ func HandlePermissionUsersGet(
 			return
 		}
 
-		perm, err := database.GetPermissionById(r.Context(), nil, permissionId)
+		perm, err := database.GetPermissionByID(r.Context(), nil, permissionId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "error getting permission by ID for users listing"), "permission_id", permissionId)
 			return
@@ -61,7 +61,7 @@ func HandlePermissionUsersGet(
 			}
 		}
 
-		users, total, err := database.GetUsersByPermissionIdPaginated(r.Context(), nil, permissionId, page, size)
+		users, total, err := database.GetUsersByPermissionIDPaginated(r.Context(), nil, permissionId, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "error getting users by permission paginated"), "permission_id", permissionId, "page", page, "size", size)
 			return

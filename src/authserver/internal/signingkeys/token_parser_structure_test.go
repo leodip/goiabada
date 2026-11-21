@@ -41,7 +41,7 @@ func signRawRS256(t *testing.T, key *rsa.PrivateKey, header, payload string) str
 // optionalKeyDatabase answers the current key and the stored keys with key's, if asked at all.
 func optionalKeyDatabase(t *testing.T, key *rsa.PrivateKey) *datamocks.Database {
 	t.Helper()
-	pair := record.KeyPair{Id: 1, State: record.KeyStateCurrent.String(),
+	pair := record.KeyPair{ID: 1, State: record.KeyStateCurrent.String(),
 		PublicKeyPEM: []byte(exportRSAPublicKeyAsPEMStr(&key.PublicKey))}
 	database := datamocks.NewDatabase(t)
 	database.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&pair, nil).Maybe()

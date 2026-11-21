@@ -36,10 +36,10 @@ func loadGroupsOnto(groups ...record.Group) func(mock.Arguments) {
 // usergroups/get-count.
 func TestHandleUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
-		Return(&record.User{Id: 42, Subject: "sub-42"}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(42)).
+		Return(&record.User{ID: 42, Subject: "sub-42"}, nil).Once()
 	database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).
-		Run(loadGroupsOnto(record.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
+		Run(loadGroupsOnto(record.Group{ID: 5, GroupIdentifier: "admins"})).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
 	capture := logtest.CaptureSlog(t)
@@ -57,19 +57,19 @@ func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
-		Return(&record.User{Id: 42, Subject: "sub-42"}, nil).Once()
-	database.On("GetGroupsByIds", mock.Anything, mock.Anything, []int64{5}).
-		Return([]record.Group{{Id: 5, GroupIdentifier: "admins"}}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(42)).
+		Return(&record.User{ID: 42, Subject: "sub-42"}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, mock.Anything, []int64{5}).
+		Return([]record.Group{{ID: 5, GroupIdentifier: "admins"}}, nil).Once()
 	// The user holds no group before the request and the one it names after it.
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
-	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, int64(42)).Return([]record.UserGroup{}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, userGroupsTx, int64(42)).Return([]record.UserGroup{}, nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	expectChangedGroupsHoldNothing(database, 5)
 	auditLogger.On("Log", mock.Anything, audit.EventUserAddedToGroup, mock.Anything).Return().Once()
 	database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).
-		Run(loadGroupsOnto(record.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
+		Run(loadGroupsOnto(record.Group{ID: 5, GroupIdentifier: "admins"})).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
 	body, err := json.Marshal(api.UpdateUserGroupsRequest{GroupIDs: []int64{5}, ExpectedGroupIDs: []int64{}})
@@ -124,32 +124,32 @@ func serveUserGroupsBody(database *datamocks.Database, auditLogger *handlersmock
 // expectUserAndGroups registers the reads the save makes before the transaction: the user, and the
 // one lookup of the wanted groups, which every one of them answers.
 func expectUserAndGroups(database *datamocks.Database, wanted ...int64) {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
-		Return(&record.User{Id: userGroupsOwnerId, Subject: "sub-42"}, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
+		Return(&record.User{ID: userGroupsOwnerId, Subject: "sub-42"}, nil).Once()
 	if len(wanted) == 0 {
 		return
 	}
 	groups := make([]record.Group, 0, len(wanted))
 	for _, id := range wanted {
-		groups = append(groups, record.Group{Id: id, GroupIdentifier: "g"})
+		groups = append(groups, record.Group{ID: id, GroupIdentifier: "g"})
 	}
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), wanted).Return(groups, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), wanted).Return(groups, nil).Once()
 }
 
 // expectStoredMemberships registers the read of the stored memberships on the save's transaction.
 func expectStoredMemberships(database *datamocks.Database, rows ...membershipRow) {
 	stored := make([]record.UserGroup, 0, len(rows))
 	for _, r := range rows {
-		stored = append(stored, record.UserGroup{Id: r.id, UserId: userGroupsOwnerId, GroupId: r.groupId})
+		stored = append(stored, record.UserGroup{ID: r.id, UserID: userGroupsOwnerId, GroupID: r.groupId})
 	}
-	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(stored, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(stored, nil).Once()
 }
 
 // expectChangedGroupsHoldNothing registers the save's read, on its transaction, of what the groups
 // it adds and then those it removes hold, for the administrative_permission_changed records it
 // owes (#402). The groups hold no grant at all, so the administrative set is not read.
 func expectChangedGroupsHoldNothing(database *datamocks.Database, groupIds ...int64) {
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, groupIds).
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, userGroupsTx, groupIds).
 		Return([]record.GroupPermission{}, nil).Once()
 }
 
@@ -157,7 +157,7 @@ func expectChangedGroupsHoldNothing(database *datamocks.Database, groupIds ...in
 // transaction, of what the groups it removes hold: none of them gives manage, so the guard counts
 // nothing (#402 decision 11).
 func expectRemovedGroupsGiveNoOneManage(database *datamocks.Database, groupIds ...int64) {
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, groupIds).
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, userGroupsTx, groupIds).
 		Return([]record.GroupPermission{}, nil).Once()
 }
 
@@ -214,8 +214,8 @@ func TestHandleUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ug := args.Get(2).(*record.UserGroup)
-			assert.Equal(t, userGroupsOwnerId, ug.UserId)
-			added = append(added, ug.GroupId)
+			assert.Equal(t, userGroupsOwnerId, ug.UserID)
+			added = append(added, ug.GroupID)
 			order = append(order, "insert")
 		}).Return(nil).Once()
 	expectChangedGroupsHoldNothing(database, 6, 3)
@@ -315,7 +315,7 @@ func TestHandleUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 			stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 			expectAdministratorsLock(database, userGroupsTx)
 			loadErr := errors.New("the read failed")
-			database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(nil, loadErr).Once()
+			database.On("GetUserGroupsByUserID", mock.Anything, userGroupsTx, userGroupsOwnerId).Return(nil, loadErr).Once()
 
 			rr := serveUserGroupsSave(t, database, auditLogger, []int64{}, variant.expected)
 
@@ -357,9 +357,9 @@ func TestHandleUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	// Both attempts take the administrators' lock, read the memberships afresh, find that group 3
 	// gives no one manage, and remove it.
 	database.On("AcquireManagePermissionRow", mock.Anything, userGroupsTx).Return(permManage, nil).Twice()
-	database.On("GetUserGroupsByUserId", mock.Anything, userGroupsTx, userGroupsOwnerId).
-		Return([]record.UserGroup{{Id: 21, UserId: userGroupsOwnerId, GroupId: 3}}, nil).Twice()
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, []int64{3}).
+	database.On("GetUserGroupsByUserID", mock.Anything, userGroupsTx, userGroupsOwnerId).
+		Return([]record.UserGroup{{ID: 21, UserID: userGroupsOwnerId, GroupID: 3}}, nil).Twice()
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, userGroupsTx, []int64{3}).
 		Return([]record.GroupPermission{}, nil).Twice()
 	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, int64(21)).Return(nil).Twice()
 	// The first insert is the deadlock victim; the second lands.
@@ -518,11 +518,11 @@ func TestHandleUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) 
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			if variant.readsUser {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
-					Return(&record.User{Id: userGroupsOwnerId}, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
+					Return(&record.User{ID: userGroupsOwnerId}, nil).Once()
 			}
 			if variant.missing {
-				database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{6}).Return([]record.Group{}, nil).Once()
+				database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{6}).Return([]record.Group{}, nil).Once()
 			}
 
 			rr := serveUserGroupsBody(database, auditLogger, variant.body)

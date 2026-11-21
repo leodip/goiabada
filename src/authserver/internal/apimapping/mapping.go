@@ -22,7 +22,7 @@ func ToUserResponse(user *record.User) *api.UserResponse {
 	}
 
 	resp := &api.UserResponse{
-		ID:                            user.Id,
+		ID:                            user.ID,
 		Enabled:                       user.Enabled,
 		Subject:                       user.Subject,
 		Username:                      user.Username,
@@ -38,7 +38,7 @@ func ToUserResponse(user *record.User) *api.UserResponse {
 		ZoneInfo:                      user.ZoneInfo,
 		Locale:                        user.Locale,
 		PageLanguage:                  user.PageLanguage,
-		PhoneNumberCountryUniqueID:    user.PhoneNumberCountryUniqueId,
+		PhoneNumberCountryUniqueID:    user.PhoneNumberCountryUniqueID,
 		PhoneNumberCountryCallingCode: user.PhoneNumberCountryCallingCode,
 		PhoneNumber:                   user.PhoneNumber,
 		PhoneNumberVerified:           user.PhoneNumberVerified,
@@ -49,7 +49,7 @@ func ToUserResponse(user *record.User) *api.UserResponse {
 		AddressPostalCode:             user.AddressPostalCode,
 		AddressCountry:                user.AddressCountry,
 		OTPEnabled:                    user.OTPEnabled,
-		OTPAuthenticatorDisabled:      user.OtpAuthenticatorDisabled(),
+		OTPAuthenticatorDisabled:      user.OTPAuthenticatorDisabled(),
 	}
 
 	if user.CreatedAt.Valid {
@@ -90,7 +90,7 @@ func ToSessionOwnerResponse(user *record.User) *api.SessionOwnerResponse {
 	}
 
 	return &api.SessionOwnerResponse{
-		ID:         user.Id,
+		ID:         user.ID,
 		Email:      user.Email,
 		GivenName:  user.GivenName,
 		MiddleName: user.MiddleName,
@@ -119,12 +119,12 @@ func ToUserAttributeResponse(attr *record.UserAttribute) *api.UserAttributeRespo
 	}
 
 	resp := &api.UserAttributeResponse{
-		ID:                   attr.Id,
+		ID:                   attr.ID,
 		Key:                  attr.Key,
 		Value:                attr.Value,
-		IncludeInIDToken:     attr.IncludeInIdToken,
+		IncludeInIDToken:     attr.IncludeInIDToken,
 		IncludeInAccessToken: attr.IncludeInAccessToken,
-		UserID:               attr.UserId,
+		UserID:               attr.UserID,
 	}
 
 	if attr.CreatedAt.Valid {
@@ -199,16 +199,16 @@ func ToUserSessionResponse(session *record.UserSession) *api.UserSessionResponse
 	}
 
 	resp := &api.UserSessionResponse{
-		ID:                session.Id,
+		ID:                session.ID,
 		SessionIdentifier: session.SessionIdentifier,
 		AuthMethods:       session.AuthMethods,
-		ACRLevel:          session.AcrLevel.String(),
-		IPAddress:         session.IpAddress,
+		ACRLevel:          session.ACRLevel.String(),
+		IPAddress:         session.IPAddress,
 		DeviceName:        session.DeviceName,
 		DeviceType:        session.DeviceType,
 		DeviceOS:          session.DeviceOS,
 		UserAgent:         session.UserAgent,
-		UserID:            session.UserId,
+		UserID:            session.UserID,
 	}
 
 	if session.CreatedAt.Valid {
@@ -236,9 +236,9 @@ func ToUserConsentResponse(consent *record.UserConsent) *api.UserConsentResponse
 	}
 
 	resp := &api.UserConsentResponse{
-		ID:       consent.Id,
-		ClientID: consent.ClientId,
-		UserID:   consent.UserId,
+		ID:       consent.ID,
+		ClientID: consent.ClientID,
+		UserID:   consent.UserID,
 		Scope:    consent.Scope,
 	}
 
@@ -253,7 +253,7 @@ func ToUserConsentResponse(consent *record.UserConsent) *api.UserConsentResponse
 	}
 
 	// Include client information if loaded
-	if consent.Client.Id != 0 {
+	if consent.Client.ID != 0 {
 		resp.ClientIdentifier = consent.Client.ClientIdentifier
 		resp.ClientName, resp.ClientNameUnverified = consent.Client.NameForUsers()
 		resp.ClientDescription = consent.Client.Description
@@ -296,7 +296,7 @@ func ToAccountConnectedClientResponse(client *record.Client, consent *record.Use
 	isCurrent bool) api.ConnectedClientResponse {
 
 	resp := api.ConnectedClientResponse{
-		ClientID:          client.Id,
+		ClientID:          client.ID,
 		ClientIdentifier:  client.ClientIdentifier,
 		ClientDescription: client.DescriptionForUsers(),
 		GrantScope:        grantScope,
@@ -304,7 +304,7 @@ func ToAccountConnectedClientResponse(client *record.Client, consent *record.Use
 	}
 	resp.ClientName, resp.ClientNameUnverified = client.NameForUsers()
 	if consent != nil {
-		resp.Consent = &api.ConnectedClientConsentResponse{ID: consent.Id, Scope: consent.Scope}
+		resp.Consent = &api.ConnectedClientConsentResponse{ID: consent.ID, Scope: consent.Scope}
 		if consent.GrantedAt.Valid {
 			resp.Consent.GrantedAt = &consent.GrantedAt.Time
 		}
@@ -329,10 +329,10 @@ func ToGroupResponse(group *record.Group, memberCount int) *api.GroupResponse {
 	}
 
 	resp := &api.GroupResponse{
-		ID:                   group.Id,
+		ID:                   group.ID,
 		GroupIdentifier:      group.GroupIdentifier,
 		Description:          group.Description,
-		IncludeInIDToken:     group.IncludeInIdToken,
+		IncludeInIDToken:     group.IncludeInIDToken,
 		IncludeInAccessToken: group.IncludeInAccessToken,
 		MemberCount:          memberCount,
 	}
@@ -360,7 +360,7 @@ func ToGroupResponses(groups []record.Group, memberCounts map[int64]int) []api.G
 	for _, group := range groups {
 		memberCount := 0
 		if memberCounts != nil {
-			memberCount = memberCounts[group.Id]
+			memberCount = memberCounts[group.ID]
 		}
 		resp := ToGroupResponse(&group, memberCount)
 		if resp != nil {
@@ -375,10 +375,10 @@ func ToPermissionResponse(perm *record.Permission) *api.PermissionResponse {
 		return nil
 	}
 	return &api.PermissionResponse{
-		ID:                   perm.Id,
+		ID:                   perm.ID,
 		PermissionIdentifier: perm.PermissionIdentifier,
 		Description:          perm.Description,
-		ResourceID:           perm.ResourceId,
+		ResourceID:           perm.ResourceID,
 		Resource:             *ToResourceResponse(&perm.Resource),
 	}
 }
@@ -402,7 +402,7 @@ func ToResourceResponse(resource *record.Resource) *api.ResourceResponse {
 		return nil
 	}
 	return &api.ResourceResponse{
-		ID:                    resource.Id,
+		ID:                    resource.ID,
 		ResourceIdentifier:    resource.ResourceIdentifier,
 		Description:           resource.Description,
 		IsSystemLevelResource: resource.IsSystemLevelResource(),
@@ -429,12 +429,12 @@ func ToGroupAttributeResponse(attr *record.GroupAttribute) *api.GroupAttributeRe
 	}
 
 	resp := &api.GroupAttributeResponse{
-		ID:                   attr.Id,
+		ID:                   attr.ID,
 		Key:                  attr.Key,
 		Value:                attr.Value,
-		IncludeInIDToken:     attr.IncludeInIdToken,
+		IncludeInIDToken:     attr.IncludeInIDToken,
 		IncludeInAccessToken: attr.IncludeInAccessToken,
-		GroupID:              attr.GroupId,
+		GroupID:              attr.GroupID,
 	}
 
 	if attr.CreatedAt.Valid {
@@ -475,9 +475,9 @@ func toRedirectURIResponses(uris []record.RedirectURI) []api.RedirectURIResponse
 	responses := make([]api.RedirectURIResponse, len(uris))
 	for i, uri := range uris {
 		responses[i] = api.RedirectURIResponse{
-			ID:       uri.Id,
+			ID:       uri.ID,
 			URI:      uri.URI,
-			ClientID: uri.ClientId,
+			ClientID: uri.ClientID,
 		}
 		if uri.CreatedAt.Valid {
 			responses[i].CreatedAt = &uris[i].CreatedAt.Time
@@ -495,9 +495,9 @@ func toPostLogoutRedirectURIResponses(uris []record.PostLogoutRedirectURI) []api
 	responses := make([]api.PostLogoutRedirectURIResponse, len(uris))
 	for i, uri := range uris {
 		responses[i] = api.PostLogoutRedirectURIResponse{
-			ID:       uri.Id,
+			ID:       uri.ID,
 			URI:      uri.URI,
-			ClientID: uri.ClientId,
+			ClientID: uri.ClientID,
 		}
 		if uri.CreatedAt.Valid {
 			responses[i].CreatedAt = &uris[i].CreatedAt.Time
@@ -513,9 +513,9 @@ func toWebOriginResponses(origins []record.WebOrigin) []api.WebOriginResponse {
 	responses := make([]api.WebOriginResponse, len(origins))
 	for i, origin := range origins {
 		responses[i] = api.WebOriginResponse{
-			ID:       origin.Id,
+			ID:       origin.ID,
 			Origin:   origin.Origin,
-			ClientID: origin.ClientId,
+			ClientID: origin.ClientID,
 		}
 		if origin.CreatedAt.Valid {
 			responses[i].CreatedAt = &origins[i].CreatedAt.Time
@@ -530,7 +530,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 	}
 
 	resp := &api.ClientResponse{
-		ID:                                      client.Id,
+		ID:                                      client.ID,
 		ClientIdentifier:                        client.ClientIdentifier,
 		Description:                             client.Description,
 		WebsiteURL:                              client.WebsiteURL,
@@ -561,15 +561,15 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
 		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
 		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
-		IncludeOpenIDConnectClaimsInIDToken:     client.IncludeOpenIDConnectClaimsInIdToken,
-		DefaultACRLevel:                         string(client.DefaultAcrLevel),
+		IncludeOpenIDConnectClaimsInIDToken:     client.IncludeOpenIDConnectClaimsInIDToken,
+		DefaultACRLevel:                         string(client.DefaultACRLevel),
 		RedirectURIs:                            toRedirectURIResponses(client.RedirectURIs),
 		PostLogoutRedirectURIs:                  toPostLogoutRedirectURIResponses(client.PostLogoutRedirectURIs),
 		WebOrigins:                              toWebOriginResponses(client.WebOrigins),
 	}
 
-	if client.BrandId.Valid {
-		brandId := client.BrandId.Int64
+	if client.BrandID.Valid {
+		brandId := client.BrandID.Int64
 		resp.BrandID = &brandId
 	}
 
@@ -611,7 +611,7 @@ func ToClientResponses(clients []record.Client) []api.ClientResponse {
 func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDocumentVersion,
 	links []record.LegalDocumentClient) api.LegalDocumentResponse {
 	resp := api.LegalDocumentResponse{
-		ID:        doc.Id,
+		ID:        doc.ID,
 		ShortName: doc.ShortName,
 		Kind:      doc.Kind,
 		Title:     doc.DraftTitle.String,
@@ -621,7 +621,7 @@ func ToLegalDocumentResponse(doc *record.LegalDocument, current *record.LegalDoc
 		ClientIDs: make([]int64, 0, len(links)),
 	}
 	for _, link := range links {
-		resp.ClientIDs = append(resp.ClientIDs, link.ClientId)
+		resp.ClientIDs = append(resp.ClientIDs, link.ClientID)
 	}
 	if doc.CreatedAt.Valid {
 		resp.CreatedAt = &doc.CreatedAt.Time
@@ -686,9 +686,9 @@ func ToLegalDocumentAcceptanceResponse(acceptance *record.LegalDocumentAcceptanc
 	acceptedAt := acceptance.AcceptedAt
 	publishedAt := version.PublishedAt
 	resp := api.LegalDocumentAcceptanceResponse{
-		ID:              acceptance.Id,
+		ID:              acceptance.ID,
 		AcceptedAt:      &acceptedAt,
-		LegalDocumentID: doc.Id,
+		LegalDocumentID: doc.ID,
 		ShortName:       doc.ShortName,
 		Version:         version.VersionNumber,
 		Title:           version.Title,
@@ -707,13 +707,13 @@ func ToLegalDocumentAcceptanceResponse(acceptance *record.LegalDocumentAcceptanc
 // existed does (#780 decision 6).
 func ToAuditLogResponse(log *record.AuditLog) api.AuditLogResponse {
 	return api.AuditLogResponse{
-		ID:             log.Id,
+		ID:             log.ID,
 		CreatedAt:      log.CreatedAt,
 		AuditEvent:     log.AuditEvent,
 		Details:        log.Details, // JSON string
-		RequestID:      log.RequestId,
-		UserID:         nullableId(log.UserId),
-		LoggedInUserID: nullableId(log.LoggedInUserId),
+		RequestID:      log.RequestID,
+		UserID:         nullableId(log.UserID),
+		LoggedInUserID: nullableId(log.LoggedInUserID),
 	}
 }
 

@@ -97,7 +97,7 @@ func TestAuthorize_APageOfASignInPushedOutByFiveNewerIsRefusedAtItsNextStep(t *t
 	submitted := authenticateWithPassword(t, httpClient, pwdUrlA, pwdPageA, user.Email, password)
 	defer func() { _ = submitted.Body.Close() }()
 	assertCeremonyNoLongerActive(t, submitted, "the login form of the pushed-out sign-in")
-	assertNothingWasCompleted(t, user.Id)
+	assertNothingWasCompleted(t, user.ID)
 
 	// B's sign-in, the oldest of the five newer ones, was not disturbed by any of it: its own screen
 	// signs in and receives its code.

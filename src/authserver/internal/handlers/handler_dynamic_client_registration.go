@@ -186,9 +186,9 @@ func HandleDynamicClientRegistrationPost(
 			// a flow on for it, on its OAuth2 flows tab.
 			ImplicitGrantEnabled:                    &implicitGrantEnabled,
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-			DefaultAcrLevel:                         record.AcrLevel2Optional,
+			DefaultACRLevel:                         record.ACRLevel2Optional,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,
@@ -216,7 +216,7 @@ func HandleDynamicClientRegistrationPost(
 			}
 			for _, uri := range req.RedirectURIs {
 				redirectURI := &record.RedirectURI{
-					ClientId: client.Id,
+					ClientID: client.ID,
 					URI:      uri,
 				}
 				if err := database.CreateRedirectURI(r.Context(), tx, redirectURI); err != nil {
@@ -225,7 +225,7 @@ func HandleDynamicClientRegistrationPost(
 			}
 			for _, uri := range req.PostLogoutRedirectURIs {
 				postLogoutRedirectURI := &record.PostLogoutRedirectURI{
-					ClientId: client.Id,
+					ClientID: client.ID,
 					URI:      uri,
 				}
 				if err := database.CreatePostLogoutRedirectURI(r.Context(), tx, postLogoutRedirectURI); err != nil {
@@ -246,7 +246,7 @@ func HandleDynamicClientRegistrationPost(
 
 		// 11. Audit log, after the commit, so an event never records a client that does not exist
 		auditLogger.Log(r.Context(), audit.EventDynamicClientRegistration, map[string]interface{}{
-			"client_id":         client.Id,
+			"client_id":         client.ID,
 			"client_identifier": client.ClientIdentifier,
 			"grant_types":       grantTypes,
 			"is_public":         isPublic,

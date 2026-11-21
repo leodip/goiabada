@@ -44,9 +44,9 @@ type pausedLegalDocumentWrite struct {
 	pause string
 }
 
-func (d pausedLegalDocumentWrite) GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx,
-	legalDocumentId int64) ([]record.LegalDocumentVersion, error) {
-	versions, err := d.Database.GetLegalDocumentVersionsByLegalDocumentId(ctx, tx, legalDocumentId)
+func (d pausedLegalDocumentWrite) GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx,
+	legalDocumentID int64) ([]record.LegalDocumentVersion, error) {
+	versions, err := d.Database.GetLegalDocumentVersionsByLegalDocumentID(ctx, tx, legalDocumentID)
 	if tx != nil && d.pause == pauseAfterVersionsRead {
 		d.b.arriveBefore(tx)
 	}
@@ -137,18 +137,18 @@ func TestLegalDocumentLifecycle_PublishClearsOnlyTheDraftItFroze(t *testing.T) {
 	original := doc.DraftMarkdown.String
 
 	published, saved := serialize(t, pauseAfterVersionsRead,
-		func(db data.Database) legalWriteOutcome { return publish(db, doc.Id) },
+		func(db data.Database) legalWriteOutcome { return publish(db, doc.ID) },
 		func() legalWriteOutcome {
-			return saveDraft(database, doc.Id, &api.SaveLegalDocumentDraftRequest{Title: "Later draft", Markdown: "Saved during the publish."})
+			return saveDraft(database, doc.ID, &api.SaveLegalDocumentDraftRequest{Title: "Later draft", Markdown: "Saved during the publish."})
 		})
 
 	require.Equal(t, http.StatusOK, published.status)
 	require.Equal(t, http.StatusOK, saved.status)
-	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 1)
+	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 1)
 	require.NoError(t, err)
 	require.NotNil(t, version)
 	assert.Equal(t, original, version.Markdown, "the publish froze the draft it read")
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.HasDraft(), "the draft saved after the publish read the document is kept")
 	assert.Equal(t, "Saved during the publish.", stored.DraftMarkdown.String)
@@ -160,16 +160,16 @@ func TestLegalDocumentLifecycle_ASaveWaitingOnTheFirstPublishCannotRenameIt(t *t
 	original := doc.ShortName
 
 	published, saved := serialize(t, pauseAfterVersionsRead,
-		func(db data.Database) legalWriteOutcome { return publish(db, doc.Id) },
+		func(db data.Database) legalWriteOutcome { return publish(db, doc.ID) },
 		func() legalWriteOutcome {
-			return saveDraft(database, doc.Id, &api.SaveLegalDocumentDraftRequest{
+			return saveDraft(database, doc.ID, &api.SaveLegalDocumentDraftRequest{
 				ShortName: original + "-renamed", Title: "Next draft", Markdown: "Next draft."})
 		})
 
 	require.Equal(t, http.StatusOK, published.status)
 	assert.Equal(t, http.StatusBadRequest, saved.status)
 	assert.Equal(t, "handler.legal_document.short_name_fixed", saved.errorCode)
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.Equal(t, original, stored.ShortName, "the published address is kept")
 	assert.False(t, stored.HasDraft(), "the refused save wrote nothing")
@@ -182,17 +182,17 @@ func TestLegalDocumentLifecycle_ARenameCommittedFirstIsTheNamePublished(t *testi
 
 	saved, published := serialize(t, pauseBeforeShortNameRead,
 		func(db data.Database) legalWriteOutcome {
-			return saveDraft(db, doc.Id, &api.SaveLegalDocumentDraftRequest{
+			return saveDraft(db, doc.ID, &api.SaveLegalDocumentDraftRequest{
 				ShortName: renamed, Title: "Next draft", Markdown: "Next draft."})
 		},
-		func() legalWriteOutcome { return publish(database, doc.Id) })
+		func() legalWriteOutcome { return publish(database, doc.ID) })
 
 	require.Equal(t, http.StatusOK, saved.status)
 	require.Equal(t, http.StatusOK, published.status)
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.Equal(t, renamed, stored.ShortName)
-	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.Id, 1)
+	version, err := database.GetLegalDocumentVersion(ctx, nil, doc.ID, 1)
 	require.NoError(t, err)
 	require.NotNil(t, version)
 	assert.Equal(t, "Next draft.", version.Markdown,
@@ -202,17 +202,17 @@ func TestLegalDocumentLifecycle_ARenameCommittedFirstIsTheNamePublished(t *testi
 func TestLegalDocumentLifecycle_ASaveCannotUndoARetirement(t *testing.T) {
 	ctx := context.Background()
 	doc := createLegalDocument(t, record.LegalDocumentKindForInformation)
-	publishVersion(t, doc.Id, 1, "Notice", "Text")
+	publishVersion(t, doc.ID, 1, "Notice", "Text")
 
 	saved, retired := serialize(t, pauseBeforeDocumentWrite,
 		func(db data.Database) legalWriteOutcome {
-			return saveDraft(db, doc.Id, &api.SaveLegalDocumentDraftRequest{Title: "Next draft", Markdown: "Next draft."})
+			return saveDraft(db, doc.ID, &api.SaveLegalDocumentDraftRequest{Title: "Next draft", Markdown: "Next draft."})
 		},
-		func() legalWriteOutcome { return retire(database, doc.Id) })
+		func() legalWriteOutcome { return retire(database, doc.ID) })
 
 	require.Equal(t, http.StatusOK, saved.status)
 	require.Equal(t, http.StatusOK, retired.status)
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.IsRetired(), "the retirement that waited for the save is kept")
 	assert.Equal(t, "Next draft.", stored.DraftMarkdown.String)
@@ -221,19 +221,19 @@ func TestLegalDocumentLifecycle_ASaveCannotUndoARetirement(t *testing.T) {
 func TestLegalDocumentLifecycle_ASaveWaitingOnARetirementIsRefused(t *testing.T) {
 	ctx := context.Background()
 	doc := createLegalDocument(t, record.LegalDocumentKindForInformation)
-	publishVersion(t, doc.Id, 1, "Notice", "Text")
+	publishVersion(t, doc.ID, 1, "Notice", "Text")
 	draft := doc.DraftMarkdown.String
 
 	retired, saved := serialize(t, pauseBeforeDocumentWrite,
-		func(db data.Database) legalWriteOutcome { return retire(db, doc.Id) },
+		func(db data.Database) legalWriteOutcome { return retire(db, doc.ID) },
 		func() legalWriteOutcome {
-			return saveDraft(database, doc.Id, &api.SaveLegalDocumentDraftRequest{Title: "Next draft", Markdown: "Next draft."})
+			return saveDraft(database, doc.ID, &api.SaveLegalDocumentDraftRequest{Title: "Next draft", Markdown: "Next draft."})
 		})
 
 	require.Equal(t, http.StatusOK, retired.status)
 	assert.Equal(t, http.StatusBadRequest, saved.status)
 	assert.Equal(t, "handler.legal_document.retired", saved.errorCode)
-	stored, err := database.GetLegalDocumentById(ctx, nil, doc.Id)
+	stored, err := database.GetLegalDocumentByID(ctx, nil, doc.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.IsRetired())
 	assert.Equal(t, draft, stored.DraftMarkdown.String, "the refused save wrote nothing")

@@ -153,7 +153,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// stolen refresh token could present it under any public client and tell three outcomes apart:
 	// "does not belong to the client" for an untouched account, "The user account is disabled." and
 	// the superseded wording. A check on the token's state placed above ownership reopens that.
-	if tokenClientId != client.Id {
+	if tokenClientId != client.ID {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"The refresh token is invalid because it does not belong to the client.", http.StatusBadRequest)
 	}
@@ -178,7 +178,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		slog.WarnContext(ctx, "refresh token refused for its dpop binding",
 			"reason", reason,
 			"client_identifier", client.ClientIdentifier,
-			"refresh_token_id", refreshToken.Id)
+			"refresh_token_id", refreshToken.ID)
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", BoundRefreshTokenMessage, http.StatusBadRequest)
 	}
 
@@ -216,11 +216,11 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			"token_issuer", refreshTokenInfo.StringClaim("iss"),
 			"issuer", settings.Issuer,
 			"client_identifier", client.ClientIdentifier,
-			"refresh_token_id", refreshToken.Id)
+			"refresh_token_id", refreshToken.ID)
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	case liveness.RefreshUserDisabled:
-		return nil, userDisabled(invalidRefreshTokenMessage, stored.User.Id)
+		return nil, userDisabled(invalidRefreshTokenMessage, stored.User.ID)
 	case liveness.RefreshGenerationSuperseded:
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidGenerationMessage, http.StatusBadRequest)
@@ -359,7 +359,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	}
 	consentCheckRequired := !isROPCToken && (consentEveryScope || len(owed) > 0)
 	if consentCheckRequired {
-		consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)
+		consent, err := val.database.GetConsentByUserIDAndClientID(ctx, nil, tokenUserId, tokenClientId)
 		if err != nil {
 			return nil, err
 		}
@@ -422,7 +422,7 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// check if user still has permission to the scope. A claim scope and offline_access
 		// are not permissions, so they are not re-checked.
 		if !oidc.IsClaimScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) {
-			userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.Id, inputScopeStr)
+			userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.ID, inputScopeStr)
 			if err != nil {
 				return nil, err
 			}

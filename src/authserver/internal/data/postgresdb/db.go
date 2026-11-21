@@ -137,16 +137,16 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		}
 	}
 
-	commonDb := commondb.New(db, data.Postgres, logSQL)
-	commonDb.IsDeadlock = isDeadlock
-	commonDb.IsUniqueViolation = isUniqueViolation
-	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
+	commonDB := commondb.New(db, data.Postgres, logSQL)
+	commonDB.IsDeadlock = isDeadlock
+	commonDB.IsUniqueViolation = isUniqueViolation
+	commonDB.ExplicitIDInsertSQL = explicitIDInsertSQL
 
-	postgresDb := Database{
-		Database: commonDb,
+	postgresDB := Database{
+		Database: commonDB,
 		dbConfig: dbConfig,
 	}
-	return &postgresDb, nil
+	return &postgresDB, nil
 }
 
 // openMaintenance opens a pool on the postgres maintenance database, over the same TLS as the

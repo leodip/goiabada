@@ -31,13 +31,13 @@ func NewKeyPair(dataCipher *encryption.DataCipher, state record.KeyState, bits i
 	}
 
 	return &record.KeyPair{
-		State:             state.String(),
-		KeyIdentifier:     kid,
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     privateKeyPEMEncrypted,
-		PublicKeyPEM:      material.PublicKeyPEM,
-		PublicKeyASN1_DER: material.PublicKeyDER,
-		PublicKeyJWK:      material.PublicKeyJWK,
+		State:            state.String(),
+		KeyIdentifier:    kid,
+		Type:             "RSA",
+		Algorithm:        "RS256",
+		PrivateKeyPEM:    privateKeyPEMEncrypted,
+		PublicKeyPEM:     material.PublicKeyPEM,
+		PublicKeyASN1DER: material.PublicKeyDER,
+		PublicKeyJWK:     material.PublicKeyJWK,
 	}, nil
 }

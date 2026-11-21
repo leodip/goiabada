@@ -58,27 +58,27 @@ func TestMigration000083_SettingsAccountDeletion(t *testing.T) {
 	assertColumn000083(t, h, "after apply")
 
 	// 2.
-	assert.Truef(t, accountDeletionOf000083(t, h, settings.Id),
+	assert.Truef(t, accountDeletionOf000083(t, h, settings.ID),
 		"2. an existing installation lets users delete their own account on %s", dbType())
 
 	// 3.
 	_, err := h.SQL.Exec("UPDATE settings SET account_deletion_enabled = " + boolLiteral000083(false) +
-		" WHERE id = " + fmt.Sprint(settings.Id))
+		" WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "turn account deletion off on %s", dbType())
-	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.Id))
+	_, err = h.SQL.Exec("UPDATE settings SET app_name = 'Previous release' WHERE id = " + fmt.Sprint(settings.ID))
 	require.NoErrorf(t, err, "save the settings as the previous release does on %s", dbType())
-	assert.Falsef(t, accountDeletionOf000083(t, h, settings.Id),
+	assert.Falsef(t, accountDeletionOf000083(t, h, settings.ID),
 		"3. a save naming no account_deletion_enabled leaves it as stored on %s", dbType())
 
 	// 4.
 	migrateToHead000063(t, h)
-	stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+	stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	for _, enabled := range []bool{true, false, true} {
 		stored.AccountDeletionEnabled = enabled
 		require.NoError(t, h.DB.UpdateSettings(ctx, nil, stored))
-		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		read, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		require.NotNil(t, read)
 		assert.Equalf(t, enabled, read.AccountDeletionEnabled, "4. %v round-trips on %s", enabled, dbType())
@@ -93,7 +93,7 @@ func TestMigration000083_SettingsAccountDeletion(t *testing.T) {
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, settingsAccountDeletion000083), "re-apply 000083 on %s", dbType())
 	assertColumn000083(t, h, "after down/up round trip")
-	assert.Truef(t, accountDeletionOf000083(t, h, settings.Id),
+	assert.Truef(t, accountDeletionOf000083(t, h, settings.ID),
 		"5. the value dropped with the column reads on once it is back on %s", dbType())
 }
 
@@ -143,10 +143,10 @@ func boolLiteral000083(b bool) string {
 
 // accountDeletionOf000083 reads the column with raw SQL, since the data layer can read it only at
 // head.
-func accountDeletionOf000083(t *testing.T, h *isolatedDB, settingsId int64) bool {
+func accountDeletionOf000083(t *testing.T, h *isolatedDB, settingsID int64) bool {
 	t.Helper()
 	var enabled bool
-	q := fmt.Sprintf("SELECT account_deletion_enabled FROM settings WHERE id = %d", settingsId)
+	q := fmt.Sprintf("SELECT account_deletion_enabled FROM settings WHERE id = %d", settingsID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&enabled), "read account_deletion_enabled on %s", dbType())
 	return enabled
 }

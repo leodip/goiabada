@@ -143,7 +143,7 @@ func HandleAccountProfilePut(
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnProfile, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

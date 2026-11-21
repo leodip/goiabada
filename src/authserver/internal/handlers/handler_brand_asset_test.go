@@ -24,12 +24,12 @@ import (
 const consoleOrigin = "https://console.example.com"
 
 var logoAsset = record.BrandAsset{
-	Id: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "0a1b2c3d4e5f",
+	ID: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "0a1b2c3d4e5f",
 	Width: 10, Height: 10, Content: []byte("\x89PNG\r\n\x1a\n-logo-bytes"),
 }
 
 var fontAsset = record.BrandAsset{
-	Id: 13, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "f0e1d2c3b4a5",
+	ID: 13, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "f0e1d2c3b4a5",
 	Content: []byte("wOF2-font-bytes"),
 }
 
@@ -37,7 +37,7 @@ func serveBrandAsset(t *testing.T, asset *record.BrandAsset, id, query string) *
 	t.Helper()
 	database := datamocks.NewDatabase(t)
 	if asset != nil {
-		database.On("GetBrandAssetById", mock.Anything, (*sql.Tx)(nil), asset.Id).Return(asset, nil).Once()
+		database.On("GetBrandAssetByID", mock.Anything, (*sql.Tx)(nil), asset.ID).Return(asset, nil).Once()
 	}
 	req := httptest.NewRequest(http.MethodGet, "/brand-assets/"+id+query, nil)
 	req.SetPathValue("id", id)
@@ -99,11 +99,11 @@ func TestHandleBrandAssetGet_GrantsAFontToTheConsoleAlone(t *testing.T) {
 
 	for _, image := range []record.BrandAsset{
 		logoAsset,
-		{Id: 14, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "aaaaaaaaaaaa", Content: []byte("x")},
-		{Id: 15, Kind: record.BrandAssetKindBackground, ContentType: "image/jpeg", Fingerprint: "bbbbbbbbbbbb", Content: []byte("x")},
+		{ID: 14, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "aaaaaaaaaaaa", Content: []byte("x")},
+		{ID: 15, Kind: record.BrandAssetKindBackground, ContentType: "image/jpeg", Fingerprint: "bbbbbbbbbbbb", Content: []byte("x")},
 	} {
 		t.Run(string(image.Kind), func(t *testing.T) {
-			rr := serveBrandAsset(t, &image, strconv.FormatInt(image.Id, 10), "")
+			rr := serveBrandAsset(t, &image, strconv.FormatInt(image.ID, 10), "")
 
 			require.Equal(t, http.StatusOK, rr.Code)
 			assert.Empty(t, rr.Header().Values("Access-Control-Allow-Origin"))
@@ -114,7 +114,7 @@ func TestHandleBrandAssetGet_GrantsAFontToTheConsoleAlone(t *testing.T) {
 func TestHandleBrandAssetGet_NotFound(t *testing.T) {
 	t.Run("no such asset", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandAssetById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
+		database.On("GetBrandAssetByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 		req := httptest.NewRequest(http.MethodGet, "/brand-assets/99", nil)
 		req.SetPathValue("id", "99")
 		rr := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestHandleBrandAssetGet_NotFound(t *testing.T) {
 func TestHandleBrandAssetGet_AReadThatFailsIsA500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	failure := errors.New("connection refused")
-	database.On("GetBrandAssetById", mock.Anything, (*sql.Tx)(nil), int64(12)).Return(nil, failure).Once()
+	database.On("GetBrandAssetByID", mock.Anything, (*sql.Tx)(nil), int64(12)).Return(nil, failure).Once()
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		return errors.Is(err, failure)
@@ -150,7 +150,7 @@ func TestHandleBrandAssetGet_AReadThatFailsIsA500(t *testing.T) {
 // With no console origin to grant, a font is answered with no grant at all, never a wildcard.
 func TestHandleBrandAssetGet_NoOriginToGrantGrantsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandAssetById", mock.Anything, (*sql.Tx)(nil), int64(13)).Return(&fontAsset, nil).Once()
+	database.On("GetBrandAssetByID", mock.Anything, (*sql.Tx)(nil), int64(13)).Return(&fontAsset, nil).Once()
 	req := httptest.NewRequest(http.MethodGet, "/brand-assets/13", nil)
 	req.SetPathValue("id", "13")
 	rr := httptest.NewRecorder()

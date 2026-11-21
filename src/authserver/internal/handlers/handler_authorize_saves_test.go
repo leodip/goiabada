@@ -211,7 +211,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			req = req.WithContext(reqctx.WithSessionIdentifier(ctx, "session-123"))
 			rr := httptest.NewRecorder()
 
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
@@ -229,8 +229,8 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			// owns that.
 			var userSession *record.UserSession
 			if tc.hasSession {
-				userSession = &record.UserSession{Id: 1, UserId: 123, AcrLevel: record.AcrLevel1, AuthMethods: "pwd",
-					User: record.User{Id: 123, Enabled: true, Subject: sessionSubject}}
+				userSession = &record.UserSession{ID: 1, UserID: 123, ACRLevel: record.ACRLevel1, AuthMethods: "pwd",
+					User: record.User{ID: 123, Enabled: true, Subject: sessionSubject}}
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").
 				Return(userSession, nil).Maybe()
@@ -264,7 +264,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			assert.Equal(t, "the-nonce", saved.Nonce)
 			assert.Equal(t, tc.hint, saved.IdTokenHintSub)
 			if !tc.scopeInvalid {
-				assert.Equal(t, record.AcrLevel1.String(), saved.TargetAcrLevel,
+				assert.Equal(t, record.ACRLevel1.String(), saved.TargetAcrLevel,
 					"the target is fixed before the exit saves")
 			}
 

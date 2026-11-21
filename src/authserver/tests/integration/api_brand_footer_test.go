@@ -56,7 +56,7 @@ func TestAPIBrandFooter_StoredReadAndWrittenBackUnchanged(t *testing.T) {
 	assert.Equal(t, "https://help.acme.example/contact", brand["supportUrl"])
 	assert.Equal(t, "+442079460958", brand["supportPhone"])
 
-	stored, err := database.GetBrandById(ctx, nil, id)
+	stored, err := database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, record.BrandFooterLinks{
@@ -77,7 +77,7 @@ func TestAPIBrandFooter_StoredReadAndWrittenBackUnchanged(t *testing.T) {
 
 	status, body, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""), read)
 	require.Equal(t, http.StatusOK, status, "write back: %v", body)
-	rewritten, err := database.GetBrandById(ctx, nil, id)
+	rewritten, err := database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	rewritten.UpdatedAt = stored.UpdatedAt
 	assert.Equal(t, stored, rewritten, "a brand read and written back is unchanged")
@@ -88,7 +88,7 @@ func TestAPIBrandFooter_StoredReadAndWrittenBackUnchanged(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "update: %v", body)
 	assert.Equal(t, []any{}, body["brand"].(map[string]any)["footerLinks"])
 	assert.Empty(t, body["brand"].(map[string]any)["supportPhone"])
-	cleared, err := database.GetBrandById(ctx, nil, id)
+	cleared, err := database.GetBrandByID(ctx, nil, id)
 	require.NoError(t, err)
 	assert.Nil(t, cleared.FooterLinks)
 	assert.Equal(t, []string{"", "", ""}, []string{cleared.SupportEmail, cleared.SupportURL, cleared.SupportPhone})
@@ -158,7 +158,7 @@ func TestAPIBrandFooter_Refusals(t *testing.T) {
 		}
 	}
 
-	stored, err := database.GetBrandById(context.Background(), nil, other)
+	stored, err := database.GetBrandByID(context.Background(), nil, other)
 	require.NoError(t, err)
 	assert.Nil(t, stored.FooterLinks, "no refused update wrote the brand")
 	assert.Empty(t, stored.SupportPhone)

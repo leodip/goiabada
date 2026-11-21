@@ -36,12 +36,12 @@ func capLimits(maxSessions int) SessionLimits {
 func otherBrowser(id int64, startedAgo, usedAgo time.Duration) record.UserSession {
 	now := time.Now().UTC()
 	return record.UserSession{
-		Id:                id,
+		ID:                id,
 		SessionIdentifier: fmt.Sprintf("other-browser-%d", id),
-		UserId:            123,
+		UserID:            123,
 		Started:           now.Add(-startedAgo),
 		LastAccessed:      now.Add(-usedAgo),
-		DeviceId:          otherDeviceId,
+		DeviceID:          otherDeviceId,
 	}
 }
 
@@ -56,7 +56,7 @@ func startCapped(t *testing.T, existing []record.UserSession, limits SessionLimi
 	}
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, limits)
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, limits)
 
 	require.NoError(t, err)
 	return removed
@@ -157,7 +157,7 @@ func TestStartNewUserSession_TheCapCountsWhatTheSweepsLeft(t *testing.T) {
 	m := newStartSessionMocks(t)
 	replaced := otherBrowser(41, time.Hour, 50*time.Minute)
 	sameDevice := otherBrowser(42, time.Hour, 45*time.Minute)
-	sameDevice.DeviceId = thisDeviceId
+	sameDevice.DeviceID = thisDeviceId
 	m.expectPersistThroughCommit(123, []record.UserSession{
 		replaced,
 		sameDevice,
@@ -168,7 +168,7 @@ func TestStartNewUserSession_TheCapCountsWhatTheSweepsLeft(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, capLimits(3))
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", &replaced, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, map[int64]string{41: "replaced_by_sign_in", 42: "same_device"}, removedReasons(removed))
@@ -179,7 +179,7 @@ func TestStartNewUserSession_TheCapCountsWhatTheSweepsLeft(t *testing.T) {
 func TestStartNewUserSession_TheCapEndsWhatIsStillOverItAfterTheSweeps(t *testing.T) {
 	m := newStartSessionMocks(t)
 	sameDevice := otherBrowser(42, time.Hour, time.Minute)
-	sameDevice.DeviceId = thisDeviceId
+	sameDevice.DeviceID = thisDeviceId
 	m.expectPersistThroughCommit(123, []record.UserSession{
 		otherBrowser(41, time.Hour, 50*time.Minute),
 		sameDevice,
@@ -190,7 +190,7 @@ func TestStartNewUserSession_TheCapEndsWhatIsStillOverItAfterTheSweeps(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(41)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42, 41}, removedIds(removed), "the sweep's row, then the cap's")
@@ -205,22 +205,22 @@ func TestStartNewUserSession_TheCapNeverEndsTheNewSession(t *testing.T) {
 	datamocks.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
 		created = args.Get(2).(*record.UserSession)
-		created.Id = 99
+		created.ID = 99
 	}).Return(nil).Once()
 	m.db.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
-	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(
+	m.db.On("GetUserSessionsByUserID", mock.Anything, txSentinel, int64(123)).Return(
 		func(_ context.Context, _ *sql.Tx, _ int64) ([]record.UserSession, error) {
 			// The new row as the database lists it: the lowest id here and the oldest last access,
 			// so an ordering that did not exclude it would pick it first.
 			self := *created
-			self.Id = 1
+			self.ID = 1
 			self.LastAccessed = time.Now().UTC().Add(-50 * time.Minute)
 			return []record.UserSession{self, otherBrowser(41, time.Hour, 10*time.Minute)}, nil
 		}).Once()
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(41)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(1))
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(1))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{41}, removedIds(removed))
@@ -234,16 +234,16 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsCapRemovalsOnce(t 
 
 	datamocks.ExpectRunInTransactionRerun(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.UserSession).Id = 99
+		args.Get(2).(*record.UserSession).ID = 99
 	}).Return(nil).Twice()
 	m.db.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Twice()
-	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return([]record.UserSession{
+	m.db.On("GetUserSessionsByUserID", mock.Anything, txSentinel, int64(123)).Return([]record.UserSession{
 		otherBrowser(41, time.Hour, 50*time.Minute),
 		otherBrowser(42, time.Hour, 40*time.Minute),
 		otherBrowser(43, time.Hour, 30*time.Minute),
 		otherBrowser(44, time.Hour, 20*time.Minute),
 	}, nil).Once()
-	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return([]record.UserSession{
+	m.db.On("GetUserSessionsByUserID", mock.Anything, txSentinel, int64(123)).Return([]record.UserSession{
 		otherBrowser(42, time.Hour, 40*time.Minute),
 		otherBrowser(43, time.Hour, 30*time.Minute),
 		otherBrowser(44, time.Hour, 20*time.Minute),
@@ -254,7 +254,7 @@ func TestStartNewUserSession_ARerunReportsTheCommittedAttemptsCapRemovalsOnce(t 
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(), "192.168.1.50", nil, capLimits(3))
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{42, 43}, removedIds(removed))

@@ -143,12 +143,12 @@ func TestRevoke_EndsOneGrantAndNothingElse(t *testing.T) {
 
 	otherSecret := fake.LetterN(32)
 	password := fake.Password(12)
-	user, err := database.GetUserById(context.Background(), nil, code.UserId)
+	user, err := database.GetUserByID(context.Background(), nil, code.UserID)
 	require.NoError(t, err)
 	setUserPassword(t, user, password)
 	otherHttpClient, otherCode := createAuthCode(t, otherSecret, "openid",
 		authCodeOptions{user: user, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
 	other := redeemCode(t, otherHttpClient, otherCode, otherSecret)
 
 	revokeAs(t, code.Client.ClientIdentifier, clientSecret, data["refresh_token"].(string))
@@ -189,7 +189,7 @@ func TestRevoke_AnotherClientsLiveTokenIsRefused(t *testing.T) {
 	data, code, httpClient, clientSecret := userTokenResponseWithScope(t, "openid", nil)
 	otherSecret := fake.LetterN(32)
 	_, otherCode := createAuthCode(t, otherSecret, "openid")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
 
 	for name, token := range map[string]string{
 		"a refresh token": data["refresh_token"].(string),
@@ -216,7 +216,7 @@ func TestRevoke_RepeatedForeignTokensBoundAuditWrites(t *testing.T) {
 	data, code, _, clientSecret := userTokenResponseWithScope(t, "openid", nil)
 	callers := []*record.Client{createPublicClient(t), createPublicClient(t)}
 	for _, caller := range callers {
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	}
 	countEvents := func() int {
 		t.Helper()
@@ -331,7 +331,7 @@ func TestRevoke_TheClientAuthenticates(t *testing.T) {
 // leaves it working.
 func TestRevoke_AClientCredentialsTokenIsRevokedByItsJti(t *testing.T) {
 	accessToken, client, clientSecret := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	claims := decodeJWTPayload(t, accessToken)
 	require.NotContains(t, claims, "grant_id", "a client credentials token has no grant")
 	jti := claims["jti"].(string)
@@ -339,7 +339,7 @@ func TestRevoke_AClientCredentialsTokenIsRevokedByItsJti(t *testing.T) {
 	assertAPIAdmitsToken(t, target, accessToken)
 
 	_, other, otherSecret := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, other.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, other.ID) })
 	answer := postRevoke(t, revokeRequest{form: url.Values{
 		"token": {accessToken}, "client_id": {other.ClientIdentifier}, "client_secret": {otherSecret},
 	}})
@@ -366,7 +366,7 @@ func TestRevoke_AnImplicitFlowTokenIsRevokedByItsJti(t *testing.T) {
 	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
 	client.IsPublic = true
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	user, password := createTestUserForImplicit(t)
 	resp := signInToIssue(t, createHttpClient(t),
 		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
@@ -411,7 +411,7 @@ func TestRevoke_AnswersCORSForRegisteredOriginsAndIsExemptFromCSRF(t *testing.T)
 	registered := "https://revoke-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	unregistered := "https://revoke-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
-		ClientId: code.ClientId, Origin: registered,
+		ClientID: code.ClientID, Origin: registered,
 	}))
 
 	req, err := http.NewRequest(http.MethodOptions, appConfig.AuthServer.BaseURL+"/auth/revoke", nil)

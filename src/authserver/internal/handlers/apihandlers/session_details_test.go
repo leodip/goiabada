@@ -31,16 +31,16 @@ var sessionSettings = &record.Settings{
 func liveSession(id int64, identifier string, clientIds ...int64) record.UserSession {
 	now := time.Now().UTC()
 	session := record.UserSession{
-		Id:                id,
+		ID:                id,
 		SessionIdentifier: identifier,
 		Started:           now.Add(-time.Hour),
 		LastAccessed:      now.Add(-time.Minute),
-		UserId:            42,
+		UserID:            42,
 	}
 	for _, clientId := range clientIds {
 		session.Clients = append(session.Clients, record.UserSessionClient{
-			UserSessionId: id,
-			ClientId:      clientId,
+			UserSessionID: id,
+			ClientID:      clientId,
 			Started:       now.Add(-time.Hour),
 			LastAccessed:  now.Add(-time.Minute),
 		})
@@ -63,11 +63,11 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 	}
 
 	var gotClientIds []int64
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
 		Return([]record.Client{
-			{Id: 5, ClientIdentifier: "portal"},
-			{Id: 6, ClientIdentifier: "backoffice"},
+			{ID: 5, ClientIdentifier: "portal"},
+			{ID: 6, ClientIdentifier: "backoffice"},
 		}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
@@ -95,7 +95,7 @@ func TestBuildSessionDetails_NoClientsRunsNoQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, details, 1)
 	assert.Equal(t, []string{}, details[0].ClientIdentifiers)
-	// No GetClientsByIds expectation is registered, so the strict mock fails the test if one is
+	// No GetClientsByIDs expectation is registered, so the strict mock fails the test if one is
 	// made.
 	database.AssertExpectations(t)
 }
@@ -114,9 +114,9 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 	sessions := []record.UserSession{liveSession(1, "sid-live", 5), idle, expired}
 
 	var gotClientIds []int64
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
 
@@ -150,7 +150,7 @@ func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
 func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(nil, errors.New("connection reset")).Once()
 
 	details, err := buildSessionDetails(context.Background(), database,
@@ -167,8 +167,8 @@ func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database,
 		[]record.UserSession{liveSession(1, "sid-1", 5, 99)}, sessionSettings, "")
@@ -199,10 +199,10 @@ func TestBuildSessionDetails_LoadsClientsUnderTheCallersContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientsByIds", mock.MatchedBy(func(got context.Context) bool {
+	database.On("GetClientsByIDs", mock.MatchedBy(func(got context.Context) bool {
 		return got.Value(marker{}) == "the caller's own"
 	}), (*sql.Tx)(nil), mock.Anything).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	_, err := buildSessionDetails(ctx, database, []record.UserSession{liveSession(1, "sid-1", 5)}, sessionSettings, "")
 

@@ -144,15 +144,15 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		}
 	}
 
-	commonDb := commondb.New(db, data.MySQL, logSQL)
-	commonDb.IsDeadlock = isDeadlock
-	commonDb.IsUniqueViolation = isUniqueViolation
+	commonDB := commondb.New(db, data.MySQL, logSQL)
+	commonDB.IsDeadlock = isDeadlock
+	commonDB.IsUniqueViolation = isUniqueViolation
 
-	mysqlDb := Database{
-		Database: commonDb,
+	mysqlDB := Database{
+		Database: commonDB,
 		dbConfig: dbConfig,
 	}
-	return &mysqlDb, nil
+	return &mysqlDB, nil
 }
 
 // open is sql.Open("mysql", dsn) for a configuration rather than a string, which is what carries

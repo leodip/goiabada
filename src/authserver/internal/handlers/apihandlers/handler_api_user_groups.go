@@ -20,7 +20,7 @@ import (
 // maxGroupIdsPerRequest bounds how many group ids one request body may name.
 //
 // The list is validated by reading every group it names back from the database, and a list longer
-// than one statement can bind is read in several of them (commondb's forEachIdBatch), so without a
+// than one statement can bind is read in several of them (commondb's forEachIDBatch), so without a
 // bound a caller holding manage-users can post a million ids and buy a thousand statements reading
 // ids that cannot exist. The number is one statement's worth, which is the largest list that
 // validation reads in one go, and it is far above any real request: a user can hold at most as
@@ -48,8 +48,8 @@ type userGroupsDatabase interface {
 	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *record.UserGroup) error
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
-	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetGroupsByIDs(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -72,7 +72,7 @@ func HandleUserGroupsGet(
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for groups"), "user_id", id)
 			return
@@ -84,13 +84,13 @@ func HandleUserGroupsGet(
 
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading user groups"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading user groups"), "user_id", user.ID)
 			return
 		}
 
 		memberCounts, err := countGroupMembers(r.Context(), database, user.Groups)
 		if err != nil {
-			writeInternalServerError(w, r, err, "user_id", user.Id)
+			writeInternalServerError(w, r, err, "user_id", user.ID)
 			return
 		}
 
@@ -147,7 +147,7 @@ func HandleUserGroupsPut(
 		// that does not exist, since the lookup below returns each group once (#428).
 		wanted := firstOccurrences(request.GroupIDs)
 
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for groups"), "user_id", id)
 			return
@@ -159,9 +159,9 @@ func HandleUserGroupsPut(
 
 		// Validate all requested groups exist
 		if len(wanted) > 0 {
-			groups, getGroupsErr := database.GetGroupsByIds(r.Context(), nil, wanted)
+			groups, getGroupsErr := database.GetGroupsByIDs(r.Context(), nil, wanted)
 			if getGroupsErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getGroupsErr, "database error getting groups by IDs for validation"), "group_ids", wanted, "user_id", user.Id)
+				writeInternalServerError(w, r, errs.Wrap(getGroupsErr, "database error getting groups by IDs for validation"), "group_ids", wanted, "user_id", user.ID)
 				return
 			}
 			if len(groups) != len(wanted) {
@@ -174,17 +174,17 @@ func HandleUserGroupsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage moves a user into or out of a group holding an administrative
 		// permission (#402).
-		if !userGroupsCeilingAllows(w, r, database, auditLogger, user.Id, wanted, request.ExpectedGroupIDs) {
+		if !userGroupsCeilingAllows(w, r, database, auditLogger, user.ID, wanted, request.ExpectedGroupIDs) {
 			return
 		}
 
 		// The grant ceiling judged what the save changes; this judges whom it changes (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
-		membershipKey := func(ug record.UserGroup) int64 { return ug.GroupId }
-		membershipId := func(ug record.UserGroup) int64 { return ug.Id }
+		membershipKey := func(ug record.UserGroup) int64 { return ug.GroupID }
+		membershipId := func(ug record.UserGroup) int64 { return ug.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where
 		// the autocommitted writes this replaced could leave a membership added, and audited, under
@@ -212,7 +212,7 @@ func HandleUserGroupsPut(
 				return lockErr
 			}
 
-			stored, loadErr := database.GetUserGroupsByUserId(r.Context(), tx, user.Id)
+			stored, loadErr := database.GetUserGroupsByUserID(r.Context(), tx, user.ID)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user groups before update")
 			}
@@ -237,8 +237,8 @@ func HandleUserGroupsPut(
 			}
 			for _, groupId := range insert {
 				if createErr := database.CreateUserGroup(r.Context(), tx, &record.UserGroup{
-					UserId:  user.Id,
-					GroupId: groupId,
+					UserID:  user.ID,
+					GroupID: groupId,
 				}); createErr != nil {
 					return errs.Wrapf(createErr, "database error adding the user to group %d", groupId)
 				}
@@ -269,7 +269,7 @@ func HandleUserGroupsPut(
 			return
 		}
 		if err != nil {
-			writeListSaveFailure(w, r, err, "user_id", user.Id)
+			writeListSaveFailure(w, r, err, "user_id", user.ID)
 			return
 		}
 
@@ -278,25 +278,25 @@ func HandleUserGroupsPut(
 		loggedInSubject := callerSubject(r)
 		for _, groupId := range added {
 			auditLogger.Log(r.Context(), audit.EventUserAddedToGroup, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"group_id":       groupId,
 				"logged_in_user": loggedInSubject,
 			})
 		}
 		for _, groupId := range removed {
 			auditLogger.Log(r.Context(), audit.EventUserRemovedFromGroup, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"group_id":       groupId,
 				"logged_in_user": loggedInSubject,
 			})
 		}
-		recordMembershipChanges(r, auditLogger, user.Id, changeGranted, joined)
-		recordMembershipChanges(r, auditLogger, user.Id, changeRevoked, left)
+		recordMembershipChanges(r, auditLogger, user.ID, changeGranted, joined)
+		recordMembershipChanges(r, auditLogger, user.ID, changeRevoked, left)
 
 		// Reload user groups to get updated state
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error reloading user groups after update"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error reloading user groups after update"), "user_id", user.ID)
 			return
 		}
 
@@ -304,7 +304,7 @@ func HandleUserGroupsPut(
 		// 500 for a request whose effect stands; a retry of the same set writes nothing new.
 		memberCounts, err := countGroupMembers(r.Context(), database, user.Groups)
 		if err != nil {
-			writeInternalServerError(w, r, err, "user_id", user.Id)
+			writeInternalServerError(w, r, err, "user_id", user.ID)
 			return
 		}
 

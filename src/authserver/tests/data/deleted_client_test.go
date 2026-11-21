@@ -34,7 +34,7 @@ func TestDeleteClient_RecordsTheDeletedIdentifier(t *testing.T) {
 	require.Nil(t, deletedClient(t, client.ClientIdentifier), "a client that exists was never deleted")
 
 	before := time.Now().UTC().Add(-time.Second)
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 	after := time.Now().UTC().Add(time.Second)
 
 	deleted := deletedClient(t, client.ClientIdentifier)
@@ -48,15 +48,15 @@ func TestDeleteClient_RecordsTheDeletedIdentifier(t *testing.T) {
 // latest can precede a client that exists now.
 func TestDeleteClient_ALaterDeletionReplacesTheRecord(t *testing.T) {
 	first := createTestClient(t)
-	require.NoError(t, database.DeleteClient(context.Background(), nil, first.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, first.ID))
 	firstDeletion := deletedClient(t, first.ClientIdentifier)
 	require.NotNil(t, firstDeletion)
 
 	time.Sleep(10 * time.Millisecond)
 	second := &record.Client{ClientIdentifier: first.ClientIdentifier, Description: "Test Client"}
 	require.NoError(t, database.CreateClient(context.Background(), nil, second))
-	require.NotEqual(t, first.Id, second.Id)
-	require.NoError(t, database.DeleteClient(context.Background(), nil, second.Id))
+	require.NotEqual(t, first.ID, second.ID)
+	require.NoError(t, database.DeleteClient(context.Background(), nil, second.ID))
 
 	secondDeletion := deletedClient(t, first.ClientIdentifier)
 	require.NotNil(t, secondDeletion)
@@ -70,11 +70,11 @@ func TestDeleteClient_ARolledBackDeletionRecordsNothing(t *testing.T) {
 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
-	require.NoError(t, database.DeleteClient(context.Background(), tx, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), tx, client.ID))
 	require.NoError(t, database.RollbackTransaction(context.Background(), tx))
 
 	assert.Nil(t, deletedClient(t, client.ClientIdentifier), "the deletion rolled back, and its record with it")
-	still, err := database.GetClientById(context.Background(), nil, client.Id)
+	still, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, still)
 }
@@ -82,11 +82,11 @@ func TestDeleteClient_ARolledBackDeletionRecordsNothing(t *testing.T) {
 // Deleting a client that is not there records nothing.
 func TestDeleteClient_AClientThatIsNotThereRecordsNothing(t *testing.T) {
 	client := createTestClient(t)
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 	deletion := deletedClient(t, client.ClientIdentifier)
 	require.NotNil(t, deletion)
 
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 
 	again := deletedClient(t, client.ClientIdentifier)
 	require.NotNil(t, again)
@@ -122,13 +122,13 @@ func runDeleteClientOverlappingARename(t *testing.T, db data.Database) {
 	renamed := "renamed_" + fake.LetterN(8)
 
 	rename := beginTxOn(t, db)
-	changed, err := db.SetClientIdentifier(ctx, rename, client.Id, renamed)
+	changed, err := db.SetClientIdentifier(ctx, rename, client.ID, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
 	deletion := goBlocked(t, "the deletion", rename, func(reached func()) error {
 		reached()
-		return db.DeleteClient(ctx, nil, client.Id)
+		return db.DeleteClient(ctx, nil, client.ID)
 	})
 
 	deletion.requireBlocked(t)
@@ -137,7 +137,7 @@ func runDeleteClientOverlappingARename(t *testing.T, db data.Database) {
 
 	require.NoError(t, deletion.await(t))
 
-	gone, err := db.GetClientById(ctx, nil, client.Id)
+	gone, err := db.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the client is deleted")
 
@@ -174,7 +174,7 @@ func runARenameOverlappingTheDeletion(t *testing.T, db data.Database) {
 	renamed := "renamed_" + fake.LetterN(8)
 
 	deletion := beginTxOn(t, db)
-	require.NoError(t, db.DeleteClient(ctx, deletion, client.Id))
+	require.NoError(t, db.DeleteClient(ctx, deletion, client.ID))
 
 	rename := beginTxOn(t, db)
 	type outcome struct {
@@ -183,7 +183,7 @@ func runARenameOverlappingTheDeletion(t *testing.T, db data.Database) {
 	}
 	renaming := goBlocked(t, "the rename", deletion, func(reached func()) outcome {
 		reached()
-		renameChanged, renameErr := db.SetClientIdentifier(ctx, rename, client.Id, renamed)
+		renameChanged, renameErr := db.SetClientIdentifier(ctx, rename, client.ID, renamed)
 		return outcome{renameChanged, renameErr}
 	})
 
@@ -209,7 +209,7 @@ func runARenameOverlappingTheDeletion(t *testing.T, db data.Database) {
 // without one, and a collation that folds case would find the other case (#283).
 func TestGetDeletedClientByClientIdentifier_ComparesTheIdentifierExactly(t *testing.T) {
 	client := createTestClient(t)
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 	require.NotNil(t, deletedClient(t, client.ClientIdentifier))
 
 	for name, asked := range map[string]string{

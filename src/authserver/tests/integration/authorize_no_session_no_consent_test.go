@@ -25,7 +25,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -34,7 +34,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -118,10 +118,10 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 }
@@ -133,7 +133,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -142,7 +142,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -231,10 +231,10 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods)
 	assert.False(t, code.Used)
 }
@@ -246,7 +246,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -255,7 +255,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -356,10 +356,10 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 }
@@ -371,7 +371,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -380,7 +380,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -479,10 +479,10 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 }
@@ -494,7 +494,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -503,7 +503,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -604,10 +604,10 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
 	assert.Equal(t, redirectUri.URI, code.RedirectURI)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
-	assert.Equal(t, record.AcrLevel2Mandatory, code.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, code.ACRLevel)
 	assert.Equal(t, fmt.Sprintf("%s %s", oidc.AuthMethodPassword.String(), oidc.AuthMethodOTP.String()), code.AuthMethods)
 	assert.False(t, code.Used)
 }
@@ -618,7 +618,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -627,7 +627,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -712,7 +712,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -721,7 +721,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
@@ -828,7 +828,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Mandatory,
+		DefaultACRLevel:          record.ACRLevel2Mandatory,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -837,7 +837,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 

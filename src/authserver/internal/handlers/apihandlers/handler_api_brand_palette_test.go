@@ -212,7 +212,7 @@ func TestBrandPalette_UpdateRefusals(t *testing.T) {
 	for _, c := range brandPaletteRefusals {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 
 			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
@@ -290,7 +290,7 @@ func storedCustomBrand(appearance record.BrandAppearance) *record.Brand {
 
 // expectBrandRead is what a brand read needs besides the brand: the default and the counts.
 func expectBrandRead(database *datamocks.Database, brand *record.Brand) {
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), brand.Id).Return(brand, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), brand.ID).Return(brand, nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
@@ -419,8 +419,8 @@ func TestBrandPalette_ACustomBrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 				return brand
 			}
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
 			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 				Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Twice()
 			database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Twice()
@@ -455,7 +455,7 @@ func TestBrandPalette_ABuiltInThemeSavedOverACustomOneDropsThePalette(t *testing
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedCustomBrand(record.BrandAppearanceAuto), nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedCustomBrand(record.BrandAppearanceAuto), nil).Once()
 			database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 				Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 			database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Once()
@@ -498,7 +498,7 @@ func TestBrandPalette_TheAuditEventsRecordTheThemeAndTheMode(t *testing.T) {
 	})
 	t.Run("update", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).

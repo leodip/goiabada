@@ -59,13 +59,13 @@ const maxOTPRequestBodyBytes = 64 * 1024
 // that is not yet stale, so the request would answer 200 with a seed that was never stored and
 // that the PUT could therefore never accept (#247).
 func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record.User, staleBefore time.Time) (string, error) {
-	if len(user.OtpEnrollmentSecretEncrypted) == 0 || !user.OtpEnrollmentIssuedAt.Valid {
+	if len(user.OTPEnrollmentSecretEncrypted) == 0 || !user.OTPEnrollmentIssuedAt.Valid {
 		return "", nil
 	}
-	if user.OtpEnrollmentIssuedAt.Time.Before(staleBefore) {
+	if user.OTPEnrollmentIssuedAt.Time.Before(staleBefore) {
 		return "", nil
 	}
-	return dataCipher.Decrypt(user.OtpEnrollmentSecretEncrypted)
+	return dataCipher.Decrypt(user.OTPEnrollmentSecretEncrypted)
 }
 
 // writeLostOTPChange answers an enable or a disable whose compare-and-set matched nothing, from what
@@ -82,7 +82,7 @@ func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record
 func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByIdReader, userId int64,
 	wantEnabled bool) {
 
-	current, err := database.GetUserById(r.Context(), nil, userId)
+	current, err := database.GetUserByID(r.Context(), nil, userId)
 	if err != nil {
 		writeInternalServerError(w, r, err)
 		return
@@ -104,7 +104,7 @@ func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByI
 
 // userByIdReader is the one read writeLostOTPChange makes.
 type userByIdReader interface {
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 }
 
 // accountOTPDatabase is what the account OTP endpoints need: the caller's user row, the pending
@@ -116,7 +116,7 @@ type userByIdReader interface {
 type accountOTPDatabase interface {
 	otpcredential.Database
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
@@ -193,7 +193,7 @@ func HandleAccountOTPEnrollmentGet(
 				return
 			}
 
-			installed, enrollErr := database.TryInstallPendingOTPEnrollment(r.Context(), nil, user.Id, secretEncrypted, now, staleBefore)
+			installed, enrollErr := database.TryInstallPendingOTPEnrollment(r.Context(), nil, user.ID, secretEncrypted, now, staleBefore)
 			if enrollErr != nil {
 				writeInternalServerError(w, r, enrollErr)
 				return
@@ -206,7 +206,7 @@ func HandleAccountOTPEnrollmentGet(
 				// the row is read back and the winner's value answered instead. Two
 				// concurrent calls then agree on one enrollment, which is the reason the
 				// install is conditional at all.
-				user, enrollErr = database.GetUserById(r.Context(), nil, user.Id)
+				user, enrollErr = database.GetUserByID(r.Context(), nil, user.ID)
 				if enrollErr != nil {
 					writeInternalServerError(w, r, enrollErr)
 					return
@@ -428,7 +428,7 @@ func HandleAccountOTPPut(
 				// That is no replay: the account gone is the 404 a request arriving a moment later
 				// would get, with nothing audited (#796 decision 3). A replay on an account still
 				// there is answered as a wrong code, as below.
-				current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+				current, readErr := database.GetUserByID(r.Context(), nil, user.ID)
 				if readErr != nil {
 					writeInternalServerError(w, r, readErr)
 					return
@@ -443,7 +443,7 @@ func HandleAccountOTPPut(
 				// existing failure event, and here there is none. That is why the verification
 				// reports an outcome and leaves the audit set to each caller (#387 decision 4).
 				auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-					"user_id":        user.Id,
+					"user_id":        user.ID,
 					"step":           verified.Step,
 					"logged_in_user": subject,
 				})
@@ -459,7 +459,7 @@ func HandleAccountOTPPut(
 				// clock from guessing everywhere a code is checked. Nothing was claimed, so the
 				// user's next code still enables (#142).
 				auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-					"user_id":        user.Id,
+					"user_id":        user.ID,
 					"logged_in_user": subject,
 					"reason":         audit.AuthFailedOtpClockAhead,
 				})
@@ -483,18 +483,18 @@ func HandleAccountOTPPut(
 			if !established {
 				// The authenticator is no longer as this request read it, so nothing was
 				// stored; the passcode's step stays spent, as for a failed enable (#111).
-				writeLostOTPChange(w, r, database, user.Id, true)
+				writeLostOTPChange(w, r, database, user.ID, true)
 				return
 			}
 			defer notifier.Send(r, accountnotice.OTPEnabled, accountnotice.To(current))
 
 			auditLogger.Log(r.Context(), audit.EventEnabledOTP, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"logged_in_user": subject,
 			})
 			// Beside the enable, after the commit, and naming nothing of the codes (#257 decision 10).
 			auditLogger.Log(r.Context(), audit.EventRecoveryCodesCreated, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"logged_in_user": subject,
 			})
 			recoveryCodes = codes
@@ -511,13 +511,13 @@ func HandleAccountOTPPut(
 				return
 			}
 			if !removed {
-				writeLostOTPChange(w, r, database, user.Id, false)
+				writeLostOTPChange(w, r, database, user.ID, false)
 				return
 			}
 			defer notifier.Send(r, accountnotice.OTPDisabled, accountnotice.To(current))
 
 			auditLogger.Log(r.Context(), audit.EventDisabledOTP, map[string]interface{}{
-				"user_id":        user.Id,
+				"user_id":        user.ID,
 				"logged_in_user": subject,
 			})
 		}
@@ -534,7 +534,7 @@ func HandleAccountOTPPut(
 		// had (#242, parts 1.2 and 1.3).
 
 		// Get updated user and respond
-		updated, err := database.GetUserById(r.Context(), nil, user.Id)
+		updated, err := database.GetUserByID(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

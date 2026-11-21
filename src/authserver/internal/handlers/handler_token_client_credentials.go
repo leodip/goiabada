@@ -21,7 +21,7 @@ func (tr tokenResponder) respondClientCredentials(w http.ResponseWriter, r *http
 	}
 
 	tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedClientCredentialsResponse, map[string]interface{}{
-		"client_id": grant.Client.Id,
+		"client_id": grant.Client.ID,
 		// Which scopes were issued, to whom. Absent before, which is why exploitation of
 		// the #104 cross-resource escalation cannot be reconstructed from the audit log for
 		// any period before this release. Forward-looking only.

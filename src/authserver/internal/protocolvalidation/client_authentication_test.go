@@ -193,7 +193,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 				require.NoError(t, err)
 				client := &record.Client{
-					Id:                      7,
+					ID:                      7,
 					ClientIdentifier:        "the_client",
 					Enabled:                 true,
 					IsPublic:                r.isPublic,

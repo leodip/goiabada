@@ -44,10 +44,10 @@ func TestRunInTransaction_ABodyThatReturnsNilIsCommittedAndItsRowsAreVisible(t *
 	})
 
 	require.NoError(t, err)
-	require.NotZero(t, client.Id)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	require.NotZero(t, client.ID)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	got, err := database.GetClientById(context.Background(), nil, client.Id)
+	got, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got, "the row is visible through the pool after the helper returned, so it was committed")
 	assert.Equal(t, client.ClientIdentifier, got.ClientIdentifier)
@@ -63,7 +63,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 		}
 		// Enlisted: the insert is visible on the transaction that made it, which is what a
 		// write handed nil instead of tx would not show from here, having autocommitted.
-		inside, err := database.GetClientById(context.Background(), tx, client.Id)
+		inside, err := database.GetClientByID(context.Background(), tx, client.ID)
 		if err != nil {
 			return err
 		}
@@ -75,9 +75,9 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 
 	require.Error(t, err)
 	assert.Equal(t, refused, err, "the body's error is returned as it was, not wrapped and not replaced")
-	require.NotZero(t, client.Id, "the insert ran before the body refused")
+	require.NotZero(t, client.ID, "the insert ran before the body refused")
 
-	got, err := database.GetClientById(context.Background(), nil, client.Id)
+	got, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, got, "the insert did not survive the rollback: the write was enlisted in the transaction the body was handed")
 }
@@ -108,8 +108,8 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	rowA := createTestClient(t)
 	rowB := createTestClient(t)
 	t.Cleanup(func() {
-		_ = database.DeleteClient(context.Background(), nil, rowA.Id)
-		_ = database.DeleteClient(context.Background(), nil, rowB.Id)
+		_ = database.DeleteClient(context.Background(), nil, rowA.ID)
+		_ = database.DeleteClient(context.Background(), nil, rowB.ID)
 	})
 
 	aHeld := make(chan struct{})
@@ -120,7 +120,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	party := func(db data.Database, first, second *record.Client, held *sync.Once, mine, theirs chan struct{}) error {
 		return db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			attempts.Add(1)
-			if err := db.AcquireClientRow(context.Background(), tx, first.Id); err != nil {
+			if err := db.AcquireClientRow(context.Background(), tx, first.ID); err != nil {
 				return err
 			}
 			held.Do(func() { close(mine) })
@@ -129,7 +129,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 			case <-time.After(deadlockCeiling):
 				return errors.New("the other party never took its first row")
 			}
-			return db.AcquireClientRow(context.Background(), tx, second.Id)
+			return db.AcquireClientRow(context.Background(), tx, second.ID)
 		})
 	}
 
@@ -150,7 +150,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 		"exactly one party was chosen as the victim and ran its body a second time; %d attempts in total", attempts.Load())
 
 	for _, row := range []*record.Client{rowA, rowB} {
-		got, err := database.GetClientById(context.Background(), nil, row.Id)
+		got, err := database.GetClientByID(context.Background(), nil, row.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, got, "both rows are still there after both parties committed")
 	}
@@ -203,7 +203,7 @@ func TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAW
 	for i := range cancelledCommitRuns {
 		ctx, cancel := context.WithCancel(context.Background())
 		err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			if _, readErr := database.GetSettingsById(ctx, tx, 1); readErr != nil {
+			if _, readErr := database.GetSettingsByID(ctx, tx, 1); readErr != nil {
 				return readErr
 			}
 			cancel()
@@ -215,7 +215,7 @@ func TestRunInTransaction_ARunCancelledBeforeItsCommitLeavesTheNextTransactionAW
 			"run %d: its commit was refused before the driver was asked, so its outcome is known", i)
 
 		err = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			_, readErr := database.GetSettingsById(context.Background(), tx, 1)
+			_, readErr := database.GetSettingsByID(context.Background(), tx, 1)
 			return readErr
 		})
 		require.NoError(t, err, "run %d: the transaction after a cancelled one opens and runs", i)

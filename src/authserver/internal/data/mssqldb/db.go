@@ -130,16 +130,16 @@ func New(ctx context.Context, dbConfig *DatabaseConfig, logSQL bool) (*Database,
 		return nil, errs.Wrap(err, "unable to connect to database")
 	}
 
-	commonDb := commondb.New(db, data.MSSQL, logSQL)
-	commonDb.IsDeadlock = isDeadlock
-	commonDb.IsUniqueViolation = isUniqueViolation
-	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
+	commonDB := commondb.New(db, data.MSSQL, logSQL)
+	commonDB.IsDeadlock = isDeadlock
+	commonDB.IsUniqueViolation = isUniqueViolation
+	commonDB.ExplicitIDInsertSQL = explicitIDInsertSQL
 
-	mssqlDb := Database{
-		Database: commonDb,
+	mssqlDB := Database{
+		Database: commonDB,
 		dbConfig: dbConfig,
 	}
-	return &mssqlDb, nil
+	return &mssqlDB, nil
 }
 
 // open is sql.Open("sqlserver", dsn) for a configuration rather than a string, which is what

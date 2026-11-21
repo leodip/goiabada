@@ -48,7 +48,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	assert.Equal(t, u.Email, body.EmailDestination)
 
 	// DB should have code and issuedAt
-	updated, err := database.GetUserById(context.Background(), nil, u.Id)
+	updated, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updated.EmailVerificationCodeEncrypted)
 	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid)
@@ -91,7 +91,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	// Mark user as verified
-	user, err := database.GetUserById(context.Background(), nil, u.Id)
+	user, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil
@@ -151,7 +151,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	_ = makeAPIRequest(t, "POST", sendURL, accessToken, map[string]string{})
 
 	// Load user and decrypt code
-	user, err := database.GetUserById(context.Background(), nil, u.Id)
+	user, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	code, err := dataCipher.Decrypt(user.EmailVerificationCodeEncrypted)
 	require.NoError(t, err)
@@ -166,7 +166,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, body.User.EmailVerified)
 
-	updated, err := database.GetUserById(context.Background(), nil, u.Id)
+	updated, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.True(t, updated.EmailVerified)
 	assert.Nil(t, updated.EmailVerificationCodeEncrypted)
@@ -196,7 +196,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
 	// Manually set a code that is already expired
-	user, err := database.GetUserById(context.Background(), nil, u.Id)
+	user, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	codePlain := "ABC123"
 	encrypted, err := dataCipher.Encrypt(codePlain)
@@ -221,7 +221,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	// Enable SMTP
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
 
-	user, err := database.GetUserById(context.Background(), nil, u.Id)
+	user, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil

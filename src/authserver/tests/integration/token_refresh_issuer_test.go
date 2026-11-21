@@ -51,14 +51,14 @@ func TestToken_Refresh_ATokenOfAnEarlierIssuerIsRefused(t *testing.T) {
 
 	assertRefusedForItsIssuer(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken)
 	assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "the refusal revokes nothing")
-	rows, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	rows, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1, "the refusal minted no refresh token")
 
 	assertInactive(t, introspectAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken))
 	revokeAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken)
 	assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "revocation revoked nothing: the token is not live")
-	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, refreshToken).FirstRefreshTokenJti)
+	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, refreshToken).FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.False(t, recorded, "nor recorded its family")
 
@@ -154,7 +154,7 @@ func TestToken_Refresh_ARotatedTokenOfAnEarlierIssuerContainsItsFamily(t *testin
 	assert.Equal(t, "This refresh token has been revoked.", body["error_description"])
 
 	assert.True(t, refreshTokenRowByJti(t, rt2).Revoked, "the family's live member is revoked")
-	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, rt1).FirstRefreshTokenJti)
+	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, rt1).FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.True(t, recorded, "the family is recorded as revoked")
 	status, body = replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt2)

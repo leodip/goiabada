@@ -34,11 +34,11 @@ func legalShortName(prefix string) string {
 // retireWhenDone retires the document when the test ends, whatever it left it as.
 func retireWhenDone(t *testing.T, id int64) {
 	t.Cleanup(func() {
-		doc, err := database.GetLegalDocumentById(context.Background(), nil, id)
+		doc, err := database.GetLegalDocumentByID(context.Background(), nil, id)
 		if err != nil || doc == nil || doc.RetiredAt.Valid {
 			return
 		}
-		versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+		versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(context.Background(), nil, id)
 		if err != nil {
 			return
 		}
@@ -150,7 +150,7 @@ func TestAPILegalDocuments_DraftPublishAndVersions(t *testing.T) {
 	status, _, _ = legalCall(t, accessToken, http.MethodGet, legalPath(id, "/versions/3"), nil)
 	assert.Equal(t, http.StatusNotFound, status)
 
-	stored, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+	stored, err := database.GetLegalDocumentVersionsByLegalDocumentID(context.Background(), nil, id)
 	require.NoError(t, err)
 	require.Len(t, stored, 2)
 	assert.Equal(t, "# Terms\n\nFirst text, fixed.", stored[0].Markdown, "version 1 is never rewritten")
@@ -335,7 +335,7 @@ func TestAPILegalDocuments_TheSettingsDomainsScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 			for _, r := range reads {
 				status, _, _ := legalCall(t, token, r.method, r.path, nil)

@@ -42,7 +42,7 @@ func expectGuardOfGroup(database *datamocks.Database, tx *sql.Tx, group int64) {
 // nothing.
 func expectGuardOfOrdinaryUser(database *datamocks.Database, tx *sql.Tx, userId int64) {
 	expectAdministratorsLock(database, tx)
-	database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, tx, userId, permManage).
+	database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, tx, userId, permManage).
 		Return((*record.UserPermission)(nil), nil).Once()
-	database.On("GetUserGroupsByUserId", mock.Anything, tx, userId).Return([]record.UserGroup{}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, tx, userId).Return([]record.UserGroup{}, nil).Once()
 }

@@ -20,10 +20,10 @@ var redirectURIColumns = columnList{
 // scanRedirectURI reads one row selected with redirectURIColumns.
 func scanRedirectURI(row rowScanner, redirectURI *record.RedirectURI) error {
 	return row.Scan(
-		&redirectURI.Id,
+		&redirectURI.ID,
 		&redirectURI.CreatedAt,
 		&redirectURI.URI,
-		&redirectURI.ClientId,
+		&redirectURI.ClientID,
 	)
 }
 
@@ -34,14 +34,14 @@ var insertRedirectURI = statement{
 	mssql:    "INSERT INTO redirect_uris (created_at, uri, client_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
 }
 
-var selectRedirectURIById = statement{
+var selectRedirectURIByID = statement{
 	sqlite:   "SELECT " + redirectURIColumns.sqlite + " FROM redirect_uris WHERE id = ?",
 	mysql:    "SELECT " + redirectURIColumns.mysql + " FROM redirect_uris WHERE id = ?",
 	postgres: "SELECT " + redirectURIColumns.postgres + " FROM redirect_uris WHERE id = $1",
 	mssql:    "SELECT " + redirectURIColumns.mssql + " FROM redirect_uris WHERE id = @p1",
 }
 
-var selectRedirectURIsByClientId = statement{
+var selectRedirectURIsByClientID = statement{
 	sqlite:   "SELECT " + redirectURIColumns.sqlite + " FROM redirect_uris WHERE client_id = ?",
 	mysql:    "SELECT " + redirectURIColumns.mysql + " FROM redirect_uris WHERE client_id = ?",
 	postgres: "SELECT " + redirectURIColumns.postgres + " FROM redirect_uris WHERE client_id = $1",
@@ -57,7 +57,7 @@ var deleteRedirectURI = statement{
 
 func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error {
 
-	if redirectURI.ClientId == 0 {
+	if redirectURI.ClientID == 0 {
 		return errs.New("client id must be greater than 0")
 	}
 
@@ -67,28 +67,28 @@ func (d *Database) CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectUR
 	redirectURI.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertRedirectURI, "redirectURI",
-		redirectURI.CreatedAt, redirectURI.URI, redirectURI.ClientId)
+		redirectURI.CreatedAt, redirectURI.URI, redirectURI.ClientID)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
 		return err
 	}
 
-	redirectURI.Id = id
+	redirectURI.ID = id
 	return nil
 }
 
-func (d *Database) GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*record.RedirectURI, error) {
-	return queryOne(ctx, d, tx, selectRedirectURIById.text(d.Dialect), []any{redirectURIId}, scanRedirectURI, "redirectURI")
+func (d *Database) GetRedirectURIByID(ctx context.Context, tx *sql.Tx, redirectURIID int64) (*record.RedirectURI, error) {
+	return queryOne(ctx, d, tx, selectRedirectURIByID.text(d.Dialect), []any{redirectURIID}, scanRedirectURI, "redirectURI")
 }
 
-func (d *Database) GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error) {
-	return queryAll(ctx, d, tx, []record.RedirectURI{}, selectRedirectURIsByClientId.text(d.Dialect), []any{clientId},
+func (d *Database) GetRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.RedirectURI, error) {
+	return queryAll(ctx, d, tx, []record.RedirectURI{}, selectRedirectURIsByClientID.text(d.Dialect), []any{clientID},
 		scanRedirectURI, "redirectURI")
 }
 
-func (d *Database) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error {
+func (d *Database) DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteRedirectURI.text(d.Dialect), redirectURIId)
+	_, err := d.ExecSQL(ctx, tx, deleteRedirectURI.text(d.Dialect), redirectURIID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete redirectURI")
 	}

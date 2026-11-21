@@ -51,8 +51,8 @@ func (d *choiceSavedDuringTheRead) GetUserBySubject(ctx context.Context, tx *sql
 	return read, nil
 }
 
-func (d *choiceSavedDuringTheRead) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
-	read, err := d.Database.GetUserById(ctx, tx, userId)
+func (d *choiceSavedDuringTheRead) GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
+	read, err := d.Database.GetUserByID(ctx, tx, userId)
 	require.NoError(d.t, err)
 	d.saveChoiceUnder(ctx, read)
 	return read, nil
@@ -77,9 +77,9 @@ func TestPageLanguage_AProfileSaveLeavingItOutCannotUndoAChoiceSavedMeanwhile(t 
 			return rr
 		}},
 		{"PUT /api/v1/admin/users/{id}/profile", func(t *testing.T, db *choiceSavedDuringTheRead, user *record.User, body string) *httptest.ResponseRecorder {
-			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/"+strconv.FormatInt(user.Id, 10)+"/profile",
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/"+strconv.FormatInt(user.ID, 10)+"/profile",
 				strings.NewReader(body))
-			req.SetPathValue("id", strconv.FormatInt(user.Id, 10))
+			req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 			req = req.WithContext(reqctx.WithValidatedToken(req.Context(),
 				oauth.JWTToken{Claims: map[string]interface{}{"sub": "an-administrator", "scope": "authserver:manage"}}))
 			rr := httptest.NewRecorder()
@@ -97,7 +97,7 @@ func TestPageLanguage_AProfileSaveLeavingItOutCannotUndoAChoiceSavedMeanwhile(t 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.True(t, db.saved, "the choice was not saved during the read, so the case proves nothing")
 
-			stored, err := database.GetUserById(context.Background(), nil, user.Id)
+			stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			assert.Equal(t, "Ada", stored.GivenName, "the save's own fields landed")
 			assert.Equal(t, "de", stored.PageLanguage, "leaving pageLanguage out leaves the choice saved meanwhile")

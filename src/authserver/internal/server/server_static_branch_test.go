@@ -40,7 +40,7 @@ import (
 // files that can use neither.
 //
 // datamocks.NewDatabase(t) fails the test on any call nobody expected, so the absence of a
-// GetSettingsById expectation in the static case IS the assertion.
+// GetSettingsByID expectation in the static case IS the assertion.
 
 func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) {
 	database := datamocks.NewDatabase(t)
@@ -59,7 +59,7 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 	defer func() { _ = result.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, result.StatusCode, "the file must still be served")
-	database.AssertNotCalled(t, "GetSettingsById", mock.Anything, nilTx, int64(1))
+	database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, nilTx, int64(1))
 }
 
 // TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain is the other half, and
@@ -68,7 +68,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1}, nil).Once()
 
 	s := newStaticBranchTestServer(database)
 	app := s.initMiddleware().pages
@@ -85,7 +85,7 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 
 	assert.True(t, reached, "the request must reach the handler")
 	database.AssertExpectations(t)
-	database.AssertNumberOfCalls(t, "GetSettingsById", 1)
+	database.AssertNumberOfCalls(t, "GetSettingsByID", 1)
 }
 
 // nilTx is the transaction middleware.Settings passes, spelled out so AssertNotCalled names

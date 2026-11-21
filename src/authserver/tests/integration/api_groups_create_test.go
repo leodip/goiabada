@@ -146,13 +146,13 @@ func TestHandleGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 	existingGroup := &record.Group{
 		GroupIdentifier:      "existing-group-" + fake.LetterN(6),
 		Description:          "Existing Group",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, existingGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, existingGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, existingGroup.ID)
 	}()
 
 	// Try to create another group with same identifier
@@ -240,7 +240,7 @@ func TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		_ = database.DeleteGroup(context.Background(), nil, groupId)
 	}()
 
-	stored, err := database.GetGroupById(context.Background(), nil, groupId)
+	stored, err := database.GetGroupByID(context.Background(), nil, groupId)
 	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }

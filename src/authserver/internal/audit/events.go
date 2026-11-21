@@ -130,7 +130,7 @@ const (
 	EventOTPCodeReplayDetected = "otp_code_replay_detected"
 	// EventOTPAuthenticatorDisabled records the refused code that brought a user's
 	// consecutive failed attempts against their authenticator to
-	// record.OtpConsecutiveFailureLimit, disabling it until a new one is set up (NIST SP
+	// record.OTPConsecutiveFailureLimit, disabling it until a new one is set up (NIST SP
 	// 800-63B section 3.2.2, #489). Emitted once per disable, beside that attempt's
 	// EventAuthFailedOtp: the count's statement reports the one call that reached the
 	// limit, and the codes refused after it move nothing and raise nothing more.

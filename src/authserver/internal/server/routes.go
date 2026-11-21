@@ -587,7 +587,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// account_export tier comes last, so a request either guard refuses spends nothing
 		// (decision 5).
 		r.With(apiBearer.RequireAdminConsoleClient(),
-			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.AcrLevel2Optional, time.Now),
+			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.ACRLevel2Optional, time.Now),
 			rateLimiter.LimitAccountExport).Get("/export",
 			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))

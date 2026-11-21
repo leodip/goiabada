@@ -77,7 +77,7 @@ func newWelcomeRegistration(t *testing.T, signIns signInCeremonies, rr *httptest
 	passwordValidator.On("ValidatePassword", mock.Anything, newAccountPassword, mock.Anything).Return(nil).Once()
 	userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 		return input.Email == newAccountEmail
-	})).Return(&record.User{Id: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
+	})).Return(&record.User{ID: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Maybe()
 

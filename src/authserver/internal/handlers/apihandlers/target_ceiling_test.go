@@ -93,23 +93,23 @@ var (
 func expectUserHolding(database *datamocks.Database, holding targetHolding) {
 	var grants []record.UserPermission
 	for _, permissionId := range holding.direct {
-		grants = append(grants, record.UserPermission{UserId: targetUserId, PermissionId: permissionId})
+		grants = append(grants, record.UserPermission{UserID: targetUserId, PermissionID: permissionId})
 	}
-	database.On("GetUserPermissionsByUserId", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(grants, nil).Once()
+	database.On("GetUserPermissionsByUserID", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(grants, nil).Once()
 
 	var memberships []record.UserGroup
 	var groupIds []int64
 	var groupGrants []record.GroupPermission
 	for _, group := range holding.groups {
-		memberships = append(memberships, record.UserGroup{UserId: targetUserId, GroupId: group.id})
+		memberships = append(memberships, record.UserGroup{UserID: targetUserId, GroupID: group.id})
 		groupIds = append(groupIds, group.id)
 		for _, permissionId := range group.permissionIds {
-			groupGrants = append(groupGrants, record.GroupPermission{GroupId: group.id, PermissionId: permissionId})
+			groupGrants = append(groupGrants, record.GroupPermission{GroupID: group.id, PermissionID: permissionId})
 		}
 	}
-	database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(memberships, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(memberships, nil).Once()
 	if len(groupIds) > 0 {
-		database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), groupIds).Return(groupGrants, nil).Once()
+		database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), groupIds).Return(groupGrants, nil).Once()
 	}
 	expectAuthServerPermissions(database)
 }
@@ -119,9 +119,9 @@ func expectUserHolding(database *datamocks.Database, holding targetHolding) {
 func expectGroupHolding(database *datamocks.Database, holding targetHolding) {
 	var grants []record.GroupPermission
 	for _, permissionId := range holding.direct {
-		grants = append(grants, record.GroupPermission{GroupId: targetGroupId, PermissionId: permissionId})
+		grants = append(grants, record.GroupPermission{GroupID: targetGroupId, PermissionID: permissionId})
 	}
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{targetGroupId}).Return(grants, nil).Once()
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), []int64{targetGroupId}).Return(grants, nil).Once()
 	expectAuthServerPermissions(database)
 }
 
@@ -158,14 +158,14 @@ func withPasswordSettings(r *http.Request) *http.Request {
 
 func expectTargetUser(database *datamocks.Database, user *record.User) {
 	if user == nil {
-		user = &record.User{Id: targetUserId, Subject: "sub-52", Email: "target@example.com", Enabled: true}
+		user = &record.User{ID: targetUserId, Subject: "sub-52", Email: "target@example.com", Enabled: true}
 	}
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(user, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(user, nil).Once()
 }
 
 func expectTargetGroup(database *datamocks.Database) {
-	database.On("GetGroupById", mock.Anything, (*sql.Tx)(nil), targetGroupId).
-		Return(&record.Group{Id: targetGroupId, GroupIdentifier: "target-group"}, nil).Once()
+	database.On("GetGroupByID", mock.Anything, (*sql.Tx)(nil), targetGroupId).
+		Return(&record.Group{ID: targetGroupId, GroupIdentifier: "target-group"}, nil).Once()
 }
 
 func failingWrite(method string, arguments ...interface{}) func(database *datamocks.Database) {
@@ -240,7 +240,7 @@ var userTargetWrites = []targetWrite{
 		expectReads: func(database *datamocks.Database, _ bool) {
 			expectTargetUser(database, nil)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, "sub-52").
-				Return(&record.User{Id: targetUserId, Subject: "sub-52"}, nil).Once()
+				Return(&record.User{ID: targetUserId, Subject: "sub-52"}, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "taken-over@example.com").Return(nil, nil).Once()
 		},
 		writes:           []string{"SetUserEmail"},
@@ -300,7 +300,7 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			expectTargetUser(database, &record.User{Id: targetUserId, Subject: "sub-52", OTPEnabled: true})
+			expectTargetUser(database, &record.User{ID: targetUserId, Subject: "sub-52", OTPEnabled: true})
 		},
 		writes:           []string{"RunInTransaction"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
@@ -322,7 +322,7 @@ var userTargetWrites = []targetWrite{
 		expectReads: func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
 		writes:      []string{"CreateUserProfilePicture", "UpdateUserProfilePicture"},
 		expectFirstWrite: func(database *datamocks.Database) {
-			database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(nil, nil).Once()
+			database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(nil, nil).Once()
 			database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errFirstWriteFails).Once()
 		},
 	},
@@ -375,8 +375,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetUserAttributeById", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
-				Return(&record.UserAttribute{Id: targetAttributeId, UserId: targetUserId, Key: "tier", Value: "gold"}, nil).Once()
+			database.On("GetUserAttributeByID", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
+				Return(&record.UserAttribute{ID: targetAttributeId, UserID: targetUserId, Key: "tier", Value: "gold"}, nil).Once()
 		},
 		writes:           []string{"UpdateUserAttribute"},
 		expectFirstWrite: failingWrite("UpdateUserAttribute", mock.Anything, (*sql.Tx)(nil), mock.Anything),
@@ -391,8 +391,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetUserAttributeById", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
-				Return(&record.UserAttribute{Id: targetAttributeId, UserId: targetUserId, Key: "tier"}, nil).Once()
+			database.On("GetUserAttributeByID", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
+				Return(&record.UserAttribute{ID: targetAttributeId, UserID: targetUserId, Key: "tier"}, nil).Once()
 		},
 		writes:           []string{"DeleteUserAttribute"},
 		expectFirstWrite: failingWrite("DeleteUserAttribute", mock.Anything, (*sql.Tx)(nil), targetAttributeId),
@@ -408,11 +408,11 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), targetSessionId).
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), targetSessionId).
 				Return(liveSessionOf(targetSessionId, "sid-91", targetUserId), nil).Once()
 			// The termination reads the session's user's subject before its transaction (#784).
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), targetUserId).
-				Return(&record.User{Id: targetUserId, Subject: "subject-91"}, nil).Maybe()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), targetUserId).
+				Return(&record.User{ID: targetUserId, Subject: "subject-91"}, nil).Maybe()
 		},
 		writes:           []string{"RunInTransaction", "DeleteUserSession"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
@@ -427,8 +427,8 @@ var userTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), targetConsentId).
-				Return(&record.UserConsent{Id: targetConsentId, UserId: targetUserId, ClientId: 3}, nil).Once()
+			database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), targetConsentId).
+				Return(&record.UserConsent{ID: targetConsentId, UserID: targetUserId, ClientID: 3}, nil).Once()
 		},
 		writes:           []string{"RunInTransaction", "DeleteUserConsent"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
@@ -445,8 +445,8 @@ var userTargetWrites = []targetWrite{
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
 			expectTargetUser(database, nil)
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(3)).
-				Return(&record.Client{Id: 3, ClientIdentifier: "app-3"}, nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
+				Return(&record.Client{ID: 3, ClientIdentifier: "app-3"}, nil).Once()
 		},
 		writes:           []string{"RunInTransaction", "DeleteUserConsent"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
@@ -516,7 +516,7 @@ var userTargetWrites = []targetWrite{
 		expectReads: func(database *datamocks.Database, _ bool) {
 			expectGroup(database, ordinaryGroupId)
 			expectTargetUser(database, nil)
-			database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), targetUserId, ordinaryGroupId).
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), targetUserId, ordinaryGroupId).
 				Return((*record.UserGroup)(nil), nil).Once()
 			// The grant ceiling's read of what the group holds, which an authserver:manage caller
 			// makes too, for the change's records.
@@ -538,8 +538,8 @@ var userTargetWrites = []targetWrite{
 		expectReads: func(database *datamocks.Database, _ bool) {
 			expectGroup(database, ordinaryGroupId)
 			expectTargetUser(database, nil)
-			database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), targetUserId, ordinaryGroupId).
-				Return(&record.UserGroup{Id: targetMembershipId, UserId: targetUserId, GroupId: ordinaryGroupId}, nil).Once()
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), targetUserId, ordinaryGroupId).
+				Return(&record.UserGroup{ID: targetMembershipId, UserID: targetUserId, GroupID: ordinaryGroupId}, nil).Once()
 			expectGroupPermissions(database, ordinaryGroupId)
 			expectAuthServerPermissions(database)
 		},
@@ -589,8 +589,8 @@ var groupTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetGroupAttributeById", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
-				Return(&record.GroupAttribute{Id: targetAttributeId, GroupId: targetGroupId, Key: "tier", Value: "gold"}, nil).Once()
+			database.On("GetGroupAttributeByID", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
+				Return(&record.GroupAttribute{ID: targetAttributeId, GroupID: targetGroupId, Key: "tier", Value: "gold"}, nil).Once()
 		},
 		writes: []string{"UpdateGroupAttribute"},
 		expectFirstWrite: func(database *datamocks.Database) {
@@ -609,8 +609,8 @@ var groupTargetWrites = []targetWrite{
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
-			database.On("GetGroupAttributeById", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
-				Return(&record.GroupAttribute{Id: targetAttributeId, GroupId: targetGroupId, Key: "tier"}, nil).Once()
+			database.On("GetGroupAttributeByID", mock.Anything, (*sql.Tx)(nil), targetAttributeId).
+				Return(&record.GroupAttribute{ID: targetAttributeId, GroupID: targetGroupId, Key: "tier"}, nil).Once()
 		},
 		writes: []string{"DeleteGroupAttribute"},
 		expectFirstWrite: func(database *datamocks.Database) {
@@ -819,9 +819,9 @@ func TestTargetCeiling_AManageTokenWritesToAdministratorsAndReadsNothingForIt(t 
 					continue
 				}
 				switch call.Method {
-				case "GetUserPermissionsByUserId", "GetUserGroupsByUserId":
+				case "GetUserPermissionsByUserID", "GetUserGroupsByUserID":
 					t.Errorf("%s was read for the target ceiling", call.Method)
-				case "GetGroupPermissionsByGroupIds":
+				case "GetGroupPermissionsByGroupIDs":
 					if ids, ok := call.Arguments.Get(2).([]int64); ok && len(ids) == 1 && ids[0] == targetGroupId {
 						t.Errorf("the target group's permissions were read for the target ceiling")
 					}
@@ -842,10 +842,10 @@ func TestTargetCeiling_AFailedPolicyReadIsOneFiveHundred(t *testing.T) {
 
 			write.expectReads(database, true)
 			if write.kind == targetKindGroup {
-				database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{targetGroupId}).
+				database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), []int64{targetGroupId}).
 					Return(nil, errors.New("the read failed")).Once()
 			} else {
-				database.On("GetUserPermissionsByUserId", mock.Anything, (*sql.Tx)(nil), targetUserId).
+				database.On("GetUserPermissionsByUserID", mock.Anything, (*sql.Tx)(nil), targetUserId).
 					Return(nil, errors.New("the read failed")).Once()
 			}
 
@@ -866,14 +866,14 @@ func TestTargetCeiling_AFailedPolicyReadIsOneFiveHundred(t *testing.T) {
 func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 	assertNoTargetPolicyRead := func(t *testing.T, database *datamocks.Database) {
 		t.Helper()
-		assertNotAttemptedOnClientDatabase(t, database, "GetUserPermissionsByUserId", "GetUserGroupsByUserId",
-			"GetGroupPermissionsByGroupIds", "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+		assertNotAttemptedOnClientDatabase(t, database, "GetUserPermissionsByUserID", "GetUserGroupsByUserID",
+			"GetGroupPermissionsByGroupIDs", "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 	}
 
 	t.Run("a user that does not exist", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(nil, nil).Once()
+		database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), targetUserId).Return(nil, nil).Once()
 
 		r := targetRequest(http.MethodDelete, "/api/v1/admin/users/52", "", granularScopeOfTarget, map[string]string{"id": "52"})
 		rr := httptest.NewRecorder()
@@ -887,7 +887,7 @@ func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 	t.Run("a user attribute that does not exist", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetUserAttributeById", mock.Anything, (*sql.Tx)(nil), targetAttributeId).Return(nil, nil).Once()
+		database.On("GetUserAttributeByID", mock.Anything, (*sql.Tx)(nil), targetAttributeId).Return(nil, nil).Once()
 
 		r := targetRequest(http.MethodDelete, "/api/v1/admin/user-attributes/90", "", granularScopeOfTarget, map[string]string{"id": "90"})
 		rr := httptest.NewRecorder()
@@ -917,7 +917,7 @@ func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		expectTargetGroup(database)
 		database.On("GetGroupByGroupIdentifier", mock.Anything, (*sql.Tx)(nil), "renamed-group").
-			Return(&record.Group{Id: 99, GroupIdentifier: "renamed-group"}, nil).Once()
+			Return(&record.Group{ID: 99, GroupIdentifier: "renamed-group"}, nil).Once()
 
 		r := targetRequest(http.MethodPut, "/api/v1/admin/groups/57", `{"groupIdentifier":"renamed-group"}`, granularScopeOfTarget,
 			map[string]string{"id": "57"})
@@ -933,6 +933,6 @@ func TestTargetCeiling_TheWritesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 // expectHoldsNothing registers the target ceiling's reads of a user who holds no grant, directly or
 // through a group, for a caller without authserver:manage: an ordinary user, whose write goes on.
 func expectHoldsNothing(database *datamocks.Database, userId int64) {
-	database.On("GetUserPermissionsByUserId", mock.Anything, (*sql.Tx)(nil), userId).Return([]record.UserPermission{}, nil).Once()
-	database.On("GetUserGroupsByUserId", mock.Anything, (*sql.Tx)(nil), userId).Return([]record.UserGroup{}, nil).Once()
+	database.On("GetUserPermissionsByUserID", mock.Anything, (*sql.Tx)(nil), userId).Return([]record.UserPermission{}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, (*sql.Tx)(nil), userId).Return([]record.UserGroup{}, nil).Once()
 }

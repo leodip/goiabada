@@ -43,11 +43,11 @@ func authServerPermissionId(t *testing.T, identifier string) int64 {
 	t.Helper()
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 	for _, permission := range permissions {
 		if permission.PermissionIdentifier == identifier {
-			return permission.Id
+			return permission.ID
 		}
 	}
 	t.Fatalf("the authserver resource has no permission %q", identifier)
@@ -71,21 +71,21 @@ var grantCeilingTargets = []grantCeilingTarget{
 		create: func(t *testing.T) int64 {
 			user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("ceiling@grants.test"), GivenName: "Ceiling"}
 			require.NoError(t, database.CreateUser(context.Background(), nil, user))
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-			return user.Id
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+			return user.ID
 		},
 		path: func(id int64) string { return fmt.Sprintf("/api/v1/admin/users/%d/permissions", id) },
 		stored: func(t *testing.T, id int64) []int64 {
-			rows, err := database.GetUserPermissionsByUserId(context.Background(), nil, id)
+			rows, err := database.GetUserPermissionsByUserID(context.Background(), nil, id)
 			require.NoError(t, err)
 			var ids []int64
 			for _, row := range rows {
-				ids = append(ids, row.PermissionId)
+				ids = append(ids, row.PermissionID)
 			}
 			return ids
 		},
 		grant: func(t *testing.T, id int64, permissionId int64) {
-			require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: id, PermissionId: permissionId}))
+			require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: id, PermissionID: permissionId}))
 		},
 	},
 	{
@@ -93,21 +93,21 @@ var grantCeilingTargets = []grantCeilingTarget{
 		granularScope: builtin.ManageUsersPermissionIdentifier,
 		create: func(t *testing.T) int64 {
 			group := createTestGroup(t)
-			t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-			return group.Id
+			t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
+			return group.ID
 		},
 		path: func(id int64) string { return fmt.Sprintf("/api/v1/admin/groups/%d/permissions", id) },
 		stored: func(t *testing.T, id int64) []int64 {
-			rows, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, id)
+			rows, err := database.GetGroupPermissionsByGroupID(context.Background(), nil, id)
 			require.NoError(t, err)
 			var ids []int64
 			for _, row := range rows {
-				ids = append(ids, row.PermissionId)
+				ids = append(ids, row.PermissionID)
 			}
 			return ids
 		},
 		grant: func(t *testing.T, id int64, permissionId int64) {
-			require.NoError(t, database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: id, PermissionId: permissionId}))
+			require.NoError(t, database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupID: id, PermissionID: permissionId}))
 		},
 	},
 	{
@@ -120,21 +120,21 @@ var grantCeilingTargets = []grantCeilingTarget{
 				ClientCredentialsEnabled: true,
 			}
 			require.NoError(t, database.CreateClient(context.Background(), nil, client))
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
-			return client.Id
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
+			return client.ID
 		},
 		path: func(id int64) string { return fmt.Sprintf("/api/v1/admin/clients/%d/permissions", id) },
 		stored: func(t *testing.T, id int64) []int64 {
-			rows, err := database.GetClientPermissionsByClientId(context.Background(), nil, id)
+			rows, err := database.GetClientPermissionsByClientID(context.Background(), nil, id)
 			require.NoError(t, err)
 			var ids []int64
 			for _, row := range rows {
-				ids = append(ids, row.PermissionId)
+				ids = append(ids, row.PermissionID)
 			}
 			return ids
 		},
 		grant: func(t *testing.T, id int64, permissionId int64) {
-			require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: id, PermissionId: permissionId}))
+			require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientID: id, PermissionID: permissionId}))
 		},
 	},
 }
@@ -149,7 +149,7 @@ func putPermissions(t *testing.T, accessToken, path string, wanted, expected []i
 	if expected == nil {
 		expected = []int64{}
 	}
-	body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+	body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 	require.NoError(t, err)
 
 	req, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+path, bytes.NewReader(body))
@@ -242,7 +242,7 @@ func TestGrantCeiling_AGranularTokenCannotGrantAnAdministrativePermission(t *tes
 
 	for _, target := range grantCeilingTargets {
 		granularToken, caller := createClientWithGranularScope(t, target.granularScope)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 		for _, identifier := range administrativePermissionIdentifiers {
 			t.Run(target.kind+"/"+identifier, func(t *testing.T) {
@@ -264,7 +264,7 @@ func TestGrantCeiling_AGranularTokenCannotRevokeAnAdministrativePermission(t *te
 
 	for _, target := range grantCeilingTargets {
 		granularToken, caller := createClientWithGranularScope(t, target.granularScope)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 		t.Run(target.kind, func(t *testing.T) {
 			targetId := target.create(t)
@@ -288,30 +288,30 @@ func TestGrantCeiling_AGranularTokenStillChangesOrdinaryPermissions(t *testing.T
 	manageToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "ceiling-res-"+strings.ToLower(fake.LetterN(6)), "Grant ceiling")
-	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
-	ordinary := createTestPermission(t, resource.Id, "read", "Read")
+	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) })
+	ordinary := createTestPermission(t, resource.ID, "read", "Read")
 	authServer, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	custom := createTestPermission(t, authServer.Id, "ceiling-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.Id) })
+	custom := createTestPermission(t, authServer.ID, "ceiling-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.ID) })
 	manageAccount := authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)
 
 	for _, target := range grantCeilingTargets {
 		granularToken, caller := createClientWithGranularScope(t, target.granularScope)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 		t.Run(target.kind, func(t *testing.T) {
 			targetId := target.create(t)
 
 			resp, requestId := putPermissions(t, granularToken, target.path(targetId),
-				[]int64{manageAccount, custom.Id, ordinary.Id}, []int64{})
+				[]int64{manageAccount, custom.ID, ordinary.ID}, []int64{})
 			_ = resp.Body.Close()
 			assert.Equal(t, http.StatusOK, resp.StatusCode, "manage-account, a custom authserver permission and another resource's are not administrative")
-			assert.ElementsMatch(t, []int64{manageAccount, custom.Id, ordinary.Id}, target.stored(t, targetId))
+			assert.ElementsMatch(t, []int64{manageAccount, custom.ID, ordinary.ID}, target.stored(t, targetId))
 			assert.Empty(t, refusalRows(t, manageToken, requestId))
 
 			resp, _ = putPermissions(t, granularToken, target.path(targetId),
-				[]int64{}, []int64{manageAccount, custom.Id, ordinary.Id})
+				[]int64{}, []int64{manageAccount, custom.ID, ordinary.ID})
 			_ = resp.Body.Close()
 			assert.Equal(t, http.StatusOK, resp.StatusCode, "and revoking them is as open")
 			assert.Empty(t, target.stored(t, targetId))

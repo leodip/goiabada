@@ -47,7 +47,7 @@ func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *tes
 	clientSecret := fake.LetterN(32)
 	code, destUrl := challengelessCode(t, clientSecret)
 
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil
@@ -92,7 +92,7 @@ func TestToken_AuthCode_ChallengelessCode_SurvivesTurningPKCEOnForAConfidentialC
 	clientSecret := fake.LetterN(32)
 	code, destUrl := challengelessCode(t, clientSecret)
 
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	pkceRequired := true
 	client.PKCERequired = &pkceRequired

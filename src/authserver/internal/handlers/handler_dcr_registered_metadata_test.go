@@ -35,7 +35,7 @@ func serveRawRegistration(t *testing.T, body string) (*httptest.ResponseRecorder
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 	rr := httptest.NewRecorder()
 	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 
@@ -214,7 +214,7 @@ func TestHandleDynamicClientRegistrationPost_StoresTheRegisteredMethod(t *testin
 
 			req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader([]byte(tc.body)))
 			req.Header.Set("Content-Type", "application/json")
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 			rr := httptest.NewRecorder()
 			HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 

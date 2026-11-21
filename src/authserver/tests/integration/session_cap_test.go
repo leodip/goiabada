@@ -25,7 +25,7 @@ func withSessionCap(t *testing.T, maxSessions int) *record.Settings {
 func storedSessionIds(sessions []record.UserSession) []int64 {
 	ids := []int64{}
 	for _, session := range sessions {
-		ids = append(ids, session.Id)
+		ids = append(ids, session.ID)
 	}
 	return ids
 }
@@ -46,11 +46,11 @@ func TestSessionCap_ASignInOverTheCapEndsTheLeastRecentlyUsedSession(t *testing.
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2, "the user holds no more than the cap")
-	assert.NotContains(t, storedSessionIds(sessions), first[0].Id, "the first browser's session is the one ended")
-	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.Id), 2)
+	assert.NotContains(t, storedSessionIds(sessions), first[0].ID, "the first browser's session is the one ended")
+	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.ID), 2)
 	assert.Equal(t, []map[string]any{{
-		"user_session_id": float64(first[0].Id),
-		"user_id":         float64(f.user.Id),
+		"user_session_id": float64(first[0].ID),
+		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
@@ -68,7 +68,7 @@ func TestSessionCap_ExpiredSessionsGoFirst(t *testing.T) {
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2)
 	valid, expired := sessions[0], sessions[1]
-	if valid.Id > expired.Id {
+	if valid.ID > expired.ID {
 		valid, expired = expired, valid
 	}
 	now := time.Now().UTC()
@@ -82,11 +82,11 @@ func TestSessionCap_ExpiredSessionsGoFirst(t *testing.T) {
 
 	after := f.storedSessions(t)
 	require.Len(t, after, 2)
-	assert.Contains(t, storedSessionIds(after), valid.Id, "the valid session stays")
-	assert.NotContains(t, storedSessionIds(after), expired.Id, "the expired session is the one ended")
+	assert.Contains(t, storedSessionIds(after), valid.ID, "the valid session stays")
+	assert.NotContains(t, storedSessionIds(after), expired.ID, "the expired session is the one ended")
 	assert.Equal(t, []map[string]any{{
-		"user_session_id": float64(expired.Id),
-		"user_id":         float64(f.user.Id),
+		"user_session_id": float64(expired.ID),
+		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
 	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))

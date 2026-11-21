@@ -25,8 +25,8 @@ const (
 // TargetRequiresSecondFactor reports whether a ceremony aiming at target has to answer the level 2
 // question, which is every level above level 1. A level outside the three answers false, as
 // IsHigherThan ranks it below level 1.
-func TargetRequiresSecondFactor(target record.AcrLevel) bool {
-	return target.IsHigherThan(record.AcrLevel1)
+func TargetRequiresSecondFactor(target record.ACRLevel) bool {
+	return target.IsHigherThan(record.ACRLevel1)
 }
 
 // StepUpOwed is the one "does this session satisfy the target level" rule, read by
@@ -46,7 +46,7 @@ func TargetRequiresSecondFactor(target record.AcrLevel) bool {
 // no re-prompt (#242 decision 1).
 //
 // A session ACR that does not parse is returned as an error; each caller decides what that answers.
-func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, error) {
+func StepUpOwed(target record.ACRLevel, session *record.UserSession) (StepUp, error) {
 	if session == nil {
 		if TargetRequiresSecondFactor(target) {
 			return StepUpLevel, nil
@@ -54,7 +54,7 @@ func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, er
 		return StepUpNone, nil
 	}
 
-	sessionAcrLevel, err := record.AcrLevelFromString(session.AcrLevel.String())
+	sessionAcrLevel, err := record.ACRLevelFromString(session.ACRLevel.String())
 	if err != nil {
 		return StepUpNone, err
 	}
@@ -66,10 +66,10 @@ func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, er
 	// the generation alone, a session at level 3 whose user then removed their authenticator went
 	// on answering level 3 after any such sign-in, with no authenticator to answer it, while
 	// prompt=none refused the same request.
-	if target == record.AcrLevel2Mandatory && !session.User.OTPEnabled {
+	if target == record.ACRLevel2Mandatory && !session.User.OTPEnabled {
 		return StepUpAuthenticatorMissing, nil
 	}
-	if session.OtpConfigGeneration != session.User.OtpConfigGeneration && TargetRequiresSecondFactor(target) {
+	if session.OTPConfigGeneration != session.User.OTPConfigGeneration && TargetRequiresSecondFactor(target) {
 		return StepUpOtpConfigChanged, nil
 	}
 	return StepUpNone, nil

@@ -57,13 +57,13 @@ func newAdministrativeScopeFixture(t *testing.T, allowed bool) *administrativeSc
 		AuthorizationCodeEnabled:    true,
 		ImplicitGrantEnabled:        &implicit,
 		ConsentRequired:             false,
-		DefaultAcrLevel:             record.AcrLevel1,
+		DefaultACRLevel:             record.ACRLevel1,
 		AdministrativeScopesAllowed: allowed,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{ClientId: client.Id, URI: administrativeScopeRedirectURI}))
+		&record.RedirectURI{ClientID: client.ID, URI: administrativeScopeRedirectURI}))
 
 	user, password := newSignInAdministrator(t)
 	return &administrativeScopeFixture{client: client, user: user, password: password, browser: createHttpClient(t)}
@@ -78,8 +78,8 @@ func newSignInAdministrator(t *testing.T) (*record.User, string) {
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
 	return user, password
 }
 
@@ -152,7 +152,7 @@ func administrativeScopeRefusedRows(t *testing.T, clientIdentifier string) []map
 	t.Helper()
 
 	readerToken, readerClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, readerClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, readerClient.ID) })
 	logs, resp := getAuditLogs(t, readerToken, "auditEvent="+audit.EventAdministrativeScopeRefused+"&size=200")
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -175,11 +175,11 @@ func (f *administrativeScopeFixture) assertRefusedAtAuthorize(t *testing.T) {
 	rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 	require.Len(t, rows, 1, "one row for the refusal")
 	assert.Equal(t, map[string]any{
-		"client_id":         float64(f.client.Id),
+		"client_id":         float64(f.client.ID),
 		"client_identifier": f.client.ClientIdentifier,
 		"scopes":            []any{"authserver:manage"},
 		"checkpoint":        "authorize",
-		"user_id":           float64(f.user.Id),
+		"user_id":           float64(f.user.ID),
 	}, rows[0])
 }
 
@@ -240,7 +240,7 @@ func TestAuthorize_AdministrativeScope_RefusedForTheImplicitFlow(t *testing.T) {
 	require.Len(t, rows, 2, "one row for each refusal")
 	for _, row := range rows {
 		assert.Equal(t, "authorize", row["checkpoint"])
-		assert.InDelta(t, float64(f.user.Id), row["user_id"], 0)
+		assert.InDelta(t, float64(f.user.ID), row["user_id"], 0)
 	}
 }
 
@@ -274,7 +274,7 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 	assert.Equal(t, administrativeScopeState, state)
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, "openid authserver:manage", code.Scope)
-	assert.Equal(t, f.user.Id, code.User.Id)
+	assert.Equal(t, f.user.ID, code.User.ID)
 	assert.Empty(t, administrativeScopeRefusedRows(t, f.client.ClientIdentifier))
 }
 
@@ -285,7 +285,7 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 // owed to (#509 decision 2).
 func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsentScreen(t *testing.T) {
 	user, password := newSignInAdministrator(t)
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 	browser := createHttpClient(t)
 	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
 
@@ -344,8 +344,8 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 	assert.Equal(t, builtin.AdminConsoleClientIdentifier, code.Client.ClientIdentifier)
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage")
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage-account")
-	assert.Equal(t, user.Id, code.User.Id)
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, code.Client.Id)
+	assert.Equal(t, user.ID, code.User.ID)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, code.Client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, consent, "no consent was asked for or stored")
 }

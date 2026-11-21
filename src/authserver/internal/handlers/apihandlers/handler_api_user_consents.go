@@ -24,9 +24,9 @@ type userConsentsDatabase interface {
 	revocation.Database
 
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
-	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserConsentByID(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
 }
 
@@ -47,7 +47,7 @@ func HandleUserConsentsGet(
 		}
 
 		// Check if user exists
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -58,7 +58,7 @@ func HandleUserConsentsGet(
 		}
 
 		// Get user consents
-		userConsents, err := database.GetConsentsByUserId(r.Context(), nil, user.Id)
+		userConsents, err := database.GetConsentsByUserID(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -98,7 +98,7 @@ func HandleUserConsentDelete(
 		}
 
 		// Get the consent to check if it exists and get user info for audit
-		consent, err := database.GetUserConsentById(r.Context(), nil, consentId)
+		consent, err := database.GetUserConsentByID(r.Context(), nil, consentId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -109,7 +109,7 @@ func HandleUserConsentDelete(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, consent.UserId) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, consent.UserID) {
 			return
 		}
 
@@ -125,7 +125,7 @@ func HandleUserConsentDelete(
 		// stored consent only when the client has Consent required on or the grant is an
 		// offline one, so deleting the row alone would leave a once-consented client's grant
 		// standing. It also collects the logout tokens that tell the client (#135 decision 3).
-		result, err := revocation.DisconnectClientTx(r.Context(), database, consent.UserId, consent.ClientId,
+		result, err := revocation.DisconnectClientTx(r.Context(), database, consent.UserID, consent.ClientID,
 			sessionLive(settings), func(tx *sql.Tx) (bool, error) {
 				return database.DeleteUserConsent(r.Context(), tx, consentId)
 			})
@@ -144,14 +144,14 @@ func HandleUserConsentDelete(
 
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedUserConsent, map[string]interface{}{
-				"user_id":        consent.UserId,
+				"user_id":        consent.UserID,
 				"consent_id":     consentId,
 				"logged_in_user": callerSubject(r),
 			})
 		}
 		// What the disconnect revoked, beside the deletion event and after the commit, as
 		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#135 decision 6).
-		revocation.LogDisconnectedClient(r.Context(), auditLogger, consent.UserId, consent.ClientId,
+		revocation.LogDisconnectedClient(r.Context(), auditLogger, consent.UserID, consent.ClientID,
 			callerSubject(r), result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 

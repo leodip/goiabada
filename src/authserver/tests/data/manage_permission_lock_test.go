@@ -31,7 +31,7 @@ func managePermissionRow(t *testing.T) *record.Permission {
 		require.NoError(t, database.CreateResource(ctx, nil, resource))
 	}
 
-	permissions, err := database.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(ctx, nil, resource.ID)
 	require.NoError(t, err)
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == builtin.ManagePermissionIdentifier {
@@ -39,7 +39,7 @@ func managePermissionRow(t *testing.T) *record.Permission {
 		}
 	}
 
-	manage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Manage the authorization server", ResourceId: resource.Id}
+	manage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Manage the authorization server", ResourceID: resource.ID}
 	require.NoError(t, database.CreatePermission(ctx, nil, manage))
 	return manage
 }
@@ -63,14 +63,14 @@ func TestAcquireManagePermissionRow(t *testing.T) {
 	// Two decoys an identifier match alone would also take: a permission named manage on another
 	// resource, and another permission on the authserver resource.
 	otherResource := createTestResource(t)
-	decoyManage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Not the administrators'", ResourceId: otherResource.Id}
+	decoyManage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Not the administrators'", ResourceID: otherResource.ID}
 	require.NoError(t, database.CreatePermission(ctx, nil, decoyManage))
 	authServer, err := database.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authServer)
 	decoySibling := createTestPermission(t, authServer)
 
-	before, err := database.GetPermissionById(ctx, nil, manage.Id)
+	before, err := database.GetPermissionByID(ctx, nil, manage.ID)
 	require.NoError(t, err)
 	require.NotNil(t, before)
 
@@ -79,14 +79,14 @@ func TestAcquireManagePermissionRow(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 
-	assert.Equal(t, manage.Id, id, "the authserver resource's manage permission, not the decoys %d and %d", decoyManage.Id, decoySibling.Id)
+	assert.Equal(t, manage.ID, id, "the authserver resource's manage permission, not the decoys %d and %d", decoyManage.ID, decoySibling.ID)
 
-	after, err := database.GetPermissionById(ctx, nil, manage.Id)
+	after, err := database.GetPermissionByID(ctx, nil, manage.ID)
 	require.NoError(t, err)
 	require.NotNil(t, after)
 	assert.Equal(t, before.PermissionIdentifier, after.PermissionIdentifier, "assigned to itself, so it does not move")
 	assert.Equal(t, before.Description, after.Description)
-	assert.Equal(t, before.ResourceId, after.ResourceId)
+	assert.Equal(t, before.ResourceID, after.ResourceID)
 	assert.True(t, before.UpdatedAt.Time.Equal(after.UpdatedAt.Time),
 		"taking the lock is not an edit of the permission: updated_at is %v and was %v", after.UpdatedAt.Time, before.UpdatedAt.Time)
 
@@ -120,10 +120,10 @@ func TestAcquireManagePermissionRow_RefusesWhereThereIsNoManagePermission(t *tes
 
 	resource := &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
 	require.NoError(t, h.DB.CreateResource(ctx, nil, resource))
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{PermissionIdentifier: builtin.AdminReadPermissionIdentifier, Description: "Read", ResourceId: resource.Id}))
+	require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{PermissionIdentifier: builtin.AdminReadPermissionIdentifier, Description: "Read", ResourceID: resource.ID}))
 	other := &record.Resource{ResourceIdentifier: "lock-decoy", Description: "Another resource"}
 	require.NoError(t, h.DB.CreateResource(ctx, nil, other))
-	require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Not the administrators'", ResourceId: other.Id}))
+	require.NoError(t, h.DB.CreatePermission(ctx, nil, &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Not the administrators'", ResourceID: other.ID}))
 
 	tx, err = h.DB.BeginTransaction(ctx)
 	require.NoError(t, err)
@@ -158,8 +158,8 @@ func TestAcquireManagePermissionRow_HoldsTheRowUntilTheTransactionEnds(t *testin
 		if err != nil {
 			return err
 		}
-		if id != manage.Id {
-			t.Errorf("the second acquisition answered permission %d, not manage's %d", id, manage.Id)
+		if id != manage.ID {
+			t.Errorf("the second acquisition answered permission %d, not manage's %d", id, manage.ID)
 		}
 		return nil
 	})
@@ -183,7 +183,7 @@ func TestAcquireManagePermissionRow_AReadAfterTheWaitSeesWhatTheHolderCommitted(
 	_, err := database.AcquireManagePermissionRow(context.Background(), holder)
 	require.NoError(t, err)
 	require.NoError(t, database.CreateUserPermission(context.Background(), holder,
-		&record.UserPermission{UserId: user.Id, PermissionId: manage.Id}), "the holder grants manage under the lock")
+		&record.UserPermission{UserID: user.ID, PermissionID: manage.ID}), "the holder grants manage under the lock")
 
 	type seen struct {
 		holdsManage bool
@@ -200,7 +200,7 @@ func TestAcquireManagePermissionRow_AReadAfterTheWaitSeesWhatTheHolderCommitted(
 		if _, err = other.AcquireManagePermissionRow(context.Background(), tx); err != nil {
 			return seen{err: err}
 		}
-		granted, err := other.GetUserPermissionByUserIdAndPermissionId(context.Background(), tx, user.Id, manage.Id)
+		granted, err := other.GetUserPermissionByUserIDAndPermissionID(context.Background(), tx, user.ID, manage.ID)
 		return seen{holdsManage: granted != nil, err: err}
 	})
 	waiter.requireBlocked(t)
@@ -229,10 +229,10 @@ func TestAcquireManagePermissionRow_TheFirstOrdinaryReadAfterItSeesWhatCommitted
 	_, err := database.AcquireManagePermissionRow(ctx, tx)
 	require.NoError(t, err)
 
-	committed := createTestUserSessionOn(t, other, user.Id)
+	committed := createTestUserSessionOn(t, other, user.ID)
 
-	sessions, err := database.GetUserSessionsByUserId(ctx, tx, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(ctx, tx, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1, "the session another connection committed after the lock returned")
-	assert.Equal(t, committed.Id, sessions[0].Id)
+	assert.Equal(t, committed.ID, sessions[0].ID)
 }

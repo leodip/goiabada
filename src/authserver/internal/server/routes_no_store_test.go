@@ -136,7 +136,7 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 // as in the sweep above, the public settings among them.
 func TestRegisterRoutes_AnApiFaultInFrontOfTheGroupsIsNoStore(t *testing.T) {
 	failing := datamocks.NewDatabase(t)
-	failing.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	failing.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the settings row could not be read"))
 
 	for _, fault := range []struct {

@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// The refusal whose count reached record.OtpConsecutiveFailureLimit disables the authenticator, and
+// The refusal whose count reached record.OTPConsecutiveFailureLimit disables the authenticator, and
 // it is audited once, as otp_authenticator_disabled after the refusal's own events, on both refused
 // arms: a wrong code and a replayed one count alike. The submitter is answered exactly as for any
 // other refused code (#489 decision 2). The refusals that do not reach the limit audit nothing more,
@@ -69,13 +69,13 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 				UserId:     1,
 				ClientId:   "test-client",
 			}, nil)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-				Id:                     1,
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+				ID:                     1,
 				Enabled:                true,
 				OTPEnabled:             true,
 				OTPSecretEncrypted:     encryptOTPForTest(t, otpSecret),
-				OtpConfigGeneration:    3,
-				OtpConsecutiveFailures: record.OtpConsecutiveFailureLimit - 1,
+				OTPConfigGeneration:    3,
+				OTPConsecutiveFailures: record.OTPConsecutiveFailureLimit - 1,
 			}, nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 				Return(&record.Client{ClientIdentifier: "test-client"}, nil)
@@ -85,8 +85,8 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 			}
 			// The count's statement reports that this call is the one that reached the limit.
 			expectOTPWriteTransactions(database)
-			expectUserRowLocked(database, &record.User{Id: 1})
-			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
+			expectUserRowLocked(database, &record.User{ID: 1})
+			database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
 				Return(true, nil).Once()
 
 			var events []string

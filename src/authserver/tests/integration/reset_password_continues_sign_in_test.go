@@ -38,7 +38,7 @@ const resetReturnToAppText = "Your password is set. Go back to the application y
 func resetFromTheAppUser(t *testing.T) (*record.User, string) {
 	t.Helper()
 	user, password := createResetTestUser(t, plusAddress())
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user, password
 }
 
@@ -120,7 +120,7 @@ func TestResetPasswordContinuesSignIn_InTheSameBrowserTheUserGoesOnIntoTheApp(t 
 	newPassword := fake.Password(20)
 	resp := postCleanReset(t, browser, cleanURL, newPassword, continuationId)
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.True(t, passwordhash.Verify(stored.PasswordHash, newPassword), "the reset set the new password")
 	assert.False(t, passwordhash.Verify(stored.PasswordHash, oldPassword))
@@ -144,7 +144,7 @@ func TestResetPasswordContinuesSignIn_InAnotherBrowserTheResetSendsThePersonBack
 
 	resp, newPassword := resetFromLink(t, createHttpClient(t), link, ceremonyId)
 	assertResetEndsOnItsPageSendingThePersonBack(t, resp, user.Email)
-	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), newPassword), "the password is reset all the same")
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), newPassword), "the password is reset all the same")
 }
 
 func TestResetPasswordContinuesSignIn_ASignInPastItsPasswordStepIsNotCarriedOn(t *testing.T) {
@@ -164,14 +164,14 @@ func TestResetPasswordContinuesSignIn_ASignInPastItsPasswordStepIsNotCarriedOn(t
 
 	resp, newPassword := resetFromLink(t, browser, link, ceremonyId)
 	assertResetEndsOnItsPageSendingThePersonBack(t, resp, user.Email)
-	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), newPassword))
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), newPassword))
 }
 
 func TestResetPasswordContinuesSignIn_AnAccountWithTwoFactorGoesOnToItsCode(t *testing.T) {
 	useMailpitSMTP(t)
 	f, _ := newRegistrationApp(t)
 	// Level 2 optional: the app asks for the second factor of an account that has one.
-	f.client.DefaultAcrLevel = record.AcrLevel2Optional
+	f.client.DefaultACRLevel = record.ACRLevel2Optional
 	require.NoError(t, database.UpdateClient(context.Background(), nil, f.client))
 	hashed, err := passwordhash.Hash(fake.Password(20))
 	require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestResetPasswordContinuesSignIn_AnAccountWithTwoFactorGoesOnToItsCode(t *t
 		PasswordHash: hashed, OTPEnabled: true}
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, newOTPSecretForTest(t, user.Email))
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	browser := createHttpClient(t)
 	ceremonyId, link := requestResetFromTheApp(t, browser, f.link(""), user.Email)
 

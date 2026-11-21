@@ -52,8 +52,8 @@ func newMetricsTestServer(t *testing.T) *Server {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Maybe()
 	database.On("PoolStats").Return(testPoolStats).Maybe()
 
 	cfg := &config.Config{}

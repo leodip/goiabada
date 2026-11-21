@@ -29,7 +29,7 @@ func TestUpdateClient_LeavesTheIdentifierAlone(t *testing.T) {
 	client.Description = "rewritten_" + fake.LetterN(6)
 	require.NoError(t, database.UpdateClient(ctx, nil, client))
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, stored, got.ClientIdentifier, "UpdateClient must not write client_identifier")
@@ -47,12 +47,12 @@ func TestSetClientIdentifier_ChangesADifferentIdentifierAndReportsIt(t *testing.
 	renamed := "renamed_" + fake.LetterN(8)
 
 	tx := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, tx, target.Id, renamed)
+	changed, err := database.SetClientIdentifier(ctx, tx, target.ID, renamed)
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	assert.True(t, changed, "a different identifier is a change")
 
-	got, err := database.GetClientById(ctx, nil, target.Id)
+	got, err := database.GetClientByID(ctx, nil, target.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, renamed, got.ClientIdentifier)
@@ -62,13 +62,13 @@ func TestSetClientIdentifier_ChangesADifferentIdentifierAndReportsIt(t *testing.
 	byIdentifier, err := database.GetClientByClientIdentifier(ctx, nil, renamed)
 	require.NoError(t, err)
 	require.NotNil(t, byIdentifier, "the client is found by its new identifier")
-	assert.Equal(t, target.Id, byIdentifier.Id)
+	assert.Equal(t, target.ID, byIdentifier.ID)
 
 	gone, err := database.GetClientByClientIdentifier(ctx, nil, target.ClientIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "no client holds the identifier the rename gave up")
 
-	other, err := database.GetClientById(ctx, nil, bystander.Id)
+	other, err := database.GetClientByID(ctx, nil, bystander.ID)
 	require.NoError(t, err)
 	require.NotNil(t, other)
 	assert.Equal(t, bystander.ClientIdentifier, other.ClientIdentifier, "another client is not renamed")
@@ -80,19 +80,19 @@ func TestSetClientIdentifier_ChangesADifferentIdentifierAndReportsIt(t *testing.
 func TestSetClientIdentifier_TheRowsOwnIdentifierIsNoChange(t *testing.T) {
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
-	before, err := database.GetClientById(ctx, nil, client.Id)
+	before, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, before)
 	// Long enough that a write of updated_at would show.
 	time.Sleep(timestampTick)
 
 	tx := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, tx, client.Id, client.ClientIdentifier)
+	changed, err := database.SetClientIdentifier(ctx, tx, client.ID, client.ClientIdentifier)
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	assert.False(t, changed, "the row's own identifier is not a change")
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, client.ClientIdentifier, got.ClientIdentifier)
@@ -110,12 +110,12 @@ func TestSetClientIdentifier_ComparesByteForByte(t *testing.T) {
 	upper := "CASE_" + client.ClientIdentifier[len("case_"):]
 
 	tx := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, tx, client.Id, upper)
+	changed, err := database.SetClientIdentifier(ctx, tx, client.ID, upper)
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	assert.True(t, changed, "a change of case is a change")
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, upper, got.ClientIdentifier)
@@ -126,11 +126,11 @@ func TestSetClientIdentifier_ComparesByteForByte(t *testing.T) {
 func TestSetClientIdentifier_AClientNotThereIsNoChange(t *testing.T) {
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
-	require.NoError(t, database.DeleteClient(ctx, nil, client.Id))
+	require.NoError(t, database.DeleteClient(ctx, nil, client.ID))
 	identifier := "nobody_" + fake.LetterN(8)
 
 	tx := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, tx, client.Id, identifier)
+	changed, err := database.SetClientIdentifier(ctx, tx, client.ID, identifier)
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(ctx, tx))
 	assert.False(t, changed)
@@ -147,17 +147,17 @@ func TestSetClientIdentifier_RefusesCallerBugs(t *testing.T) {
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
 
-	_, err := database.SetClientIdentifier(ctx, nil, client.Id, "renamed_"+fake.LetterN(8))
+	_, err := database.SetClientIdentifier(ctx, nil, client.ID, "renamed_"+fake.LetterN(8))
 	require.Error(t, err, "a nil transaction")
 
 	tx := beginTx(t)
 	_, err = database.SetClientIdentifier(ctx, tx, 0, "renamed_"+fake.LetterN(8))
 	require.Error(t, err, "a zero id")
-	_, err = database.SetClientIdentifier(ctx, tx, client.Id, "")
+	_, err = database.SetClientIdentifier(ctx, tx, client.ID, "")
 	require.Error(t, err, "an empty identifier")
 	require.NoError(t, tx.Rollback())
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, client.ClientIdentifier, got.ClientIdentifier, "a refused call writes nothing")
@@ -190,7 +190,7 @@ func runRenameDecidesAgainstARenameCommittedMeanwhile(t *testing.T, db data.Data
 	renamed := "renamed_" + fake.LetterN(8)
 
 	first := beginTxOn(t, db)
-	changed, err := db.SetClientIdentifier(ctx, first, client.Id, renamed)
+	changed, err := db.SetClientIdentifier(ctx, first, client.ID, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -201,7 +201,7 @@ func runRenameDecidesAgainstARenameCommittedMeanwhile(t *testing.T, db data.Data
 	}
 	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
 		reached()
-		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.Id, renamed)
+		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.ID, renamed)
 		return outcome{secondChanged, secondErr}
 	})
 
@@ -214,7 +214,7 @@ func runRenameDecidesAgainstARenameCommittedMeanwhile(t *testing.T, db data.Data
 	assert.False(t, o.changed, "the row already holds the identifier, as committed by the other save")
 	require.NoError(t, db.CommitTransaction(ctx, second))
 
-	got, err := db.GetClientById(ctx, nil, client.Id)
+	got, err := db.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, renamed, got.ClientIdentifier)
@@ -245,7 +245,7 @@ func runASecondRenameMeanwhileIsAChange(t *testing.T, db data.Database) {
 	renamed := "renamed_" + fake.LetterN(8)
 
 	first := beginTxOn(t, db)
-	changed, err := db.SetClientIdentifier(ctx, first, client.Id, renamed)
+	changed, err := db.SetClientIdentifier(ctx, first, client.ID, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -256,7 +256,7 @@ func runASecondRenameMeanwhileIsAChange(t *testing.T, db data.Database) {
 	}
 	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
 		reached()
-		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.Id, original)
+		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.ID, original)
 		return outcome{secondChanged, secondErr}
 	})
 
@@ -269,7 +269,7 @@ func runASecondRenameMeanwhileIsAChange(t *testing.T, db data.Database) {
 	assert.True(t, o.changed, "the row holds the other save's identifier, so writing the original back is a change")
 	require.NoError(t, db.CommitTransaction(ctx, second))
 
-	got, err := db.GetClientById(ctx, nil, client.Id)
+	got, err := db.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, original, got.ClientIdentifier)

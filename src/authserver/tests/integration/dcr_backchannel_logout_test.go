@@ -43,10 +43,10 @@ func registeredClientThroughTheAdminAPI(t *testing.T, adminToken string, members
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, identifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
-		strconv.FormatInt(client.Id, 10), adminToken, nil)
+		strconv.FormatInt(client.ID, 10), adminToken, nil)
 	defer func() { _ = detail.Body.Close() }()
 	require.Equal(t, http.StatusOK, detail.StatusCode)
 

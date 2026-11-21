@@ -41,7 +41,7 @@ func serveClient(method, target, body string, stored *record.Client, expect func
 	return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 		database := datamocks.NewDatabase(t)
 		if stored != nil {
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(stored, nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(stored, nil).Once()
 		}
 		if expect != nil {
 			expect(database)
@@ -56,7 +56,7 @@ func serveClient(method, target, body string, stored *record.Client, expect func
 // authentication and its administrative scopes.
 func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	stored := func() *record.Client {
-		return &record.Client{Id: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}
+		return &record.Client{ID: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true}
 	}
 	create := func(body string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return serveClient(http.MethodPost, "/api/v1/admin/clients", body, nil, expect,
@@ -81,7 +81,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		return func(database *datamocks.Database) {
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(stored(), nil).Once()
+			database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).Return(stored(), nil).Once()
 			lookups(database)
 		}
 	}
@@ -124,7 +124,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "create naming a resource's identifier",
 			serve: create(`{"clientIdentifier":"a-client"}`, func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-client").Return(nil, nil).Once()
-				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "a-client").Return(&record.Resource{Id: 4, ResourceIdentifier: "a-client"}, nil).Once()
+				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "a-client").Return(&record.Resource{ID: 4, ResourceIdentifier: "a-client"}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.identifier_names_resource",
@@ -149,7 +149,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "renaming the system-level client",
-			serve: update(&record.Client{Id: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier},
+			serve: update(&record.Client{ID: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier},
 				`{"clientIdentifier":"renamed"}`, nil),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.system_level_identifier_fixed",
@@ -158,7 +158,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "renaming a self-registered client",
-			serve: update(&record.Client{Id: 7, ClientIdentifier: "dcr_a", CreatedViaDCR: true},
+			serve: update(&record.Client{ID: 7, ClientIdentifier: "dcr_a", CreatedViaDCR: true},
 				`{"clientIdentifier":"renamed"}`, nil),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.self_registered_identifier_fixed",
@@ -169,7 +169,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "update onto another client's identifier",
 			serve: update(stored(), `{"clientIdentifier":"other-client"}`, renameChecked(func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "other-client").
-					Return(&record.Client{Id: 8, ClientIdentifier: "other-client"}, nil).Once()
+					Return(&record.Client{ID: 8, ClientIdentifier: "other-client"}, nil).Once()
 			})),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.identifier_in_use",
@@ -180,7 +180,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "update onto a resource's identifier",
 			serve: update(stored(), `{"clientIdentifier":"named-like-a-resource"}`, renameChecked(func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "named-like-a-resource").Return(nil, nil).Once()
-				database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "named-like-a-resource").Return(&record.Resource{Id: 9, ResourceIdentifier: "named-like-a-resource"}, nil).Once()
+				database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "named-like-a-resource").Return(&record.Resource{ID: 9, ResourceIdentifier: "named-like-a-resource"}, nil).Once()
 			})),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.identifier_names_resource",
@@ -189,7 +189,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "a default ACR level with the authorization code flow off",
-			serve: update(&record.Client{Id: 7, ClientIdentifier: "a-client"},
+			serve: update(&record.Client{ID: 7, ClientIdentifier: "a-client"},
 				`{"clientIdentifier":"a-client","defaultAcrLevel":"urn:goiabada:level1"}`, nil),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.default_acr_not_applicable",
@@ -287,7 +287,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "deleting the system-level client",
 			serve: serveClient(http.MethodDelete, "/api/v1/admin/clients/7", "",
-				&record.Client{Id: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, nil,
+				&record.Client{ID: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, nil,
 				func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
 					return HandleClientDelete(database, auditLogger)
 				}),
@@ -322,7 +322,7 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "the admin console's client denied the administrative scopes",
 			serve: serveClient(http.MethodPut, "/api/v1/admin/clients/7/administrative-scopes", `{"allowed":false}`,
-				&record.Client{Id: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, nil,
+				&record.Client{ID: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, nil,
 				func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
 					return HandleClientAdministrativeScopesPut(database, auditLogger)
 				}),
@@ -346,7 +346,7 @@ func TestClientDPoPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name:       "no dpopBoundAccessTokens",
-			serve:      save(&record.Client{Id: 7, ClientIdentifier: "a-client"}, `{}`),
+			serve:      save(&record.Client{ID: 7, ClientIdentifier: "a-client"}, `{}`),
 			status:     http.StatusBadRequest,
 			code:       "handler.client_dpop.dpop_bound_access_tokens_required",
 			english:    "dpopBoundAccessTokens is required: send true or false.",
@@ -354,7 +354,7 @@ func TestClientDPoPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "the admin console's client switched on",
-			serve:      save(&record.Client{Id: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, `{"dpopBoundAccessTokens":true}`),
+			serve:      save(&record.Client{ID: 7, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, `{"dpopBoundAccessTokens":true}`),
 			status:     http.StatusBadRequest,
 			code:       "handler.client_dpop.admin_console_not_allowed",
 			english:    "The admin console's client can't require DPoP for token requests.",
@@ -369,7 +369,7 @@ func TestClientPermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "permissions with the client credentials flow off",
 			serve: serveClient(http.MethodPut, "/api/v1/admin/clients/7/permissions", `{"permissionIds":[],"expectedPermissionIds":[]}`,
-				&record.Client{Id: 7, ClientIdentifier: "a-client"}, nil,
+				&record.Client{ID: 7, ClientIdentifier: "a-client"}, nil,
 				func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
 					return HandleClientPermissionsPut(database, auditLogger)
 				}),
@@ -393,7 +393,7 @@ func TestClientRedirectURIRefusals_AreInTheRequestsLanguage(t *testing.T) {
 				})(t, acceptLanguage)
 		}
 	}
-	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
+	codeFlow := func() *record.Client { return &record.Client{ID: 7, AuthorizationCodeEnabled: true} }
 	tooMany := make([]string, record.RedirectURIsMaxPerClient+1)
 	for i := range tooMany {
 		tooMany[i] = "https://example.com/cb"
@@ -403,7 +403,7 @@ func TestClientRedirectURIRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name:       "a client with no redirect-based flow",
-			serve:      save(&record.Client{Id: 7}, []string{"https://example.com/cb"}),
+			serve:      save(&record.Client{ID: 7}, []string{"https://example.com/cb"}),
 			status:     http.StatusBadRequest,
 			code:       "handler.client_redirect_uris.no_redirect_flow",
 			english:    "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.",
@@ -480,7 +480,7 @@ func TestClientPostLogoutRedirectURIRefusals_AreInTheRequestsLanguage(t *testing
 				})(t, acceptLanguage)
 		}
 	}
-	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
+	codeFlow := func() *record.Client { return &record.Client{ID: 7, AuthorizationCodeEnabled: true} }
 	tooMany := make([]string, 61)
 	for i := range tooMany {
 		tooMany[i] = "https://example.com/bye"
@@ -490,7 +490,7 @@ func TestClientPostLogoutRedirectURIRefusals_AreInTheRequestsLanguage(t *testing
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name:       "a client with no redirect-based flow",
-			serve:      save(&record.Client{Id: 7}, []string{"https://example.com/bye"}),
+			serve:      save(&record.Client{ID: 7}, []string{"https://example.com/bye"}),
 			status:     http.StatusBadRequest,
 			code:       "handler.client_post_logout_redirect_uris.no_redirect_flow",
 			english:    "Sign-out redirect URIs are used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",
@@ -561,7 +561,7 @@ func TestClientWebOriginRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	save := func(origins, expected []string) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			return serveClient(http.MethodPut, "/api/v1/admin/clients/7/web-origins", webOriginsBody(t, origins, expected),
-				&record.Client{Id: 7}, nil,
+				&record.Client{ID: 7}, nil,
 				func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
 					return HandleClientWebOriginsPut(database, auditLogger)
 				})(t, acceptLanguage)
@@ -618,7 +618,7 @@ func TestClientWebOriginRefusals_AreInTheRequestsLanguage(t *testing.T) {
 // TestClientTokenRefusals_AreInTheRequestsLanguage covers the client tokens save.
 func TestClientTokenRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	save := func(body string) func(*testing.T, string) *httptest.ResponseRecorder {
-		return serveClient(http.MethodPut, "/api/v1/admin/clients/7/tokens", body, &record.Client{Id: 7}, nil,
+		return serveClient(http.MethodPut, "/api/v1/admin/clients/7/tokens", body, &record.Client{ID: 7}, nil,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger) http.Handler {
 				return HandleClientTokensPut(database, auditLogger)
 			})
@@ -691,10 +691,10 @@ func TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) 
 			return save(client, backchannelLogoutBody(t, uri, false))(t, acceptLanguage)
 		}
 	}
-	codeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true} }
-	publicCodeFlow := func() *record.Client { return &record.Client{Id: 7, AuthorizationCodeEnabled: true, IsPublic: true} }
+	codeFlow := func() *record.Client { return &record.Client{ID: 7, AuthorizationCodeEnabled: true} }
+	publicCodeFlow := func() *record.Client { return &record.Client{ID: 7, AuthorizationCodeEnabled: true, IsPublic: true} }
 	selfRegisteredCodeFlow := func() *record.Client {
-		return &record.Client{Id: 7, AuthorizationCodeEnabled: true, CreatedViaDCR: true}
+		return &record.Client{ID: 7, AuthorizationCodeEnabled: true, CreatedViaDCR: true}
 	}
 	overlong := "https://example.com/" + strings.Repeat("x", 2048)
 
@@ -717,7 +717,7 @@ func TestClientBackchannelLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) 
 		},
 		{
 			name:       "a client with no flow that signs users in",
-			serve:      saveURI(&record.Client{Id: 7}, "https://example.com/bcl"),
+			serve:      saveURI(&record.Client{ID: 7}, "https://example.com/bcl"),
 			status:     http.StatusBadRequest,
 			code:       "handler.client_backchannel_logout.no_sign_in_flow",
 			english:    "A back-channel logout URI is used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",

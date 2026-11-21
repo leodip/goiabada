@@ -25,12 +25,12 @@ import (
 // cancellation every engine and every driver answers identically, because database/sql refuses
 // the call before the driver is reached at all, confirmed against all four engines (#386).
 
-// TestGetGroupById_RefusesAnAlreadyCancelledContext is the plain read through getGroupCommon,
+// TestGetGroupByID_RefusesAnAlreadyCancelledContext is the plain read through getGroupCommon,
 // the helper every group lookup shares.
-func TestGetGroupById_RefusesAnAlreadyCancelledContext(t *testing.T) {
+func TestGetGroupByID_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	group := createTestGroup(t)
 
-	got, err := database.GetGroupById(cancelled(), nil, group.Id)
+	got, err := database.GetGroupByID(cancelled(), nil, group.ID)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
@@ -50,7 +50,7 @@ func TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing(t *testing
 
 	require.Error(t, err, "an insert must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled)
-	assert.Zero(t, group.Id, "no id came back, because no row was inserted")
+	assert.Zero(t, group.ID, "no id came back, because no row was inserted")
 
 	found, lookupErr := database.GetGroupByGroupIdentifier(context.Background(), nil, identifier)
 	require.NoError(t, lookupErr)
@@ -58,15 +58,15 @@ func TestCreateGroup_RefusesAnAlreadyCancelledContextAndWritesNothing(t *testing
 }
 
 // TestGroupLoadPermissions_RefusesAnAlreadyCancelledContext is one of stage 1's five
-// nil-transaction sites, whose two hops -- GetGroupPermissionsByGroupIds and then
-// GetPermissionsByIds -- now both take the caller's context. Against a context that is already
+// nil-transaction sites, whose two hops -- GetGroupPermissionsByGroupIDs and then
+// GetPermissionsByIDs -- now both take the caller's context. Against a context that is already
 // over the first hop is the one that refuses; the second has a case of its own in
 // cancellation_test.go, for the reason recorded there.
 func TestGroupLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 	group := createTestGroup(t)
-	createTestGroupPermission(t, group.Id, permission.Id)
+	createTestGroupPermission(t, group.ID, permission.ID)
 
 	err := database.GroupLoadPermissions(cancelled(), nil, group)
 
@@ -82,9 +82,9 @@ func TestGroupLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 func TestGetGroupMembersPaginated_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	group := createTestGroup(t)
 	user := createTestUser(t)
-	createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
+	createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
 
-	members, total, err := database.GetGroupMembersPaginated(cancelled(), nil, group.Id, 1, 10)
+	members, total, err := database.GetGroupMembersPaginated(cancelled(), nil, group.ID, 1, 10)
 
 	require.Error(t, err, "a paged read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled)
@@ -92,13 +92,13 @@ func TestGetGroupMembersPaginated_RefusesAnAlreadyCancelledContext(t *testing.T)
 	assert.Zero(t, total, "the count statement did not run either")
 }
 
-// TestGetGroupAttributesByGroupId_RefusesAnAlreadyCancelledContext is group_attribute.go's read,
+// TestGetGroupAttributesByGroupID_RefusesAnAlreadyCancelledContext is group_attribute.go's read,
 // the other half of what the userinfo endpoint and the token issuer load onto a user's groups.
-func TestGetGroupAttributesByGroupId_RefusesAnAlreadyCancelledContext(t *testing.T) {
+func TestGetGroupAttributesByGroupID_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	group := createTestGroup(t)
-	createTestGroupAttribute(t, group.Id)
+	createTestGroupAttribute(t, group.ID)
 
-	got, err := database.GetGroupAttributesByGroupId(cancelled(), nil, group.Id)
+	got, err := database.GetGroupAttributesByGroupID(cancelled(), nil, group.ID)
 
 	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
 	require.ErrorIs(t, err, context.Canceled)
@@ -113,14 +113,14 @@ func TestGetGroupAttributesByGroupId_RefusesAnAlreadyCancelledContext(t *testing
 func TestUpdateKeyPairState_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	keyPair := createKeyPairInState(t, record.KeyStateNext.String())
 
-	moved, err := database.UpdateKeyPairState(cancelled(), nil, keyPair.Id,
+	moved, err := database.UpdateKeyPairState(cancelled(), nil, keyPair.ID,
 		record.KeyStateNext.String(), record.KeyStateCurrent.String())
 
 	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
 	require.ErrorIs(t, err, context.Canceled)
 	assert.False(t, moved)
 
-	after, readErr := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	after, readErr := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	require.NoError(t, readErr)
 	require.NotNil(t, after)
 	assert.Equal(t, record.KeyStateNext.String(), after.State, "the refused update moved nothing")
@@ -198,7 +198,7 @@ func TestGetPreRegistrationByEmail_RefusesAnAlreadyCancelledContext(t *testing.T
 }
 
 // TestIsEmpty_RefusesAnAlreadyCancelledContext is main's first question of a new database, asked
-// through GetSettingsById. It is worth its own case because the answer is a bool and the caller
+// through GetSettingsByID. It is worth its own case because the answer is a bool and the caller
 // acts on it: a swallowed cancellation would read as "this database is empty" and send a running
 // process into the bootstrap seeder.
 func TestIsEmpty_RefusesAnAlreadyCancelledContext(t *testing.T) {

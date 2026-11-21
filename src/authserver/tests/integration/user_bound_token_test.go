@@ -91,7 +91,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
@@ -101,7 +101,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	require.NoError(t, err)
 	require.NotNil(t, authserverResource)
 
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 	require.NoError(t, err)
 
 	var granted *record.Permission
@@ -114,8 +114,8 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	require.NotNil(t, granted, "built-in permission %q must exist on the authserver resource", permissionIdentifier)
 
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: granted.Id,
+		ClientID:     client.ID,
+		PermissionID: granted.ID,
 	})
 	require.NoError(t, err)
 
@@ -185,7 +185,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 
 		// Asserting the status alone would still pass against a guard placed after the
 		// mutation, so check the data.
-		persisted, err := database.GetUserById(context.Background(), nil, accountUser.Id)
+		persisted, err := database.GetUserByID(context.Background(), nil, accountUser.ID)
 		require.NoError(t, err)
 		assert.Equal(t, originalEmail, persisted.Email,
 			"the user's email must not have been modified")
@@ -257,7 +257,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 			t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 		}
 
-		persisted, err := database.GetUserById(context.Background(), nil, user.Id)
+		persisted, err := database.GetUserByID(context.Background(), nil, user.ID)
 		require.NoError(t, err)
 		assert.Equal(t, newEmail, persisted.Email)
 	}
@@ -351,11 +351,11 @@ func userAccessTokenViaROPC(t *testing.T) (string, *record.User, string) {
 	grantManageAccount := func(user *record.User) {
 		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
-		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+		permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 		require.NoError(t, err)
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
-				assignPermissionToUser(t, user.Id, permissions[i].Id)
+				assignPermissionToUser(t, user.ID, permissions[i].ID)
 				break
 			}
 		}

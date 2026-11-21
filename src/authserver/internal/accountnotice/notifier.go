@@ -85,7 +85,7 @@ const (
 	// OTPDisabledByAdministrator tells a user an administrator turned their two-factor
 	// authentication off.
 	OTPDisabledByAdministrator Notice = "otp_disabled_by_administrator"
-	// OTPLockout tells a user their authenticator was disabled after record.OtpConsecutiveFailureLimit
+	// OTPLockout tells a user their authenticator was disabled after record.OTPConsecutiveFailureLimit
 	// wrong codes in a row, at sign-in or confirming the account's deletion, which only someone holding the password reaches (#489, #724
 	// decision 7). The refusal that disabled it sends it, so it goes once per lockout.
 	OTPLockout Notice = "otp_lockout"
@@ -133,7 +133,7 @@ type Recipient struct {
 // To is the account's own address, as user holds it.
 func To(user *record.User) Recipient {
 	return Recipient{
-		UserId:        user.Id,
+		UserId:        user.ID,
 		Email:         user.Email,
 		EmailVerified: user.EmailVerified,
 		Name:          user.FullName(),

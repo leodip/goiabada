@@ -827,7 +827,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		user := &record.User{
-			Id:           31,
+			ID:           31,
 			Email:        "alice@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
@@ -1011,7 +1011,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		user := &record.User{
-			Id:           1,
+			ID:           1,
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
@@ -1020,7 +1020,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			AuthStateGeneration: 7,
 			// The same trick for the OTP configuration generation, and a different number so
 			// the two cannot be crossed (#242).
-			OtpConfigGeneration: 4,
+			OTPConfigGeneration: 4,
 		}
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(user, nil)
 
@@ -1113,7 +1113,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id:           1,
+			ID:           1,
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
@@ -1184,7 +1184,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		disabledUser := &record.User{
-			Id:           2,
+			ID:           2,
 			Email:        "disabled@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      false,
@@ -1231,7 +1231,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	knownAccount := func() *record.User {
-		return &record.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
+		return &record.User{ID: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
 	}
 
 	// newHandler wires one handler and its limiter together, the way routes.go does. The

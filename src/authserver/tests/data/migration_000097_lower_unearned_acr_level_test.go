@@ -83,7 +83,7 @@ func signInShapes000097() []signInShape000097 {
 	}
 }
 
-// TestMigration000097_LowerUnearnedAcrLevel exercises the migration that lowers to level1 every
+// TestMigration000097_LowerUnearnedACRLevel exercises the migration that lowers to level1 every
 // stored sign-in at level2_mandatory whose methods name neither otp nor recovery_code (#199
 // decisions 2 and 3), against a REAL engine of the configured dialect: the methods are matched as
 // whole, case-exact names, which each engine is asked to do in its own SQL.
@@ -105,8 +105,8 @@ func signInShapes000097() []signInShape000097 {
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000097_LowerUnearnedAcrLevel
-func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
+//	--run TestMigration000097_LowerUnearnedACRLevel
+func TestMigration000097_LowerUnearnedACRLevel(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -116,21 +116,21 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	// naming the columns 000096 carries, so a column a later migration adds to one of these tables
 	// cannot break the seed (migration_seed_sql_test.go).
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeLowerUnearnedLevel000097), "migrate to 000096 on %s", dbType())
-	userId := seedUser(t, h, userSeed{Enabled: true})
+	userID := seedUser(t, h, userSeed{Enabled: true})
 	// Enabled, as seedClient leaves it, so the grant below is one its client can still refresh.
-	clientId := seedClient(t, h, "m97_"+fake.LetterN(6))
+	clientID := seedClient(t, h, "m97_"+fake.LetterN(6))
 
 	shapes := signInShapes000097()
 	ids := make([]int64, len(shapes))
 	for i, s := range shapes {
-		ids[i] = createSignIn000097(t, h, clientId, userId, s.level, s.methods)
+		ids[i] = createSignIn000097(t, h, clientID, userID, s.level, s.methods)
 	}
 	// 4. The first shape is the one the migration exists for: a password alone at the highest
 	// level. Its grant's live offline refresh token, and a live browser session of the user stored
 	// at that same unearned pair.
 	require.Equal(t, "pwd", shapes[0].methods, "the first shape is the password-only sign-in at the highest level")
-	refreshTokenId := createOfflineRefreshToken000097(t, h, ids[0])
-	sessionId := createBrowserSession000097(t, h, userId)
+	refreshTokenID := createOfflineRefreshToken000097(t, h, ids[0])
+	sessionID := createBrowserSession000097(t, h, userID)
 
 	before := make([]map[string]string, len(shapes))
 	for i := range shapes {
@@ -138,17 +138,17 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 		require.Equalf(t, shapes[i].level, before[i]["acr_level"], "seeded level of %q", shapes[i].methods)
 		require.Equalf(t, shapes[i].methods, before[i]["auth_methods"], "seeded methods of %q", shapes[i].methods)
 	}
-	refreshTokenBefore := row000097(t, h, "refresh_tokens", refreshTokenId)
+	refreshTokenBefore := row000097(t, h, "refresh_tokens", refreshTokenID)
 	require.Equalf(t, ids[0], mustInt000097(t, refreshTokenBefore["code_id"]), "the refresh token belongs to the lowered sign-in")
 	// The stored shape of an offline grant, as the issuer writes it: no session identifier, which
 	// stays on the sign-in, and a maximum lifetime instead.
 	require.Empty(t, refreshTokenBefore["session_identifier"], "an offline refresh token stores no session identifier")
 	require.NotEqual(t, "<NULL>", refreshTokenBefore["max_lifetime"], "an offline refresh token stores its maximum lifetime")
 	require.NotEmpty(t, before[0]["session_identifier"], "the lowered sign-in keeps its session identifier")
-	sessionBefore := row000097(t, h, "user_sessions", sessionId)
+	sessionBefore := row000097(t, h, "user_sessions", sessionID)
 
 	// 2, first half: what the release-note query lists before the upgrade.
-	listed := releaseNoteQueryIds000097(t, h)
+	listed := releaseNoteQueryIDs000097(t, h)
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, lowerUnearnedLevel000097), "apply 000097 on %s", dbType())
 
@@ -168,7 +168,7 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	}
 
 	// 4.
-	assertGrantAndSessionKept000097(t, h, "the up", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
+	assertGrantAndSessionKept000097(t, h, "the up", refreshTokenID, refreshTokenBefore, sessionID, sessionBefore)
 
 	// 2, second half: among the rows naming only real methods, the query listed exactly the ones
 	// the migration lowered.
@@ -188,42 +188,42 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 		assert.Equalf(t, after[i], codeRow000097(t, h, ids[i]),
 			"3. on %s the down migration is a no-op: the sign-in with methods %q stays as the up left it", dbType(), s.methods)
 	}
-	assertGrantAndSessionKept000097(t, h, "the down", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
+	assertGrantAndSessionKept000097(t, h, "the down", refreshTokenID, refreshTokenBefore, sessionID, sessionBefore)
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, lowerUnearnedLevel000097), "re-apply 000097 on %s", dbType())
 	for i, s := range shapes {
 		assert.Equalf(t, after[i], codeRow000097(t, h, ids[i]),
 			"3. on %s the re-applied up changes nothing more on the sign-in with methods %q", dbType(), s.methods)
 	}
-	assertGrantAndSessionKept000097(t, h, "the re-applied up", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
+	assertGrantAndSessionKept000097(t, h, "the re-applied up", refreshTokenID, refreshTokenBefore, sessionID, sessionBefore)
 }
 
 // assertGrantAndSessionKept000097 checks property 4 after the migration step named by step: the
 // refresh token and the browser session are each the row they were at seeding, every column.
 func assertGrantAndSessionKept000097(t *testing.T, h *isolatedDB, step string,
-	refreshTokenId int64, refreshTokenBefore map[string]string, sessionId int64, sessionBefore map[string]string) {
+	refreshTokenID int64, refreshTokenBefore map[string]string, sessionID int64, sessionBefore map[string]string) {
 	t.Helper()
-	refreshToken := row000097(t, h, "refresh_tokens", refreshTokenId)
+	refreshToken := row000097(t, h, "refresh_tokens", refreshTokenID)
 	assert.Equalf(t, refreshTokenBefore, refreshToken,
 		"4. on %s %s leaves the lowered sign-in's offline refresh token as it was: the grant lives on", dbType(), step)
 	assert.Equalf(t, "false", boolText000097(refreshToken["revoked"]),
 		"4. on %s the refresh token is still live after %s", dbType(), step)
-	assert.Equalf(t, sessionBefore, row000097(t, h, "user_sessions", sessionId),
+	assert.Equalf(t, sessionBefore, row000097(t, h, "user_sessions", sessionID),
 		"4. on %s %s leaves the browser session as it was: nobody is signed out", dbType(), step)
 }
 
-// createOfflineRefreshToken000097 stores a live offline refresh token of the sign-in codeId in the
+// createOfflineRefreshToken000097 stores a live offline refresh token of the sign-in codeID in the
 // shape the token issuer writes one (issuance.TokenIssuer, refresh_token_row.go): the family's
 // first token, with no session identifier and a maximum lifetime, and returns its id. The columns
 // are 000096's; auth_state_generation and dpop_jkt are left to their default and NULL, as for the
 // unbound token of a sign-in at the default generation.
-func createOfflineRefreshToken000097(t *testing.T, h *isolatedDB, codeId int64) int64 {
+func createOfflineRefreshToken000097(t *testing.T, h *isolatedDB, codeID int64) int64 {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Second)
 	jti := "m97jti_" + fake.LetterN(8)
 	return seedRow000097(t, h, "refresh_tokens", "refresh_token_jti", jti, map[string]any{
 		"created_at":                 now,
 		"updated_at":                 now,
-		"code_id":                    codeId,
+		"code_id":                    codeID,
 		"refresh_token_jti":          jti,
 		"previous_refresh_token_jti": "",
 		"first_refresh_token_jti":    jti,
@@ -237,10 +237,10 @@ func createOfflineRefreshToken000097(t *testing.T, h *isolatedDB, codeId int64) 
 	})
 }
 
-// createBrowserSession000097 stores a live browser session of userId at the highest level with a
+// createBrowserSession000097 stores a live browser session of userID at the highest level with a
 // password alone, the pair the migration lowers in codes and leaves in sessions, and returns its id.
 // The columns are 000096's; the ones with a default are left to it.
-func createBrowserSession000097(t *testing.T, h *isolatedDB, userId int64) int64 {
+func createBrowserSession000097(t *testing.T, h *isolatedDB, userID int64) int64 {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Second)
 	sessionIdentifier := "m97session_" + fake.LetterN(8)
@@ -253,12 +253,12 @@ func createBrowserSession000097(t *testing.T, h *isolatedDB, userId int64) int64
 		"auth_time":          now,
 		"password_auth_time": now,
 		"auth_methods":       "pwd",
-		"acr_level":          string(record.AcrLevel2Mandatory),
+		"acr_level":          string(record.ACRLevel2Mandatory),
 		"ip_address":         "192.0.2.1",
 		"device_name":        "",
 		"device_type":        "",
 		"device_os":          "",
-		"user_id":            userId,
+		"user_id":            userID,
 	})
 }
 
@@ -284,7 +284,7 @@ func mustInt000097(t *testing.T, value string) int64 {
 
 // createSignIn000097 stores one sign-in of client and user at level with methods, in 000096's
 // columns, and returns its id. revoked and auth_state_generation are left to their defaults.
-func createSignIn000097(t *testing.T, h *isolatedDB, clientId, userId int64, level, methods string) int64 {
+func createSignIn000097(t *testing.T, h *isolatedDB, clientID, userID int64, level, methods string) int64 {
 	t.Helper()
 	random := fake.LetterN(8)
 	now := time.Now().UTC().Truncate(time.Second)
@@ -292,8 +292,8 @@ func createSignIn000097(t *testing.T, h *isolatedDB, clientId, userId int64, lev
 	return seedRow000097(t, h, "codes", "code_hash", codeHash, map[string]any{
 		"created_at":         now,
 		"updated_at":         now,
-		"client_id":          clientId,
-		"user_id":            userId,
+		"client_id":          clientID,
+		"user_id":            userID,
 		"code_hash":          codeHash,
 		"redirect_uri":       "https://example.com/callback",
 		"scope":              "openid offline_access",
@@ -373,8 +373,8 @@ func row000097(t *testing.T, h *isolatedDB, table string, id int64) map[string]s
 	return row
 }
 
-// releaseNoteQueryIds000097 runs the release notes' query and returns the codes ids it lists.
-func releaseNoteQueryIds000097(t *testing.T, h *isolatedDB) []int64 {
+// releaseNoteQueryIDs000097 runs the release notes' query and returns the codes ids it lists.
+func releaseNoteQueryIDs000097(t *testing.T, h *isolatedDB) []int64 {
 	t.Helper()
 	rows, err := h.SQL.Query(releaseNoteQuery000097)
 	require.NoErrorf(t, err, "run the release-note query on %s", dbType())

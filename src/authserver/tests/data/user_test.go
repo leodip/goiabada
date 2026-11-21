@@ -21,7 +21,7 @@ import (
 func TestCreateUser(t *testing.T) {
 	user := createTestUser(t)
 
-	if user.Id == 0 {
+	if user.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !user.CreatedAt.Valid || user.CreatedAt.Time.IsZero() {
@@ -31,7 +31,7 @@ func TestCreateUser(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	retrievedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestUpdateUser(t *testing.T) {
 	user.Locale = "lang" + fake.LetterN(4)
 	user.PageLanguage = "page" + fake.LetterN(4)
 	user.BirthDate = sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true}
-	user.PhoneNumberCountryUniqueId = strings.ToUpper(fake.LetterN(2))
+	user.PhoneNumberCountryUniqueID = strings.ToUpper(fake.LetterN(2))
 	user.PhoneNumberCountryCallingCode = fmt.Sprintf("+%s", fake.DigitN(2))
 	user.PhoneNumber = fake.DigitN(10)
 	user.PhoneNumberVerified = !user.PhoneNumberVerified
@@ -84,7 +84,7 @@ func TestUpdateUser(t *testing.T) {
 		t.Fatalf("Failed to update user: %v", err)
 	}
 
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user: %v", err)
 	}
@@ -96,22 +96,22 @@ func TestUpdateUser(t *testing.T) {
 	}
 }
 
-func TestGetUserById(t *testing.T) {
+func TestGetUserByID(t *testing.T) {
 	user := createTestUser(t)
 
-	retrievedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	retrievedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user by ID: %v", err)
 	}
 
 	compareUsers(t, user, retrievedUser)
 
-	nonExistentUser, err := database.GetUserById(context.Background(), nil, 99999)
+	nonExistentUser, err := database.GetUserByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user, got: %v", err)
 	}
 	if nonExistentUser != nil {
-		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.Id)
+		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.ID)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestGetUserByUsername(t *testing.T) {
 		t.Errorf("Expected no error for non-existent user, got: %v", err)
 	}
 	if nonExistentUser != nil {
-		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.Id)
+		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.ID)
 	}
 }
 
@@ -149,7 +149,7 @@ func TestGetUserBySubject(t *testing.T) {
 		t.Errorf("Expected no error for non-existent user, got: %v", err)
 	}
 	if nonExistentUser != nil {
-		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.Id)
+		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.ID)
 	}
 }
 
@@ -168,7 +168,7 @@ func TestGetUserByEmail(t *testing.T) {
 		t.Errorf("Expected no error for non-existent user, got: %v", err)
 	}
 	if nonExistentUser != nil {
-		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.Id)
+		t.Errorf("Expected nil for non-existent user, got a user with ID: %d", nonExistentUser.ID)
 	}
 }
 
@@ -234,7 +234,7 @@ func TestSearchUsersPaginated(t *testing.T) {
 			{"exact", tag},
 		} {
 			t.Run(c.name, func(t *testing.T) {
-				assertSearchFindsExactly(t, c.query, want.Id)
+				assertSearchFindsExactly(t, c.query, want.ID)
 			})
 		}
 	})
@@ -246,7 +246,7 @@ func TestSearchUsersPaginated(t *testing.T) {
 		// only be matched by reading "%" as a wildcard.
 		createSearchUser(t, tag+"zx", "u"+fake.LetterN(12))
 
-		assertSearchFindsExactly(t, tag+"%x", withPercent.Id)
+		assertSearchFindsExactly(t, tag+"%x", withPercent.ID)
 	})
 
 	t.Run("a term of % stops matching every user", func(t *testing.T) {
@@ -267,11 +267,11 @@ func TestSearchUsersPaginated(t *testing.T) {
 		if total > len(users) {
 			t.Fatalf("A search for %%%% matched %d users, more than the %d this page holds: the term is being read as a wildcard", total, len(users))
 		}
-		ids := userIds(users)
-		if !ids[withPercent.Id] {
+		ids := userIDs(users)
+		if !ids[withPercent.ID] {
 			t.Errorf("Expected the user whose given name contains a literal %%%% to be found, got %d rows", len(users))
 		}
-		if ids[plain.Id] {
+		if ids[plain.ID] {
 			t.Errorf("Expected a user with no %%%% in any searched column to be absent, but a term of %%%% matched it")
 		}
 	})
@@ -282,7 +282,7 @@ func TestSearchUsersPaginated(t *testing.T) {
 		// Again one character apart: "_" matches any single character until it is escaped.
 		createSearchUser(t, "g"+fake.LetterN(12), tag+"axb")
 
-		assertSearchFindsExactly(t, tag+"a_b", withUnderscore.Id)
+		assertSearchFindsExactly(t, tag+"a_b", withUnderscore.ID)
 	})
 
 	t.Run("a literal ! is findable", func(t *testing.T) {
@@ -292,7 +292,7 @@ func TestSearchUsersPaginated(t *testing.T) {
 		tag := "Tag" + fake.LetterN(10)
 		withBang := createSearchUser(t, tag+"!e", "u"+fake.LetterN(12))
 
-		assertSearchFindsExactly(t, tag+"!e", withBang.Id)
+		assertSearchFindsExactly(t, tag+"!e", withBang.ID)
 	})
 
 	t.Run("a [ in the term is matched literally", func(t *testing.T) {
@@ -304,7 +304,7 @@ func TestSearchUsersPaginated(t *testing.T) {
 		withClass := createSearchUser(t, tag+"[x]y", "u"+fake.LetterN(12))
 		createSearchUser(t, tag+"xy", "u"+fake.LetterN(12))
 
-		assertSearchFindsExactly(t, tag+"[x]y", withClass.Id)
+		assertSearchFindsExactly(t, tag+"[x]y", withClass.ID)
 	})
 }
 
@@ -328,7 +328,7 @@ func createSearchUser(t *testing.T, givenName string, username string) *record.U
 // assertSearchFindsExactly checks both halves of the query SearchUsersPaginated builds: the rows
 // the page returns, and the total, which is a second set of predicates over the same columns and
 // would otherwise go unasserted.
-func assertSearchFindsExactly(t *testing.T, query string, wantId int64) {
+func assertSearchFindsExactly(t *testing.T, query string, wantID int64) {
 	t.Helper()
 	users, total, err := database.SearchUsersPaginated(context.Background(), nil, query, 1, 10)
 	if err != nil {
@@ -340,15 +340,15 @@ func assertSearchFindsExactly(t *testing.T, query string, wantId int64) {
 	if len(users) != 1 {
 		t.Fatalf("Expected 1 user for %q, got %d", query, len(users))
 	}
-	if users[0].Id != wantId {
-		t.Errorf("Expected user %d for %q, got %d", wantId, query, users[0].Id)
+	if users[0].ID != wantID {
+		t.Errorf("Expected user %d for %q, got %d", wantID, query, users[0].ID)
 	}
 }
 
-func userIds(users []record.User) map[int64]bool {
+func userIDs(users []record.User) map[int64]bool {
 	ids := make(map[int64]bool, len(users))
 	for _, user := range users {
-		ids[user.Id] = true
+		ids[user.ID] = true
 	}
 	return ids
 }
@@ -366,9 +366,9 @@ func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) 
 	givenName := "TiedPage" + fake.LetterN(10)
 
 	const userCount = 7
-	wantIds := make([]int64, 0, userCount)
+	wantIDs := make([]int64, 0, userCount)
 	for i := 0; i < userCount; i++ {
-		wantIds = append(wantIds, createUserWithGivenName(t, givenName).Id)
+		wantIDs = append(wantIDs, createUserWithGivenName(t, givenName).ID)
 	}
 
 	// Ids ascend with creation, so the order the fix establishes is the order they were made in.
@@ -376,7 +376,7 @@ func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) 
 	// missing tiebreaker; the others read these back in primary-key order anyway and the assertion
 	// holds there either way. Running the data tier on all four is what makes the coverage real.
 	const pageSize = 3
-	gotIds := make([]int64, 0, userCount)
+	gotIDs := make([]int64, 0, userCount)
 	for page := 1; page <= userCount; page++ {
 		users, total, err := database.SearchUsersPaginated(context.Background(), nil, givenName, page, pageSize)
 		if err != nil {
@@ -392,18 +392,18 @@ func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) 
 			t.Fatalf("Expected at most %d users on page %d, got %d", pageSize, page, len(users))
 		}
 		for _, user := range users {
-			gotIds = append(gotIds, user.Id)
+			gotIDs = append(gotIDs, user.ID)
 		}
 	}
 
-	if len(gotIds) != len(wantIds) {
+	if len(gotIDs) != len(wantIDs) {
 		t.Fatalf("Expected paging to return each of the %d users exactly once, got %d rows: %v",
-			len(wantIds), len(gotIds), gotIds)
+			len(wantIDs), len(gotIDs), gotIDs)
 	}
-	for i := range wantIds {
-		if gotIds[i] != wantIds[i] {
+	for i := range wantIDs {
+		if gotIDs[i] != wantIDs[i] {
 			t.Fatalf("Expected the pages to concatenate into ascending id order %v, got %v",
-				wantIds, gotIds)
+				wantIDs, gotIDs)
 		}
 	}
 }
@@ -411,12 +411,12 @@ func TestSearchUsersPaginated_TiedGivenNamesStillPageAsAPartition(t *testing.T) 
 func TestDeleteUser(t *testing.T) {
 	user := createTestUser(t)
 
-	err := database.DeleteUser(context.Background(), nil, user.Id)
+	err := database.DeleteUser(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user: %v", err)
 	}
 
-	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	deletedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user: %v", err)
 	}
@@ -456,7 +456,7 @@ func createTestUserOn(t *testing.T, db data.Database) *record.User {
 		Locale:                         "lang" + fake.LetterN(4),
 		PageLanguage:                   "page" + fake.LetterN(4),
 		BirthDate:                      sql.NullTime{Time: fake.Date().Truncate(time.Microsecond), Valid: true},
-		PhoneNumberCountryUniqueId:     strings.ToUpper(fake.LetterN(2)),
+		PhoneNumberCountryUniqueID:     strings.ToUpper(fake.LetterN(2)),
 		PhoneNumberCountryCallingCode:  fmt.Sprintf("+%s", fake.DigitN(2)),
 		PhoneNumber:                    fake.DigitN(10),
 		PhoneNumberVerified:            fake.Bool(),
@@ -481,8 +481,8 @@ func createTestUserOn(t *testing.T, db data.Database) *record.User {
 }
 
 func compareUsers(t *testing.T, expected, actual *record.User) {
-	if actual.Id != expected.Id {
-		t.Errorf("ID mismatch: expected %d, got %d", expected.Id, actual.Id)
+	if actual.ID != expected.ID {
+		t.Errorf("ID mismatch: expected %d, got %d", expected.ID, actual.ID)
 	}
 	if actual.Enabled != expected.Enabled {
 		t.Errorf("Enabled mismatch: expected %v, got %v", expected.Enabled, actual.Enabled)
@@ -538,8 +538,8 @@ func compareUsers(t *testing.T, expected, actual *record.User) {
 	if !actual.BirthDate.Time.Equal(expected.BirthDate.Time) {
 		t.Errorf("BirthDate mismatch: expected %v, got %v", expected.BirthDate, actual.BirthDate)
 	}
-	if actual.PhoneNumberCountryUniqueId != expected.PhoneNumberCountryUniqueId {
-		t.Errorf("PhoneNumberCountryUniqueId mismatch: expected %s, got %s", expected.PhoneNumberCountryUniqueId, actual.PhoneNumberCountryUniqueId)
+	if actual.PhoneNumberCountryUniqueID != expected.PhoneNumberCountryUniqueID {
+		t.Errorf("PhoneNumberCountryUniqueID mismatch: expected %s, got %s", expected.PhoneNumberCountryUniqueID, actual.PhoneNumberCountryUniqueID)
 	}
 	if actual.PhoneNumberCountryCallingCode != expected.PhoneNumberCountryCallingCode {
 		t.Errorf("PhoneNumberCountryCallingCode mismatch: expected %s, got %s", expected.PhoneNumberCountryCallingCode, actual.PhoneNumberCountryCallingCode)
@@ -602,7 +602,7 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	user.AuthStateGeneration = 7
 	// Re-created rather than updated: writing it is exactly what UpdateUser must
 	// not do, so the nonzero value has to arrive through an insert.
-	user.Id = 0
+	user.ID = 0
 	user.Subject = fake.UUID()
 	user.Username = "gen_" + fake.LetterN(8)
 	user.Email = fake.LetterN(8) + "@example.com"
@@ -610,7 +610,7 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Fatalf("Failed to create user with a generation: %v", err)
 	}
 
-	created, err := database.GetUserById(context.Background(), nil, user.Id)
+	created, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload created user: %v", err)
 	}
@@ -626,7 +626,7 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Fatalf("Failed to update user: %v", updateUserErr)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload updated user: %v", err)
 	}
@@ -651,7 +651,7 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 	// and this caller would be handed the other caller's generation.
 	tx := beginTx(t)
 
-	first, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, user.Id)
+	first, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, user.ID)
 	if err != nil {
 		t.Fatalf("first increment failed: %v", err)
 	}
@@ -659,7 +659,7 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 		t.Errorf("first increment returned %d, want 1", first)
 	}
 
-	second, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, user.Id)
+	second, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, user.ID)
 	if err != nil {
 		t.Fatalf("second increment failed: %v", err)
 	}
@@ -671,7 +671,7 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 		t.Fatalf("CommitTransaction failed: %v", commitErr)
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -681,7 +681,7 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 
 	// A nil transaction is refused rather than quietly allowed. Keep this: without it
 	// the test would endorse exactly the unsafe usage the method exists to prevent.
-	if _, err := database.IncrementUserAuthStateGeneration(context.Background(), nil, user.Id); err == nil {
+	if _, err := database.IncrementUserAuthStateGeneration(context.Background(), nil, user.ID); err == nil {
 		t.Error("expected an error incrementing the generation without a transaction")
 	}
 
@@ -706,16 +706,16 @@ func TestSetUserPasswordHash(t *testing.T) {
 		t.Fatalf("Failed to seed a pending reset code: %v", err)
 	}
 
-	before, err := database.GetUserById(context.Background(), nil, user.Id)
+	before, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
 
-	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); setUserPasswordHashErr != nil {
+	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.ID, "newhash"); setUserPasswordHashErr != nil {
 		t.Fatalf("SetUserPasswordHash failed: %v", setUserPasswordHashErr)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -753,7 +753,7 @@ func TestTrySetUserEnabled(t *testing.T) {
 	}
 
 	// Disable: the first call transitions, the second does not.
-	first, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	first, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	if err != nil {
 		t.Fatalf("first disable failed: %v", err)
 	}
@@ -761,7 +761,7 @@ func TestTrySetUserEnabled(t *testing.T) {
 		t.Error("first disable should report the transition")
 	}
 
-	second, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	second, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	if err != nil {
 		t.Fatalf("second disable failed: %v", err)
 	}
@@ -769,7 +769,7 @@ func TestTrySetUserEnabled(t *testing.T) {
 		t.Error("second disable must report false; the account was already disabled")
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -780,7 +780,7 @@ func TestTrySetUserEnabled(t *testing.T) {
 	// Enable: same property in the other direction. This is why the method covers both
 	// rather than being a TryDisableUser, so enabling does not fall back to a full-row
 	// update that could clobber a concurrent password change.
-	firstEnable, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, false, true)
+	firstEnable, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, false, true)
 	if err != nil {
 		t.Fatalf("first enable failed: %v", err)
 	}
@@ -788,7 +788,7 @@ func TestTrySetUserEnabled(t *testing.T) {
 		t.Error("first enable should report the transition")
 	}
 
-	secondEnable, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, false, true)
+	secondEnable, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, false, true)
 	if err != nil {
 		t.Fatalf("second enable failed: %v", err)
 	}
@@ -797,14 +797,14 @@ func TestTrySetUserEnabled(t *testing.T) {
 	}
 
 	// A mismatched expectation is a no-op, not an error.
-	mismatch, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, false, false)
+	mismatch, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, false, false)
 	if err != nil {
 		t.Fatalf("mismatched expectation should not error: %v", err)
 	}
 	if mismatch {
 		t.Error("a mismatched expected value must report false")
 	}
-	reloaded, err = database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err = database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -829,7 +829,7 @@ func TestTrySetUserEmail(t *testing.T) {
 		t.Fatalf("Failed to mark the test user's address verified: %v", err)
 	}
 
-	before, err := database.GetUserById(context.Background(), nil, user.Id)
+	before, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -838,12 +838,12 @@ func TestTrySetUserEmail(t *testing.T) {
 	}
 
 	newEmail := "changed_" + fake.Email()
-	changed, setErr := database.TrySetUserEmail(context.Background(), nil, user.Id, before.Email, true, newEmail)
+	changed, setErr := database.TrySetUserEmail(context.Background(), nil, user.ID, before.Email, true, newEmail)
 	if setErr != nil || !changed {
 		t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, setErr)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -875,7 +875,7 @@ func TestTrySetUserEmail(t *testing.T) {
 	if _, err := database.TrySetUserEmail(context.Background(), nil, 0, "a@example.com", true, "x@example.com"); err == nil {
 		t.Error("expected an error setting the email of user id 0")
 	}
-	if _, err := database.TrySetUserEmail(context.Background(), nil, user.Id, newEmail, false, newEmail); err == nil {
+	if _, err := database.TrySetUserEmail(context.Background(), nil, user.ID, newEmail, false, newEmail); err == nil {
 		t.Error("expected an error moving an email to the address it already has")
 	}
 }
@@ -895,29 +895,29 @@ func TestTrySetUserEmail_AConcurrentDisableAndPasswordChangeSurvive(t *testing.T
 	}
 
 	// The email change's request-start read.
-	snapshot, err := database.GetUserById(context.Background(), nil, user.Id)
+	snapshot, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to load the request-start snapshot: %v", err)
 	}
 
 	// What lands underneath it.
-	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	if err != nil || !disabled {
 		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 	}
-	if setPasswordErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "hash-set-meanwhile"); setPasswordErr != nil {
+	if setPasswordErr := database.SetUserPasswordHash(context.Background(), nil, user.ID, "hash-set-meanwhile"); setPasswordErr != nil {
 		t.Fatalf("the concurrent password change failed: %v", setPasswordErr)
 	}
 
 	newEmail := "changed_" + fake.Email()
 	// Neither the disable nor the password change touches the address or its verified flag, so
 	// the conditional write still matches: those are not what it guards against.
-	changed, setEmailErr := database.TrySetUserEmail(context.Background(), nil, snapshot.Id, snapshot.Email, snapshot.EmailVerified, newEmail)
+	changed, setEmailErr := database.TrySetUserEmail(context.Background(), nil, snapshot.ID, snapshot.Email, snapshot.EmailVerified, newEmail)
 	if setEmailErr != nil || !changed {
 		t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, setEmailErr)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -965,7 +965,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	step := nowStep()
 
 	// A fresh row starts at 0, so the first claim of any real step transitions it.
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil {
 		t.Fatalf("first claim failed: %v", err)
 	}
@@ -973,7 +973,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 		t.Error("the first claim of a step must report the transition")
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -982,7 +982,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	}
 
 	// The same step again is the replay this whole issue exists to refuse.
-	again, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	again, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil {
 		t.Fatalf("replayed claim errored instead of being refused: %v", err)
 	}
@@ -993,7 +993,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	// A lower step is refused too. The marker is a high-water mark, so it also refuses
 	// codes below it that were never used: decision 1 accepts that imprecision because
 	// it only spans the 90 second acceptance window.
-	lower, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step-1)
+	lower, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step-1)
 	if err != nil {
 		t.Fatalf("lower claim errored: %v", err)
 	}
@@ -1002,7 +1002,7 @@ func TestTryConsumeUserOTPStep(t *testing.T) {
 	}
 
 	// The next step is a different code and is accepted.
-	higher, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1)
+	higher, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step+1)
 	if err != nil {
 		t.Fatalf("higher claim failed: %v", err)
 	}
@@ -1033,16 +1033,16 @@ func TestResetUserOTPStep(t *testing.T) {
 	user := createEnrolledTestUser(t)
 	step := nowStep()
 
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil || !claimed {
 		t.Fatalf("seeding a consumed step failed: claimed=%v err=%v", claimed, err)
 	}
 
-	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.Id); resetUserOTPStepErr != nil {
+	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.ID); resetUserOTPStepErr != nil {
 		t.Fatalf("ResetUserOTPStep failed: %v", resetUserOTPStepErr)
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1051,7 +1051,7 @@ func TestResetUserOTPStep(t *testing.T) {
 	}
 
 	// The consumed step is claimable again, which is the observable half of the reset.
-	reclaimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	reclaimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil {
 		t.Fatalf("claim after reset failed: %v", err)
 	}
@@ -1061,7 +1061,7 @@ func TestResetUserOTPStep(t *testing.T) {
 
 	// Resetting an already-reset user is a no-op rather than a failure: nothing gates
 	// on a transition here, unlike TrySetUserEnabled's disable direction.
-	if err := database.ResetUserOTPStep(context.Background(), nil, user.Id); err != nil {
+	if err := database.ResetUserOTPStep(context.Background(), nil, user.ID); err != nil {
 		t.Errorf("resetting twice must not error, got %v", err)
 	}
 
@@ -1086,11 +1086,11 @@ func TestResetUserOTPStep(t *testing.T) {
 // TestTryConsumeEnrolledUserOTPStep (#471).
 func TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled(t *testing.T) {
 	user := createEnrolledTestUser(t)
-	generation := reloadUser(t, user.Id).OtpConfigGeneration
+	generation := reloadUser(t, user.ID).OTPConfigGeneration
 	step := nowStep()
 
 	// Enrolled: a verification claim transitions the row.
-	claimed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
+	claimed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.ID, step, generation)
 	if err != nil {
 		t.Fatalf("verification claim against an enrolled user failed: %v", err)
 	}
@@ -1108,7 +1108,7 @@ func TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled(t *testing.T) {
 
 	// A verification claim is now refused, with no error: the step is newer than the
 	// stored one, so only the otp_enabled term can be refusing it.
-	afterDisable, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step+1, generation)
+	afterDisable, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.ID, step+1, generation)
 	if err != nil {
 		t.Fatalf("verification claim after a disable errored instead of being refused: %v", err)
 	}
@@ -1118,7 +1118,7 @@ func TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled(t *testing.T) {
 
 	// The enrolment claim succeeds, which is what the enrollment sites need: they
 	// claim while otp_enabled is still false.
-	enrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step+1)
+	enrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step+1)
 	if err != nil {
 		t.Fatalf("enrollment claim failed: %v", err)
 	}
@@ -1136,10 +1136,10 @@ func TestTryConsumeEnrolledUserOTPStep_RequiresOTPEnabled(t *testing.T) {
 // the verification claim is refused even though the marker is back at 0.
 func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) {
 	user := createEnrolledTestUser(t)
-	generation := reloadUser(t, user.Id).OtpConfigGeneration
+	generation := reloadUser(t, user.ID).OTPConfigGeneration
 	step := nowStep()
 
-	consumed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
+	consumed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.ID, step, generation)
 	if err != nil || !consumed {
 		t.Fatalf("seeding a consumed step failed: consumed=%v err=%v", consumed, err)
 	}
@@ -1151,11 +1151,11 @@ func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) 
 	if updateUserErr := database.UpdateUser(context.Background(), nil, user); updateUserErr != nil {
 		t.Fatalf("Failed to disable OTP: %v", updateUserErr)
 	}
-	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.Id); resetUserOTPStepErr != nil {
+	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.ID); resetUserOTPStepErr != nil {
 		t.Fatalf("ResetUserOTPStep failed: %v", resetUserOTPStepErr)
 	}
 
-	replayed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.Id, step, generation)
+	replayed, err := database.TryConsumeEnrolledUserOTPStep(context.Background(), nil, user.ID, step, generation)
 	if err != nil {
 		t.Fatalf("verification claim after reset errored instead of being refused: %v", err)
 	}
@@ -1164,7 +1164,7 @@ func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) 
 	}
 
 	// Re-enrolment, which is the point of the reset, still works with that same step.
-	reenrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	reenrolling, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil {
 		t.Fatalf("re-enrolment claim failed: %v", err)
 	}
@@ -1194,7 +1194,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	step := nowStep()
 
 	tx := beginTx(t)
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.ID, step)
 	if err != nil {
 		t.Fatalf("claim inside a transaction failed: %v", err)
 	}
@@ -1206,7 +1206,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1216,7 +1216,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	}
 
 	// The step is free again, which is the same fact from the other side.
-	afterRollback, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	afterRollback, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil {
 		t.Fatalf("claim after rollback failed: %v", err)
 	}
@@ -1225,7 +1225,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 	}
 
 	// The finished transaction is the forced fault.
-	failed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.Id, step+1)
+	failed, err := database.TryConsumeUserOTPStep(context.Background(), tx, user.ID, step+1)
 	if err == nil {
 		t.Error("a claim through a finished transaction must return an error, not a benign false")
 	}
@@ -1233,7 +1233,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 		t.Error("a failed claim must never report true")
 	}
 
-	if err := database.ResetUserOTPStep(context.Background(), tx, user.Id); err == nil {
+	if err := database.ResetUserOTPStep(context.Background(), tx, user.ID); err == nil {
 		t.Error("a reset through a finished transaction must return an error")
 	}
 }
@@ -1283,7 +1283,7 @@ func TestTryConsumeUserOTPStep_ConcurrentCallersProduceOneWinner(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				<-start
-				claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+				claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 				outcomes[i] = outcome{claimed: claimed, err: err}
 			}(i)
 		}
@@ -1313,7 +1313,7 @@ func TestTryConsumeUserOTPStep_ConcurrentCallersProduceOneWinner(t *testing.T) {
 			t.Logf("round %d: 1 winner, %d lock contention errors (acceptable)", round, failures)
 		}
 
-		reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+		reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("round %d: Failed to reload user: %v", round, err)
 		}
@@ -1342,7 +1342,7 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 
 	// A model read before the claim, which is what a concurrent handler holds. Read
 	// rather than reused, so its LastOTPStep is genuinely the pre-claim value.
-	stale, err := database.GetUserById(context.Background(), nil, user.Id)
+	stale, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to load the pre-claim model: %v", err)
 	}
@@ -1350,7 +1350,7 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 		t.Fatalf("expected a fresh user to start at step 0, got %d", stale.LastOTPStep)
 	}
 
-	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step)
+	claimed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.ID, step)
 	if err != nil || !claimed {
 		t.Fatalf("seeding a consumed step failed: claimed=%v err=%v", claimed, err)
 	}
@@ -1360,7 +1360,7 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 		t.Fatalf("Failed to update user: %v", updateUserErr)
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload updated user: %v", err)
 	}
@@ -1421,8 +1421,8 @@ func TestGetUserByForgotPasswordCodeHash(t *testing.T) {
 	if found == nil {
 		t.Fatal("the stored hash must find the user it was stored on")
 	}
-	if found.Id != user.Id {
-		t.Errorf("found user id %d, want %d", found.Id, user.Id)
+	if found.ID != user.ID {
+		t.Errorf("found user id %d, want %d", found.ID, user.ID)
 	}
 	if found.ForgotPasswordCodeHash != hash {
 		t.Errorf("round-tripped hash = %q, want %q", found.ForgotPasswordCodeHash, hash)
@@ -1436,7 +1436,7 @@ func TestGetUserByForgotPasswordCodeHash(t *testing.T) {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
 	if missing != nil {
-		t.Errorf("a hash no row carries must return nil, got user id %d", missing.Id)
+		t.Errorf("a hash no row carries must return nil, got user id %d", missing.ID)
 	}
 }
 
@@ -1465,7 +1465,7 @@ func TestGetUserByForgotPasswordCodeHash_EmptyNeverMatches(t *testing.T) {
 	}
 	if found != nil {
 		t.Errorf("an empty hash matched user id %d; every user with no outstanding code carries '' and none of them may be findable",
-			found.Id)
+			found.ID)
 	}
 
 	// 4. A real hash nobody holds still misses, with those same dormant rows present.
@@ -1474,11 +1474,11 @@ func TestGetUserByForgotPasswordCodeHash_EmptyNeverMatches(t *testing.T) {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
 	if found != nil {
-		t.Errorf("a hash no row carries matched user id %d", found.Id)
+		t.Errorf("a hash no row carries matched user id %d", found.ID)
 	}
 
 	for _, u := range dormant {
-		reloaded, err := database.GetUserById(context.Background(), nil, u.Id)
+		reloaded, err := database.GetUserByID(context.Background(), nil, u.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload a dormant user: %v", err)
 		}
@@ -1502,7 +1502,7 @@ func TestSetUserPasswordHash_ClearsCodeHash(t *testing.T) {
 		t.Fatalf("the seeded hash must be findable before the password write: user=%v err=%v", before, err)
 	}
 
-	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); setUserPasswordHashErr != nil {
+	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.ID, "newhash"); setUserPasswordHashErr != nil {
 		t.Fatalf("SetUserPasswordHash failed: %v", setUserPasswordHashErr)
 	}
 
@@ -1512,10 +1512,10 @@ func TestSetUserPasswordHash_ClearsCodeHash(t *testing.T) {
 	}
 	if after != nil {
 		t.Errorf("the hash still finds user id %d after the password was set; SetUserPasswordHash must clear it in the same statement",
-			after.Id)
+			after.ID)
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1560,8 +1560,8 @@ func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
 	if inTx == nil {
 		t.Fatal("a row written in this transaction must be visible through it (did the lookup ignore its tx?)")
 	}
-	if inTx.Id != user.Id {
-		t.Errorf("found user id %d through the transaction, want %d", inTx.Id, user.Id)
+	if inTx.ID != user.ID {
+		t.Errorf("found user id %d through the transaction, want %d", inTx.ID, user.ID)
 	}
 
 	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
@@ -1574,7 +1574,7 @@ func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
 		t.Fatalf("lookup after rollback failed: %v", err)
 	}
 	if afterRollback != nil {
-		t.Errorf("a rolled-back write must leave no findable hash, found user id %d", afterRollback.Id)
+		t.Errorf("a rolled-back write must leave no findable hash, found user id %d", afterRollback.ID)
 	}
 
 	// 7b. The finished transaction is the forced fault. A driver failure must not
@@ -1609,7 +1609,7 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 
 	// 16. The stored hash claims, writes the password, clears all three code columns, and
 	// marks the address verified, dropping the verification code outstanding for it.
-	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "firstpassword")
+	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.ID, hash, "firstpassword")
 	if err != nil {
 		t.Fatalf("the first claim failed: %v", err)
 	}
@@ -1617,7 +1617,7 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 		t.Fatal("the first claim of an outstanding code must report the transition")
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1642,7 +1642,7 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 
 	// 17. The same hash again claims nothing and leaves the first password standing.
 	// Without the hash in the WHERE clause this returns true and overwrites it.
-	replayed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "replayedpassword")
+	replayed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.ID, hash, "replayedpassword")
 	if err != nil {
 		t.Fatalf("the replayed claim errored rather than reporting false: %v", err)
 	}
@@ -1650,7 +1650,7 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 		t.Error("a second claim of a consumed code must report false")
 	}
 
-	afterReplay, err := database.GetUserById(context.Background(), nil, user.Id)
+	afterReplay, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1661,14 +1661,14 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 
 	// 18. A real hash the row does not carry changes nothing either.
 	other, otherHash := createUserWithResetCode(t)
-	wrong, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.Id, codeHashOf(t, fake.UUID()), "wrongpassword")
+	wrong, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.ID, codeHashOf(t, fake.UUID()), "wrongpassword")
 	if err != nil {
 		t.Fatalf("a claim with a non-matching hash errored: %v", err)
 	}
 	if wrong {
 		t.Error("a claim with a hash the row does not carry must report false")
 	}
-	otherAfter, err := database.GetUserById(context.Background(), nil, other.Id)
+	otherAfter, err := database.GetUserByID(context.Background(), nil, other.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload the second user: %v", err)
 	}
@@ -1684,13 +1684,13 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 	// '' is the dormant value on every user with no code outstanding, so an empty
 	// predicate would claim one of them and set a password on an account nobody asked to
 	// reset.
-	if _, consumeErr := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.Id, "", "guardedpassword"); consumeErr == nil {
+	if _, consumeErr := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.ID, "", "guardedpassword"); consumeErr == nil {
 		t.Error("an empty code hash must return an error")
 	}
 	if _, consumeErr := database.TryConsumeForgotPasswordCode(context.Background(), nil, 0, otherHash, "guardedpassword"); consumeErr == nil {
 		t.Error("a zero user id must return an error")
 	}
-	guarded, err := database.GetUserById(context.Background(), nil, other.Id)
+	guarded, err := database.GetUserByID(context.Background(), nil, other.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload the second user: %v", err)
 	}
@@ -1711,7 +1711,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 	originalPassword := user.PasswordHash
 
 	tx := beginTx(t)
-	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), tx, user.Id, hash, "committedpassword")
+	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), tx, user.ID, hash, "committedpassword")
 	if err != nil {
 		t.Fatalf("claim inside a transaction failed: %v", err)
 	}
@@ -1723,7 +1723,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
-	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+	reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1737,7 +1737,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 	}
 
 	// The code is claimable again, which is the same fact from the other side.
-	afterRollback, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "secondpassword")
+	afterRollback, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.ID, hash, "secondpassword")
 	if err != nil {
 		t.Fatalf("claim after rollback failed: %v", err)
 	}
@@ -1746,7 +1746,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 	}
 
 	// The finished transaction is the forced fault: an error, never a benign false.
-	failed, err := database.TryConsumeForgotPasswordCode(context.Background(), tx, user.Id, hash, "faultedpassword")
+	failed, err := database.TryConsumeForgotPasswordCode(context.Background(), tx, user.ID, hash, "faultedpassword")
 	if err == nil {
 		t.Error("a claim through a finished transaction must return an error, not a benign false")
 	}
@@ -1797,7 +1797,7 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 				defer wg.Done()
 				password := fmt.Sprintf("password-%d-%d", round, i)
 				<-start
-				claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, password)
+				claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.ID, hash, password)
 				outcomes[i] = outcome{claimed: claimed, err: err, password: password}
 			}(i)
 		}
@@ -1826,7 +1826,7 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 			t.Logf("round %d: 1 winner, %d lock contention errors (acceptable)", round, failures)
 		}
 
-		reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
+		reloaded, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("round %d: Failed to reload user: %v", round, err)
 		}
@@ -1847,14 +1847,14 @@ func TestTryConsumeForgotPasswordCode_ConcurrentCallersProduceOneWinner(t *testi
 // stays outstanding, refused at every step while the account is disabled (#404).
 func TestTryConsumeForgotPasswordCode_ADisabledAccountIsNotReset(t *testing.T) {
 	user, hash := createUserWithResetCode(t)
-	passwordBefore := passwordHashStored(t, user.Id)
+	passwordBefore := passwordHashStored(t, user.ID)
 
-	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	if err != nil || !disabled {
 		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 	}
 
-	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.Id, hash, "passwordondisabled")
+	claimed, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, user.ID, hash, "passwordondisabled")
 	if err != nil {
 		t.Fatalf("a claim on a disabled account errored rather than reporting false: %v", err)
 	}
@@ -1862,7 +1862,7 @@ func TestTryConsumeForgotPasswordCode_ADisabledAccountIsNotReset(t *testing.T) {
 		t.Error("a claim on a disabled account must report false")
 	}
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1878,9 +1878,9 @@ func TestTryConsumeForgotPasswordCode_ADisabledAccountIsNotReset(t *testing.T) {
 	}
 }
 
-func passwordHashStored(t *testing.T, userId int64) string {
+func passwordHashStored(t *testing.T, userID int64) string {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	if err != nil {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
@@ -1914,13 +1914,13 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 
 	t.Run("an enabled account with a verified address takes the code and nothing else", func(t *testing.T) {
 		user := createRecoverableTestUser(t)
-		before, err := database.GetUserById(context.Background(), nil, user.Id)
+		before, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
 		hash := codeHashOf(t, fake.UUID())
 
-		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, user.Email,
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.ID, user.Email,
 			codeEncrypted, hash, issuedAt)
 		if err != nil {
 			t.Fatalf("TryStoreForgotPasswordCode failed: %v", err)
@@ -1929,7 +1929,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			t.Fatal("the store must take effect on an enabled account with a verified address")
 		}
 
-		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		after, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -1947,7 +1947,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 
 		// And the link finds it.
 		found, err := database.GetUserByForgotPasswordCodeHash(context.Background(), nil, hash)
-		if err != nil || found == nil || found.Id != user.Id {
+		if err != nil || found == nil || found.ID != user.ID {
 			t.Errorf("the stored hash must find the user it was stored on: found=%v err=%v", found, err)
 		}
 	})
@@ -1959,7 +1959,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 		{
 			name: "a disabled account",
 			mutate: func(t *testing.T, user *record.User) string {
-				disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+				disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 				if err != nil || !disabled {
 					t.Fatalf("the disable must take effect: disabled=%v err=%v", disabled, err)
 				}
@@ -1971,7 +1971,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			// stops being verified; it is the email change landing under the request.
 			name: "an address no longer verified",
 			mutate: func(t *testing.T, user *record.User) string {
-				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+				fresh, err := database.GetUserByID(context.Background(), nil, user.ID)
 				if err != nil {
 					t.Fatalf("Failed to reload user: %v", err)
 				}
@@ -1988,15 +1988,15 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			name: "an account re-addressed and verified again",
 			mutate: func(t *testing.T, user *record.User) string {
 				looked := user.Email
-				current, err := database.GetUserById(context.Background(), nil, user.Id)
+				current, err := database.GetUserByID(context.Background(), nil, user.ID)
 				if err != nil {
 					t.Fatalf("Failed to reload user: %v", err)
 				}
-				changed, err := database.TrySetUserEmail(context.Background(), nil, user.Id, current.Email, current.EmailVerified, "moved_"+fake.Email())
+				changed, err := database.TrySetUserEmail(context.Background(), nil, user.ID, current.Email, current.EmailVerified, "moved_"+fake.Email())
 				if err != nil || !changed {
 					t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, err)
 				}
-				fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+				fresh, err := database.GetUserByID(context.Background(), nil, user.ID)
 				if err != nil {
 					t.Fatalf("Failed to reload user: %v", err)
 				}
@@ -2014,12 +2014,12 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 			user := createRecoverableTestUser(t)
 			lookedUpEmail := tc.mutate(t, user)
 
-			before, err := database.GetUserById(context.Background(), nil, user.Id)
+			before, err := database.GetUserByID(context.Background(), nil, user.ID)
 			if err != nil {
 				t.Fatalf("Failed to reload user: %v", err)
 			}
 
-			stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, lookedUpEmail,
+			stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.ID, lookedUpEmail,
 				codeEncrypted, codeHashOf(t, fake.UUID()), issuedAt)
 			if err != nil {
 				t.Fatalf("a declined store errored rather than reporting false: %v", err)
@@ -2028,7 +2028,7 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 				t.Error("the store must report false")
 			}
 
-			after, err := database.GetUserById(context.Background(), nil, user.Id)
+			after, err := database.GetUserByID(context.Background(), nil, user.ID)
 			if err != nil {
 				t.Fatalf("Failed to reload user: %v", err)
 			}
@@ -2047,11 +2047,11 @@ func TestTryStoreForgotPasswordCode(t *testing.T) {
 		}
 		// '' is the dormant value meaning no code outstanding, so storing it beside an
 		// encrypted code would leave a code no link can ever find.
-		if _, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.Id, user.Email,
+		if _, err := database.TryStoreForgotPasswordCode(context.Background(), nil, user.ID, user.Email,
 			codeEncrypted, "", issuedAt); err == nil {
 			t.Error("an empty code hash must return an error")
 		}
-		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		after, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -2074,12 +2074,12 @@ func TestTryStoreForgotPasswordCode_AConcurrentDisableAndPasswordChangeSurvive(t
 			t.Fatalf("Failed to load the request-start snapshot: %v", err)
 		}
 
-		disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+		disabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 		if err != nil || !disabled {
 			t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 		}
 
-		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.Id, snapshot.Email,
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.ID, snapshot.Email,
 			[]byte("ENCRYPTEDRESETCODE"), codeHashOf(t, fake.UUID()), time.Now().UTC())
 		if err != nil {
 			t.Fatalf("TryStoreForgotPasswordCode failed: %v", err)
@@ -2088,7 +2088,7 @@ func TestTryStoreForgotPasswordCode_AConcurrentDisableAndPasswordChangeSurvive(t
 			t.Error("a code was stored on an account disabled under the request")
 		}
 
-		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		after, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -2107,17 +2107,17 @@ func TestTryStoreForgotPasswordCode_AConcurrentDisableAndPasswordChangeSurvive(t
 			t.Fatalf("Failed to load the request-start snapshot: %v", err)
 		}
 
-		if setErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "hash-set-meanwhile"); setErr != nil {
+		if setErr := database.SetUserPasswordHash(context.Background(), nil, user.ID, "hash-set-meanwhile"); setErr != nil {
 			t.Fatalf("the concurrent password change failed: %v", setErr)
 		}
 
-		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.Id, snapshot.Email,
+		stored, err := database.TryStoreForgotPasswordCode(context.Background(), nil, snapshot.ID, snapshot.Email,
 			[]byte("ENCRYPTEDRESETCODE"), codeHashOf(t, fake.UUID()), time.Now().UTC())
 		if err != nil || !stored {
 			t.Fatalf("the store must still take effect on the enabled account: stored=%v err=%v", stored, err)
 		}
 
-		after, err := database.GetUserById(context.Background(), nil, user.Id)
+		after, err := database.GetUserByID(context.Background(), nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -2169,32 +2169,32 @@ func TestGetUserByEmailIsCaseSensitive(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		lookup string
-		wantId int64
+		wantID int64
 	}{
-		{"the lowercase address resolves the lowercase user", lower, lowerUser.Id},
-		{"the uppercase address resolves the uppercase user", upper, upperUser.Id},
+		{"the lowercase address resolves the lowercase user", lower, lowerUser.ID},
+		{"the uppercase address resolves the uppercase user", upper, upperUser.ID},
 		{"a mis-cased address resolves nothing", "Case_Email_" + strings.ToUpper(random) + "@case.local", 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
-		{"the NFC spelling resolves the row stored in NFC", nfcAddress, nfcUser.Id},
+		{"the NFC spelling resolves the row stored in NFC", nfcAddress, nfcUser.ID},
 		{"the NFD spelling resolves nothing, which MySQL's and SQL Server's normalisation fold would otherwise defeat", nfdAddress, 0},
 	} {
 		got, err := database.GetUserByEmail(context.Background(), nil, tc.lookup)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
-		if tc.wantId == 0 {
+		if tc.wantID == 0 {
 			if got != nil {
 				t.Errorf("%s: expected nil, got the user with id %d and email %q",
-					tc.name, got.Id, got.Email)
+					tc.name, got.ID, got.Email)
 			}
 			continue
 		}
 		if got == nil {
-			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantId)
+			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantID)
 		}
-		if got.Id != tc.wantId {
+		if got.ID != tc.wantID {
 			t.Errorf("%s: expected the user with id %d, got id %d (email %q)",
-				tc.name, tc.wantId, got.Id, got.Email)
+				tc.name, tc.wantID, got.ID, got.Email)
 		}
 	}
 }
@@ -2211,9 +2211,9 @@ func TestGetUserBySubjectIsCaseSensitive(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		lookup string
-		wantId int64
+		wantID int64
 	}{
-		{"the subject as stored resolves the user", subject, user.Id},
+		{"the subject as stored resolves the user", subject, user.ID},
 		{"an upper-cased subject resolves nothing", strings.ToUpper(subject), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", subject + " ", 0},
 	} {
@@ -2221,18 +2221,18 @@ func TestGetUserBySubjectIsCaseSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
-		if tc.wantId == 0 {
+		if tc.wantID == 0 {
 			if got != nil {
 				t.Errorf("%s: expected nil, got the user with id %d and subject %q",
-					tc.name, got.Id, got.Subject)
+					tc.name, got.ID, got.Subject)
 			}
 			continue
 		}
 		if got == nil {
-			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantId)
+			t.Fatalf("%s: expected the user with id %d, got nil", tc.name, tc.wantID)
 		}
-		if got.Id != tc.wantId {
-			t.Errorf("%s: expected the user with id %d, got id %d", tc.name, tc.wantId, got.Id)
+		if got.ID != tc.wantID {
+			t.Errorf("%s: expected the user with id %d, got id %d", tc.name, tc.wantID, got.ID)
 		}
 	}
 }
@@ -2283,8 +2283,8 @@ func TestSearchUsersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	if len(users) != 1 {
 		t.Fatalf("Expected the transaction's own user, got %d", len(users))
 	}
-	if users[0].Id != user.Id {
-		t.Errorf("Expected user %d, got %d", user.Id, users[0].Id)
+	if users[0].ID != user.ID {
+		t.Errorf("Expected user %d, got %d", user.ID, users[0].ID)
 	}
 	if total != 1 {
 		t.Errorf("Expected a total of 1 to agree with the one user on the page, got %d: "+

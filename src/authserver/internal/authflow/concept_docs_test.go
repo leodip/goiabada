@@ -55,8 +55,8 @@ func silentRefusalWorlds() []silentWorld {
 		disabled:           true,
 		subject:            "sub-1",
 		hint:               "sub-2",
-		target:             record.AcrLevel2Mandatory,
-		sessionAcr:         record.AcrLevel1,
+		target:             record.ACRLevel2Mandatory,
+		sessionAcr:         record.ACRLevel1,
 		sessionOtpGen:      1,
 		userOtpGen:         2,
 		otpEnabled:         false,
@@ -85,7 +85,7 @@ func silentRefusalWorlds() []silentWorld {
 	lowerLevel.hint = "sub-1"
 
 	noAuthenticator := lowerLevel
-	noAuthenticator.sessionAcr = record.AcrLevel2Mandatory
+	noAuthenticator.sessionAcr = record.ACRLevel2Mandatory
 
 	authenticatorChanged := noAuthenticator
 	authenticatorChanged.otpEnabled = true
@@ -140,7 +140,7 @@ func TestConceptDocs_TheSilentChecksAreTheCodesRefusalsInOrder(t *testing.T) {
 // signInLevel is one row of the sign-in table: a level, whether the user has an authenticator, and
 // the acr and amr the sign-in ends with.
 type signInLevel struct {
-	level      record.AcrLevel
+	level      record.ACRLevel
 	userHasOTP bool
 	acr, amr   string
 }
@@ -152,7 +152,7 @@ type signInLevel struct {
 func signInLevels(t *testing.T) []signInLevel {
 	t.Helper()
 	var levels []signInLevel
-	for _, level := range []record.AcrLevel{record.AcrLevel1, record.AcrLevel2Optional, record.AcrLevel2Mandatory} {
+	for _, level := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory} {
 		for _, userHasOTP := range []bool{false, true} {
 			var authContext ceremony.AuthContext
 			if err := authContext.SetAcrLevel(level, nil); err != nil {
@@ -314,9 +314,9 @@ func TestConceptDocs_ASignInTableDisagreeingWithTheCodeFails(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
-			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
-			{record.AcrLevel2Optional, false, "urn:goiabada:level2_optional", `["pwd"]`},
-			{record.AcrLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
+			{record.ACRLevel1, false, "urn:goiabada:level1", `["pwd"]`},
+			{record.ACRLevel2Optional, false, "urn:goiabada:level2_optional", `["pwd"]`},
+			{record.ACRLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
 		})
 	})
 
@@ -342,7 +342,7 @@ func TestConceptDocs_ASignInTableNamingARowTwiceFails(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
-			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
+			{record.ACRLevel1, false, "urn:goiabada:level1", `["pwd"]`},
 		})
 	})
 
@@ -361,8 +361,8 @@ func TestConceptDocs_ASignInTableAgreeingWithTheCodePasses(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"}, []signInLevel{
-			{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`},
-			{record.AcrLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
+			{record.ACRLevel1, false, "urn:goiabada:level1", `["pwd"]`},
+			{record.ACRLevel2Mandatory, true, "urn:goiabada:level2_mandatory", `["pwd", "otp"]`},
 		})
 	})
 
@@ -377,7 +377,7 @@ func TestConceptDocs_ASignInSectionWithNoTableStops(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertSignInTable(r, root, conceptSection{"site/acr.mdx", "## A sign-in with no session"},
-			[]signInLevel{{record.AcrLevel1, false, "urn:goiabada:level1", `["pwd"]`}})
+			[]signInLevel{{record.ACRLevel1, false, "urn:goiabada:level1", `["pwd"]`}})
 	})
 
 	if !report.Stopped || !strings.Contains(report.Fatal, "## A sign-in with no session") {

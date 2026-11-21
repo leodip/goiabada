@@ -49,8 +49,8 @@ type codeIssuerDatabase interface {
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetClientByIDForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -75,7 +75,7 @@ type CreateCodeInput struct {
 	UserAgent           string
 	IpAddress           string
 	UserId              int64
-	AcrLevel            record.AcrLevel
+	AcrLevel            record.ACRLevel
 	AuthMethods         string
 	// AuthenticatedAt is the code's auth_time: the ceremony's, which /auth/completed set from the
 	// session it bound, or prompt=none from the session it reused. Required: IssueAuthCode refuses a
@@ -228,7 +228,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	// held to the end of this transaction: either this code commits before the rename can change the
 	// row and the rename's sweep finds it, or the rename commits first, this read waits for it, and
 	// the identifier is no longer the one the ceremony named, so nothing is issued (#866).
-	held, err := ci.database.GetClientByIdForShare(ctx, tx, client.Id)
+	held, err := ci.database.GetClientByIDForShare(ctx, tx, client.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,9 +260,9 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	code := &record.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
-		ClientId:            client.Id,
+		ClientID:            client.ID,
 		AuthenticatedAt:     *input.AuthenticatedAt,
-		UserId:              input.UserId,
+		UserID:              input.UserId,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 		DPoPJkt:             dpopJkt,
@@ -278,8 +278,8 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		// (#281).
 		UserAgent:         useragent.BoundRaw(input.UserAgent),
 		ResponseMode:      responseMode,
-		IpAddress:         input.IpAddress,
-		AcrLevel:          input.AcrLevel,
+		IPAddress:         input.IpAddress,
+		ACRLevel:          input.AcrLevel,
 		AuthMethods:       input.AuthMethods,
 		SessionIdentifier: input.SessionIdentifier,
 		Used:              false,

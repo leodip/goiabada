@@ -21,7 +21,7 @@ import (
 // a real one re-signed with the current signing key under its at+jwt header, its sub padded.
 func TestAPIAccount_ASubjectWithSurroundingWhitespaceNamesOneUser(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
-	signOutURI := registerSignOutRedirectURI(t, code.Client.Id)
+	signOutURI := registerSignOutRedirectURI(t, code.Client.ID)
 
 	claims := jwt.MapClaims(decodeJWTPayload(t, accessToken))
 	require.Equal(t, code.User.Subject, claims["sub"])
@@ -36,7 +36,7 @@ func TestAPIAccount_ASubjectWithSurroundingWhitespaceNamesOneUser(t *testing.T) 
 
 		var got api.GetUserResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
-		assert.Equal(t, code.User.Id, got.User.ID)
+		assert.Equal(t, code.User.ID, got.User.ID)
 	})
 
 	t.Run("the logout hint names the user's subject", func(t *testing.T) {

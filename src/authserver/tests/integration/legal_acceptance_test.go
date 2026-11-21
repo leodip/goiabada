@@ -73,14 +73,14 @@ func newLegalAcceptanceApp(t *testing.T, user *record.User, password, adminToken
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropc,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		ClientSecretEncrypted:                   clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	redirectURI := "https://" + client.ClientIdentifier + ".example.com/callback"
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{ClientId: client.Id, URI: redirectURI}))
+		&record.RedirectURI{ClientID: client.ID, URI: redirectURI}))
 	return &legalAcceptanceFixture{client: client, clientSecret: clientSecret, redirectURI: redirectURI,
 		user: user, password: password, adminToken: adminToken}
 }
@@ -99,7 +99,7 @@ func newLegalAcceptanceUser(t *testing.T) (*record.User, string) {
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user, password
 }
 
@@ -126,7 +126,7 @@ func (f *legalAcceptanceFixture) mustAcceptFor(t *testing.T, prefix, title strin
 	t.Helper()
 	shortName := legalShortName(prefix)
 	id := createLegalDocumentOverAPI(t, f.adminToken, "must_accept", shortName, title, "Be nice to "+title+".")
-	status, body := setApps(t, f.adminToken, id, "selected_apps", []int64{f.client.Id}, []int64{})
+	status, body := setApps(t, f.adminToken, id, "selected_apps", []int64{f.client.ID}, []int64{})
 	require.Equal(t, http.StatusOK, status, "apps: %v", body)
 	status, body, _ = legalCall(t, f.adminToken, http.MethodPost, legalPath(id, "/publish"), nil)
 	require.Equal(t, http.StatusOK, status, "publish: %v", body)
@@ -139,17 +139,17 @@ func versionId(t *testing.T, documentId int64, n int) int64 {
 	version, err := database.GetLegalDocumentVersion(context.Background(), nil, documentId, n)
 	require.NoError(t, err)
 	require.NotNil(t, version, "version %d of document %d", n, documentId)
-	return version.Id
+	return version.ID
 }
 
 // acceptedVersionIds answers the version ids the user has accepted, in the order they were stored.
 func acceptedVersionIds(t *testing.T, userId int64) []int64 {
 	t.Helper()
-	acceptances, err := database.GetLegalDocumentAcceptancesByUserId(context.Background(), nil, userId)
+	acceptances, err := database.GetLegalDocumentAcceptancesByUserID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, acceptance := range acceptances {
-		ids = append(ids, acceptance.LegalDocumentVersionId)
+		ids = append(ids, acceptance.LegalDocumentVersionID)
 	}
 	return ids
 }
@@ -351,23 +351,23 @@ func TestLegalAcceptance_ASignInWithADocumentOwedLandsOnTheStepAndAcceptRecordsT
 	assert.Equal(t, []stepDocument{{title: "Shop terms", href: publicPage, version: version1}}, documents,
 		"the step lists the one must-accept document, unticked, linking its public page, which names the sign-in "+
 			"so the page is drawn in the app's brand (#812)")
-	assert.Empty(t, acceptedVersionIds(t, f.user.Id), "showing the step records nothing")
+	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "showing the step records nothing")
 
 	started := time.Now().UTC().Add(-time.Second)
 	resp := postStep(t, browser, stepURL, page, []string{version1}, false)
 	_ = page.Body.Close()
 	f.assertCodeIssued(t, browser, resp)
 
-	acceptances, err := database.GetLegalDocumentAcceptancesByUserId(context.Background(), nil, f.user.Id)
+	acceptances, err := database.GetLegalDocumentAcceptancesByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	require.Len(t, acceptances, 1, "one acceptance, of the version shown")
-	assert.Equal(t, versionId(t, termsId, 1), acceptances[0].LegalDocumentVersionId)
+	assert.Equal(t, versionId(t, termsId, 1), acceptances[0].LegalDocumentVersionID)
 	assertStampedSince(t, acceptances[0].AcceptedAt, started)
 
 	details := latestAuditDetails(t, audit.EventAcceptedLegalDocument)
 	require.NotNil(t, details, "the acceptance is audited")
-	assert.Equal(t, f.user.Id, detailNumber(t, details, "user_id"))
-	assert.Equal(t, f.client.Id, detailNumber(t, details, "client_id"))
+	assert.Equal(t, f.user.ID, detailNumber(t, details, "user_id"))
+	assert.Equal(t, f.client.ID, detailNumber(t, details, "client_id"))
 	assert.Equal(t, termsId, detailNumber(t, details, "legal_document_id"))
 	assert.Equal(t, terms, details["short_name"])
 	assert.Equal(t, int64(1), detailNumber(t, details, "version"))
@@ -397,12 +397,12 @@ func TestLegalAcceptance_AnUntickedBoxShowsTheStepAgainAndRecordsNothing(t *test
 	assert.Equal(t, versionsOf(documents), versionsOf(redrawn), "listing the same documents")
 	assert.True(t, redrawn[0].ticked, "the box ticked stays ticked")
 	assert.False(t, redrawn[1].ticked)
-	assert.Empty(t, acceptedVersionIds(t, f.user.Id), "nothing is recorded")
+	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "nothing is recorded")
 
 	resp2 := postStep(t, browser, stepURL, resp, versionsOf(redrawn), false)
 	_ = resp.Body.Close()
 	f.assertCodeIssued(t, browser, resp2)
-	assert.Len(t, acceptedVersionIds(t, f.user.Id), 2)
+	assert.Len(t, acceptedVersionIds(t, f.user.ID), 2)
 }
 
 func TestLegalAcceptance_DeclineAnswersAccessDeniedKeepsTheSessionAndAsksAgain(t *testing.T) {
@@ -420,14 +420,14 @@ func TestLegalAcceptance_DeclineAnswersAccessDeniedKeepsTheSessionAndAsksAgain(t
 	assert.Equal(t, declinedDescription, query.Get("error_description"))
 	assert.Equal(t, legalAcceptanceState, query.Get("state"))
 	assert.Empty(t, query.Get("code"))
-	assert.Empty(t, acceptedVersionIds(t, f.user.Id), "a decline is never stored")
+	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "a decline is never stored")
 
 	details := latestAuditDetails(t, audit.EventDeclinedLegalDocuments)
 	require.NotNil(t, details, "the decline is audited")
-	assert.Equal(t, f.user.Id, detailNumber(t, details, "user_id"))
-	assert.Equal(t, f.client.Id, detailNumber(t, details, "client_id"))
+	assert.Equal(t, f.user.ID, detailNumber(t, details, "user_id"))
+	assert.Equal(t, f.client.ID, detailNumber(t, details, "client_id"))
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, f.user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Len(t, sessions, 1, "the user's session stays")
 
@@ -463,11 +463,11 @@ func TestLegalAcceptance_ANewVersionIsAskedAgain(t *testing.T) {
 	assert.Equal(t, []string{version3}, versionsOf(redrawn), "with the version now current")
 	assert.Equal(t, 1, doc.Find("#legal-acceptance-changed").Length(), "saying it changed")
 	assert.Equal(t, 0, doc.Find("#legal-acceptance-error").Length())
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.Id), "nothing more is recorded")
+	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID), "nothing more is recorded")
 
 	f.assertCodeIssued(t, browser, postStep(t, browser, stepURL, resp, []string{version3}, false))
 	_ = resp.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1), versionId(t, termsId, 3)}, acceptedVersionIds(t, f.user.Id),
+	assert.Equal(t, []int64{versionId(t, termsId, 1), versionId(t, termsId, 3)}, acceptedVersionIds(t, f.user.ID),
 		"the version accepted is the one shown")
 }
 
@@ -476,8 +476,8 @@ func TestLegalAcceptance_AnAppSpecificDocumentBlocksOnlyItsAppsAndAnAcceptanceCo
 	blog := newLegalAcceptanceApp(t, shop.user, shop.password, shop.adminToken)
 	forum := newLegalAcceptanceApp(t, shop.user, shop.password, shop.adminToken)
 	id, _ := shop.mustAcceptFor(t, "shared", "Shared terms")
-	status, body := setApps(t, shop.adminToken, id, "selected_apps", []int64{shop.client.Id, forum.client.Id},
-		[]int64{shop.client.Id})
+	status, body := setApps(t, shop.adminToken, id, "selected_apps", []int64{shop.client.ID, forum.client.ID},
+		[]int64{shop.client.ID})
 	require.Equal(t, http.StatusOK, status, "apps: %v", body)
 
 	browser := createHttpClient(t)
@@ -614,7 +614,7 @@ func TestLegalAcceptance_ARefreshKeepsWorkingWhileADocumentIsOwed(t *testing.T) 
 func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	user, password := newLegalAcceptanceUser(t)
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 
 	// A must-accept document for all apps, the one kind that could reach the admin console's
 	// sign-in, retired before the test ends so no other test's sign-in owes it.
@@ -659,7 +659,7 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	resp = loadPage(t, browser, location)
 	defer func() { _ = resp.Body.Close() }()
 	assertRedirect(t, resp, "/auth/issue")
-	assert.Empty(t, acceptedVersionIds(t, user.Id))
+	assert.Empty(t, acceptedVersionIds(t, user.ID))
 
 	// The same document is owed on a sign-in to any other app.
 	app := newLegalAcceptanceApp(t, user, password, adminToken)
@@ -711,10 +711,10 @@ func TestLegalAcceptance_ADocumentsAppsChangeWhoIsAskedWithNoNewVersion(t *testi
 	owingAtForum.assertCodeIssued(t, browser, owingAtForum.signInToCompleted(t, browser))
 
 	// The forum is added, which publishes no new version.
-	status, body := setApps(t, shop.adminToken, id, "selected_apps", []int64{shop.client.Id, forum.client.Id},
-		[]int64{shop.client.Id})
+	status, body := setApps(t, shop.adminToken, id, "selected_apps", []int64{shop.client.ID, forum.client.ID},
+		[]int64{shop.client.ID})
 	require.Equal(t, http.StatusOK, status, "apps: %v", body)
-	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(context.Background(), nil, id)
 	require.NoError(t, err)
 	assert.Len(t, versions, 1, "changing the apps publishes no version")
 
@@ -725,8 +725,8 @@ func TestLegalAcceptance_ADocumentsAppsChangeWhoIsAskedWithNoNewVersion(t *testi
 	forum.assertCodeIssued(t, accepted, forum.ssoToCompleted(t, accepted))
 
 	// The shop taken off, the document asks nothing there.
-	status, body = setApps(t, shop.adminToken, id, "selected_apps", []int64{forum.client.Id},
-		[]int64{shop.client.Id, forum.client.Id})
+	status, body = setApps(t, shop.adminToken, id, "selected_apps", []int64{forum.client.ID},
+		[]int64{shop.client.ID, forum.client.ID})
 	require.Equal(t, http.StatusOK, status, "apps: %v", body)
 	owingAtShop.assertCodeIssued(t, browser, owingAtShop.ssoToCompleted(t, browser))
 }

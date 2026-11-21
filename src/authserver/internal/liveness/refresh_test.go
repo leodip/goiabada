@@ -19,16 +19,16 @@ const familyJti = "family-1"
 
 func TestFindRefreshToken(t *testing.T) {
 	t.Run("a code-descended token names its code's user, client and scope", func(t *testing.T) {
-		row := &record.RefreshToken{RefreshTokenJti: "jti-1", CodeId: sql.NullInt64{Int64: 11, Valid: true}}
+		row := &record.RefreshToken{RefreshTokenJTI: "jti-1", CodeID: sql.NullInt64{Int64: 11, Valid: true}}
 		database := datamocks.NewDatabase(t)
-		database.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(row, nil).Once()
+		database.On("GetRefreshTokenByJTI", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(row, nil).Once()
 		database.On("RefreshTokenLoadCode", mock.Anything, (*sql.Tx)(nil), row).Return(nil).Once().
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*record.RefreshToken).Code = record.Code{Id: 11, ClientId: 4, UserId: 1, Scope: "openid email"}
+				args.Get(2).(*record.RefreshToken).Code = record.Code{ID: 11, ClientID: 4, UserID: 1, Scope: "openid email"}
 			})
 		database.On("CodeLoadUser", mock.Anything, (*sql.Tx)(nil), &row.Code).Return(nil).Once().
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*record.Code).User = record.User{Id: 1, Subject: "user-1", Enabled: true}
+				args.Get(2).(*record.Code).User = record.User{ID: 1, Subject: "user-1", Enabled: true}
 			})
 
 		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
@@ -46,16 +46,16 @@ func TestFindRefreshToken(t *testing.T) {
 
 	t.Run("a password grant's token names the user, client and scope on its own row", func(t *testing.T) {
 		row := &record.RefreshToken{
-			RefreshTokenJti: "jti-1",
-			UserId:          sql.NullInt64{Int64: 2, Valid: true},
-			ClientId:        sql.NullInt64{Int64: 5, Valid: true},
+			RefreshTokenJTI: "jti-1",
+			UserID:          sql.NullInt64{Int64: 2, Valid: true},
+			ClientID:        sql.NullInt64{Int64: 5, Valid: true},
 			Scope:           "openid profile",
 		}
 		database := datamocks.NewDatabase(t)
-		database.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(row, nil).Once()
+		database.On("GetRefreshTokenByJTI", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(row, nil).Once()
 		database.On("RefreshTokenLoadUser", mock.Anything, (*sql.Tx)(nil), row).Return(nil).Once().
 			Run(func(args mock.Arguments) {
-				args.Get(2).(*record.RefreshToken).User = record.User{Id: 2, Subject: "user-2", Enabled: true}
+				args.Get(2).(*record.RefreshToken).User = record.User{ID: 2, Subject: "user-2", Enabled: true}
 			})
 		database.On("RefreshTokenLoadClient", mock.Anything, (*sql.Tx)(nil), row).Return(nil).Once()
 
@@ -74,7 +74,7 @@ func TestFindRefreshToken(t *testing.T) {
 
 	t.Run("a jti with no row is no token, and nothing more is read", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(nil, nil).Once()
+		database.On("GetRefreshTokenByJTI", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(nil, nil).Once()
 
 		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
 
@@ -98,7 +98,7 @@ func TestFindRefreshToken(t *testing.T) {
 		ropc   bool
 		failOn string
 	}{
-		{label: "reading the row fails", failOn: "GetRefreshTokenByJti"},
+		{label: "reading the row fails", failOn: "GetRefreshTokenByJTI"},
 		{label: "loading the code fails", failOn: "RefreshTokenLoadCode"},
 		{label: "loading the code's user fails", failOn: "CodeLoadUser"},
 		{label: "loading a password grant's user fails", ropc: true, failOn: "RefreshTokenLoadUser"},
@@ -106,12 +106,12 @@ func TestFindRefreshToken(t *testing.T) {
 	}
 	for _, f := range faults {
 		t.Run(f.label, func(t *testing.T) {
-			row := &record.RefreshToken{RefreshTokenJti: "jti-1", CodeId: sql.NullInt64{Int64: 11, Valid: true}}
-			calls := []string{"GetRefreshTokenByJti", "RefreshTokenLoadCode", "CodeLoadUser"}
+			row := &record.RefreshToken{RefreshTokenJTI: "jti-1", CodeID: sql.NullInt64{Int64: 11, Valid: true}}
+			calls := []string{"GetRefreshTokenByJTI", "RefreshTokenLoadCode", "CodeLoadUser"}
 			if f.ropc {
-				row = &record.RefreshToken{RefreshTokenJti: "jti-1",
-					UserId: sql.NullInt64{Int64: 2, Valid: true}, ClientId: sql.NullInt64{Int64: 5, Valid: true}}
-				calls = []string{"GetRefreshTokenByJti", "RefreshTokenLoadUser", "RefreshTokenLoadClient"}
+				row = &record.RefreshToken{RefreshTokenJTI: "jti-1",
+					UserID: sql.NullInt64{Int64: 2, Valid: true}, ClientID: sql.NullInt64{Int64: 5, Valid: true}}
+				calls = []string{"GetRefreshTokenByJTI", "RefreshTokenLoadUser", "RefreshTokenLoadClient"}
 			}
 			database := datamocks.NewDatabase(t)
 			for _, call := range calls {
@@ -120,7 +120,7 @@ func TestFindRefreshToken(t *testing.T) {
 					err = down
 				}
 				switch call {
-				case "GetRefreshTokenByJti":
+				case "GetRefreshTokenByJTI":
 					if err != nil {
 						database.On(call, mock.Anything, mock.Anything, "jti-1").Return(nil, err).Once()
 					} else {
@@ -145,13 +145,13 @@ func TestFindRefreshToken(t *testing.T) {
 // codeDescended is a live session-bound token of user 1, descended from code 11 of client 4 through
 // session sid, everything on generation 2.
 func codeDescended() *StoredRefreshToken {
-	user := &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 2}
+	user := &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 2}
 	return &StoredRefreshToken{
 		Row: &record.RefreshToken{
-			RefreshTokenJti:      "jti-1",
-			FirstRefreshTokenJti: familyJti,
-			CodeId:               sql.NullInt64{Int64: 11, Valid: true},
-			Code: record.Code{Id: 11, ClientId: 4, UserId: 1, SessionIdentifier: sid,
+			RefreshTokenJTI:      "jti-1",
+			FirstRefreshTokenJTI: familyJti,
+			CodeID:               sql.NullInt64{Int64: 11, Valid: true},
+			Code: record.Code{ID: 11, ClientID: 4, UserID: 1, SessionIdentifier: sid,
 				CodeChallenge: sql.NullString{String: "challenge", Valid: true}, AuthStateGeneration: 2},
 			SessionIdentifier:   sid,
 			AuthStateGeneration: 2,
@@ -168,17 +168,17 @@ func codeDescended() *StoredRefreshToken {
 func passwordGrant() *StoredRefreshToken {
 	return &StoredRefreshToken{
 		Row: &record.RefreshToken{
-			RefreshTokenJti:      "jti-1",
-			FirstRefreshTokenJti: familyJti,
-			UserId:               sql.NullInt64{Int64: 1, Valid: true},
-			ClientId:             sql.NullInt64{Int64: 4, Valid: true},
+			RefreshTokenJTI:      "jti-1",
+			FirstRefreshTokenJTI: familyJti,
+			UserID:               sql.NullInt64{Int64: 1, Valid: true},
+			ClientID:             sql.NullInt64{Int64: 4, Valid: true},
 			AuthenticatedAt:      sql.NullTime{Time: checkedAt.Add(-time.Hour), Valid: true},
 			AuthStateGeneration:  2,
 		},
 		IsROPC:   true,
 		ClientId: 4,
 		UserId:   1,
-		User:     &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 2},
+		User:     &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 2},
 		Scope:    "openid",
 	}
 }
@@ -216,7 +216,7 @@ func TestRefreshToken(t *testing.T) {
 
 	sessionOfUser := func(userId int64) *record.UserSession {
 		session := liveSession(2)
-		session.UserId = userId
+		session.UserID = userId
 		return session
 	}
 	idleSession := liveSession(2)

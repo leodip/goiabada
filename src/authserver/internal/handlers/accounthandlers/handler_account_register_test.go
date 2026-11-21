@@ -780,7 +780,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
+		})).Return(&record.User{ID: 12, Email: "test@example.com"}, nil)
 
 		var createdDetails map[string]interface{}
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).
@@ -859,7 +859,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
+		})).Return(&record.User{ID: 12, Email: "test@example.com"}, nil)
 
 		var createdDetails map[string]interface{}
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).

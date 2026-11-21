@@ -39,7 +39,7 @@ type logoutDatabase interface {
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 }
 
@@ -554,7 +554,7 @@ func classifyIdTokenHint(
 			// the database's health is what the comment above refuses to do.
 			return hintClassification{}, err
 		}
-		if user == nil || user.Id != userSession.UserId {
+		if user == nil || user.ID != userSession.UserID {
 			return rejectIdTokenHint(r.Context(), "session ownership", "reason", "sid names a session that does not belong to sub")
 		}
 	}
@@ -613,9 +613,9 @@ func handleExistingSessionOnLogout(
 	// is no caller identity to read here, and "" is what this row has always carried. The actor is
 	// this event's own user_id, which is where an auditor reads it (#385).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
-		"user_id":         userSession.UserId,
-		"user_session_id": userSession.Id,
-		"client_id":       sessionClient.Client.Id,
+		"user_id":         userSession.UserID,
+		"user_session_id": userSession.ID,
+		"client_id":       sessionClient.Client.ID,
 		"logged_in_user":  "",
 	})
 	revocation.LogRevokedSignOutGrants(r.Context(), auditLogger, end)
@@ -625,13 +625,13 @@ func handleExistingSessionOnLogout(
 		// event's own user_id. The session went, so it is recorded as every other deletion of one is,
 		// with the reason the sign-out without a hint gives (#564).
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": userSession.Id,
-			"user_id":         userSession.UserId,
+			"user_session_id": userSession.ID,
+			"user_id":         userSession.UserID,
 			"logged_in_user":  "",
 			"reason":          audit.DeletedUserSessionSignedOut,
 		})
 		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-			"user_id":            userSession.UserId,
+			"user_id":            userSession.UserID,
 			"session_identifier": hint.sessionIdentifier,
 			"logged_in_user":     "",
 		})
@@ -907,7 +907,7 @@ func deleteWholeUserSession(
 	if sessionLive(settings, userSession) {
 		deliveries, err = endLiveUserSession(r.Context(), database, userSession)
 	} else {
-		err = database.DeleteUserSession(r.Context(), nil, userSession.Id)
+		err = database.DeleteUserSession(r.Context(), nil, userSession.ID)
 	}
 	if err != nil {
 		return 0, err
@@ -917,14 +917,14 @@ func deleteWholeUserSession(
 	// there is no caller identity to read, and "" is what this row has always carried. The
 	// actor is this event's own user_id, the session's user (#385, #780).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-		"user_session_id": userSession.Id,
-		"user_id":         userSession.UserId,
+		"user_session_id": userSession.ID,
+		"user_id":         userSession.UserID,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionSignedOut,
 	})
 	logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
 
-	return userSession.UserId, nil
+	return userSession.UserID, nil
 }
 
 // endLiveUserSession deletes userSession and answers the logout tokens for the apps it served, read
@@ -932,7 +932,7 @@ func deleteWholeUserSession(
 // app: that end tells them. A user already gone names nobody either, since deleting a user takes
 // their sessions with it.
 func endLiveUserSession(ctx context.Context, database logoutDatabase, userSession *record.UserSession) ([]backchannel.Delivery, error) {
-	user, err := database.GetUserById(ctx, nil, userSession.UserId)
+	user, err := database.GetUserByID(ctx, nil, userSession.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -954,7 +954,7 @@ func endLiveUserSession(ctx context.Context, database logoutDatabase, userSessio
 			}
 			deliveries = read
 		}
-		return database.DeleteUserSession(ctx, tx, userSession.Id)
+		return database.DeleteUserSession(ctx, tx, userSession.ID)
 	})
 	if err != nil {
 		return nil, err

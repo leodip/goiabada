@@ -18,7 +18,7 @@ import (
 )
 
 // ============================================================================
-// Tests for IncludeOpenIDConnectClaimsInIdToken Setting
+// Tests for IncludeOpenIDConnectClaimsInIDToken Setting
 // ============================================================================
 
 func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *testing.T) {
@@ -28,7 +28,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Global setting enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Global setting enabled
 	}
 
 	now := time.Now().UTC()
@@ -56,7 +56,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 			BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 			ZoneInfo:                      "Europe/London",
 			Locale:                        "en-GB",
-			PhoneNumberCountryUniqueId:    "PRT_0",
+			PhoneNumberCountryUniqueID:    "PRT_0",
 			PhoneNumberCountryCallingCode: "+351",
 			PhoneNumber:                   "912 345 678",
 			PhoneNumberVerified:           true,
@@ -70,8 +70,8 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 		},
 		Client: &record.Client{
 			ClientIdentifier: "test-client",
-			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			// IncludeOpenIDConnectClaimsInIDToken is "default", so uses global setting
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -136,7 +136,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: false, // Global setting disabled
+		IncludeOpenIDConnectClaimsInIDToken: false, // Global setting disabled
 	}
 
 	now := time.Now().UTC()
@@ -157,7 +157,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 			Username:                      "testuser",
 			GivenName:                     "Test",
 			FamilyName:                    "User",
-			PhoneNumberCountryUniqueId:    "PRT_0",
+			PhoneNumberCountryUniqueID:    "PRT_0",
 			PhoneNumberCountryCallingCode: "+351",
 			PhoneNumber:                   "912 345 678",
 			PhoneNumberVerified:           true,
@@ -166,8 +166,8 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 		},
 		Client: &record.Client{
 			ClientIdentifier: "test-client",
-			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			// IncludeOpenIDConnectClaimsInIDToken is "default", so uses global setting
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -223,7 +223,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: false, // Global setting disabled
+		IncludeOpenIDConnectClaimsInIDToken: false, // Global setting disabled
 	}
 
 	now := time.Now().UTC()
@@ -248,7 +248,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// Client override: ON (should include claims despite global disabled)
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOn.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingOn.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -288,7 +288,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Global setting enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Global setting enabled
 	}
 
 	now := time.Now().UTC()
@@ -313,7 +313,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 		Client: &record.Client{
 			ClientIdentifier: "test-client",
 			// Client override: OFF (should NOT include claims despite global enabled)
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOff.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingOff.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -351,7 +351,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: false, // Disabled - but groups/attributes should still work
+		IncludeOpenIDConnectClaimsInIDToken: false, // Disabled - but groups/attributes should still work
 	}
 
 	now := time.Now().UTC()
@@ -369,19 +369,19 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 			Subject:   sub,
 			UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 			Groups: []record.Group{
-				{GroupIdentifier: "group1", IncludeInIdToken: true},
-				{GroupIdentifier: "group2", IncludeInIdToken: true},
-				{GroupIdentifier: "group3", IncludeInIdToken: false},
+				{GroupIdentifier: "group1", IncludeInIDToken: true},
+				{GroupIdentifier: "group2", IncludeInIDToken: true},
+				{GroupIdentifier: "group3", IncludeInIDToken: false},
 			},
 			Attributes: []record.UserAttribute{
-				{Key: "attr1", Value: "value1", IncludeInIdToken: true},
-				{Key: "attr2", Value: "value2", IncludeInIdToken: true},
-				{Key: "attr3", Value: "value3", IncludeInIdToken: false},
+				{Key: "attr1", Value: "value1", IncludeInIDToken: true},
+				{Key: "attr2", Value: "value2", IncludeInIDToken: true},
+				{Key: "attr3", Value: "value3", IncludeInIDToken: false},
 			},
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "test-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email groups attributes",
 		Nonce:             "test-nonce",
@@ -426,7 +426,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
-		IncludeOpenIDConnectClaimsInIdToken:     false, // ID token claims disabled
+		IncludeOpenIDConnectClaimsInIDToken:     false, // ID token claims disabled
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
@@ -441,27 +441,27 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	publicKeyBytes := getTestPublicKey(t)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 		// Client uses default (which is global disabled)
-		IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		Subject:       sub,
 		Email:         "test@example.com",
@@ -478,10 +478,10 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
-		Id:           1,
-		UserId:       1,
+		ID:           1,
+		UserID:       1,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
@@ -505,7 +505,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.Equal(t, code.Nonce, idClaims["nonce"])
-	assert.Equal(t, code.AcrLevel.String(), idClaims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), idClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 
 	// OIDC scope claims should NOT be in ID token
@@ -535,7 +535,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     false, // Global disabled
+		IncludeOpenIDConnectClaimsInIDToken:     false, // Global disabled
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
@@ -550,25 +550,25 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	publicKeyBytes := getTestPublicKey(t)
 
 	code := &record.Code{
-		Id:                2,
-		ClientId:          2,
-		UserId:            2,
+		ID:                2,
+		ClientID:          2,
+		UserID:            2,
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce-override",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                       2,
+		ID:                       2,
 		ClientIdentifier:         "test-client-override",
 		TokenExpirationInSeconds: 900,
 		// Client override: ON
-		IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingOn.String(),
 	}
 	user := &record.User{
-		Id:            2,
+		ID:            2,
 		UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
 		Subject:       sub,
 		Email:         "override@example.com",
@@ -585,10 +585,10 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
-		Id:           1,
-		UserId:       2,
+		ID:           1,
+		UserID:       2,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
@@ -629,7 +629,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: false, // Disabled
+		IncludeOpenIDConnectClaimsInIDToken: false, // Disabled
 	}
 
 	now := time.Now().UTC()
@@ -650,7 +650,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "minimal-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -689,7 +689,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Enabled
 	}
 
 	now := time.Now().UTC()
@@ -710,7 +710,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "minimal-enabled-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -747,7 +747,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Enabled
 	}
 
 	now := time.Now().UTC()
@@ -766,7 +766,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 			EmailVerified:                 true,
 			GivenName:                     "Test",
 			FamilyName:                    "User",
-			PhoneNumberCountryUniqueId:    "PRT_0",
+			PhoneNumberCountryUniqueID:    "PRT_0",
 			PhoneNumberCountryCallingCode: "+351",
 			PhoneNumber:                   "912 345 678",
 			PhoneNumberVerified:           true,
@@ -775,7 +775,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "email-only-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid email", // Only email scope, NOT profile/address/phone
 		Nonce:             "test-nonce",
@@ -825,7 +825,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Enabled
 	}
 
 	now := time.Now().UTC()
@@ -840,7 +840,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 
 	input := &tokenGenerationInput{
 		User: &record.User{
-			Id:            userId,
+			ID:            userId,
 			Subject:       sub,
 			Email:         "picture@example.com",
 			EmailVerified: true,
@@ -850,7 +850,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "picture-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -893,7 +893,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	settings := &record.Settings{
 		Issuer:                              "https://test-issuer.com",
 		TokenExpirationInSeconds:            600,
-		IncludeOpenIDConnectClaimsInIdToken: true, // Enabled
+		IncludeOpenIDConnectClaimsInIDToken: true, // Enabled
 	}
 
 	now := time.Now().UTC()
@@ -925,7 +925,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 		},
 		Client: &record.Client{
 			ClientIdentifier:                    "minimal-fields-client",
-			IncludeOpenIDConnectClaimsInIdToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken: record.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",

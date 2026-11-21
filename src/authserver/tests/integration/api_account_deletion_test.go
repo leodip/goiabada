@@ -45,8 +45,8 @@ func consoleSignInUser(t *testing.T, locale string) *record.User {
 		GivenName: "Dana", FamilyName: "Deleting", PasswordHash: hash, Locale: locale,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 	return user
 }
 
@@ -131,7 +131,7 @@ func deleteAccount(t *testing.T, accessToken string, body api.DeleteAccountReque
 // userExists reports whether the user's row is still there.
 func userExists(t *testing.T, userId int64) bool {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	return user != nil
 }
@@ -174,12 +174,12 @@ func TestAPIAccountDeletion_DeletesTheAccountWithThePassword(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
 	assert.Equal(t, map[string]any{"success": true}, body)
-	assert.False(t, userExists(t, user.Id), "the account's row is gone")
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	assert.False(t, userExists(t, user.ID), "the account's row is gone")
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "the user is signed out everywhere")
 	assertTokenRefused(t, accessToken)
-	assert.Equal(t, []map[string]any{{"user_id": float64(user.Id), "logged_in_user": user.Subject}},
+	assert.Equal(t, []map[string]any{{"user_id": float64(user.ID), "logged_in_user": user.Subject}},
 		auditRows(t, readerToken, "deleted_own_account", requestId))
 
 	messages := awaitMailTo(t, user.Email)
@@ -211,13 +211,13 @@ func TestAPIAccountDeletion_DeletesWithAnAuthenticatorCode(t *testing.T) {
 	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
 	require.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "OTP_CODE_REQUIRED", body["error_code"])
-	require.True(t, userExists(t, user.Id))
+	require.True(t, userExists(t, user.ID))
 
 	code := otptest.Code(t, secret, time.Now())
 	status, body, _ = deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword, OTPCode: code})
 
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
-	assert.False(t, userExists(t, user.Id))
+	assert.False(t, userExists(t, user.ID))
 	assertTokenRefused(t, accessToken)
 }
 
@@ -234,7 +234,7 @@ func TestAPIAccountDeletion_DeletesWithARecoveryCode(t *testing.T) {
 		Password: deletionUserPassword, RecoveryCode: codes[3]})
 
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
-	assert.False(t, userExists(t, user.Id))
+	assert.False(t, userExists(t, user.ID))
 	assertTokenRefused(t, accessToken)
 	require.Eventually(t, func() bool { return len(sentTo(t, user.Email)) == 2 }, afterResponseWait, 100*time.Millisecond,
 		"the deletion's notice arrives beside the enable's")
@@ -253,7 +253,7 @@ func TestAPIAccountDeletion_RefusesAWrongOrUsedRecoveryCodeAndSpendsNone(t *test
 	user := consoleSignInUser(t, "en")
 	accessToken := consoleAccessToken(t, user)
 	_, codes := enableAuthenticatorOverAPI(t, accessToken)
-	require.True(t, claimRecoveryCodeForTest(t, user.Id, codes[0]), "a code spent at a sign-in")
+	require.True(t, claimRecoveryCodeForTest(t, user.ID, codes[0]), "a code spent at a sign-in")
 
 	for _, code := range []string{codes[0], "zzzz-zzzz-zzzz-zzzz-zzzz-zzzz"} {
 		status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{
@@ -262,7 +262,7 @@ func TestAPIAccountDeletion_RefusesAWrongOrUsedRecoveryCodeAndSpendsNone(t *test
 		assert.Equal(t, "INVALID_RECOVERY_CODE", body["error_code"])
 		assert.Equal(t, "That recovery code isn't right, or it was already used.", body["error_description"])
 	}
-	assert.True(t, userExists(t, user.Id))
+	assert.True(t, userExists(t, user.ID))
 
 	// Both codes at once is refused before anything is checked.
 	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{
@@ -274,7 +274,7 @@ func TestAPIAccountDeletion_RefusesAWrongOrUsedRecoveryCodeAndSpendsNone(t *test
 	status, body, _ = deleteAccount(t, accessToken, api.DeleteAccountRequest{
 		Password: deletionUserPassword, RecoveryCode: codes[1]})
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
-	assert.False(t, userExists(t, user.Id))
+	assert.False(t, userExists(t, user.ID))
 }
 
 // A wrong password is refused and deletes nothing; the five failures the account_password budget
@@ -294,7 +294,7 @@ func TestAPIAccountDeletion_AWrongPasswordSpendsTheSharedBudget(t *testing.T) {
 		assert.Equal(t, "AUTHENTICATION_FAILED", body["error_code"])
 		assert.Equal(t, "That password isn't right. Try again.", body["error_description"])
 	}
-	assert.True(t, userExists(t, user.Id))
+	assert.True(t, userExists(t, user.ID))
 
 	resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/password", accessToken,
 		api.UpdateAccountPasswordRequest{CurrentPassword: deletionUserPassword, NewPassword: fake.Password(20)})
@@ -318,7 +318,7 @@ func TestAPIAccountDeletion_RefusesAnotherClientsToken(t *testing.T) {
 	var refusal api.ErrorResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&refusal))
 	assert.Equal(t, "CLIENT_NOT_ALLOWED", refusal.ErrorCode)
-	assert.True(t, userExists(t, user.Id))
+	assert.True(t, userExists(t, user.ID))
 }
 
 // With the setting off, the deletion is refused before the password is read.
@@ -332,7 +332,7 @@ func TestAPIAccountDeletion_RefusedWhileTheSettingIsOff(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "ACCOUNT_DELETION_DISABLED", body["error_code"])
 	assert.Equal(t, "Account deletion is turned off. Ask your administrator to delete your account.", body["error_description"])
-	assert.True(t, userExists(t, user.Id))
+	assert.True(t, userExists(t, user.ID))
 }
 
 // The last enabled user holding authserver:manage is refused, with nothing deleted and, since the
@@ -340,7 +340,7 @@ func TestAPIAccountDeletion_RefusedWhileTheSettingIsOff(t *testing.T) {
 func TestAPIAccountDeletion_TheLastAdministratorIsRefused(t *testing.T) {
 	disableOtherAdministrators(t)
 	user := consoleSignInUser(t, "en")
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
 	accessToken := consoleAccessToken(t, user)
 
 	for i := 0; i < 6; i++ {
@@ -350,10 +350,10 @@ func TestAPIAccountDeletion_TheLastAdministratorIsRefused(t *testing.T) {
 		assert.Equal(t, "You're the last administrator, so you can't delete your account. Give another user authserver:manage first.",
 			body["error_description"])
 	}
-	assert.True(t, userExists(t, user.Id))
+	assert.True(t, userExists(t, user.ID))
 
 	newAdministrator(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
 	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
 	require.Equal(t, http.StatusOK, status, "no password attempt was spent on the refusals: %v", body)
-	assert.False(t, userExists(t, user.Id))
+	assert.False(t, userExists(t, user.ID))
 }

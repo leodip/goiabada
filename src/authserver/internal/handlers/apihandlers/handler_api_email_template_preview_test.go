@@ -56,8 +56,8 @@ func sampleRenderer() *render.Renderer {
 func darkBrandDatabase(t *testing.T) *datamocks.Database {
 	database := datamocks.NewDatabase(t)
 	dark := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	dark.Id = chosenBrandId
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(&dark, nil).Maybe()
+	dark.ID = chosenBrandId
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(&dark, nil).Maybe()
 	return database
 }
 
@@ -167,7 +167,7 @@ func TestEmailTemplatePreview_IsDrawnInTheChosenBrand(t *testing.T) {
 
 func TestEmailTemplatePreview_AnUnknownBrandIsA400(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil)
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil)
 	r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
 		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": 99,
 	})
@@ -182,7 +182,7 @@ func TestEmailTemplatePreview_AnUnknownBrandIsA400(t *testing.T) {
 
 func TestEmailTemplatePreview_ABrandThatCannotBeReadIsA500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(nil, errs.New("database down"))
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(nil, errs.New("database down"))
 	r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
 		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": chosenBrandId,
 	})
@@ -462,7 +462,7 @@ func TestEmailTemplateSendTest_Refusals(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Maybe()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Maybe()
 			r := sampleRequest(t, "authserver:manage", "otp_enabled", "en", "", acmeSettings(), tc.request)
 
 			rr, body := serveJSON(t, sendTestHandler(database, accounthandlersmocks.NewEmailSender(t), handlersmocks.NewAuditLogger(t)), r)

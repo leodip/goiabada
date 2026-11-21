@@ -28,8 +28,8 @@ var legalAcceptanceTx = &sql.Tx{}
 func TestHandleLegalAcceptance_AFailureAnswers500AndMovesNothingOn(t *testing.T) {
 	failure := errors.New("read failed")
 	owedTerms := []legaldocuments.InEffect{{
-		Document: record.LegalDocument{Id: 3, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
-		Current:  record.LegalDocumentVersion{Id: 31, LegalDocumentId: 3, VersionNumber: 1},
+		Document: record.LegalDocument{ID: 3, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
+		Current:  record.LegalDocumentVersion{ID: 31, LegalDocumentID: 3, VersionNumber: 1},
 	}}
 	accept := url.Values{"btnAccept": {"accept"}, "shownVersion": {"31"}, "legalDocument": {"31"}}
 
@@ -44,7 +44,7 @@ func TestHandleLegalAcceptance_AFailureAnswers500AndMovesNothingOn(t *testing.T)
 		{name: "an acceptance the database refuses to record", method: http.MethodPost, owed: &owedRead{owed: owedTerms},
 			recording: func(database *datamocks.Database) {
 				datamocks.ExpectRunInTransaction(database, legalAcceptanceTx)
-				database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, legalAcceptanceTx, int64(1)).
+				database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, legalAcceptanceTx, int64(1)).
 					Return([]record.LegalDocumentAcceptance{}, nil).Once()
 				database.On("CreateLegalDocumentAcceptance", mock.Anything, legalAcceptanceTx, mock.Anything).
 					Return(failure).Once()
@@ -86,9 +86,9 @@ func TestHandleLegalAcceptance_AFailureAnswers500AndMovesNothingOn(t *testing.T)
 				Scope:      "openid",
 			}, nil).Once()
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-				Return(&record.Client{Id: 7, ClientIdentifier: "test-client"}, nil).Once()
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+				Return(&record.Client{ID: 7, ClientIdentifier: "test-client"}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 			if tc.recording != nil {
 				tc.recording(database)
 			}

@@ -47,7 +47,7 @@ func settingsRowAsTheRequestLoadedIt(ctx context.Context, _ *sql.Tx, _ int64) (*
 func expectSettingsSave(database *datamocks.Database) {
 	datamocks.ExpectRunInTransaction(database, settingsSaveTx)
 	database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Once()
-	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+	database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 		RunAndReturn(settingsRowAsTheRequestLoadedIt).Once()
 }
 
@@ -57,7 +57,7 @@ func allowSettingsSave(database *datamocks.Database) {
 	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
 	database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
-	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+	database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 		RunAndReturn(settingsRowAsTheRequestLoadedIt).Maybe()
 }
 
@@ -130,7 +130,7 @@ func settingsSectionSaves() []settingsSectionSave {
 			},
 			owns: []string{"TokenExpirationInSeconds", "RefreshTokenOfflineIdleTimeoutInSeconds",
 				"RefreshTokenOfflineMaxLifetimeInSeconds", "IncludeOpenIDConnectClaimsInAccessToken",
-				"IncludeOpenIDConnectClaimsInIdToken"},
+				"IncludeOpenIDConnectClaimsInIDToken"},
 		},
 		{
 			name: "audit logs",
@@ -164,7 +164,7 @@ var emailSectionColumns = []string{"SMTPEnabled", "SMTPHost", "SMTPPort", "SMTPE
 func settingsAsTheRequestLoadedThem() record.Settings {
 	before := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	return record.Settings{
-		Id:                                      1,
+		ID:                                      1,
 		CreatedAt:                               sql.NullTime{Time: before, Valid: true},
 		UpdatedAt:                               sql.NullTime{Time: before, Valid: true},
 		AppName:                                 "Before",
@@ -185,7 +185,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 		SMTPEncryption:                          "none",
 		TurnstileSiteKey:                        "before-site-key",
 		AuditLogRetentionDays:                   30,
-		DefaultBrandId:                          sql.NullInt64{Int64: 1, Valid: true},
+		DefaultBrandID:                          sql.NullInt64{Int64: 1, Valid: true},
 	}
 }
 
@@ -194,7 +194,7 @@ func settingsAsTheRequestLoadedThem() record.Settings {
 func settingsSavedMeanwhile() record.Settings {
 	meanwhile := time.Date(2026, 2, 2, 0, 0, 0, 0, time.UTC)
 	return record.Settings{
-		Id:                      1,
+		ID:                      1,
 		CreatedAt:               sql.NullTime{Time: meanwhile, Valid: true},
 		UpdatedAt:               sql.NullTime{Time: meanwhile, Valid: true},
 		AppName:                 "Meanwhile",
@@ -208,7 +208,7 @@ func settingsSavedMeanwhile() record.Settings {
 		UserSessionIdleTimeoutInSeconds:           601,
 		UserSessionMaxLifetimeInSeconds:           3601,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		IncludeOpenIDConnectClaimsInIdToken:       true,
+		IncludeOpenIDConnectClaimsInIDToken:       true,
 		MaxUserSessionsPerUser:                    21,
 		KeepSignedIn:                              record.KeepSignedInNever,
 		AESEncryptionKeyLegacy:                    []byte("legacy"),
@@ -232,7 +232,7 @@ func settingsSavedMeanwhile() record.Settings {
 		AuditLogsInDatabaseEnabled:                true,
 		AuditLogRetentionDays:                     31,
 		LastCleanupAt:                             sql.NullTime{Time: meanwhile, Valid: true},
-		DefaultBrandId:                            sql.NullInt64{Int64: 2, Valid: true},
+		DefaultBrandID:                            sql.NullInt64{Int64: 2, Valid: true},
 	}
 }
 
@@ -255,7 +255,7 @@ func TestSettingsSectionSaves_TheTwoRowsDifferInEveryColumn(t *testing.T) {
 	lv, mv := reflect.ValueOf(loaded), reflect.ValueOf(meanwhile)
 	for i := 0; i < lv.NumField(); i++ {
 		name := lv.Type().Field(i).Name
-		if name == "Id" {
+		if name == "ID" {
 			continue
 		}
 		assert.False(t, reflect.DeepEqual(lv.Field(i).Interface(), mv.Field(i).Interface()),
@@ -277,7 +277,7 @@ func TestSettingsSectionSaves_EverySaveKeepsWhatOtherSectionsSavedMeanwhile(t *t
 			var steps []string
 			database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).
 				Run(func(context.Context, *sql.Tx, int64) { steps = append(steps, "acquire") }).Return(nil).Once()
-			database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+			database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, int64(1)).
 				RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 					steps = append(steps, "read")
 					stored := settingsSavedMeanwhile()
@@ -345,7 +345,7 @@ func TestSettingsEmailPut_AKeptPasswordIsTheOneTheHostCheckRead(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	datamocks.ExpectRunInTransaction(database, settingsSaveTx)
 	database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Once()
-	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+	database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, int64(1)).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 			stored := settingsAsTheRequestLoadedThem()
 			stored.SMTPHost = "elsewhere.example.test"
@@ -383,7 +383,7 @@ func TestSettingsTurnstilePut_AKeptSecretKeyIsTheOneTheSiteKeyCheckRead(t *testi
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 	datamocks.ExpectRunInTransaction(database, settingsSaveTx)
 	database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Once()
-	database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+	database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, int64(1)).
 		RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 			stored := settingsAsTheRequestLoadedThem()
 			stored.TurnstileEnabled = true
@@ -447,7 +447,7 @@ func (s *lockingSettingsStore) AcquireSettingsRow(_ context.Context, tx *sql.Tx,
 	return nil
 }
 
-func (s *lockingSettingsStore) GetSettingsById(_ context.Context, _ *sql.Tx, _ int64) (*record.Settings, error) {
+func (s *lockingSettingsStore) GetSettingsByID(_ context.Context, _ *sql.Tx, _ int64) (*record.Settings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored := s.row
@@ -516,7 +516,7 @@ var settingsSectionReplaced = map[string]func(stored record.Settings) map[string
 			"refresh_token_offline_idle_timeout_in_seconds":  stored.RefreshTokenOfflineIdleTimeoutInSeconds,
 			"refresh_token_offline_max_lifetime_in_seconds":  stored.RefreshTokenOfflineMaxLifetimeInSeconds,
 			"include_open_id_connect_claims_in_access_token": stored.IncludeOpenIDConnectClaimsInAccessToken,
-			"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIdToken,
+			"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIDToken,
 		}}
 	},
 	"turnstile": func(stored record.Settings) map[string]interface{} {
@@ -543,7 +543,7 @@ func TestSettingsSectionSaves_TheAuditRecordsTheValuesTheSaveReplaced(t *testing
 			logged := recordLoggedEvents(auditLogger)
 			datamocks.ExpectRunInTransaction(database, settingsSaveTx)
 			database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, int64(1)).Return(nil).Once()
-			database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+			database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, int64(1)).
 				RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 					stored := settingsSavedMeanwhile()
 					return &stored, nil
@@ -577,7 +577,7 @@ func TestSettingsSectionSaves_ARerunBodyWritesAndRecordsTheCommittedAttempt(t *t
 			// The aborted attempt reads the row as the request loaded it; the committed one reads it
 			// after saves of every section committed between the two.
 			reads := 0
-			database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, int64(1)).
+			database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, int64(1)).
 				RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 					reads++
 					stored := settingsAsTheRequestLoadedThem()
@@ -633,7 +633,7 @@ func (s *settingsSaveStore) RunInTransaction(_ context.Context, fn func(tx *sql.
 
 func (s *settingsSaveStore) AcquireSettingsRow(context.Context, *sql.Tx, int64) error { return nil }
 
-func (s *settingsSaveStore) GetSettingsById(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+func (s *settingsSaveStore) GetSettingsByID(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 	if s.row == nil {
 		return nil, nil
 	}

@@ -188,7 +188,7 @@ type selfCall struct {
 //
 // The over-approximation also runs the other way, since a selector is matched by name alone: a
 // FIELD on Database sharing a name with a divergent dialect method would be reported. There
-// are seven fields (DB, Dialect, logSQL, IsDeadlock, IsUniqueViolation, ExplicitIdInsertSQL,
+// are seven fields (DB, Dialect, logSQL, IsDeadlock, IsUniqueViolation, ExplicitIDInsertSQL,
 // sleep), none of them a method name on any dialect, so the case is theoretical today and a
 // false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {

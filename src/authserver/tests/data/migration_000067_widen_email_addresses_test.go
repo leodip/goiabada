@@ -93,7 +93,7 @@ func TestEmailAddressColumns_StoreTheLongestAddress(t *testing.T) {
 
 	user := &record.User{Subject: fake.UUID(), Username: fake.Username(), Email: userEmail}
 	require.NoError(t, database.CreateUser(ctx, nil, user), "create a user with a 254-character address")
-	storedUser, err := database.GetUserById(ctx, nil, user.Id)
+	storedUser, err := database.GetUserByID(ctx, nil, user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, userEmail, storedUser.Email, "users.email")
 
@@ -105,7 +105,7 @@ func TestEmailAddressColumns_StoreTheLongestAddress(t *testing.T) {
 	}
 	require.NoError(t, database.CreatePreRegistration(ctx, nil, preRegistration),
 		"create a pre-registration with a 254-character address")
-	storedPreRegistration, err := database.GetPreRegistrationById(ctx, nil, preRegistration.Id)
+	storedPreRegistration, err := database.GetPreRegistrationByID(ctx, nil, preRegistration.ID)
 	require.NoError(t, err)
 	assert.Equal(t, preRegistrationEmail, storedPreRegistration.Email, "pre_registrations.email")
 
@@ -114,7 +114,7 @@ func TestEmailAddressColumns_StoreTheLongestAddress(t *testing.T) {
 	settings.SMTPUsername = smtpUsername
 	require.NoError(t, database.CreateSettings(ctx, nil, settings),
 		"create a settings row with a 254-character sender address and SMTP username")
-	storedSettings, err := database.GetSettingsById(ctx, nil, settings.Id)
+	storedSettings, err := database.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	assert.Equal(t, fromEmail, storedSettings.SMTPFromEmail, "settings.smtp_from_email")
 	assert.Equal(t, smtpUsername, storedSettings.SMTPUsername, "settings.smtp_username")
@@ -223,7 +223,7 @@ func seedRows000067(t *testing.T, h *isolatedDB) rows000067 {
 	settings := settingsRow000067()
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, settings), "seed a settings row")
 
-	return rows000067{"users": user.Id, "pre_registrations": preRegistration.Id, "settings": settings.Id}
+	return rows000067{"users": user.ID, "pre_registrations": preRegistration.ID, "settings": settings.ID}
 }
 
 // write sets c to value on its seeded row, with literal SQL, since the value is what the down

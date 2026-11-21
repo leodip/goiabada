@@ -38,7 +38,7 @@ const (
 )
 
 // enabledClient is the client every token names: it exists and is enabled.
-var enabledClient = &record.Client{Id: 7, ClientIdentifier: clientIdentifier, Enabled: true}
+var enabledClient = &record.Client{ID: 7, ClientIdentifier: clientIdentifier, Enabled: true}
 
 // accessToken is an access token as issuance mints it since #676: the at+jwt header, the configured
 // issuer, the client it was issued to and its jti, with claims on top, which may replace any of the
@@ -60,9 +60,9 @@ func expectEnabledClient(database *datamocks.Database) {
 // ago: within both bounds at checkedAt.
 func liveSession(gen int64) *record.UserSession {
 	return &record.UserSession{
-		Id:                  9,
+		ID:                  9,
 		SessionIdentifier:   sid,
-		UserId:              1,
+		UserID:              1,
 		Started:             checkedAt.Add(-1 * time.Hour),
 		LastAccessed:        checkedAt.Add(-5 * time.Minute),
 		AuthStateGeneration: gen,
@@ -70,7 +70,7 @@ func liveSession(gen int64) *record.UserSession {
 }
 
 func TestAccessToken(t *testing.T) {
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	expiredSession := liveSession(0)
 	expiredSession.LastAccessed = checkedAt.Add(-2 * time.Hour)
@@ -79,7 +79,7 @@ func TestAccessToken(t *testing.T) {
 	pastMaxLifetime.Started = checkedAt.Add(-25 * time.Hour)
 
 	foreignSession := liveSession(0)
-	foreignSession.UserId = 2
+	foreignSession.UserID = 2
 
 	tests := []struct {
 		label  string
@@ -113,13 +113,13 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "disabled user, sid-less",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1"},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: false},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: false},
 			wantRefusal: UserDisabled,
 		},
 		{
 			label:       "disabled user, session-bound",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: false},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: false},
 			wantRefusal: UserDisabled,
 		},
 
@@ -127,13 +127,13 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "sid-less, claim matches",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "auth_state_generation": float64(3)},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 3},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 3},
 			wantRefusal: Live,
 		},
 		{
 			label:       "sid-less, claim behind",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "auth_state_generation": float64(2)},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 3},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 3},
 			wantRefusal: TokenGenerationSuperseded,
 		},
 		{
@@ -145,7 +145,7 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "sid-less, absent claim once the user has advanced",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1"},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
 			wantRefusal: TokenGenerationSuperseded,
 		},
 		// A malformed claim is never read as 0, or it would inherit the absent claim's pass.
@@ -158,7 +158,7 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "sid-less, malformed claim against a stored -1",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "auth_state_generation": "-1"},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: -1},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: -1},
 			wantRefusal: TokenGenerationSuperseded,
 		},
 
@@ -173,7 +173,7 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "session-bound, stale token claim ignored",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "auth_state_generation": float64(0)},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
 			session:     liveSession(1),
 			wantRefusal: Live,
 		},
@@ -208,7 +208,7 @@ func TestAccessToken(t *testing.T) {
 		{
 			label:       "session on a superseded generation",
 			claims:      map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid},
-			user:        &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
+			user:        &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1},
 			session:     liveSession(0),
 			wantRefusal: SessionGenerationSuperseded,
 		},
@@ -258,8 +258,8 @@ func TestAccessToken(t *testing.T) {
 // issuer exactly, and a client that exists and is enabled. Each applies to a client's token as much
 // as to a user's, and a refusal on the header or the issuer reads nothing.
 func TestAccessToken_RFC9068(t *testing.T) {
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
-	disabledClient := &record.Client{Id: 7, ClientIdentifier: clientIdentifier, Enabled: false}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
+	disabledClient := &record.Client{ID: 7, ClientIdentifier: clientIdentifier, Enabled: false}
 	userToken := map[string]interface{}{"auth_time": float64(1), "sub": "user-1"}
 	clientToken := map[string]interface{}{"sub": clientIdentifier}
 
@@ -369,7 +369,7 @@ func TestAccessToken_RFC9068(t *testing.T) {
 // The session identifier the verdict carries is the token's sid once the check reached the
 // session, and empty before: a caller logs it beside a refusal or a fault.
 func TestAccessToken_SessionIdentifier(t *testing.T) {
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	t.Run("a session-bound token's verdict names its session", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
@@ -389,7 +389,7 @@ func TestAccessToken_SessionIdentifier(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		expectEnabledClient(database)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, "user-1").
-			Return(&record.User{Id: 1, Subject: "user-1", Enabled: false}, nil)
+			Return(&record.User{ID: 1, Subject: "user-1", Enabled: false}, nil)
 
 		verdict, err := AccessToken(context.Background(), database,
 			accessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid}),
@@ -405,7 +405,7 @@ func TestAccessToken_SessionIdentifier(t *testing.T) {
 // token.
 func TestAccessToken_Faults(t *testing.T) {
 	sessionBound := accessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid})
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	t.Run("reading the user fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
@@ -479,7 +479,7 @@ func TestAccessToken_Faults(t *testing.T) {
 // jti instead (TestAccessToken_RevokedJti).
 func TestAccessToken_Grant(t *testing.T) {
 	const grantId = "grant-1"
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	type grantRead int
 	const (
@@ -512,10 +512,10 @@ func TestAccessToken_Grant(t *testing.T) {
 		// Refused before the grant: the earlier refusal stands, and no grant is read.
 		{label: "a disabled user's token",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
-			user:   &record.User{Id: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
+			user:   &record.User{ID: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
 		{label: "a superseded generation",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "grant_id": grantId},
-			user:   &record.User{Id: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1}, wantRefusal: TokenGenerationSuperseded},
+			user:   &record.User{ID: 1, Subject: "user-1", Enabled: true, AuthStateGeneration: 1}, wantRefusal: TokenGenerationSuperseded},
 		{label: "a session past its idle timeout",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "sid": sid, "grant_id": grantId},
 			user:   enabledUser, session: func() *record.UserSession {
@@ -581,7 +581,7 @@ func TestAccessToken_GrantFault(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	expectEnabledClient(database)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, "user-1").
-		Return(&record.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
+		Return(&record.User{ID: 1, Subject: "user-1", Enabled: true}, nil)
 	database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, "grant-1").Return(false, errors.New("the database is down"))
 
 	verdict, err := AccessToken(context.Background(), database,
@@ -615,7 +615,7 @@ func TestSubject(t *testing.T) {
 // refusal and reads no jti; a token carrying grant_id never reads one, since its grant answers.
 func TestAccessToken_RevokedJti(t *testing.T) {
 	const jti = "at-1"
-	enabledUser := &record.User{Id: 1, Subject: "user-1", Enabled: true}
+	enabledUser := &record.User{ID: 1, Subject: "user-1", Enabled: true}
 
 	type jtiRead int
 	const (
@@ -651,7 +651,7 @@ func TestAccessToken_RevokedJti(t *testing.T) {
 		// Refused before the jti: the earlier refusal stands, and no jti is read.
 		{label: "a disabled user's implicit-flow token",
 			claims: map[string]interface{}{"auth_time": float64(1), "sub": "user-1", "jti": jti},
-			user:   &record.User{Id: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
+			user:   &record.User{ID: 1, Subject: "user-1", Enabled: false}, wantRefusal: UserDisabled},
 
 		// A jti the auth server would never sign names no token it could have stored, and reads
 		// nothing.
@@ -720,7 +720,7 @@ func TestAccessToken_RevokedJtiFault(t *testing.T) {
 func TestAccessToken_AClientCreatedAfterTheToken(t *testing.T) {
 	created := time.Date(2026, 10, 29, 11, 0, 0, 0, time.UTC).Add(400 * time.Millisecond)
 	createdSecond := float64(created.Unix())
-	recreated := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+	recreated := &record.Client{ID: 8, ClientIdentifier: clientIdentifier, Enabled: true,
 		CreatedAt: sql.NullTime{Time: created, Valid: true}}
 
 	type deletionRead int
@@ -789,7 +789,7 @@ func TestAccessToken_AClientCreatedAfterTheToken(t *testing.T) {
 // A fault reading the deletion is an error and never a refusal.
 func TestAccessToken_DeletedClientFault(t *testing.T) {
 	created := time.Date(2026, 10, 29, 11, 0, 0, 0, time.UTC)
-	recreated := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+	recreated := &record.Client{ID: 8, ClientIdentifier: clientIdentifier, Enabled: true,
 		CreatedAt: sql.NullTime{Time: created, Valid: true}}
 	database := datamocks.NewDatabase(t)
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(recreated, nil).Once()
@@ -817,7 +817,7 @@ func TestAccessToken_ClientRow(t *testing.T) {
 	issuedAt := float64(checkedAt.Add(-5 * time.Minute).Unix())
 	// The client holding the identifier now: row 8, created long before every token here, so the
 	// creation-time rule never refuses a token of this test that the row binding does not.
-	holder := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+	holder := &record.Client{ID: 8, ClientIdentifier: clientIdentifier, Enabled: true,
 		CreatedAt: sql.NullTime{Time: created, Valid: true}}
 
 	tests := []struct {

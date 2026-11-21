@@ -38,7 +38,7 @@ func HandleClientDPoPPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for dpop update"), "client_id", id)
 			return
@@ -69,22 +69,22 @@ func HandleClientDPoPPut(
 			return
 		}
 
-		if err = database.SetClientDPoPBoundAccessTokens(r.Context(), nil, client.Id, required); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client dpop requirement"), "client_id", client.Id)
+		if err = database.SetClientDPoPBoundAccessTokens(r.Context(), nil, client.ID, required); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client dpop requirement"), "client_id", client.ID)
 			return
 		}
 
 		// The write ran outside any transaction, so it has committed: it is recorded now, before the
 		// reads building the answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientDPoP, map[string]interface{}{
-			"client_id":                client.Id,
+			"client_id":                client.ID,
 			"client_identifier":        client.ClientIdentifier,
 			"dpop_bound_access_tokens": required,
 			"logged_in_user":           callerSubject(r),
 		})
 
 		// The answer is the row as stored, read back after the write.
-		client, err = database.GetClientById(r.Context(), nil, id)
+		client, err = database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client after dpop update"), "client_id", id)
 			return
@@ -94,15 +94,15 @@ func HandleClientDPoPPut(
 			return
 		}
 		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after dpop update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after dpop update"), "client_id", client.ID)
 			return
 		}
 		if err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after dpop update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after dpop update"), "client_id", client.ID)
 			return
 		}
 		if err = database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after dpop update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after dpop update"), "client_id", client.ID)
 			return
 		}
 

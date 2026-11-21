@@ -45,14 +45,14 @@ var ErrCodeNotClaimed = errors.New("the authorization code was no longer unused 
 func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings,
 	code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
-	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.Id)
+	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.ID)
 	if err != nil {
 		return nil, err
 	}
 	if !claimed {
 		slog.DebugContext(ctx, "code could not be claimed, rejecting the redemption",
 			"grant_type", oidc.GrantTypeAuthorizationCode.String(),
-			"code_id", code.Id)
+			"code_id", code.ID)
 		return nil, ErrCodeNotClaimed
 	}
 
@@ -140,7 +140,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 			// any failed mint after the claim (#530).
 			slog.DebugContext(ctx, "code's session is gone, rejecting the redemption",
 				"grant_type", oidc.GrantTypeAuthorizationCode.String(),
-				"code_id", code.Id)
+				"code_id", code.ID)
 			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest)
 		}
 		return nil, err

@@ -72,7 +72,7 @@ func newRevokeEndpoint(t *testing.T) *revokeEndpoint {
 		parser:      handlersmocks.NewTokenParser(t),
 		auditLogger: handlersmocks.NewAuditLogger(t),
 		registry:    metrics.NewRegistry(),
-		settings:    &record.Settings{Id: 1, Issuer: revokeIssuer},
+		settings:    &record.Settings{ID: 1, Issuer: revokeIssuer},
 	}
 	e.handler = HandleRevokePost(render.New(nil, nil, nil), e.database, e.parser, testDataCipher, e.auditLogger,
 		revocationmetrics.Register(e.registry))
@@ -84,7 +84,7 @@ func confidentialCaller(t *testing.T) *record.Client {
 	t.Helper()
 	encrypted, err := testDataCipher.Encrypt("caller-secret")
 	require.NoError(t, err)
-	return &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true,
+	return &record.Client{ID: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true,
 		ClientSecretEncrypted: encrypted}
 }
 
@@ -179,7 +179,7 @@ func (e *revokeEndpoint) accessTokenLive(owner *record.Client) {
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, owner.ClientIdentifier).
 		Return(owner, nil).Once()
 	e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-		Return(&record.User{Id: revokeUserId, Subject: "the-subject", Enabled: true}, nil).Once()
+		Return(&record.User{ID: revokeUserId, Subject: "the-subject", Enabled: true}, nil).Once()
 	e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(true, nil).Once()
 }
 
@@ -187,14 +187,14 @@ func (e *revokeEndpoint) accessTokenLive(owner *record.Client) {
 // the client whose row id is ownerId.
 func (e *revokeEndpoint) refreshTokenLive(ownerId int64) {
 	row := &record.RefreshToken{
-		Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId, RefreshTokenType: "Offline",
-		UserId:          sql.NullInt64{Int64: revokeUserId, Valid: true},
-		ClientId:        sql.NullInt64{Int64: ownerId, Valid: true},
+		ID: 9, RefreshTokenJTI: revokeRefreshJti, FirstRefreshTokenJTI: revokeGrantId, RefreshTokenType: "Offline",
+		UserID:          sql.NullInt64{Int64: revokeUserId, Valid: true},
+		ClientID:        sql.NullInt64{Int64: ownerId, Valid: true},
 		AuthenticatedAt: sql.NullTime{Time: time.Now().Add(-time.Minute), Valid: true},
 	}
-	e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
+	e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
 	e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}
+		args.Get(2).(*record.RefreshToken).User = record.User{ID: revokeUserId, Enabled: true}
 	}).Return(nil).Once()
 	e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
 	e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, revokeGrantId).Return(false, nil).Once()
@@ -205,8 +205,8 @@ func (e *revokeEndpoint) grantRevoked() {
 	datamocks.ExpectRunInTransaction(e.database, revokeTx)
 	e.database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokeGrantId, "client_revoked").
 		Return(true, nil).Once()
-	e.database.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokeGrantId).
-		Return([]*record.RefreshToken{{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId}}, nil).Once()
+	e.database.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokeGrantId).
+		Return([]*record.RefreshToken{{ID: 9, RefreshTokenJTI: revokeRefreshJti, FirstRefreshTokenJTI: revokeGrantId}}, nil).Once()
 	e.database.On("UpdateRefreshToken", mock.Anything, revokeTx, mock.Anything).Return(nil).Once()
 }
 
@@ -299,7 +299,7 @@ func TestHandleRevokePost_IgnoresTheHint(t *testing.T) {
 // A public client revokes with its client_id alone (RFC 7009 section 5).
 func TestHandleRevokePost_APublicClientRevokesWithItsIdentifierAlone(t *testing.T) {
 	e := newRevokeEndpoint(t)
-	caller := &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
+	caller := &record.Client{ID: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
 	e.callerFound(caller)
 	e.parses(grantAccessToken(revokeCallerName))
 	e.accessTokenLive(caller)
@@ -315,7 +315,7 @@ func TestHandleRevokePost_APublicClientRevokesWithItsIdentifierAlone(t *testing.
 // token_revocation_refused records the caller, the token's client and the type of token, and the
 // outcome is refused.
 func TestHandleRevokePost_RefusesAnotherClientsLiveToken(t *testing.T) {
-	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	owner := &record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
 
 	t.Run("an access token", func(t *testing.T) {
 		e := newRevokeEndpoint(t)
@@ -340,7 +340,7 @@ func TestHandleRevokePost_RefusesAnotherClientsLiveToken(t *testing.T) {
 		e.callerFound(confidentialCaller(t))
 		e.parses(offlineRefreshToken())
 		e.refreshTokenLive(revokeOwnerId)
-		e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).Return(owner, nil).Once()
+		e.database.On("GetClientByID", mock.Anything, mock.Anything, revokeOwnerId).Return(owner, nil).Once()
 		e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
 			"client_id":       revokeCallerId,
 			"token_client_id": revokeOwnerId,
@@ -360,7 +360,7 @@ func TestHandleRevokePost_RefusesAnotherClientsLiveToken(t *testing.T) {
 // Every request is still refused and counted, and the owner can still revoke its own grant.
 func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
 	e := newRevokeEndpoint(t)
-	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true, IsPublic: true}
+	owner := &record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true, IsPublic: true}
 	e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
 		"client_id": int64(1001), "token_client_id": revokeOwnerId, "token_type": "access_token",
 	}).Return().Once()
@@ -372,7 +372,7 @@ func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
 		{grantAccessToken(revokeOwnerName), func() { e.accessTokenLive(owner) }},
 		{offlineRefreshToken(), func() {
 			e.refreshTokenLive(revokeOwnerId)
-			e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).Return(owner, nil).Once()
+			e.database.On("GetClientByID", mock.Anything, mock.Anything, revokeOwnerId).Return(owner, nil).Once()
 		}},
 		{grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour)), func() {
 			e.grantlessAccessTokenLive(owner, false)
@@ -380,7 +380,7 @@ func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
 	}
 	for i, tc := range cases {
 		for j := range 2 {
-			caller := &record.Client{Id: int64(1001 + j), ClientIdentifier: fmt.Sprintf("public-caller-%d", j),
+			caller := &record.Client{ID: int64(1001 + j), ClientIdentifier: fmt.Sprintf("public-caller-%d", j),
 				Enabled: true, IsPublic: true}
 			e.callerFound(caller)
 			// Different signed representations must not get separate audit budgets.
@@ -409,9 +409,9 @@ func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
 
 func TestHandleRevokePost_ForeignTokenAuditKeepsIndependentOwners(t *testing.T) {
 	e := newRevokeEndpoint(t)
-	caller := &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
+	caller := &record.Client{ID: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
 	for i := range 2 {
-		owner := &record.Client{Id: int64(2001 + i), ClientIdentifier: fmt.Sprintf("owner-%d", i), Enabled: true}
+		owner := &record.Client{ID: int64(2001 + i), ClientIdentifier: fmt.Sprintf("owner-%d", i), Enabled: true}
 		token := grantlessAccessToken(owner.ClientIdentifier, false, time.Now().Add(time.Hour))
 		token.Claims["jti"] = fmt.Sprintf("owner-token-%d", i)
 		e.callerFound(caller)
@@ -420,7 +420,7 @@ func TestHandleRevokePost_ForeignTokenAuditKeepsIndependentOwners(t *testing.T) 
 			Return(owner, nil).Once()
 		e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, token.StringClaim("jti")).Return(false, nil).Once()
 		e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", map[string]interface{}{
-			"client_id": revokeCallerId, "token_client_id": owner.Id, "token_type": "access_token",
+			"client_id": revokeCallerId, "token_client_id": owner.ID, "token_type": "access_token",
 		}).Return().Once()
 
 		assertErrorAnswer(t, e.post(t, url.Values{"client_id": {revokeCallerName}, "token": {revokeTokenString}}),
@@ -430,8 +430,8 @@ func TestHandleRevokePost_ForeignTokenAuditKeepsIndependentOwners(t *testing.T) 
 
 func TestHandleRevokePost_ConcurrentForeignTokenAuditIsBounded(t *testing.T) {
 	e := newRevokeEndpoint(t)
-	caller := &record.Client{Id: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
-	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	caller := &record.Client{ID: revokeCallerId, ClientIdentifier: revokeCallerName, Enabled: true, IsPublic: true}
+	owner := &record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
 	token := grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour))
 	e.auditLogger.On("Log", mock.Anything, "token_revocation_refused", mock.Anything).Return().Once()
 
@@ -470,7 +470,7 @@ func TestHandleRevokePost_ConcurrentForeignTokenAuditIsBounded(t *testing.T) {
 // event fails the test.
 func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 	refusedByParser := errs.Wrap(signingkeys.ErrTokenRefused, "token is malformed")
-	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	owner := &record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
 
 	cases := []struct {
 		name string
@@ -501,7 +501,7 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeCallerName).
 				Return(confidentialCaller(t), nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
+				Return(&record.User{ID: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(false, nil).Once()
 		}},
 		{"another client's access token whose grant was revoked already", func(e *revokeEndpoint) {
@@ -509,7 +509,7 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeOwnerName).
 				Return(owner, nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
+				Return(&record.User{ID: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(false, nil).Once()
 		}},
 		{"an access token without a grant, revoked already", func(e *revokeEndpoint) {
@@ -523,21 +523,21 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeOwnerName).
 				Return(owner, nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
+				Return(&record.User{ID: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(true, nil).Once()
 		}},
 		{"a refresh token with no row", func(e *revokeEndpoint) {
 			e.parses(offlineRefreshToken())
-			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(nil, nil).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(nil, nil).Once()
 		}},
 		{"a refresh token already revoked", func(e *revokeEndpoint) {
 			e.parses(offlineRefreshToken())
-			row := &record.RefreshToken{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId,
-				UserId: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientId: sql.NullInt64{Int64: revokeCallerId, Valid: true},
+			row := &record.RefreshToken{ID: 9, RefreshTokenJTI: revokeRefreshJti, FirstRefreshTokenJTI: revokeGrantId,
+				UserID: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientID: sql.NullInt64{Int64: revokeCallerId, Valid: true},
 				AuthenticatedAt: sql.NullTime{Time: time.Now(), Valid: true}, Revoked: true}
-			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
 			e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
-				args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}
+				args.Get(2).(*record.RefreshToken).User = record.User{ID: revokeUserId, Enabled: true}
 			}).Return(nil).Once()
 			e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
 		}},
@@ -546,25 +546,25 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			token.Claims["iss"] = "https://other.example.com"
 			token.Claims["aud"] = "https://other.example.com"
 			e.parses(token)
-			row := &record.RefreshToken{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId,
-				UserId: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientId: sql.NullInt64{Int64: revokeCallerId, Valid: true},
+			row := &record.RefreshToken{ID: 9, RefreshTokenJTI: revokeRefreshJti, FirstRefreshTokenJTI: revokeGrantId,
+				UserID: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientID: sql.NullInt64{Int64: revokeCallerId, Valid: true},
 				AuthenticatedAt: sql.NullTime{Time: time.Now(), Valid: true}}
-			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
 			e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
-				args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}
+				args.Get(2).(*record.RefreshToken).User = record.User{ID: revokeUserId, Enabled: true}
 			}).Return(nil).Once()
 			e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
 		}},
 		{"another client's live refresh token, its client disabled", func(e *revokeEndpoint) {
 			e.parses(offlineRefreshToken())
 			e.refreshTokenLive(revokeOwnerId)
-			e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).
-				Return(&record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName}, nil).Once()
+			e.database.On("GetClientByID", mock.Anything, mock.Anything, revokeOwnerId).
+				Return(&record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName}, nil).Once()
 		}},
 		{"another client's live refresh token, its client deleted", func(e *revokeEndpoint) {
 			e.parses(offlineRefreshToken())
 			e.refreshTokenLive(revokeOwnerId)
-			e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).Return(nil, nil).Once()
+			e.database.On("GetClientByID", mock.Anything, mock.Anything, revokeOwnerId).Return(nil, nil).Once()
 		}},
 	}
 	for _, tc := range cases {
@@ -607,7 +607,7 @@ func TestHandleRevokePost_AFaultAnswersServiceUnavailable(t *testing.T) {
 			e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, revokeCallerName).
 				Return(confidentialCaller(t), nil).Once()
 			e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-				Return(&record.User{Id: revokeUserId, Enabled: true}, nil).Once()
+				Return(&record.User{ID: revokeUserId, Enabled: true}, nil).Once()
 			e.database.On("IsRefreshTokenFamilyLive", mock.Anything, mock.Anything, revokeGrantId).Return(false, boom).Once()
 		}},
 		{"an access token's stored jti cannot be read", func(e *revokeEndpoint) {
@@ -628,17 +628,17 @@ func TestHandleRevokePost_AFaultAnswersServiceUnavailable(t *testing.T) {
 		{"the refresh token's row cannot be read", func(e *revokeEndpoint) {
 			e.callerFound(confidentialCaller(t))
 			e.parses(offlineRefreshToken())
-			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(nil, boom).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(nil, boom).Once()
 		}},
 		{"the refresh token's family cannot be read", func(e *revokeEndpoint) {
 			e.callerFound(confidentialCaller(t))
 			e.parses(offlineRefreshToken())
-			row := &record.RefreshToken{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId,
-				UserId: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientId: sql.NullInt64{Int64: revokeCallerId, Valid: true},
+			row := &record.RefreshToken{ID: 9, RefreshTokenJTI: revokeRefreshJti, FirstRefreshTokenJTI: revokeGrantId,
+				UserID: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientID: sql.NullInt64{Int64: revokeCallerId, Valid: true},
 				AuthenticatedAt: sql.NullTime{Time: time.Now(), Valid: true}}
-			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
+			e.database.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
 			e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
-				args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}
+				args.Get(2).(*record.RefreshToken).User = record.User{ID: revokeUserId, Enabled: true}
 			}).Return(nil).Once()
 			e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
 			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, revokeGrantId).Return(false, boom).Once()
@@ -647,7 +647,7 @@ func TestHandleRevokePost_AFaultAnswersServiceUnavailable(t *testing.T) {
 			e.callerFound(confidentialCaller(t))
 			e.parses(offlineRefreshToken())
 			e.refreshTokenLive(revokeOwnerId)
-			e.database.On("GetClientById", mock.Anything, mock.Anything, revokeOwnerId).Return(nil, boom).Once()
+			e.database.On("GetClientByID", mock.Anything, mock.Anything, revokeOwnerId).Return(nil, boom).Once()
 		}},
 		{"the revocation cannot commit", func(e *revokeEndpoint) {
 			e.callerFound(confidentialCaller(t))
@@ -837,7 +837,7 @@ func (e *revokeEndpoint) grantlessAccessTokenLive(owner *record.Client, user boo
 		Return(owner, nil).Once()
 	if user {
 		e.database.On("GetUserBySubject", mock.Anything, mock.Anything, "the-subject").
-			Return(&record.User{Id: revokeUserId, Subject: "the-subject", Enabled: true}, nil).Once()
+			Return(&record.User{ID: revokeUserId, Subject: "the-subject", Enabled: true}, nil).Once()
 	}
 	e.database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, revokeAccessJti).Return(false, nil).Once()
 }
@@ -900,7 +900,7 @@ func TestHandleRevokePost_AnAccessTokenRevokedMeanwhileIsAnsweredOK(t *testing.T
 // Another client's live access token without a grant is refused as another client's grant token is
 // (decision 8): 400 invalid_grant, token_revocation_refused, and no jti stored.
 func TestHandleRevokePost_RefusesAnotherClientsAccessTokenWithoutAGrant(t *testing.T) {
-	owner := &record.Client{Id: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
+	owner := &record.Client{ID: revokeOwnerId, ClientIdentifier: revokeOwnerName, Enabled: true}
 	e := newRevokeEndpoint(t)
 	e.callerFound(confidentialCaller(t))
 	e.parses(grantlessAccessToken(revokeOwnerName, false, time.Now().Add(time.Hour)))

@@ -17,7 +17,7 @@ import (
 // replaced, both stand for nothing, and so does a claim whose generation was never recorded (#542).
 func TestOTPClaim_StandsFor(t *testing.T) {
 	generation := func(g int64) *int64 { return &g }
-	enrolledAt := func(g int64) *record.User { return &record.User{OTPEnabled: true, OtpConfigGeneration: g} }
+	enrolledAt := func(g int64) *record.User { return &record.User{OTPEnabled: true, OTPConfigGeneration: g} }
 
 	testCases := []struct {
 		name  string
@@ -25,10 +25,10 @@ func TestOTPClaim_StandsFor(t *testing.T) {
 		user  *record.User
 		want  bool
 	}{
-		{"no code claimed stands for any user", OTPClaim{}, &record.User{OtpConfigGeneration: 3}, true},
+		{"no code claimed stands for any user", OTPClaim{}, &record.User{OTPConfigGeneration: 3}, true},
 		{"no code claimed stands with no user", OTPClaim{}, nil, true},
 		{"the authenticator the code came from", OTPClaim{Claimed: true, Generation: generation(3)}, enrolledAt(3), true},
-		{"the authenticator removed", OTPClaim{Claimed: true, Generation: generation(3)}, &record.User{OtpConfigGeneration: 4}, false},
+		{"the authenticator removed", OTPClaim{Claimed: true, Generation: generation(3)}, &record.User{OTPConfigGeneration: 4}, false},
 		{"the authenticator removed and another set up", OTPClaim{Claimed: true, Generation: generation(3)}, enrolledAt(5), false},
 		{"no generation recorded", OTPClaim{Claimed: true}, enrolledAt(3), false},
 		{"the user gone", OTPClaim{Claimed: true, Generation: generation(3)}, nil, false},
@@ -57,7 +57,7 @@ func TestOTPClaim_Recheck(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		var order []string
 		database.On("AcquireUserRow", mock.Anything, tx, int64(7)).Return(nil).Run(func(mock.Arguments) { order = append(order, "lock") }).Once()
-		database.On("GetUserById", mock.Anything, tx, int64(7)).Return(&record.User{Id: 7, OTPEnabled: true, OtpConfigGeneration: 3}, nil).
+		database.On("GetUserByID", mock.Anything, tx, int64(7)).Return(&record.User{ID: 7, OTPEnabled: true, OTPConfigGeneration: 3}, nil).
 			Run(func(mock.Arguments) { order = append(order, "read") }).Once()
 		require.NoError(t, claim.Recheck(context.Background(), database, tx, 7))
 		assert.Equal(t, []string{"lock", "read"}, order, "the user is read under its row lock")
@@ -66,7 +66,7 @@ func TestOTPClaim_Recheck(t *testing.T) {
 	t.Run("the authenticator removed and another set up", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("AcquireUserRow", mock.Anything, tx, int64(7)).Return(nil).Once()
-		database.On("GetUserById", mock.Anything, tx, int64(7)).Return(&record.User{Id: 7, OTPEnabled: true, OtpConfigGeneration: 5}, nil).Once()
+		database.On("GetUserByID", mock.Anything, tx, int64(7)).Return(&record.User{ID: 7, OTPEnabled: true, OTPConfigGeneration: 5}, nil).Once()
 		require.ErrorIs(t, claim.Recheck(context.Background(), database, tx, 7), ErrAuthenticatorRemoved)
 	})
 
@@ -75,6 +75,6 @@ func TestOTPClaim_Recheck(t *testing.T) {
 		fault := assert.AnError
 		database.On("AcquireUserRow", mock.Anything, tx, int64(7)).Return(fault).Once()
 		require.ErrorIs(t, claim.Recheck(context.Background(), database, tx, 7), fault)
-		database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

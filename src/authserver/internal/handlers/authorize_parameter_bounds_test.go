@@ -41,8 +41,8 @@ func newBoundedAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 	})
 
 	client := &record.Client{
-		Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
-		DefaultAcrLevel: record.AcrLevel1,
+		ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
+		DefaultACRLevel: record.ACRLevel1,
 	}
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 	e.database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).

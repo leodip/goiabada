@@ -71,7 +71,7 @@ func seedUser(t *testing.T, h *isolatedDB, seed userSeed) int64 {
 	cols := []string{"enabled", "subject", "username", "email", "email_verified",
 		"phone_number_verified", "password_hash", "otp_enabled",
 		// The profile text columns every version carries, as empty strings rather than NULL:
-		// GetUserById scans them into plain Go strings, which cannot hold SQL NULL, and the
+		// GetUserByID scans them into plain Go strings, which cannot hold SQL NULL, and the
 		// ORM's insert used to leave exactly these non-NULL for the same reason.
 		"given_name", "middle_name", "family_name", "nickname", "website", "gender", "locale",
 		"zone_info_country_name", "zone_info", "phone_number", "address_line1", "address_line2",
@@ -133,7 +133,7 @@ func seedGroup(t *testing.T, h *isolatedDB, identifier, description string) int6
 		groupsTable(), identifier, description, falseLit, falseLit))
 	require.NoError(t, err, "seed group %s", identifier)
 
-	return seedIdByIdentifier(t, h, groupsTable(), "group_identifier", identifier)
+	return seedIDByIdentifier(t, h, groupsTable(), "group_identifier", identifier)
 }
 
 // groupsTable is the groups table's name quoted per engine, because MySQL 8.0.2 made GROUPS a
@@ -183,45 +183,45 @@ func seedResource(t *testing.T, h *isolatedDB, identifier, description string) i
 		"INSERT INTO resources (resource_identifier, description) VALUES ('%s', '%s')", identifier, description))
 	require.NoError(t, err, "seed resource %s", identifier)
 
-	return seedIdByIdentifier(t, h, "resources", "resource_identifier", identifier)
+	return seedIDByIdentifier(t, h, "resources", "resource_identifier", identifier)
 }
 
 // seedPermission writes a permissions row and reads its id back by identifier and resource.
-func seedPermission(t *testing.T, h *isolatedDB, resourceId int64, identifier, description string) int64 {
+func seedPermission(t *testing.T, h *isolatedDB, resourceID int64, identifier, description string) int64 {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
 		"INSERT INTO permissions (permission_identifier, description, resource_id) VALUES ('%s', '%s', %d)",
-		identifier, description, resourceId))
+		identifier, description, resourceID))
 	require.NoError(t, err, "seed the %s permission", identifier)
 
 	var id int64
 	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT id FROM permissions WHERE permission_identifier = '%s' AND resource_id = %d", identifier, resourceId)).Scan(&id),
+		"SELECT id FROM permissions WHERE permission_identifier = '%s' AND resource_id = %d", identifier, resourceID)).Scan(&id),
 		"read back the seeded %s permission id", identifier)
 	return id
 }
 
 // seedUserPermission, seedGroupPermission and seedClientPermission write one grant row each. No id
 // back: no fixture reads a grant by it, and the tables carry no identifier to look one up by.
-func seedUserPermission(t *testing.T, h *isolatedDB, userId, permissionId int64) {
+func seedUserPermission(t *testing.T, h *isolatedDB, userID, permissionID int64) {
 	t.Helper()
 	_, err := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO users_permissions (user_id, permission_id) VALUES (%d, %d)", userId, permissionId))
+		"INSERT INTO users_permissions (user_id, permission_id) VALUES (%d, %d)", userID, permissionID))
 	require.NoError(t, err, "seed the user permission grant")
 }
 
-func seedGroupPermission(t *testing.T, h *isolatedDB, groupId, permissionId int64) {
+func seedGroupPermission(t *testing.T, h *isolatedDB, groupID, permissionID int64) {
 	t.Helper()
 	_, err := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO groups_permissions (group_id, permission_id) VALUES (%d, %d)", groupId, permissionId))
+		"INSERT INTO groups_permissions (group_id, permission_id) VALUES (%d, %d)", groupID, permissionID))
 	require.NoError(t, err, "seed the group permission grant")
 }
 
-func seedClientPermission(t *testing.T, h *isolatedDB, clientId, permissionId int64) {
+func seedClientPermission(t *testing.T, h *isolatedDB, clientID, permissionID int64) {
 	t.Helper()
 	_, err := h.SQL.Exec(fmt.Sprintf(
-		"INSERT INTO clients_permissions (client_id, permission_id) VALUES (%d, %d)", clientId, permissionId))
+		"INSERT INTO clients_permissions (client_id, permission_id) VALUES (%d, %d)", clientID, permissionID))
 	require.NoError(t, err, "seed the client permission grant")
 }
 
@@ -229,29 +229,29 @@ func seedClientPermission(t *testing.T, h *isolatedDB, clientId, permissionId in
 // answers its id. The id is the MAXIMUM of the pair's rows rather than a lookup, because the
 // absence of that key is this migration's subject: the row just written is the newest the pair
 // holds, on every engine's auto-increment.
-func seedUserConsent(t *testing.T, h *isolatedDB, userId, clientId int64, scope string) int64 {
+func seedUserConsent(t *testing.T, h *isolatedDB, userID, clientID int64, scope string) int64 {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
 		"INSERT INTO user_consents (user_id, client_id, scope, granted_at) VALUES (%d, %d, '%s', CURRENT_TIMESTAMP)",
-		userId, clientId, scope))
+		userID, clientID, scope))
 	require.NoError(t, err, "seed a consent while no key refuses a second")
 
-	return seedMaxId(t, h, "user_consents", fmt.Sprintf("user_id = %d AND client_id = %d", userId, clientId))
+	return seedMaxID(t, h, "user_consents", fmt.Sprintf("user_id = %d AND client_id = %d", userID, clientID))
 }
 
 // seedUserSessionClient writes an association below 000055 and answers its id, for the same
 // reason seedUserConsent reads a MAXIMUM back: started and last_accessed are NOT NULL but nothing
 // asserts their values, so CURRENT_TIMESTAMP serves on every engine.
-func seedUserSessionClient(t *testing.T, h *isolatedDB, sessionId, clientId int64) int64 {
+func seedUserSessionClient(t *testing.T, h *isolatedDB, sessionID, clientID int64) int64 {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
 		"INSERT INTO user_session_clients (user_session_id, client_id, started, last_accessed) VALUES (%d, %d, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-		sessionId, clientId))
+		sessionID, clientID))
 	require.NoError(t, err, "seed an association while no key refuses a second")
 
-	return seedMaxId(t, h, "user_session_clients", fmt.Sprintf("user_session_id = %d AND client_id = %d", sessionId, clientId))
+	return seedMaxID(t, h, "user_session_clients", fmt.Sprintf("user_session_id = %d AND client_id = %d", sessionID, clientID))
 }
 
 // seedWebOrigin writes the origin verbatim and answers its id. Both statements bind the origin
@@ -259,23 +259,23 @@ func seedUserSessionClient(t *testing.T, h *isolatedDB, sessionId, clientId int6
 // sql_mode reads as an escape inside a literal: inlined, MySQL stored a different origin than the
 // fixture names. Bound, the row holds what the data layer's own write would -- the validation
 // 000034 exists to backfill has only ever lived in the API handler.
-func seedWebOrigin(t *testing.T, h *isolatedDB, clientId int64, origin string) int64 {
+func seedWebOrigin(t *testing.T, h *isolatedDB, clientID int64, origin string) int64 {
 	t.Helper()
 
 	_, err := h.SQL.ExecContext(context.Background(),
-		"INSERT INTO web_origins (origin, client_id) VALUES ("+seedBinds(2)+")", origin, clientId)
+		"INSERT INTO web_origins (origin, client_id) VALUES ("+seedBinds(2)+")", origin, clientID)
 	require.NoError(t, err, "seed web origin %s", origin)
 
 	var id int64
 	require.NoError(t, h.SQL.QueryRowContext(context.Background(),
 		"SELECT id FROM web_origins WHERE origin = "+seedBindAt(1)+" AND client_id = "+seedBindAt(2),
-		origin, clientId).Scan(&id),
+		origin, clientID).Scan(&id),
 		"read back the seeded web origin id")
 	return id
 }
 
-// seedIdByIdentifier reads the one row a fresh identifier has back.
-func seedIdByIdentifier(t *testing.T, h *isolatedDB, table, column, identifier string) int64 {
+// seedIDByIdentifier reads the one row a fresh identifier has back.
+func seedIDByIdentifier(t *testing.T, h *isolatedDB, table, column, identifier string) int64 {
 	t.Helper()
 
 	var id int64
@@ -285,8 +285,8 @@ func seedIdByIdentifier(t *testing.T, h *isolatedDB, table, column, identifier s
 	return id
 }
 
-// seedMaxId reads the newest row a predicate matches, which a seed that just inserted it is.
-func seedMaxId(t *testing.T, h *isolatedDB, table, predicate string) int64 {
+// seedMaxID reads the newest row a predicate matches, which a seed that just inserted it is.
+func seedMaxID(t *testing.T, h *isolatedDB, table, predicate string) int64 {
 	t.Helper()
 
 	var id int64

@@ -33,15 +33,15 @@ import (
 // the generation it assigns to itself.
 func TestAcquireUserRow(t *testing.T) {
 	user := createTestUser(t)
-	before, err := database.GetUserById(context.Background(), nil, user.Id)
+	before, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, before)
 
 	tx := beginTx(t)
-	require.NoError(t, database.AcquireUserRow(context.Background(), tx, user.Id))
+	require.NoError(t, database.AcquireUserRow(context.Background(), tx, user.ID))
 	require.NoError(t, database.CommitTransaction(context.Background(), tx))
 
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, after)
 	assert.True(t, before.UpdatedAt.Time.Equal(after.UpdatedAt.Time),
@@ -50,7 +50,7 @@ func TestAcquireUserRow(t *testing.T) {
 
 	t.Run("a user that is not there is not an error", func(t *testing.T) {
 		tx := beginTx(t)
-		assert.NoError(t, database.AcquireUserRow(context.Background(), tx, user.Id+1_000_000))
+		assert.NoError(t, database.AcquireUserRow(context.Background(), tx, user.ID+1_000_000))
 	})
 
 	t.Run("an id of 0 is a caller's bug", func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestAcquireUserRow(t *testing.T) {
 	})
 
 	t.Run("without a transaction the statement would autocommit and release the row", func(t *testing.T) {
-		assert.Error(t, database.AcquireUserRow(context.Background(), nil, user.Id))
+		assert.Error(t, database.AcquireUserRow(context.Background(), nil, user.ID))
 	})
 }
 
@@ -67,7 +67,7 @@ func TestAcquireUserRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)
 
 	tx := beginTx(t)
-	err := database.AcquireUserRow(cancelled(), tx, user.Id)
+	err := database.AcquireUserRow(cancelled(), tx, user.ID)
 
 	require.Error(t, err, "a refusal, not a silent acquisition of nothing")
 	assert.ErrorIs(t, err, context.Canceled)
@@ -84,7 +84,7 @@ func TestAcquireUserRow_HoldsTheRowUntilTheTransactionEnds(t *testing.T) {
 
 	user := createTestUserOn(t, database)
 	holder := beginTx(t)
-	require.NoError(t, database.AcquireUserRow(context.Background(), holder, user.Id))
+	require.NoError(t, database.AcquireUserRow(context.Background(), holder, user.ID))
 
 	writer := goBlocked(t, "a credential write", holder, func(reached func()) error {
 		tx, err := other.BeginTransaction(context.Background())
@@ -93,7 +93,7 @@ func TestAcquireUserRow_HoldsTheRowUntilTheTransactionEnds(t *testing.T) {
 		}
 		defer func() { _ = other.RollbackTransaction(context.Background(), tx) }()
 		reached()
-		if err := other.SetUserPasswordHash(context.Background(), tx, user.Id, "hash-written-behind-the-acquisition"); err != nil {
+		if err := other.SetUserPasswordHash(context.Background(), tx, user.ID, "hash-written-behind-the-acquisition"); err != nil {
 			return err
 		}
 		return other.CommitTransaction(context.Background(), tx)
@@ -114,7 +114,7 @@ func TestAcquireUserRow_WaitsForAWriterOfTheRow(t *testing.T) {
 
 	user := createTestUserOn(t, database)
 	writer := beginTx(t)
-	require.NoError(t, database.SetUserPasswordHash(context.Background(), writer, user.Id, "hash-held-by-the-writer"))
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), writer, user.ID, "hash-held-by-the-writer"))
 
 	acquiring := goBlocked(t, "the acquisition", writer, func(reached func()) error {
 		tx, err := other.BeginTransaction(context.Background())
@@ -123,7 +123,7 @@ func TestAcquireUserRow_WaitsForAWriterOfTheRow(t *testing.T) {
 		}
 		defer func() { _ = other.RollbackTransaction(context.Background(), tx) }()
 		reached()
-		return other.AcquireUserRow(context.Background(), tx, user.Id)
+		return other.AcquireUserRow(context.Background(), tx, user.ID)
 	})
 	acquiring.requireBlocked(t)
 	acquiring.requireStillWaiting(t)
@@ -132,10 +132,10 @@ func TestAcquireUserRow_WaitsForAWriterOfTheRow(t *testing.T) {
 	require.NoError(t, acquiring.await(t), "the acquisition goes through once the writer commits")
 }
 
-func userGenerationOn(t *testing.T, db data.Database, userId int64) int64 {
+func userGenerationOn(t *testing.T, db data.Database, userID int64) int64 {
 	t.Helper()
 
-	user, err := db.GetUserById(context.Background(), nil, userId)
+	user, err := db.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.AuthStateGeneration
@@ -150,8 +150,8 @@ func changeTheUsersPassword(ctx context.Context, db data.Database, f *family, pa
 	if !f.ropc {
 		preserved = f.code.SessionIdentifier
 	}
-	_, err := revocation.RevokeUserAuthStateTx(ctx, db, f.user.Id, preserved, revocation.LogoutNotice{}, func(tx *sql.Tx) error {
-		if err := db.SetUserPasswordHash(ctx, tx, f.user.Id, "hash-after-the-credential-change"); err != nil {
+	_, err := revocation.RevokeUserAuthStateTx(ctx, db, f.user.ID, preserved, revocation.LogoutNotice{}, func(tx *sql.Tx) error {
+		if err := db.SetUserPasswordHash(ctx, tx, f.user.ID, "hash-after-the-credential-change"); err != nil {
 			return err
 		}
 		if pause != nil {
@@ -179,7 +179,7 @@ func rotate(ctx context.Context, db data.Database, input *issuance.RefreshTokenG
 func requireOutcome(t *testing.T, f *family, result rotationResult, before int64, rotationFirst bool) {
 	t.Helper()
 
-	userGeneration := userGenerationOn(t, database, f.user.Id)
+	userGeneration := userGenerationOn(t, database, f.user.ID)
 	require.Equal(t, before+1, userGeneration, "the credential change moved the user one generation on")
 
 	// The property the decision is for, whichever shape and whichever order: nothing the rotation
@@ -187,9 +187,9 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 	var members []*record.RefreshToken
 	var err error
 	if f.ropc {
-		members, err = database.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
+		members, err = database.GetRefreshTokensByUserID(context.Background(), nil, f.user.ID)
 	} else {
-		members, err = database.GetRefreshTokensByCodeId(context.Background(), nil, f.code.Id)
+		members, err = database.GetRefreshTokensByCodeID(context.Background(), nil, f.code.ID)
 	}
 	require.NoError(t, err)
 	for _, member := range members {
@@ -197,7 +197,7 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 			continue
 		}
 		assert.Equal(t, userGeneration, member.AuthStateGeneration,
-			"the live token %s is behind the user's generation: the next refresh would refuse it", member.RefreshTokenJti)
+			"the live token %s is behind the user's generation: the next refresh would refuse it", member.RefreshTokenJTI)
 	}
 
 	if !f.ropc {
@@ -205,7 +205,7 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 		child := childOf(t, database, result.response)
 		assert.False(t, child.Revoked, "the user's own session keeps working: its child is live")
 		assert.Equal(t, userGeneration, child.AuthStateGeneration, "and stamped with the generation the change promoted it to")
-		assertTokenRevoked(t, f.live.Id, true, "the presented token, claimed by the rotation")
+		assertTokenRevoked(t, f.live.ID, true, "the presented token, claimed by the rotation")
 		assert.Equal(t, 3, f.members(t, database))
 		return
 	}
@@ -218,7 +218,7 @@ func requireOutcome(t *testing.T, f *family, result rotationResult, before int64
 		return
 	}
 	require.ErrorIs(t, result.err, issuance.ErrRefreshTokenNotClaimed, "the change revoked the token before the rotation could claim it")
-	assertTokenRevoked(t, f.live.Id, true, "the presented token, revoked by the change")
+	assertTokenRevoked(t, f.live.ID, true, "the presented token, revoked by the change")
 	assert.Equal(t, 2, f.members(t, database), "a refused rotation inserted no child")
 }
 
@@ -248,9 +248,9 @@ func TestRefreshRotation_ARotationThenACredentialChange(t *testing.T) {
 			defer cancel()
 
 			f := newFamilyOfShape(t, database, shape)
-			before := userGenerationOn(t, database, f.user.Id)
+			before := userGenerationOn(t, database, f.user.ID)
 
-			result := rotate(ctx, database, f.presenting(t, database, f.live.RefreshTokenJti))
+			result := rotate(ctx, database, f.presenting(t, database, f.live.RefreshTokenJTI))
 			require.NoError(t, result.err)
 			require.NoError(t, changeTheUsersPassword(ctx, database, f, nil))
 
@@ -272,9 +272,9 @@ func TestRefreshRotation_ACredentialChangeBetweenTheValidatorAndTheRotation(t *t
 			defer cancel()
 
 			f := newFamilyOfShape(t, database, shape)
-			before := userGenerationOn(t, database, f.user.Id)
+			before := userGenerationOn(t, database, f.user.ID)
 
-			stale := f.presenting(t, database, f.live.RefreshTokenJti)
+			stale := f.presenting(t, database, f.live.RefreshTokenJTI)
 			require.NoError(t, changeTheUsersPassword(ctx, database, f, nil))
 			result := rotate(ctx, database, stale)
 
@@ -301,7 +301,7 @@ func TestRefreshRotation_ACredentialChangeArrivingWhileARotationHoldsTheRow(t *t
 			defer cancel()
 
 			f := newFamilyOfShape(t, database, shape)
-			before := userGenerationOn(t, database, f.user.Id)
+			before := userGenerationOn(t, database, f.user.ID)
 			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
@@ -338,8 +338,8 @@ func TestRefreshRotation_ARotationArrivingWhileACredentialChangeHoldsTheRow(t *t
 			defer cancel()
 
 			f := newFamilyOfShape(t, database, shape)
-			before := userGenerationOn(t, database, f.user.Id)
-			stale := f.presenting(t, database, f.live.RefreshTokenJti)
+			before := userGenerationOn(t, database, f.user.ID)
+			stale := f.presenting(t, database, f.live.RefreshTokenJTI)
 
 			held := newBarrier(t, "the credential change")
 			changed := make(chan error, 1)
@@ -378,7 +378,7 @@ func TestRefreshRotation_ARotationAndACredentialChangeStartedTogetherAgreeOnTheC
 	defer cancel()
 
 	f := newFamilyOfShape(t, database, sessionBoundFamily)
-	input := f.presenting(t, database, f.live.RefreshTokenJti)
+	input := f.presenting(t, database, f.live.RefreshTokenJTI)
 
 	rotated := make(chan rotationResult, 1)
 	changed := make(chan error, 1)
@@ -390,7 +390,7 @@ func TestRefreshRotation_ARotationAndACredentialChangeStartedTogetherAgreeOnTheC
 	require.NoError(t, result.err, "a session-bound token whose session the change preserved is never refused by it")
 	child := childOf(t, database, result.response)
 	assert.False(t, child.Revoked)
-	assert.Equal(t, userGenerationOn(t, database, f.user.Id), child.AuthStateGeneration,
+	assert.Equal(t, userGenerationOn(t, database, f.user.ID), child.AuthStateGeneration,
 		"whichever order the engine chose, the child the rotation returned is not behind the user")
 	requireNoDeadlockRerun(t, logs)
 }

@@ -83,14 +83,14 @@ var (
 	}
 )
 
-// targetClient is the client GetClientById answers for a holding: confidential, with the code and
+// targetClient is the client GetClientByID answers for a holding: confidential, with the code and
 // client credentials flows on, so that every write's own validation lets it through.
 func targetClient(t *testing.T, holding clientHolding) *record.Client {
 	t.Helper()
 	sealed, err := testDataCipher.Encrypt(targetClientSecret)
 	require.NoError(t, err)
 	return &record.Client{
-		Id:                       targetClientId,
+		ID:                       targetClientId,
 		ClientIdentifier:         holding.identifier,
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
@@ -109,9 +109,9 @@ func expectClientHolding(database *datamocks.Database, holding clientHolding) {
 	}
 	var grants []record.ClientPermission
 	for _, permissionId := range holding.grants {
-		grants = append(grants, record.ClientPermission{ClientId: targetClientId, PermissionId: permissionId})
+		grants = append(grants, record.ClientPermission{ClientID: targetClientId, PermissionID: permissionId})
 	}
-	database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(grants, nil).Once()
+	database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(grants, nil).Once()
 	if len(grants) > 0 {
 		expectAuthServerPermissions(database)
 	}
@@ -146,7 +146,7 @@ func clientRequest(method, target, body, scope string) *http.Request {
 
 func expectTheTargetClient(client *record.Client) func(database *datamocks.Database) {
 	return func(database *datamocks.Database) {
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
 	}
 }
 
@@ -171,7 +171,7 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient"},
+		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientID", "UpdateClient"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
@@ -183,7 +183,7 @@ var clientTargetWrites = []clientTargetWrite{
 			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).ServeHTTP(rr, r)
 			return rr
 		},
-		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientId", "UpdateClient", "SetClientRememberConsent"},
+		writes:           []string{"RunInTransaction", "SetClientPublic", "DeleteClientIntrospectionResourcesByClientID", "UpdateClient", "SetClientRememberConsent"},
 		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 		credentials:      true,
 	},
@@ -327,7 +327,7 @@ var clientTargetWrites = []clientTargetWrite{
 		},
 		writes: []string{"CreateClientLogo", "UpdateClientLogo"},
 		expectFirstWrite: func(database *datamocks.Database) {
-			database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, nil).Once()
+			database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, nil).Once()
 			database.On("CreateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errFirstWriteFails).Once()
 		},
 	},
@@ -527,7 +527,7 @@ func TestClientTargetCeiling_AManageTokenWritesToAdministratorClientsAndReadsNot
 				assertReachedPastTheCeiling(t, write, rr, records)
 				database.AssertExpectations(t)
 				for _, call := range database.Calls {
-					if call.Method == "GetClientPermissionsByClientId" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
+					if call.Method == "GetClientPermissionsByClientID" && call.Arguments.Get(1) == (*sql.Tx)(nil) {
 						t.Errorf("the client's permissions were read for the target ceiling")
 					}
 				}
@@ -548,7 +548,7 @@ func TestClientTargetCeiling_AFailedPolicyReadIsOneFiveHundred(t *testing.T) {
 			if write.expectReads != nil {
 				write.expectReads(database)
 			}
-			database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).
+			database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), targetClientId).
 				Return(nil, errors.New("the read failed")).Once()
 
 			rr := write.serve(t, database, auditLogger, granularScopeOfClients, client)
@@ -568,14 +568,14 @@ func TestClientTargetCeiling_AFailedPolicyReadIsOneFiveHundred(t *testing.T) {
 func TestClientTargetCeiling_TheRoutesAnswerTheirOwnFourHundredsFirst(t *testing.T) {
 	assertNoClientPolicyRead := func(t *testing.T, database *datamocks.Database) {
 		t.Helper()
-		assertNotAttemptedOnClientDatabase(t, database, "GetClientPermissionsByClientId",
-			"GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+		assertNotAttemptedOnClientDatabase(t, database, "GetClientPermissionsByClientID",
+			"GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 	}
 
 	t.Run("a client that does not exist", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, nil).Once()
 
 		rr := httptest.NewRecorder()
 		HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr,

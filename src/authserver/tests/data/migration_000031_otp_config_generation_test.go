@@ -74,7 +74,7 @@ func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 		"or the seed under test has nothing to read")
 
 	// Seeded with raw SQL rather than CreateUserSession: the Go model already carries
-	// OtpConfigGeneration and no longer carries Level2AuthConfigHasChanged, so an ORM insert at
+	// OTPConfigGeneration and no longer carries Level2AuthConfigHasChanged, so an ORM insert at
 	// 000030 would name one column that does not exist yet and omit one that does.
 	enrolled := seedPreMigration000031User(t, h, true)
 	notEnrolled := seedPreMigration000031User(t, h, false)
@@ -188,7 +188,7 @@ func seedPreMigration000031User(t *testing.T, h *isolatedDB, otpEnabled bool) in
 // SQLite's DATETIME, MySQL's datetime(6), PostgreSQL's timestamp(6) without time zone and SQL
 // Server's DATETIME2(6) alike, which is why the 000024 test's reason for not seeding this table
 // does not apply here: it avoided the fixture rather than the literal.
-func seedPreMigration000031Session(t *testing.T, h *isolatedDB, userId int64, flagged bool) string {
+func seedPreMigration000031Session(t *testing.T, h *isolatedDB, userID int64, flagged bool) string {
 	t.Helper()
 
 	falseLit, trueLit := boolLiterals000031()
@@ -204,7 +204,7 @@ func seedPreMigration000031Session(t *testing.T, h *isolatedDB, userId int64, fl
 		 ip_address, device_name, device_type, device_os, level2_auth_config_has_changed, user_id)
 		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level2_optional', %s,
 		 '127.0.0.1', 'device', 'desktop', 'linux', %s, %d)`,
-		identifier, ts, ts, ts, flagLit, userId)
+		identifier, ts, ts, ts, flagLit, userID)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed pre-migration user session")
 	return identifier
@@ -231,10 +231,10 @@ func readSessionGeneration000031(t *testing.T, h *isolatedDB, sessionIdentifier 
 	return generation
 }
 
-func readUserGeneration000031(t *testing.T, h *isolatedDB, userId int64) int64 {
+func readUserGeneration000031(t *testing.T, h *isolatedDB, userID int64) int64 {
 	t.Helper()
 	var generation int64
-	q := fmt.Sprintf("SELECT otp_config_generation FROM users WHERE id = %d", userId)
+	q := fmt.Sprintf("SELECT otp_config_generation FROM users WHERE id = %d", userID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&generation), "read users.otp_config_generation")
 	return generation
 }

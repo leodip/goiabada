@@ -226,7 +226,7 @@ func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectU
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -236,7 +236,7 @@ func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectU
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	if createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, redirectUri); createRedirectURIErr != nil {
@@ -393,8 +393,8 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	oldSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, oldSession)
-	oldSession.IpAddress = "203.0.113.77"
-	oldSession.DeviceId = ""
+	oldSession.IPAddress = "203.0.113.77"
+	oldSession.DeviceID = ""
 	oldSession.AuthTime = time.Now().UTC().Add(-2 * time.Hour)
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, oldSession))
 

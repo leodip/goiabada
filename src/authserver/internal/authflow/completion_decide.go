@@ -23,7 +23,7 @@ type completionFacts struct {
 	raisesPrivilege bool
 	// otpConfigGenerationCaptured says the ceremony captured the user's OTP config generation.
 	otpConfigGenerationCaptured bool
-	target                      record.AcrLevel
+	target                      record.ACRLevel
 }
 
 // completionPlan is decideCompletion's answer, one of three modes: reuseSessionPlan,

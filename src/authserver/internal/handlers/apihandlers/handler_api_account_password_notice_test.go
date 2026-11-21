@@ -48,7 +48,7 @@ func passwordNoticeUser(t *testing.T) *record.User {
 	hash, err := passwordhash.Hash(passwordNoticeCurrent)
 	require.NoError(t, err)
 	return &record.User{
-		Id:            42,
+		ID:            42,
 		Subject:       passwordNoticeSubject,
 		Enabled:       true,
 		GivenName:     "Ana",
@@ -86,9 +86,9 @@ func passwordNoticeRequest(t *testing.T, settings *record.Settings, current stri
 // entry of its own would fail the case.
 func stubPasswordChange(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, passwordNoticeSubject).Return(user, nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, user.Id).Return(user, nil).Once()
-	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, user.Id, mock.Anything).Return(nil).Once()
-	stubSweep(database, user.Id, 8)
+	database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, user.ID).Return(user, nil).Once()
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, user.ID, mock.Anything).Return(nil).Once()
+	stubSweep(database, user.ID, 8)
 	auditLogger.On("Log", mock.Anything, audit.EventChangedPassword, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
 }
@@ -203,9 +203,9 @@ func TestHandleAccountPasswordPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 				user *record.User, settings *record.Settings) string {
 				database.On("GetUserBySubject", mock.Anything, mock.Anything, passwordNoticeSubject).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, apiRevokeTx)
-				database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, user.Id).Return(user, nil).Once()
-				database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, user.Id, mock.Anything).Return(nil).Once()
-				database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, user.Id).
+				database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, user.ID).Return(user, nil).Once()
+				database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, user.ID, mock.Anything).Return(nil).Once()
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, user.ID).
 					Return(int64(0), errors.New("increment failed")).Once()
 				return passwordNoticeCurrent
 			}},

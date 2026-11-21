@@ -71,13 +71,13 @@ var grantSaves = []grantSave{
 		name:       "user permissions",
 		kind:       "user",
 		path:       "/api/v1/admin/users/5/permissions",
-		ownerRead:  "GetUserById",
-		owner:      &record.User{Id: grantOwnerId},
-		readMethod: "GetUserPermissionsByUserId",
+		ownerRead:  "GetUserByID",
+		owner:      &record.User{ID: grantOwnerId},
+		readMethod: "GetUserPermissionsByUserID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.UserPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.UserPermission{Id: r.id, UserId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.UserPermission{ID: r.id, UserID: grantOwnerId, PermissionID: r.permissionId})
 			}
 			return out
 		},
@@ -85,7 +85,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteUserPermission",
 		created: func(arg any) (int64, int64) {
 			up := arg.(*record.UserPermission)
-			return up.UserId, up.PermissionId
+			return up.UserID, up.PermissionID
 		},
 		addedEvent:          audit.EventAddedUserPermission,
 		deletedEvent:        audit.EventDeletedUserPermission,
@@ -96,7 +96,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -105,13 +105,13 @@ var grantSaves = []grantSave{
 		name:       "group permissions",
 		kind:       "group",
 		path:       "/api/v1/admin/groups/5/permissions",
-		ownerRead:  "GetGroupById",
-		owner:      &record.Group{Id: grantOwnerId, GroupIdentifier: "admins"},
-		readMethod: "GetGroupPermissionsByGroupId",
+		ownerRead:  "GetGroupByID",
+		owner:      &record.Group{ID: grantOwnerId, GroupIdentifier: "admins"},
+		readMethod: "GetGroupPermissionsByGroupID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.GroupPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.GroupPermission{Id: r.id, GroupId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.GroupPermission{ID: r.id, GroupID: grantOwnerId, PermissionID: r.permissionId})
 			}
 			return out
 		},
@@ -119,7 +119,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteGroupPermission",
 		created: func(arg any) (int64, int64) {
 			gp := arg.(*record.GroupPermission)
-			return gp.GroupId, gp.PermissionId
+			return gp.GroupID, gp.PermissionID
 		},
 		addedEvent:          audit.EventAddedGroupPermission,
 		deletedEvent:        audit.EventDeletedGroupPermission,
@@ -130,7 +130,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -139,15 +139,15 @@ var grantSaves = []grantSave{
 		name:      "client permissions",
 		kind:      "client",
 		path:      "/api/v1/admin/clients/5/permissions",
-		ownerRead: "GetClientById",
+		ownerRead: "GetClientByID",
 		// Client permissions are configurable only with the client credentials flow enabled;
 		// handler_api_client_permissions_test.go owns the refusal when it is not.
-		owner:      &record.Client{Id: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
-		readMethod: "GetClientPermissionsByClientId",
+		owner:      &record.Client{ID: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+		readMethod: "GetClientPermissionsByClientID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.ClientPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.ClientPermission{Id: r.id, ClientId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.ClientPermission{ID: r.id, ClientID: grantOwnerId, PermissionID: r.permissionId})
 			}
 			return out
 		},
@@ -155,7 +155,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteClientPermission",
 		created: func(arg any) (int64, int64) {
 			cp := arg.(*record.ClientPermission)
-			return cp.ClientId, cp.PermissionId
+			return cp.ClientID, cp.PermissionID
 		},
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
 		ownerKey:          "client_id",
@@ -164,7 +164,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -206,8 +206,8 @@ func (s grantSave) expectOwner(database *datamocks.Database) {
 // transaction.
 func expectPermissionsExist(database *datamocks.Database, permissionIds ...int64) {
 	for _, id := range permissionIds {
-		database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), id).
-			Return(&record.Permission{Id: id, PermissionIdentifier: "p"}, nil).Once()
+		database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), id).
+			Return(&record.Permission{ID: id, PermissionIdentifier: "p"}, nil).Once()
 	}
 }
 
@@ -620,7 +620,7 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 
 				save.expectOwner(database)
 				if variant.missing != 0 {
-					database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), variant.missing).
+					database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), variant.missing).
 						Return((*record.Permission)(nil), nil).Once()
 				}
 

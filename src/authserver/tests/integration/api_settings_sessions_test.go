@@ -19,7 +19,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -69,7 +69,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 	assert.Equal(t, "never", body.KeepSignedIn)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, settings.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, settings.UserSessionMaxLifetimeInSeconds)
@@ -253,7 +253,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
 			assert.Equal(t, before.MaxUserSessionsPerUser, after.MaxUserSessionsPerUser, "nothing is saved")
@@ -269,7 +269,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 		})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-		after, err := database.GetSettingsById(context.Background(), nil, 1)
+		after, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, 0, after.MaxUserSessionsPerUser)
 	})
@@ -351,7 +351,7 @@ func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *test
 			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
 			assert.Equal(t, record.KeepSignedIn("ask"), after.KeepSignedIn, "nothing is saved")
@@ -369,7 +369,7 @@ func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *test
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, record.KeepSignedIn(mode), after.KeepSignedIn)
 

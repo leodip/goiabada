@@ -42,23 +42,23 @@ func disableOtherAdministrators(t *testing.T) {
 	manage := authServerPermissionId(t, builtin.ManagePermissionIdentifier)
 
 	holders := map[int64]bool{}
-	direct, _, err := database.GetUsersByPermissionIdPaginated(ctx, nil, manage, 1, 10000)
+	direct, _, err := database.GetUsersByPermissionIDPaginated(ctx, nil, manage, 1, 10000)
 	require.NoError(t, err)
 	for _, user := range direct {
-		holders[user.Id] = true
+		holders[user.ID] = true
 	}
 	groups, err := database.GetAllGroups(ctx, nil)
 	require.NoError(t, err)
 	for _, group := range groups {
-		grant, grantErr := database.GetGroupPermissionByGroupIdAndPermissionId(ctx, nil, group.Id, manage)
+		grant, grantErr := database.GetGroupPermissionByGroupIDAndPermissionID(ctx, nil, group.ID, manage)
 		require.NoError(t, grantErr)
 		if grant == nil {
 			continue
 		}
-		members, _, membersErr := database.GetGroupMembersPaginated(ctx, nil, group.Id, 1, 10000)
+		members, _, membersErr := database.GetGroupMembersPaginated(ctx, nil, group.ID, 1, 10000)
 		require.NoError(t, membersErr)
 		for _, member := range members {
-			holders[member.Id] = true
+			holders[member.ID] = true
 		}
 	}
 
@@ -86,9 +86,9 @@ func newAdministrator(t *testing.T, manage int64) int64 {
 	t.Helper()
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("last@administrators.test"), GivenName: "Last"}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: user.Id, PermissionId: manage}))
-	return user.Id
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: user.ID, PermissionID: manage}))
+	return user.ID
 }
 
 // newAdministratorThroughGroup creates an enabled user holding manage only through a group.
@@ -96,12 +96,12 @@ func newAdministratorThroughGroup(t *testing.T, manage int64) (userId, groupId i
 	t.Helper()
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("last@administrators.test"), GivenName: "Last"}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	group := createTestGroup(t)
-	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-	require.NoError(t, database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: group.Id, PermissionId: manage}))
-	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
-	return user.Id, group.Id
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
+	require.NoError(t, database.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupID: group.ID, PermissionID: manage}))
+	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserID: user.ID, GroupID: group.ID}))
+	return user.ID, group.ID
 }
 
 // lastAdministratorWrite is one of the guarded writes.
@@ -127,14 +127,14 @@ func groupAdministrator(t *testing.T, manage int64) lastAdministratorFixture {
 
 func userGone(t *testing.T, userId int64) bool {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	return user == nil
 }
 
 func groupGone(t *testing.T, groupId int64) bool {
 	t.Helper()
-	group, err := database.GetGroupById(context.Background(), nil, groupId)
+	group, err := database.GetGroupByID(context.Background(), nil, groupId)
 	require.NoError(t, err)
 	return group == nil
 }
@@ -148,7 +148,7 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 			return fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userId)
 		},
 		body: func(f lastAdministratorFixture) any {
-			return map[string]any{"permissionIds": []int64{}, "expectedPermissionIds": []int64{f.manage}}
+			return map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{f.manage}}
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
 			return len(userPermissionIds(t, f.userId)) == 0
@@ -162,7 +162,7 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 			return fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupId)
 		},
 		body: func(f lastAdministratorFixture) any {
-			return map[string]any{"permissionIds": []int64{}, "expectedPermissionIds": []int64{f.manage}}
+			return map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{f.manage}}
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
 			return len(groupPermissionIds(t, f.groupId)) == 0
@@ -322,10 +322,10 @@ func TestLastAdministrator_ItCountsEnabledHoldersNotGrants(t *testing.T) {
 	t.Run("revoking the direct grant of a user who keeps manage through a group", func(t *testing.T) {
 		disableOtherAdministrators(t)
 		userId, _ := newAdministratorThroughGroup(t, manage)
-		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: userId, PermissionId: manage}))
+		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userId, PermissionID: manage}))
 
 		resp, _ := sendAdminRequest(t, manageToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", userId),
-			map[string]any{"permissionIds": []int64{}, "expectedPermissionIds": []int64{manage}})
+			map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{manage}})
 		respBody, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "they remain an administrator through the group: %s", respBody)

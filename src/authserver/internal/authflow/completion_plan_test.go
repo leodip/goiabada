@@ -112,7 +112,7 @@ func frozenShapeOf(t *testing.T, plan completionPlan) frozenCompletionPlan {
 // everyCompletionFacts is every combination of the completion facts: each of the seven booleans
 // both ways, against every target level and the empty one a client with no level would carry.
 func everyCompletionFacts() []completionFacts {
-	targets := []record.AcrLevel{"", record.AcrLevel1, record.AcrLevel2Optional, record.AcrLevel2Mandatory}
+	targets := []record.ACRLevel{"", record.ACRLevel1, record.ACRLevel2Optional, record.ACRLevel2Mandatory}
 	var all []completionFacts
 	for bits := 0; bits < 1<<7; bits++ {
 		for _, target := range targets {

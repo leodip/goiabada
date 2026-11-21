@@ -34,7 +34,7 @@ type revokeDatabase interface {
 	revocation.AccessTokenDatabase
 	liveness.Database
 	liveness.RefreshDatabase
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 }
 
 // revokeRequestParameters are every form parameter the revocation endpoint reads, and so every one
@@ -195,7 +195,7 @@ func (e revocationEndpoint) revokeAccessToken(w http.ResponseWriter, r *http.Req
 		return
 	}
 	// A live token's client_id has resolved to an enabled client: the token's owner.
-	if verdict.Client.Id != client.Id {
+	if verdict.Client.ID != client.ID {
 		e.refuseAnotherClientsToken(w, r, client, verdict.Client, revocation.TokenTypeAccessToken)
 		return
 	}
@@ -204,7 +204,7 @@ func (e revocationEndpoint) revokeAccessToken(w http.ResponseWriter, r *http.Req
 	// client's has none.
 	var userId int64
 	if verdict.User != nil {
-		userId = verdict.User.Id
+		userId = verdict.User.ID
 	}
 	grantId := token.StringClaim("grant_id")
 	if grantId == "" {
@@ -232,7 +232,7 @@ func (e revocationEndpoint) revokeByJti(w http.ResponseWriter, r *http.Request, 
 		e.invalid(w)
 		return
 	}
-	revocation.LogRevokedAccessToken(r.Context(), e.auditLogger, client.Id, userId, jti)
+	revocation.LogRevokedAccessToken(r.Context(), e.auditLogger, client.ID, userId, jti)
 	e.metrics.Count(revocationmetrics.Revoked)
 	w.WriteHeader(http.StatusOK)
 }
@@ -261,12 +261,12 @@ func (e revocationEndpoint) revokeRefreshToken(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if stored.ClientId != client.Id {
+	if stored.ClientId != client.ID {
 		// The refresh check reads no client, since the refresh grant answers only the token's own,
 		// which client authentication found enabled. Here the token's owner is another, so it is
 		// read: a token of a client disabled or deleted is not live (decision 6), and is answered as
 		// invalid rather than as another client's.
-		owner, err := e.database.GetClientById(ctx, nil, stored.ClientId)
+		owner, err := e.database.GetClientByID(ctx, nil, stored.ClientId)
 		if err != nil {
 			e.fault(w, r, err)
 			return
@@ -279,11 +279,11 @@ func (e revocationEndpoint) revokeRefreshToken(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if stored.Row.FirstRefreshTokenJti == "" {
-		e.fault(w, r, errs.Errorf("the refresh token %v has no family identifier", stored.Row.Id))
+	if stored.Row.FirstRefreshTokenJTI == "" {
+		e.fault(w, r, errs.Errorf("the refresh token %v has no family identifier", stored.Row.ID))
 		return
 	}
-	e.revokeGrant(w, r, client, stored.UserId, stored.Row.FirstRefreshTokenJti, revocation.TokenTypeRefreshToken)
+	e.revokeGrant(w, r, client, stored.UserId, stored.Row.FirstRefreshTokenJTI, revocation.TokenTypeRefreshToken)
 }
 
 // revokeGrant ends the grant, audits it once it committed, and answers 200 with an empty body.
@@ -295,7 +295,7 @@ func (e revocationEndpoint) revokeGrant(w http.ResponseWriter, r *http.Request, 
 		e.fault(w, r, err)
 		return
 	}
-	revocation.LogRevokedGrant(r.Context(), e.auditLogger, client.Id, userId, grantId, tokenType, result)
+	revocation.LogRevokedGrant(r.Context(), e.auditLogger, client.ID, userId, grantId, tokenType, result)
 	e.metrics.Count(revocationmetrics.Revoked)
 	w.WriteHeader(http.StatusOK)
 }
@@ -312,8 +312,8 @@ func (e revocationEndpoint) invalid(w http.ResponseWriter) {
 func (e revocationEndpoint) refuseAnotherClientsToken(w http.ResponseWriter, r *http.Request, client *record.Client,
 	owner *record.Client, tokenType string) {
 
-	if e.refusalAuditGate.First(strconv.FormatInt(owner.Id, 10)) {
-		revocation.LogTokenRevocationRefused(r.Context(), e.auditLogger, client.Id, owner.Id, tokenType)
+	if e.refusalAuditGate.First(strconv.FormatInt(owner.ID, 10)) {
+		revocation.LogTokenRevocationRefused(r.Context(), e.auditLogger, client.ID, owner.ID, tokenType)
 	}
 	e.refuse(w, r, errAnotherClientsToken)
 }

@@ -92,7 +92,7 @@ func TestAPIBrandPalette_BasicAndAdvancedStoredReadListedAndWrittenBack(t *testi
 			assert.Equal(t, map[string]any{"light": paletteJSON(paletteMidGrayLight), "dark": paletteJSON(paletteBlueberryDark)}, brand["colors"])
 			assert.Equal(t, paletteMidGrayWarnings, brand["contrastWarnings"])
 
-			stored, err := database.GetBrandById(ctx, nil, id)
+			stored, err := database.GetBrandByID(ctx, nil, id)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			assert.Equal(t, "custom", stored.Theme)
@@ -123,7 +123,7 @@ func TestAPIBrandPalette_BasicAndAdvancedStoredReadListedAndWrittenBack(t *testi
 			require.Equal(t, http.StatusOK, status, "write back: %v", body)
 			assert.Equal(t, []any{}, body["brand"].(map[string]any)["contrastWarnings"])
 			assert.Equal(t, read["palette"], body["brand"].(map[string]any)["palette"])
-			rewritten, err := database.GetBrandById(ctx, nil, id)
+			rewritten, err := database.GetBrandByID(ctx, nil, id)
 			require.NoError(t, err)
 			assert.Equal(t, stored.Palette, rewritten.Palette, "a palette read and written back is unchanged")
 
@@ -135,7 +135,7 @@ func TestAPIBrandPalette_BasicAndAdvancedStoredReadListedAndWrittenBack(t *testi
 			assert.Equal(t, "#a84d08", body["brand"].(map[string]any)["colors"].(map[string]any)["light"].(map[string]any)["focus"],
 				"a built-in theme answers its own colors")
 			assert.Equal(t, []any{}, body["brand"].(map[string]any)["contrastWarnings"])
-			dropped, err := database.GetBrandById(ctx, nil, id)
+			dropped, err := database.GetBrandByID(ctx, nil, id)
 			require.NoError(t, err)
 			assert.Equal(t, "tangerine", dropped.Theme)
 			assert.Nil(t, dropped.Palette)
@@ -203,7 +203,7 @@ func TestAPIBrandPalette_Refusals(t *testing.T) {
 		}
 	}
 
-	stored, err := database.GetBrandById(context.Background(), nil, other)
+	stored, err := database.GetBrandByID(context.Background(), nil, other)
 	require.NoError(t, err)
 	assert.Equal(t, "blueberry", stored.Theme, "no refused update wrote the brand")
 	assert.Nil(t, stored.Palette)

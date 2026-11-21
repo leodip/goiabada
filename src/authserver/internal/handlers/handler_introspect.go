@@ -26,8 +26,8 @@ import (
 type introspectDatabase interface {
 	liveness.Database
 	liveness.RefreshDatabase
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
-	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
 }
 
 // introspectRequestParameters are every form parameter the introspection endpoint reads, and so every
@@ -238,7 +238,7 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 // resources (decision 5). A resource identifier is compared exactly, as aud's StringOrURI values are
 // (RFC 7519 section 4.1.3).
 func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *record.Client, token oauth.JWTToken) (bool, error) {
-	links, err := e.database.GetClientIntrospectionResourcesByClientId(ctx, nil, client.Id)
+	links, err := e.database.GetClientIntrospectionResourcesByClientID(ctx, nil, client.ID)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to load the caller's introspection resources")
 	}
@@ -247,9 +247,9 @@ func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *reco
 	}
 	resourceIds := make([]int64, 0, len(links))
 	for _, link := range links {
-		resourceIds = append(resourceIds, link.ResourceId)
+		resourceIds = append(resourceIds, link.ResourceID)
 	}
-	resources, err := e.database.GetResourcesByIds(ctx, nil, resourceIds)
+	resources, err := e.database.GetResourcesByIDs(ctx, nil, resourceIds)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to load the caller's introspection resources")
 	}
@@ -280,7 +280,7 @@ func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *
 		e.fault(w, r, err)
 		return
 	}
-	if stored == nil || stored.ClientId != client.Id {
+	if stored == nil || stored.ClientId != client.ID {
 		e.inactive(w, r)
 		return
 	}

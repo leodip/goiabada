@@ -47,12 +47,12 @@ func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpTo
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(10)
@@ -65,7 +65,7 @@ func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpTo
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 
 	state := fake.LetterN(8)
 	httpClient := createHttpClient(t)
@@ -124,7 +124,7 @@ func (c *signedInUpToCompleted) loadCompleted(t *testing.T) (*http.Response, str
 func (c *signedInUpToCompleted) assertNothingWasBound(t *testing.T, adminToken, requestId string) {
 	t.Helper()
 
-	assert.Empty(t, sessionsThroughAdminAPI(t, adminToken, c.user.Id), "no session row is written")
+	assert.Empty(t, sessionsThroughAdminAPI(t, adminToken, c.user.ID), "no session row is written")
 	assert.Equal(t, c.browserSessionId, decodeSessionIdentifier(t, requireSessionCookie(t, c.httpClient)),
 		"the browser session is not rotated onto a user session")
 	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestId),
@@ -136,12 +136,12 @@ func (c *signedInUpToCompleted) assertNothingWasBound(t *testing.T, adminToken, 
 func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	signIn := signInUpToCompleted(t, "")
 
 	resp := makeAPIRequest(t, http.MethodPut, appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+
-		strconv.FormatInt(signIn.user.Id, 10)+"/enabled", adminToken, api.UpdateUserEnabledRequest{Enabled: false})
+		strconv.FormatInt(signIn.user.ID, 10)+"/enabled", adminToken, api.UpdateUserEnabledRequest{Enabled: false})
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
@@ -155,7 +155,7 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	assert.Equal(t, signIn.state, params.Get("state"))
 	assert.Empty(t, params.Get("code"))
 
-	assert.Equal(t, []map[string]any{{"user_id": float64(signIn.user.Id)}},
+	assert.Equal(t, []map[string]any{{"user_id": float64(signIn.user.ID)}},
 		auditRows(t, adminToken, "user_disabled", requestId), "the refusal is recorded, naming the user")
 	signIn.assertNothingWasBound(t, adminToken, requestId)
 }
@@ -168,7 +168,7 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 func TestAuthCompleted_AHintMismatchIsRefusedBeforeAnythingIsBound(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	tokens, hintCode, _, _ := userTokenResponseWithScope(t, "openid", nil)
 	idToken, ok := tokens["id_token"].(string)
@@ -198,13 +198,13 @@ func TestAuthCompleted_AHintMismatchIsRefusedBeforeAnythingIsBound(t *testing.T)
 func TestAuthCompleted_APasswordResetMidSignInRestartsTheSignIn(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	signIn := signInUpToCompleted(t, "")
 
 	newPassword := "newSecurePassword123!" + fake.LetterN(4)
 	resp := makeAPIRequest(t, http.MethodPut, appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+
-		strconv.FormatInt(signIn.user.Id, 10)+"/password", adminToken, api.UpdateUserPasswordRequest{NewPassword: newPassword})
+		strconv.FormatInt(signIn.user.ID, 10)+"/password", adminToken, api.UpdateUserPasswordRequest{NewPassword: newPassword})
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
@@ -233,6 +233,6 @@ func TestAuthCompleted_APasswordResetMidSignInRestartsTheSignIn(t *testing.T) {
 	_ = next.Body.Close()
 	assertRedirect(t, next, "/auth/consent")
 
-	assert.Len(t, sessionsThroughAdminAPI(t, adminToken, signIn.user.Id), 1,
+	assert.Len(t, sessionsThroughAdminAPI(t, adminToken, signIn.user.ID), 1,
 		"the second pass binds the one session")
 }

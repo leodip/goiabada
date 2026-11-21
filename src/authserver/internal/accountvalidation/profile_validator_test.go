@@ -371,7 +371,7 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 
 			// The format check runs after the uniqueness lookups, so both are
 			// always reached when a username is present.
-			user := &record.User{Id: 1, Subject: subject}
+			user := &record.User{ID: 1, Subject: subject}
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
 			mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, tc.username).Return(nil, nil).Once()
 
@@ -397,9 +397,9 @@ func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
 	otherSubject := fake.UUID()
 
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-		&record.User{Id: 1, Subject: subject}, nil).Once()
+		&record.User{ID: 1, Subject: subject}, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(
-		&record.User{Id: 2, Subject: otherSubject}, nil).Once()
+		&record.User{ID: 2, Subject: otherSubject}, nil).Once()
 
 	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		Username: "jdoe",
@@ -416,7 +416,7 @@ func TestValidateProfile_UsernameOwnedBySameUserIsAllowed(t *testing.T) {
 	validator := NewProfileValidator(mockDB)
 
 	subject := fake.UUID()
-	user := &record.User{Id: 1, Subject: subject}
+	user := &record.User{ID: 1, Subject: subject}
 
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(user, nil).Once()
@@ -455,7 +455,7 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 		validator := NewProfileValidator(mockDB)
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
-			&record.User{Id: 1, Subject: subject}, nil).Once()
+			&record.User{ID: 1, Subject: subject}, nil).Once()
 		mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(nil, dbErr).Once()
 
 		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
@@ -1026,7 +1026,7 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 	validator := NewProfileValidator(mockDB)
 
 	subject := fake.UUID()
-	user := &record.User{Id: 1, Subject: subject}
+	user := &record.User{ID: 1, Subject: subject}
 
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
 	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(user, nil).Once()

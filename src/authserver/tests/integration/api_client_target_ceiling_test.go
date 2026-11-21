@@ -62,18 +62,18 @@ type clientTargetCeilingRoute struct {
 
 func storedClient(t *testing.T, clientId int64) *record.Client {
 	t.Helper()
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	return client
 }
 
 func clientPermissionIds(t *testing.T, clientId int64) []int64 {
 	t.Helper()
-	rows, err := database.GetClientPermissionsByClientId(context.Background(), nil, clientId)
+	rows, err := database.GetClientPermissionsByClientID(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
-		ids = append(ids, row.PermissionId)
+		ids = append(ids, row.PermissionID)
 	}
 	return ids
 }
@@ -113,7 +113,7 @@ func sendClientLogo(t *testing.T, accessToken string, clientId int64) (*http.Res
 func keepClientLogoOff(t *testing.T, f *clientTargetFixture) {
 	t.Helper()
 	require.NoError(t, database.CreateClientLogo(context.Background(), nil,
-		&record.ClientLogo{ClientId: f.clientId, Logo: createTestPNGImage(32, 32), ContentType: "image/png"}))
+		&record.ClientLogo{ClientID: f.clientId, Logo: createTestPNGImage(32, 32), ContentType: "image/png"}))
 	t.Cleanup(func() { _ = database.DeleteClientLogo(context.Background(), nil, f.clientId) })
 }
 
@@ -225,7 +225,7 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		// Giving the client a brand of its own (#812 decision 2): the brand is made for the test.
 		name: "PUT clients brand", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/brand",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
-			f.before = strconv.FormatInt(newBrandInStore(t, "Target").Id, 10)
+			f.before = strconv.FormatInt(newBrandInStore(t, "Target").ID, 10)
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
 			brandId, err := strconv.ParseInt(f.before, 10, 64)
@@ -281,7 +281,7 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
 			current := clientPermissionIds(t, f.clientId)
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/permissions", f.clientId),
-				map[string]any{"permissionIds": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
 			for _, id := range clientPermissionIds(t, f.clientId) {
@@ -363,15 +363,15 @@ func newTargetClient(t *testing.T, permissionIds ...int64) *clientTargetFixture 
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
 		ClientSecretEncrypted:    secret,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	for _, permissionId := range permissionIds {
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-			&record.ClientPermission{ClientId: client.Id, PermissionId: permissionId}))
+			&record.ClientPermission{ClientID: client.ID, PermissionID: permissionId}))
 	}
-	return &clientTargetFixture{clientId: client.Id, identifier: client.ClientIdentifier}
+	return &clientTargetFixture{clientId: client.ID, identifier: client.ClientIdentifier}
 }
 
 // consoleClient is the admin console's own client, as seeded.
@@ -380,7 +380,7 @@ func consoleClient(t *testing.T) *clientTargetFixture {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	return &clientTargetFixture{clientId: client.Id, identifier: client.ClientIdentifier}
+	return &clientTargetFixture{clientId: client.ID, identifier: client.ClientIdentifier}
 }
 
 // assertClientRefusedByTheTargetCeiling holds one answered request to decision 4's refusal and
@@ -396,7 +396,7 @@ func TestClientTargetCeiling_AGranularTokenCannotWriteToAnAdministratorClient(t 
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for i, route := range clientTargetCeilingRoutes {
@@ -422,7 +422,7 @@ func TestClientTargetCeiling_AGranularTokenCannotWriteToTheAdminConsolesOwnClien
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for _, route := range clientTargetCeilingRoutes {
@@ -447,7 +447,7 @@ func TestClientTargetCeiling_AGranularTokenStillWritesToOrdinaryClients(t *testi
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 	other := ordinaryPermission(t)
 

@@ -18,7 +18,7 @@ type legalDocumentsOwed interface {
 
 // consentReader reads the user's stored consent to a client.
 type consentReader interface {
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 }
 
 // routeBoundCeremony decides where a ceremony bound to a session goes (decideAfterBinding), loading
@@ -47,7 +47,7 @@ func routeBoundCeremony(ctx context.Context, database consentReader, scopes scop
 			scope := authContext.Scope
 			facts.EffectiveScope = &scope
 		case afterBindingFactConsent:
-			consent, err := database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
+			consent, err := database.GetConsentByUserIDAndClientID(ctx, nil, user.ID, client.ID)
 			if err != nil {
 				return afterBindingUndecided, err
 			}

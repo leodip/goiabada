@@ -26,7 +26,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false, // Consent NOT normally required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -62,8 +62,8 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 
 	// Create consent for all scopes
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -185,8 +185,8 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 
 	// Create consent for all scopes
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -322,7 +322,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=login" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -414,7 +414,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -422,7 +422,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -620,7 +620,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -631,7 +631,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)

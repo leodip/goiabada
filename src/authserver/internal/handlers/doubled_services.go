@@ -64,7 +64,7 @@ type UserSessionManager interface {
 	// its ACR and adds its methods, never lowering either (#537). A non-empty ipAddress replaces the
 	// session's recorded address; empty leaves it.
 	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
+		authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error)
 	// BindUserSession is BumpUserSession for a completed sign-in: under the session's row lock, it
 	// checks the sign-in's one-time code claim on the user, raises the session or, with replace,
 	// writes the sign-in's authentication over it, and sets its auth_time (#542).

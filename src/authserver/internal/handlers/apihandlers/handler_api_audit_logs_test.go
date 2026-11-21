@@ -47,15 +47,15 @@ func TestHandleAuditLogsGet_TheUserFilterReachesTheReadWithTheOthers(t *testing.
 		query string
 		want  record.AuditLogFilter
 	}{
-		{"the user alone", "userId=42", record.AuditLogFilter{UserId: 42}},
+		{"the user alone", "userId=42", record.AuditLogFilter{UserID: 42}},
 		{"the user and the event", "userId=42&auditEvent=user_login",
-			record.AuditLogFilter{AuditEvent: "user_login", UserId: 42}},
+			record.AuditLogFilter{AuditEvent: "user_login", UserID: 42}},
 		{"the user and the request id", "userId=7&requestId=host/abc-000001",
-			record.AuditLogFilter{RequestId: "host/abc-000001", UserId: 7}},
+			record.AuditLogFilter{RequestID: "host/abc-000001", UserID: 7}},
 		{"all three", "userId=7&auditEvent=user_login&requestId=host/abc-000001",
-			record.AuditLogFilter{AuditEvent: "user_login", RequestId: "host/abc-000001", UserId: 7}},
+			record.AuditLogFilter{AuditEvent: "user_login", RequestID: "host/abc-000001", UserID: 7}},
 		{"the largest id", "userId=9223372036854775807",
-			record.AuditLogFilter{UserId: 9223372036854775807}},
+			record.AuditLogFilter{UserID: 9223372036854775807}},
 		{"no user", "auditEvent=user_login", record.AuditLogFilter{AuditEvent: "user_login"}},
 	}
 
@@ -104,14 +104,14 @@ func TestHandleAuditLogsGet_EveryEntryAnswersItsUserColumns(t *testing.T) {
 	database := &auditLogsPage{
 		total: 4,
 		rows: []record.AuditLog{
-			{Id: 4, CreatedAt: created, AuditEvent: "updated_user_details", Details: "{}",
-				UserId:         sql.NullInt64{Int64: 42, Valid: true},
-				LoggedInUserId: sql.NullInt64{Int64: 7, Valid: true}},
-			{Id: 3, CreatedAt: created, AuditEvent: "user_login", Details: "{}",
-				UserId: sql.NullInt64{Int64: 42, Valid: true}},
-			{Id: 2, CreatedAt: created, AuditEvent: "updated_settings", Details: "{}",
-				LoggedInUserId: sql.NullInt64{Int64: 7, Valid: true}},
-			{Id: 1, CreatedAt: created, AuditEvent: "updated_settings", Details: "{}"},
+			{ID: 4, CreatedAt: created, AuditEvent: "updated_user_details", Details: "{}",
+				UserID:         sql.NullInt64{Int64: 42, Valid: true},
+				LoggedInUserID: sql.NullInt64{Int64: 7, Valid: true}},
+			{ID: 3, CreatedAt: created, AuditEvent: "user_login", Details: "{}",
+				UserID: sql.NullInt64{Int64: 42, Valid: true}},
+			{ID: 2, CreatedAt: created, AuditEvent: "updated_settings", Details: "{}",
+				LoggedInUserID: sql.NullInt64{Int64: 7, Valid: true}},
+			{ID: 1, CreatedAt: created, AuditEvent: "updated_settings", Details: "{}"},
 		},
 	}
 

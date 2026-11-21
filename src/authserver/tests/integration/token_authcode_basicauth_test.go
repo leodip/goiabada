@@ -37,7 +37,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 	assert.NotNil(t, data["id_token"])
 
 	// Verify that the code has been marked as used
-	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
+	usedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }

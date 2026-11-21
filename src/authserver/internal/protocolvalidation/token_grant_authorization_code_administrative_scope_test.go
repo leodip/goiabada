@@ -45,7 +45,7 @@ func newCodeGrantRedemption(t *testing.T, grant codeGrant, registered bool) (*To
 	require.NoError(t, err)
 
 	client := &record.Client{
-		Id:                          1,
+		ID:                          1,
 		ClientIdentifier:            grant.clientIdentifier,
 		Enabled:                     true,
 		AuthorizationCodeEnabled:    true,
@@ -58,9 +58,9 @@ func newCodeGrantRedemption(t *testing.T, grant codeGrant, registered bool) (*To
 		RedirectURI: redirectURI,
 		Scope:       grant.scope,
 		Revoked:     grant.revoked,
-		UserId:      7,
+		UserID:      7,
 		Client:      record.Client{ClientIdentifier: grant.clientIdentifier},
-		User:        record.User{Id: 7, Enabled: true},
+		User:        record.User{ID: 7, Enabled: true},
 		CreatedAt:   sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 
@@ -148,7 +148,7 @@ func TestValidateTokenRequest_AuthorizationCode_AdministrativeScope(t *testing.T
 			var refused *AdministrativeScopeRefusedError
 			require.ErrorAs(t, err, &refused)
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
-			assert.Equal(t, int64(1), refused.Client.Id)
+			assert.Equal(t, int64(1), refused.Client.ID)
 			assert.Equal(t, "client1", refused.Client.ClientIdentifier)
 			assert.Equal(t, int64(7), refused.UserId)
 

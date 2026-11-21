@@ -12,7 +12,7 @@ package record
 // U+1E9E and U+212A unchanged at the collation 000040 installs. So the row has to arrive carrying
 // both forms, and the comparison happens in Go where it is one rule on four engines (#351).
 type EmailCaseRow struct {
-	Id int64
+	ID int64
 	// Email is the address exactly as stored.
 	Email string
 	// EngineLowered is LOWER(email) as THIS engine computed it, which is what migration 000047's

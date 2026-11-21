@@ -41,9 +41,9 @@ func TestAPIUserDelete_TellsTheUserAnAdministratorDeletedTheirAccount(t *testing
 		t.Run(tc.locale, func(t *testing.T) {
 			user := adminNoticeUser(t, tc.locale, "the-hash")
 
-			deleteUserAsAdministrator(t, accessToken, user.Id)
+			deleteUserAsAdministrator(t, accessToken, user.ID)
 
-			deleted, err := database.GetUserById(context.Background(), nil, user.Id)
+			deleted, err := database.GetUserByID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			assert.Nil(t, deleted, "the user's row is gone")
 			messages := awaitMailTo(t, user.Email)
@@ -68,8 +68,8 @@ func TestAPIUserDelete_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
 	require.NoError(t, database.UpdateUser(context.Background(), nil, unverified))
 	verified := adminNoticeUser(t, "en", "the-hash")
 
-	deleteUserAsAdministrator(t, accessToken, unverified.Id)
-	deleteUserAsAdministrator(t, accessToken, verified.Id)
+	deleteUserAsAdministrator(t, accessToken, unverified.ID)
+	deleteUserAsAdministrator(t, accessToken, verified.ID)
 
 	require.Len(t, awaitMailWithSubject(t, verified.Email, adminDeletedSubjectEn, 1), 1,
 		"the verified user is told, so mail was on")

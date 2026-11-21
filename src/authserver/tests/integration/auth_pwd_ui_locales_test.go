@@ -27,11 +27,11 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
@@ -64,11 +64,11 @@ func TestAuthPwd_UILocales_EnglishSaysSignIn(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)

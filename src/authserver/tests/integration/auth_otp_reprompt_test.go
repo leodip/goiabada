@@ -112,7 +112,7 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The authenticator changes somewhere else, so every session of this user owes a re-prompt.
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOtpConfigGeneration(t, user.ID)
 
 	// Ceremony two reaches the OTP form and is abandoned there. Nothing is submitted.
 	where, page, _ := authorizeOnExistingSession(t, httpClient, client, redirectUri)
@@ -129,7 +129,7 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 }
 
 // TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt is the other side of the same
-// boundary, and it is what the plan review forced IncrementUserOtpConfigGeneration to return its
+// boundary, and it is what the plan review forced IncrementUserOTPConfigGeneration to return its
 // value for.
 //
 // A ceremony that enrolls an authenticator answers the level 2 question by MOVING the counter:
@@ -159,7 +159,7 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
+	enrolled, err := database.GetUserByID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,19 +203,19 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// An administrator turns the authenticator off.
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
 	// Ceremony two, at a level 2 optional client: no authenticator, so no code, straight through.
 	optionalClient := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	if err := database.CreateClient(context.Background(), nil, optionalClient); err != nil {
 		t.Fatal(err)
 	}
-	optionalRedirectUri := &record.RedirectURI{ClientId: optionalClient.Id, URI: fake.URL()}
+	optionalRedirectUri := &record.RedirectURI{ClientID: optionalClient.ID, URI: fake.URL()}
 	if err := database.CreateRedirectURI(context.Background(), nil, optionalRedirectUri); err != nil {
 		t.Fatal(err)
 	}

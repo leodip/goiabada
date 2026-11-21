@@ -161,7 +161,7 @@ func createAdminClientWithTokenAndSecret(t *testing.T) (string, *record.Client, 
 	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authServerResource.ID)
 	require.NoError(t, err)
 
 	var adminPermission *record.Permission
@@ -175,8 +175,8 @@ func createAdminClientWithTokenAndSecret(t *testing.T) (string, *record.Client, 
 
 	// Assign admin permission to client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: adminPermission.Id,
+		ClientID:     client.ID,
+		PermissionID: adminPermission.ID,
 	})
 	require.NoError(t, err)
 

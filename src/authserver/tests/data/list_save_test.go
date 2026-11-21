@@ -85,20 +85,20 @@ func createRedirectClient(t *testing.T, uris ...string) *record.Client {
 		AuthorizationCodeEnabled: true,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	for _, uri := range uris {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-			&record.RedirectURI{ClientId: client.Id, URI: uri}))
+			&record.RedirectURI{ClientID: client.ID, URI: uri}))
 	}
 	return client
 }
 
 // saveRedirectURIs serves one save through the real handler against db, with no router.
-func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.AuditLogger, clientId int64,
+func saveRedirectURIs(t *testing.T, db data.Database, auditLogger apihandlers.AuditLogger, clientID int64,
 	wanted, expected []string) *httptest.ResponseRecorder {
 
 	t.Helper()
-	return serveRedirectURIsSave(db, auditLogger, clientId, redirectURIsSaveBody(t, wanted, expected))
+	return serveRedirectURIsSave(db, auditLogger, clientID, redirectURIsSaveBody(t, wanted, expected))
 }
 
 // redirectURIsSaveBody encodes one save's request body.
@@ -112,12 +112,12 @@ func redirectURIsSaveBody(t *testing.T, wanted, expected []string) []byte {
 // serveRedirectURIsSave serves one encoded save through the real handler against db, with no
 // router. It takes no *testing.T, so a worker goroutine can call it: require stops a test only
 // from the test's own goroutine, so the body is encoded and checked there first.
-func serveRedirectURIsSave(db data.Database, auditLogger apihandlers.AuditLogger, clientId int64, body []byte) *httptest.ResponseRecorder {
-	id := strconv.FormatInt(clientId, 10)
+func serveRedirectURIsSave(db data.Database, auditLogger apihandlers.AuditLogger, clientID int64, body []byte) *httptest.ResponseRecorder {
+	id := strconv.FormatInt(clientID, 10)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.SetPathValue("id", id)
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1})
 
 	rr := httptest.NewRecorder()
 	apihandlers.HandleClientRedirectURIsPut(db, auditLogger).ServeHTTP(rr, req.WithContext(ctx))
@@ -125,9 +125,9 @@ func serveRedirectURIsSave(db data.Database, auditLogger apihandlers.AuditLogger
 }
 
 // storedRedirectURIs reads the client's rows back, one entry per row, so a duplicate shows twice.
-func storedRedirectURIs(t *testing.T, clientId int64) []string {
+func storedRedirectURIs(t *testing.T, clientID int64) []string {
 	t.Helper()
-	rows, err := database.GetRedirectURIsByClientId(context.Background(), nil, clientId)
+	rows, err := database.GetRedirectURIsByClientID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	uris := make([]string, 0, len(rows))
 	for _, row := range rows {
@@ -143,13 +143,13 @@ func TestRedirectURISave_AnInsertFailingAfterTheDeleteLeavesTheStoredListAsItWas
 	client := createRedirectClient(t, "https://a.example.com/cb", "https://b.example.com/cb")
 	auditLogger := &countingAuditLogger{}
 
-	rr := saveRedirectURIs(t, redirectURIInsertRefused{Database: database}, auditLogger, client.Id,
+	rr := saveRedirectURIs(t, redirectURIInsertRefused{Database: database}, auditLogger, client.ID,
 		[]string{"https://a.example.com/cb", "https://c.example.com/cb"},
 		[]string{"https://a.example.com/cb", "https://b.example.com/cb"})
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 	assert.ElementsMatch(t, []string{"https://a.example.com/cb", "https://b.example.com/cb"},
-		storedRedirectURIs(t, client.Id), "the delete of b was rolled back with the refused insert of c")
+		storedRedirectURIs(t, client.ID), "the delete of b was rolled back with the refused insert of c")
 	assert.Zero(t, auditLogger.count(), "a save that committed nothing audits nothing")
 }
 
@@ -181,31 +181,31 @@ func TestRedirectURISave_TwoOverlappingSavesMergePerItemAndAnOutdatedListIsRefus
 	firstBody := redirectURIsSaveBody(t, []string{a, x, z}, loaded)
 	go func() {
 		first <- serveRedirectURIsSave(pausedAfterRedirectURIRead{Database: database, b: b}, auditLogger,
-			client.Id, firstBody)
+			client.ID, firstBody)
 	}()
 	b.awaitParked(t)
 
-	second := saveRedirectURIs(t, database, auditLogger, client.Id, []string{a, y, z}, loaded)
+	second := saveRedirectURIs(t, database, auditLogger, client.ID, []string{a, y, z}, loaded)
 	require.Equal(t, http.StatusOK, second.Code, "the second save waited on nothing: %s", second.Body.String())
 
 	b.releaseParked()
 	firstRR := awaitWorker(t, "the first redirect URI save", first)
 	require.Equal(t, http.StatusOK, firstRR.Code, firstRR.Body.String())
 
-	merged := storedRedirectURIs(t, client.Id)
+	merged := storedRedirectURIs(t, client.ID)
 	assert.ElementsMatch(t, []string{a, x, y, z, z}, merged,
 		"each save's own additions survive, and the URI both added is stored once per save")
 	assert.Equal(t, 2, auditLogger.count(), "each committed save audits once")
 
-	collapse := saveRedirectURIs(t, database, auditLogger, client.Id, []string{a, x, y, z}, merged)
+	collapse := saveRedirectURIs(t, database, auditLogger, client.ID, []string{a, x, y, z}, merged)
 	require.Equal(t, http.StatusOK, collapse.Code, collapse.Body.String())
-	assert.ElementsMatch(t, []string{a, x, y, z}, storedRedirectURIs(t, client.Id),
+	assert.ElementsMatch(t, []string{a, x, y, z}, storedRedirectURIs(t, client.ID),
 		"the following save removed the duplicate row and kept one copy")
 
-	outdated := saveRedirectURIs(t, database, auditLogger, client.Id, []string{a}, loaded)
+	outdated := saveRedirectURIs(t, database, auditLogger, client.ID, []string{a}, loaded)
 	assert.Equal(t, http.StatusConflict, outdated.Code, outdated.Body.String())
 	assert.Contains(t, outdated.Body.String(), "CONCURRENT_UPDATE")
-	assert.ElementsMatch(t, []string{a, x, y, z}, storedRedirectURIs(t, client.Id),
+	assert.ElementsMatch(t, []string{a, x, y, z}, storedRedirectURIs(t, client.ID),
 		"the save from the outdated list removed nothing")
 	assert.Equal(t, 3, auditLogger.count(), "the refused save audited nothing")
 }

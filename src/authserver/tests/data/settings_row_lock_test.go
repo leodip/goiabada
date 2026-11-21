@@ -18,8 +18,8 @@ func TestAcquireSettingsRow(t *testing.T) {
 	settings := createTestSettings(t)
 
 	tx := beginTx(t)
-	require.NoError(t, database.AcquireSettingsRow(context.Background(), tx, settings.Id))
-	held, err := database.GetSettingsById(context.Background(), tx, settings.Id)
+	require.NoError(t, database.AcquireSettingsRow(context.Background(), tx, settings.ID))
+	held, err := database.GetSettingsByID(context.Background(), tx, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, held, "the row vanished inside the transaction that acquired it")
 	assert.Equal(t, settings.AppName, held.AppName, "acquiring the row changed it")
@@ -30,7 +30,7 @@ func TestAcquireSettingsRow(t *testing.T) {
 	// A row that is not there is not an error: there is nothing to hold, and the read that follows
 	// decides whether it exists, as with AcquireClientRow.
 	tx = beginTx(t)
-	require.NoError(t, database.AcquireSettingsRow(context.Background(), tx, settings.Id+1_000_000))
+	require.NoError(t, database.AcquireSettingsRow(context.Background(), tx, settings.ID+1_000_000))
 	_ = database.RollbackTransaction(context.Background(), tx)
 
 	tx = beginTx(t)
@@ -39,18 +39,18 @@ func TestAcquireSettingsRow(t *testing.T) {
 
 	// Without a transaction the statement autocommits and releases the row before the caller can
 	// read it, which is the whole of what this buys. Refused rather than silently degraded.
-	require.Error(t, database.AcquireSettingsRow(context.Background(), nil, settings.Id),
+	require.Error(t, database.AcquireSettingsRow(context.Background(), nil, settings.ID),
 		"acquiring the row without a transaction")
 }
 
 // saveSettingsSectionUnderTheLock is the shape every settings section's save writes in: the row
 // taken, read again on the transaction, the section applied onto what was read, and written.
-func saveSettingsSectionUnderTheLock(ctx context.Context, tx *sql.Tx, settingsId int64,
+func saveSettingsSectionUnderTheLock(ctx context.Context, tx *sql.Tx, settingsID int64,
 	apply func(stored *record.Settings)) error {
-	if err := database.AcquireSettingsRow(ctx, tx, settingsId); err != nil {
+	if err := database.AcquireSettingsRow(ctx, tx, settingsID); err != nil {
 		return err
 	}
-	stored, err := database.GetSettingsById(ctx, tx, settingsId)
+	stored, err := database.GetSettingsByID(ctx, tx, settingsID)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func TestAcquireSettingsRow_ASaveUnderTheLockKeepsAConcurrentSaveOfAnotherSectio
 
 	// The other save, of the token settings, holding the row uncommitted.
 	other := beginTx(t)
-	require.NoError(t, saveSettingsSectionUnderTheLock(context.Background(), other, settings.Id, func(stored *record.Settings) {
+	require.NoError(t, saveSettingsSectionUnderTheLock(context.Background(), other, settings.ID, func(stored *record.Settings) {
 		stored.TokenExpirationInSeconds = settings.TokenExpirationInSeconds + 7
 	}))
 
@@ -79,7 +79,7 @@ func TestAcquireSettingsRow_ASaveUnderTheLockKeepsAConcurrentSaveOfAnotherSectio
 	done := make(chan error, 1)
 	go func() {
 		done <- database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			return saveSettingsSectionUnderTheLock(context.Background(), tx, settings.Id, func(stored *record.Settings) {
+			return saveSettingsSectionUnderTheLock(context.Background(), tx, settings.ID, func(stored *record.Settings) {
 				stored.AppName = "Saved under the lock"
 			})
 		})
@@ -101,7 +101,7 @@ func TestAcquireSettingsRow_ASaveUnderTheLockKeepsAConcurrentSaveOfAnotherSectio
 		t.Fatal("the save never returned after the other save committed")
 	}
 
-	stored, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	stored, err := database.GetSettingsByID(context.Background(), nil, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, "Saved under the lock", stored.AppName, "this save was lost")

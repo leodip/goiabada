@@ -50,7 +50,7 @@ func newManageAccountGrant(t *testing.T, scope string) *manageAccountGrant {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 	require.False(t, code.Client.ConsentRequired, "the fixture's client has Consent required off")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.ID) })
 
 	tokens := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
@@ -79,7 +79,7 @@ func (g *manageAccountGrant) refresh(t *testing.T, scope string) (int, map[strin
 // storedConsent is the user's stored consent to the grant's client, which the fixture created.
 func (g *manageAccountGrant) storedConsent(t *testing.T) *record.UserConsent {
 	t.Helper()
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, g.code.UserId, g.code.Client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, g.code.UserID, g.code.Client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, consent, "the fixture stores a consent covering the scope")
 	return consent
@@ -91,7 +91,7 @@ func (g *manageAccountGrant) storedConsent(t *testing.T) *record.UserConsent {
 // TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens holds.
 func (g *manageAccountGrant) withdrawConsent(t *testing.T) {
 	t.Helper()
-	deleteConsentRowAlone(t, g.storedConsent(t).Id)
+	deleteConsentRowAlone(t, g.storedConsent(t).ID)
 }
 
 // assertManageAccountRefreshRefused holds a refresh's answer to invalid_grant with description, and
@@ -183,10 +183,10 @@ func TestToken_ManageAccount_AnOfflineRefreshWithTheConsentRowGone(t *testing.T)
 	require.Equal(t, http.StatusOK, status, "a consented offline grant refreshes: %v", body)
 	refreshToken = body["refresh_token"].(string)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, f.user.ID, f.client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, consent)
-	deleteConsentRowAlone(t, consent.Id)
+	deleteConsentRowAlone(t, consent.ID)
 
 	status, body = refreshWithScope(t, f.browser, f.client.ClientIdentifier, f.clientSecret, refreshToken, "")
 	assertManageAccountRefreshRefused(t, status, body, refreshNoConsent)
@@ -199,22 +199,22 @@ func TestToken_ManageAccount_APasswordGrantRefreshTokenIsNotAsked(t *testing.T) 
 
 	clientSecret := fake.Password(32)
 	client := createROPCClient(t, clientSecret, false)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
 
 	status, tokens := passwordGrant(t, client, clientSecret, user, password, "openid authserver:manage-account")
 	require.Equal(t, http.StatusOK, status, "the password grant issues manage-account: %v", tokens)
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "the password grant yields a refresh token: %v", tokens)
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	require.NoError(t, err)
 	require.Nil(t, consent, "no consent is stored")
 
@@ -258,15 +258,15 @@ func TestToken_ManageAccount_AReplayIsContainedWhateverTheConsent(t *testing.T) 
 			parent, ok := tokens["refresh_token"].(string)
 			require.True(t, ok, "the public client's code grants a refresh token")
 			child := rotateRefreshToken(t, f.browser, f.client.ClientIdentifier, "", parent)
-			first := refreshTokenRowByJti(t, parent).FirstRefreshTokenJti
+			first := refreshTokenRowByJti(t, parent).FirstRefreshTokenJTI
 			require.False(t, refreshTokenRowByJti(t, child).Revoked)
 
-			consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
+			consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, f.user.ID, f.client.ID)
 			require.NoError(t, err)
 			require.NotNil(t, consent)
 			switch change {
 			case "consent withdrawn":
-				deleteConsentRowAlone(t, consent.Id)
+				deleteConsentRowAlone(t, consent.ID)
 			case "consent leaves manage-account out":
 				consent.Scope = "openid profile"
 				require.NoError(t, database.UpdateUserConsent(context.Background(), nil, consent))

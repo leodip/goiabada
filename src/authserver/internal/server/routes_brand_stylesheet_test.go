@@ -27,7 +27,7 @@ import (
 // two safe ones (#816 decision 3).
 func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.Corners = record.BrandCornersPill
 	for _, stylesheet := range []struct {
 		name string
@@ -45,7 +45,7 @@ func TestRegisterRoutes_TheBrandStylesheetCarriesNoBrowserSession(t *testing.T) 
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			t.Run(stylesheet.name+" "+method, func(t *testing.T) {
 				database := datamocks.NewDatabase(t)
-				database.On("GetBrandById", mock.Anything, mock.Anything, int64(7)).Return(&brand, nil).Once()
+				database.On("GetBrandByID", mock.Anything, mock.Anything, int64(7)).Return(&brand, nil).Once()
 				s := newRoutingTestServer(t, database)
 
 				seed := httptest.NewRequest(http.MethodGet, "/", nil)

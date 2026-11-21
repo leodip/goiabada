@@ -82,7 +82,7 @@ func TestDPoPResources_AHandlersSessionRefusalSpendsTheProof(t *testing.T) {
 	const path = "/api/v1/account/logout-request"
 	const redirect = "https://client.example.com/dpop-signed-out"
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientId: u.client.Id, URI: redirect}))
+		&record.PostLogoutRedirectURI{ClientID: u.client.ID, URI: redirect}))
 	proof := key.ResourceProof(t, http.MethodPost, resourceURL(path), time.Now(), token)
 
 	refused := sendJSONWithProof(t, http.MethodPost, path, token, proof, api.AccountLogoutRequest{

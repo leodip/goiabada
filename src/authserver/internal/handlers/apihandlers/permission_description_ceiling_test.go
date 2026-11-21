@@ -29,9 +29,9 @@ import (
 func descriptionCeilingStored() []record.Permission {
 	stored := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers())+1)
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		stored = append(stored, record.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		stored = append(stored, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
 	}
-	return append(stored, record.Permission{Id: 60, ResourceId: resourcePermsId, PermissionIdentifier: "reports", Description: "Reports"})
+	return append(stored, record.Permission{ID: 60, ResourceID: resourcePermsId, PermissionIdentifier: "reports", Description: "Reports"})
 }
 
 // descriptionCeilingIdOf is the stored id of the permission identified so.
@@ -39,7 +39,7 @@ func descriptionCeilingIdOf(t *testing.T, stored []record.Permission, identifier
 	t.Helper()
 	for _, p := range stored {
 		if p.PermissionIdentifier == identifier {
-			return p.Id
+			return p.ID
 		}
 	}
 	t.Fatalf("no stored permission %q", identifier)
@@ -220,7 +220,7 @@ func TestPermissionDescriptionCeiling_WhatItDoesNotReachSaves(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			require.NoError(t, stub.BodyErr)
 			require.Len(t, updated, 1)
-			assert.Equal(t, descriptionCeilingIdOf(t, stored, c.identifier), updated[0].Id)
+			assert.Equal(t, descriptionCeilingIdOf(t, stored, c.identifier), updated[0].ID)
 			assert.Equal(t, "Re-described", updated[0].Description)
 			require.Len(t, *records, 1)
 			assert.Equal(t, "updated_resource_permissions", (*records)[0].event)

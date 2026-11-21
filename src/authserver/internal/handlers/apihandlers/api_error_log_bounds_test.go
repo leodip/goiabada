@@ -78,7 +78,7 @@ func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: rawEvent, RequestId: rawRequestId}).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: rawEvent, RequestID: rawRequestId}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
@@ -135,7 +135,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	const filterId = "goiabada/abc123-7"
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: event, RequestId: filterId}).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: event, RequestID: filterId}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
@@ -161,7 +161,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 // the first error record and into the annotation branch.
 func searchThatSucceeds(database *datamocks.Database, rawQuery string) {
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
-		Return([]record.User{{Id: 42}}, 1, nil)
+		Return([]record.User{{ID: 42}}, 1, nil)
 }
 
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
@@ -169,7 +169,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t
 
 	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).
+	database.On("GetGroupByID", mock.Anything, mock.Anything, int64(7)).
 		Return(nil, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
@@ -194,7 +194,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t 
 
 	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{Id: 7}, nil)
+	database.On("GetGroupByID", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{ID: 7}, nil)
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 

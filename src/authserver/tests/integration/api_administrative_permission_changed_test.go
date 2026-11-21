@@ -55,7 +55,7 @@ func administrativeChangeRows(t *testing.T, readerToken, requestId string) []map
 func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePermissionIsRecorded(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	for _, target := range grantCeilingTargets {
 		t.Run(target.kind, func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestAdministrativePermissionChanged_GrantingAndRevokingAnAdministrativePerm
 func TestAdministrativePermissionChanged_TheSavesOwnRowsAreStillWritten(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	ownEvent := map[string]string{
 		"user":   "added_user_permission",
@@ -130,28 +130,28 @@ func TestAdministrativePermissionChanged_TheSavesOwnRowsAreStillWritten(t *testi
 func TestAdministrativePermissionChanged_AnOrdinaryChangeIsNotRecorded(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	authServer, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	custom := createTestPermission(t, authServer.Id, "alert-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.Id) })
+	custom := createTestPermission(t, authServer.ID, "alert-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.ID) })
 	manageAccount := authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)
 
 	for _, target := range grantCeilingTargets {
 		granularToken, caller := createClientWithGranularScope(t, target.granularScope)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 		for _, token := range []struct{ name, value string }{{"manage", manageToken}, {"granular", granularToken}} {
 			t.Run(target.kind+"/"+token.name, func(t *testing.T) {
 				targetId := target.create(t)
 
-				resp, requestId := putPermissions(t, token.value, target.path(targetId), []int64{manageAccount, custom.Id}, []int64{})
+				resp, requestId := putPermissions(t, token.value, target.path(targetId), []int64{manageAccount, custom.ID}, []int64{})
 				_ = resp.Body.Close()
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Empty(t, administrativeChangeRows(t, manageToken, requestId))
 
-				resp, requestId = putPermissions(t, token.value, target.path(targetId), []int64{}, []int64{manageAccount, custom.Id})
+				resp, requestId = putPermissions(t, token.value, target.path(targetId), []int64{}, []int64{manageAccount, custom.ID})
 				_ = resp.Body.Close()
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Empty(t, administrativeChangeRows(t, manageToken, requestId))
@@ -165,7 +165,7 @@ func TestAdministrativePermissionChanged_AnOrdinaryChangeIsNotRecorded(t *testin
 func TestAdministrativePermissionChanged_TheClientPermissionsRowNamesWhatChanged(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	target := grantCeilingTargets[2]
 	require.Equal(t, "client", target.kind)
@@ -196,7 +196,7 @@ func TestAdministrativePermissionChanged_TheClientPermissionsRowNamesWhatChanged
 func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroupIsRecorded(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	change := map[string]string{
 		"PUT users groups joining": "granted",
@@ -253,7 +253,7 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 func TestAdministrativePermissionChanged_DeletingAnAdministrativeGroupIsNotDoubled(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, manageClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 
 	userId := newMembershipUser(t)
 	groupId := newGroupHolding(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))

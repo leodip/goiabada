@@ -48,18 +48,18 @@ func TestMigration000024_AuthStateGeneration(t *testing.T) {
 	// Seeded with raw SQL rather than CreateUser: the Go model already carries
 	// AuthStateGeneration, so an ORM insert at 000023 would target a column that
 	// does not exist yet.
-	userId := seedPreMigration000024User(t, h)
+	userID := seedPreMigration000024User(t, h)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "apply 000024")
 
 	// 1. Pre-existing rows land at generation 0.
 	//
-	// Read with raw SQL rather than GetUserById: the seeded row leaves the nullable
+	// Read with raw SQL rather than GetUserByID: the seeded row leaves the nullable
 	// string columns as SQL NULL, which the model scanner cannot map into Go strings.
 	// Enumerating every one of them in the seed would be a lot of noise for an
 	// assertion that is about a single column's value. The model mapping is covered
 	// separately by the four TestUpdate*_DoesNotClobberAuthStateGeneration tests.
-	assert.EqualValues(t, 0, readUserGeneration000024(t, h, userId),
+	assert.EqualValues(t, 0, readUserGeneration000024(t, h, userID),
 		"a row that predates the migration must land at generation 0")
 
 	// 2. Every column is NOT NULL defaulting to 0, on every engine.
@@ -80,7 +80,7 @@ func TestMigration000024_AuthStateGeneration(t *testing.T) {
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 23), "roll back 000024")
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "re-apply 000024")
 
-	assert.EqualValues(t, 0, readUserGeneration000024(t, h, userId),
+	assert.EqualValues(t, 0, readUserGeneration000024(t, h, userID),
 		"generation after the down/up round trip")
 	assertGenerationColumnDefaults000024(t, h, "after down/up round trip")
 	assertExpectedIndexes000024(t, h, "after down/up round trip")
@@ -115,10 +115,10 @@ func seedPreMigration000024User(t *testing.T, h *isolatedDB) int64 {
 	return id
 }
 
-func readUserGeneration000024(t *testing.T, h *isolatedDB, userId int64) int64 {
+func readUserGeneration000024(t *testing.T, h *isolatedDB, userID int64) int64 {
 	t.Helper()
 	var gen int64
-	q := fmt.Sprintf("SELECT auth_state_generation FROM users WHERE id = %d", userId)
+	q := fmt.Sprintf("SELECT auth_state_generation FROM users WHERE id = %d", userID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&gen), "read auth_state_generation")
 	return gen
 }

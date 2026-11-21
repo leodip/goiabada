@@ -957,7 +957,7 @@ func HandleUserGet(database Database) http.HandlerFunc {
 
 func HandleUserEnabledPut(database Database, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := database.GetUserById(r)
+		user := database.GetUserByID(r)
 		if !userTargetCeilingAllows(w, r) {
 			return
 		}

@@ -27,10 +27,10 @@ const (
 // last live, and a fork's second live child.
 func grantFixture() []*record.RefreshToken {
 	return []*record.RefreshToken{
-		{Id: 1, RefreshTokenJti: "rt-first", FirstRefreshTokenJti: revokedGrantId, Revoked: true},
-		{Id: 2, RefreshTokenJti: "rt-second", FirstRefreshTokenJti: revokedGrantId, Revoked: true},
-		{Id: 3, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: revokedGrantId},
-		{Id: 4, RefreshTokenJti: "rt-fork", FirstRefreshTokenJti: revokedGrantId},
+		{ID: 1, RefreshTokenJTI: "rt-first", FirstRefreshTokenJTI: revokedGrantId, Revoked: true},
+		{ID: 2, RefreshTokenJTI: "rt-second", FirstRefreshTokenJTI: revokedGrantId, Revoked: true},
+		{ID: 3, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: revokedGrantId},
+		{ID: 4, RefreshTokenJTI: "rt-fork", FirstRefreshTokenJTI: revokedGrantId},
 	}
 }
 
@@ -44,7 +44,7 @@ func TestRevokeGrantTx_RecordsAndSweepsTheFamily(t *testing.T) {
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 		Run(func(mock.Arguments) { order = append(order, "record") }).
 		Return(true, nil).Once()
-	db.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokedGrantId).
+	db.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokedGrantId).
 		Run(func(mock.Arguments) { order = append(order, "enumerate") }).
 		Return(tokens, nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).
@@ -61,7 +61,7 @@ func TestRevokeGrantTx_RecordsAndSweepsTheFamily(t *testing.T) {
 		"only the members this call moved from live to revoked are reported")
 	assert.Equal(t, []string{"record", "enumerate", "sweep", "sweep"}, order)
 	for _, rt := range tokens {
-		assert.True(t, rt.Revoked, "member %s is revoked", rt.RefreshTokenJti)
+		assert.True(t, rt.Revoked, "member %s is revoked", rt.RefreshTokenJTI)
 	}
 }
 
@@ -72,8 +72,8 @@ func TestRevokeGrantTx_NothingLeftReportsAnEmptyList(t *testing.T) {
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 		Return(false, nil).Once()
-	db.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokedGrantId).
-		Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-first", Revoked: true}}, nil).Once()
+	db.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokedGrantId).
+		Return([]*record.RefreshToken{{ID: 1, RefreshTokenJTI: "rt-first", Revoked: true}}, nil).Once()
 
 	result, err := RevokeGrantTx(context.Background(), db, revokedGrantId)
 
@@ -108,7 +108,7 @@ func TestRevokeGrantTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			setup: func(db *datamocks.Database) {
 				datamocks.ExpectRunInTransactionRefused(db, boom)
 			},
-			notAttempted: []string{"RecordRefreshTokenFamilyRevoked", "GetRefreshTokensByFirstRefreshTokenJti"},
+			notAttempted: []string{"RecordRefreshTokenFamilyRevoked", "GetRefreshTokensByFirstRefreshTokenJTI"},
 		},
 		{
 			name: "the record fails",
@@ -117,7 +117,7 @@ func TestRevokeGrantTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 					Return(false, boom).Once()
 			},
-			notAttempted: []string{"GetRefreshTokensByFirstRefreshTokenJti", "UpdateRefreshToken"},
+			notAttempted: []string{"GetRefreshTokensByFirstRefreshTokenJTI", "UpdateRefreshToken"},
 		},
 		{
 			name: "the members cannot be read",
@@ -125,7 +125,7 @@ func TestRevokeGrantTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 					Return(true, nil).Once()
-				db.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokedGrantId).
+				db.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokedGrantId).
 					Return(nil, boom).Once()
 			},
 			notAttempted: []string{"UpdateRefreshToken"},
@@ -136,7 +136,7 @@ func TestRevokeGrantTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				datamocks.ExpectRunInTransaction(db, revokeTx)
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 					Return(true, nil).Once()
-				db.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokedGrantId).
+				db.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokedGrantId).
 					Return(grantFixture(), nil).Once()
 				db.On("UpdateRefreshToken", mock.Anything, revokeTx, mock.Anything).Return(boom).Once()
 			},
@@ -147,7 +147,7 @@ func TestRevokeGrantTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				datamocks.ExpectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, revokedGrantId, "client_revoked").
 					Return(true, nil).Once()
-				db.On("GetRefreshTokensByFirstRefreshTokenJti", mock.Anything, revokeTx, revokedGrantId).
+				db.On("GetRefreshTokensByFirstRefreshTokenJTI", mock.Anything, revokeTx, revokedGrantId).
 					Return(grantFixture(), nil).Once()
 				db.On("UpdateRefreshToken", mock.Anything, revokeTx, mock.Anything).Return(nil).Twice()
 			},

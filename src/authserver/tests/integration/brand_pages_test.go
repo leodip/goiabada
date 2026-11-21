@@ -39,7 +39,7 @@ func makeDefaultBrandOf(t *testing.T, brand *record.Brand) *record.Brand {
 	var previous int64
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var err error
-		previous, err = database.MakeBrandDefault(ctx, tx, brand.Id)
+		previous, err = database.MakeBrandDefault(ctx, tx, brand.ID)
 		return err
 	}))
 
@@ -48,7 +48,7 @@ func makeDefaultBrandOf(t *testing.T, brand *record.Brand) *record.Brand {
 			if _, err := database.MakeBrandDefault(ctx, tx, previous); err != nil {
 				return err
 			}
-			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.ID)
 			return err
 		}), "unable to put the default brand back")
 	})
@@ -127,7 +127,7 @@ func TestPages_AreDrawnInTheDefaultBrand(t *testing.T) {
 			assert.Equal(t, "dark", head.colorScheme)
 			require.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet")
 			assert.Regexp(t, `^/static/main\.css\?v=[0-9a-f]{12}$`, head.stylesheets[0])
-			assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`, head.stylesheets[1])
+			assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`, head.stylesheets[1])
 
 			// The link names the stylesheet as it is now: the server answers it with Plum's colors,
 			// cacheable for a year.
@@ -156,5 +156,5 @@ func TestPages_AnAutomaticDefaultBrandFollowsTheDevice(t *testing.T) {
 	assert.False(t, head.hasDataTheme, "got data-theme %q", head.dataTheme)
 	assert.Equal(t, "light dark", head.colorScheme)
 	require.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet")
-	assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`, head.stylesheets[1])
+	assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`, head.stylesheets[1])
 }

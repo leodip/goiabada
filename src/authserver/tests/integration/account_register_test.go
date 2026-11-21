@@ -265,7 +265,7 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			user, err := database.GetUserByEmail(context.Background(), nil, tc.email)
 			require.NoError(t, err)
 			require.NotNil(t, user)
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 			assert.Equal(t, tc.email, user.Email)
 		})
 	}
@@ -510,7 +510,7 @@ func TestSelfRegister_TheActivationMailSaysThePasswordIsChosenFromTheLink(t *tes
 	require.Len(t, messages, 1)
 	message := messages[0]
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Activate your account", message.Subject)
@@ -619,7 +619,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	after, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
-	assert.Equal(t, activated.Id, after.Id,
+	assert.Equal(t, activated.ID, after.ID,
 		"a replayed submission must not create a second account")
 	assert.Equal(t, activated.PasswordHash, after.PasswordHash,
 		"a replayed submission must not change the password")
@@ -778,7 +778,7 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 		after, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		require.NotNil(t, after)
-		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, existing.ID, after.ID)
 		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
 	})
 
@@ -804,7 +804,7 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 		after, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		require.NotNil(t, after)
-		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, existing.ID, after.ID)
 		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
 	})
 }
@@ -891,7 +891,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	after, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
-	assert.Equal(t, preReg.Id, after.Id, "the pending registration is untouched")
+	assert.Equal(t, preReg.ID, after.ID, "the pending registration is untouched")
 	assert.Equal(t, preReg.VerificationCodeHash, after.VerificationCodeHash)
 }
 

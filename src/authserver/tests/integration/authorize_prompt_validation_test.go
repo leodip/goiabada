@@ -54,7 +54,7 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Get the session to check auth_time later
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 
 	// Load the code and verify auth_time is preserved from session
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
 
 	// Auth time should match the original session's auth time (preserved, not new)
@@ -120,7 +120,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
 
 	// Get original session
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 
 	// Verify code has NEW auth_time (not the original session's)
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 
 	// Auth time should be NEWER than the original session (re-authenticated)
 	assert.True(t, code.AuthenticatedAt.After(originalSessionAuthTime),

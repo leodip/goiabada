@@ -21,10 +21,10 @@ var postLogoutRedirectURIColumns = columnList{
 // scanPostLogoutRedirectURI reads one row selected with postLogoutRedirectURIColumns.
 func scanPostLogoutRedirectURI(row rowScanner, postLogoutRedirectURI *record.PostLogoutRedirectURI) error {
 	return row.Scan(
-		&postLogoutRedirectURI.Id,
+		&postLogoutRedirectURI.ID,
 		&postLogoutRedirectURI.CreatedAt,
 		&postLogoutRedirectURI.URI,
-		&postLogoutRedirectURI.ClientId,
+		&postLogoutRedirectURI.ClientID,
 	)
 }
 
@@ -35,7 +35,7 @@ var insertPostLogoutRedirectURI = statement{
 	mssql:    "INSERT INTO post_logout_redirect_uris (created_at, uri, client_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
 }
 
-var selectPostLogoutRedirectURIsByClientId = statement{
+var selectPostLogoutRedirectURIsByClientID = statement{
 	sqlite:   "SELECT " + postLogoutRedirectURIColumns.sqlite + " FROM post_logout_redirect_uris WHERE client_id = ?",
 	mysql:    "SELECT " + postLogoutRedirectURIColumns.mysql + " FROM post_logout_redirect_uris WHERE client_id = ?",
 	postgres: "SELECT " + postLogoutRedirectURIColumns.postgres + " FROM post_logout_redirect_uris WHERE client_id = $1",
@@ -72,7 +72,7 @@ var deletePostLogoutRedirectURI = statement{
 
 func (d *Database) CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error {
 
-	if postLogoutRedirectURI.ClientId == 0 {
+	if postLogoutRedirectURI.ClientID == 0 {
 		return errs.New("client id must be greater than 0")
 	}
 
@@ -82,19 +82,19 @@ func (d *Database) CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, 
 	postLogoutRedirectURI.CreatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertPostLogoutRedirectURI, "postLogoutRedirectURI",
-		postLogoutRedirectURI.CreatedAt, postLogoutRedirectURI.URI, postLogoutRedirectURI.ClientId)
+		postLogoutRedirectURI.CreatedAt, postLogoutRedirectURI.URI, postLogoutRedirectURI.ClientID)
 	if err != nil {
 		postLogoutRedirectURI.CreatedAt = originalCreatedAt
 		return err
 	}
 
-	postLogoutRedirectURI.Id = id
+	postLogoutRedirectURI.ID = id
 	return nil
 }
 
-func (d *Database) GetPostLogoutRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.PostLogoutRedirectURI, error) {
-	return queryAll(ctx, d, tx, []record.PostLogoutRedirectURI{}, selectPostLogoutRedirectURIsByClientId.text(d.Dialect),
-		[]any{clientId}, scanPostLogoutRedirectURI, "postLogoutRedirectURI")
+func (d *Database) GetPostLogoutRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.PostLogoutRedirectURI, error) {
+	return queryAll(ctx, d, tx, []record.PostLogoutRedirectURI{}, selectPostLogoutRedirectURIsByClientID.text(d.Dialect),
+		[]any{clientID}, scanPostLogoutRedirectURI, "postLogoutRedirectURI")
 }
 
 // clientHoldingURI is one row of selectClientsByPostLogoutRedirectURI: a client and the sign-out
@@ -140,19 +140,19 @@ func (d *Database) GetClientsByPostLogoutRedirectURI(ctx context.Context, tx *sq
 	clients := []record.Client{}
 	seen := map[int64]bool{}
 	for _, held := range rows {
-		if engineFoldedTheMatch(held.uri, uri) || seen[held.client.Id] {
+		if engineFoldedTheMatch(held.uri, uri) || seen[held.client.ID] {
 			continue
 		}
-		seen[held.client.Id] = true
+		seen[held.client.ID] = true
 		clients = append(clients, held.client)
 	}
 
 	return clients, nil
 }
 
-func (d *Database) DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error {
+func (d *Database) DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deletePostLogoutRedirectURI.text(d.Dialect), postLogoutRedirectURIId)
+	_, err := d.ExecSQL(ctx, tx, deletePostLogoutRedirectURI.text(d.Dialect), postLogoutRedirectURIID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete postLogoutRedirectURI")
 	}

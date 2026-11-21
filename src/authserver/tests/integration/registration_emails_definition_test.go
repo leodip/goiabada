@@ -38,7 +38,7 @@ func readEmail(t *testing.T, message mailpit.Message) (title, lang, text string)
 // appNameOfSettings is the app name the emails sign with.
 func appNameOfSettings(t *testing.T) string {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	return settings.AppName
 }

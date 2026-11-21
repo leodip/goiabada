@@ -10,7 +10,7 @@ import "time"
 //
 // There is no id: the first token's jti is the key, and a family is revoked once.
 type RefreshTokenFamilyRevocation struct {
-	FirstRefreshTokenJti string    `db:"first_refresh_token_jti"`
+	FirstRefreshTokenJTI string    `db:"first_refresh_token_jti"`
 	Reason               string    `db:"reason"`
 	RevokedAt            time.Time `db:"revoked_at"`
 }

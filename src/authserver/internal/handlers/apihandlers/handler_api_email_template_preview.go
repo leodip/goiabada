@@ -32,7 +32,7 @@ import (
 
 // emailTemplateBrandReader is what a preview and a test send read the brand they are drawn in from.
 type emailTemplateBrandReader interface {
-	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
 }
 
 // emailTemplateSampleRenderer draws an email in a language with a text nobody may have saved, in a
@@ -94,7 +94,7 @@ func checkEmailTemplateSample(w http.ResponseWriter, r *http.Request, database e
 	}
 	sample := &emailTemplateSample{email: email, lang: lang, text: text}
 	if brandId != nil {
-		brand, err := database.GetBrandById(r.Context(), nil, *brandId)
+		brand, err := database.GetBrandByID(r.Context(), nil, *brandId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting the brand of an email template sample"),
 				"brand_id", *brandId)

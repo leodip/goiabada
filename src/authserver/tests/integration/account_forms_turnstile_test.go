@@ -109,7 +109,7 @@ func assertReached(t *testing.T, f accountForm, resp *http.Response, email strin
 		user, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		if assert.NotNil(t, user, "the account was created") {
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		}
 		return
 	}

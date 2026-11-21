@@ -22,9 +22,9 @@ func TestAPIClientUpdatePut_PrivacyPolicyAndTermsOfServiceURLs(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10)
 	update := func(privacy, terms string) *api.ClientResponse {
 		t.Helper()
 		resp := makeAPIRequest(t, "PUT", clientURL, accessToken, api.UpdateClientSettingsRequest{
@@ -54,7 +54,7 @@ func TestAPIClientUpdatePut_PrivacyPolicyAndTermsOfServiceURLs(t *testing.T) {
 	assert.Equal(t, "https://legal.example.org/privacy", answered.PrivacyPolicyURL, "the answer carries the URL trimmed")
 	assert.Equal(t, "http://legal.example.org/terms?v=3", answered.TermsOfServiceURL)
 
-	stored, err := database.GetClientById(context.Background(), nil, client.Id)
+	stored, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "https://legal.example.org/privacy", stored.PrivacyPolicyURL)
 	assert.Equal(t, "http://legal.example.org/terms?v=3", stored.TermsOfServiceURL)
@@ -77,9 +77,9 @@ func TestAPIClientUpdatePut_PrivacyPolicyAndTermsOfServiceURLValidation(t *testi
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10)
 	exactly256 := "https://example.com/" + strings.Repeat("a", 236)
 	require.Len(t, exactly256, 256)
 
@@ -119,7 +119,7 @@ func TestAPIClientUpdatePut_PrivacyPolicyAndTermsOfServiceURLValidation(t *testi
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, tc.status, resp.StatusCode)
 
-			stored, err := database.GetClientById(context.Background(), nil, client.Id)
+			stored, err := database.GetClientByID(context.Background(), nil, client.ID)
 			require.NoError(t, err)
 			if tc.status == http.StatusOK {
 				assert.Equal(t, tc.privacy, stored.PrivacyPolicyURL)

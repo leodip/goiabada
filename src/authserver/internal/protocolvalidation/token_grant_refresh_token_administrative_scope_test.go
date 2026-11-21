@@ -114,7 +114,7 @@ func TestValidateTokenRequest_RefreshToken_AdministrativeScope(t *testing.T) {
 			var refused *AdministrativeScopeRefusedError
 			require.ErrorAs(t, err, &refused)
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
-			assert.Equal(t, int64(1), refused.Client.Id)
+			assert.Equal(t, int64(1), refused.Client.ID)
 			assert.Equal(t, "client1", refused.Client.ClientIdentifier)
 			assert.Equal(t, int64(1), refused.UserId)
 

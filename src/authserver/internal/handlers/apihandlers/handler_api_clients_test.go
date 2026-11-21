@@ -79,13 +79,13 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	secret := []byte("the-secret-another-request-just-set")
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
 	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
-	stale := &record.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
+	stale := &record.Client{ID: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	require.NotNil(t, written)
@@ -98,14 +98,14 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	// The read is inside the transaction that writes. Reading it before RunInTransaction, which
 	// the mock records at entry before the body runs, would leave exactly the gap this helper
 	// exists to close.
-	assert.Less(t, callIndex(t, database, "RunInTransaction"), callIndex(t, database, "GetClientById"))
-	assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "UpdateClient"))
+	assert.Less(t, callIndex(t, database, "RunInTransaction"), callIndex(t, database, "GetClientByID"))
+	assert.Less(t, callIndex(t, database, "GetClientByID"), callIndex(t, database, "UpdateClient"))
 
 	// And the row is taken BEFORE it is read, which is what makes the read atomic with the write
 	// that follows it. A read that runs first can be invalidated by a writer committing behind
 	// it, and on mysql and postgres it is not even made to wait for one, so the order of these
 	// two calls is the whole of the remedy rather than a detail of it (#245 decision 18).
-	assert.Less(t, callIndex(t, database, "AcquireClientRow"), callIndex(t, database, "GetClientById"))
+	assert.Less(t, callIndex(t, database, "AcquireClientRow"), callIndex(t, database, "GetClientByID"))
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode
@@ -124,8 +124,8 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
 	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
@@ -134,7 +134,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	// became public.
 	pkceOff := false
 	stale := &record.Client{
-		Id:                       7,
+		ID:                       7,
 		IsPublic:                 false,
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
@@ -161,15 +161,15 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false}, nil).Once()
 	var written *record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.Client) }).Return(nil).Once()
 
 	pkceOff := false
 	client := &record.Client{
-		Id:                       7,
+		ID:                       7,
 		IsPublic:                 false,
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
@@ -191,9 +191,9 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7}, nil)
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{ID: 7}, nil)
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper, which rolls back")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
@@ -211,10 +211,10 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
-	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{Id: 7, IsPublic: true}, nil)
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &record.Client{ID: 7, IsPublic: true}, nil)
 	require.Error(t, err)
 	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
-	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
+	assertNotAttemptedOnClientDatabase(t, database, "GetClientByID", "UpdateClient")
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_RememberConsent is the settings save's Remember
@@ -260,8 +260,8 @@ func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
 
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-				Return(&record.Client{Id: 7, ClientIdentifier: "a-client", IsPublic: tc.rowPublic, RememberConsent: tc.rowRemember}, nil).Once()
+			database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+				Return(&record.Client{ID: 7, ClientIdentifier: "a-client", IsPublic: tc.rowPublic, RememberConsent: tc.rowRemember}, nil).Once()
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "a-client").Return(false, nil).Once()
 			if tc.wantWrite != nil {
@@ -271,7 +271,7 @@ func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
 
 			// The copy the request loaded: Remember consent as it read it, opposite to the row, so an
 			// answer taken from the stale copy shows.
-			client := &record.Client{Id: 7, ClientIdentifier: "a-client", IsPublic: tc.loadedPublic, RememberConsent: !tc.rowRemember}
+			client := &record.Client{ID: 7, ClientIdentifier: "a-client", IsPublic: tc.loadedPublic, RememberConsent: !tc.rowRemember}
 			settings := &clientSettingsSave{identifier: "a-client", rememberConsent: tc.sent}
 			require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client, settings))
 
@@ -280,7 +280,7 @@ func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
 				assertNotAttemptedOnClientDatabase(t, database, "SetClientRememberConsent")
 			} else {
 				// Under the row's lock, in the transaction that re-read the mode it decided against.
-				assert.Less(t, callIndex(t, database, "GetClientById"), callIndex(t, database, "SetClientRememberConsent"))
+				assert.Less(t, callIndex(t, database, "GetClientByID"), callIndex(t, database, "SetClientRememberConsent"))
 			}
 		})
 	}
@@ -304,19 +304,19 @@ func TestHandleClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	// The snapshot the handler works from: already public.
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 
@@ -354,8 +354,8 @@ func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSav
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
@@ -369,7 +369,7 @@ func TestHandleClientAuthenticationPut_AFailedClassificationRevokesNothingAndSav
 	// Naming it says which property broke; BodyErr says the helper was asked to roll back.
 	require.EqualError(t, stub.BodyErr, "no client with that id")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
-		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
+		"RevokeCodesByClientID", "GetRefreshTokensByClientID")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything)
 }
@@ -383,14 +383,14 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -402,7 +402,7 @@ func TestHandleClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothin
 	assert.Equal(t, http.StatusOK, rr.Code)
 	// The strict mock carries most of this: neither revocation call is registered, so reaching
 	// one fails. Naming them makes the failure say which property broke.
-	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientId", "GetRefreshTokensByClientId")
+	assertNotAttemptedOnClientDatabase(t, database, "RevokeCodesByClientID", "GetRefreshTokensByClientID")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything)
 }
 
@@ -416,20 +416,20 @@ func TestHandleClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicIn
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	pkceOptional := false
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{
-		Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"),
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.Client{
+		ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"),
 		ClientCredentialsEnabled: true, PKCERequired: &pkceOptional,
 	}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	var written record.Client
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { written = *args.Get(2).(*record.Client) }).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true}, nil).Once()
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true}, nil).Once()
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
@@ -472,11 +472,11 @@ func TestUpdateClientNotOwningAuthenticationMode_AnswersRememberConsentFromTheRo
 
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true, RememberConsent: false}, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 
-	stale := &record.Client{Id: 7, IsPublic: false, RememberConsent: true}
+	stale := &record.Client{ID: 7, IsPublic: false, RememberConsent: true}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	assert.False(t, stale.RememberConsent,
@@ -491,13 +491,13 @@ func TestHandleClientAuthenticationPut_SwitchToConfidentialTurnsRememberConsentO
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true, RememberConsent: false}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, RememberConsent: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, RememberConsent: true}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
@@ -519,14 +519,14 @@ func TestHandleClientAuthenticationPut_SwitchToPublicAnswersRememberConsentFromT
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true, RememberConsent: false}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
@@ -546,18 +546,18 @@ func TestHandleClientAuthenticationPut_SwitchToPublicAnswersTheMethodTheWriteLef
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
 			CreatedViaDCR: true, TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false, CreatedViaDCR: true,
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: true, RememberConsent: false, CreatedViaDCR: true,
 			TokenEndpointAuthMethod: ""}, nil).Once()
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
@@ -586,14 +586,14 @@ func TestHandleClientAuthenticationPut_ConfidentialSaveAnswersTheMethodTheRowHol
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
 			CreatedViaDCR: true, TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, RememberConsent: true, CreatedViaDCR: true,
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, RememberConsent: true, CreatedViaDCR: true,
 			TokenEndpointAuthMethod: ""}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -610,7 +610,7 @@ func TestHandleClientAuthenticationPut_ConfidentialSaveAnswersTheMethodTheRowHol
 	assert.Empty(t, response.Client.TokenEndpointAuthMethod)
 	// Read after the writes, under the row they hold, so no switch can commit between the read
 	// and the answer's write.
-	assert.Less(t, callIndex(t, database, "SetClientRememberConsent"), lastCallIndex(t, database, "GetClientById"))
+	assert.Less(t, callIndex(t, database, "SetClientRememberConsent"), lastCallIndex(t, database, "GetClientByID"))
 }
 
 // TestHandleClientUpdatePut_AnswersTheMethodTheLockedRowHolds: a settings save that loaded a
@@ -621,13 +621,13 @@ func TestHandleClientUpdatePut_AnswersTheMethodTheLockedRowHolds(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "target-client", CreatedViaDCR: true,
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "target-client", CreatedViaDCR: true,
 			TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "target-client", IsPublic: true, CreatedViaDCR: true,
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "target-client", IsPublic: true, CreatedViaDCR: true,
 			TokenEndpointAuthMethod: ""}, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "target-client").Return(false, nil).Once()
@@ -719,8 +719,8 @@ func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
 // client's authorization code flow is off: the save has no flow gate, since a browser client of any
 // flow needs a web origin, and a client with no redirect-based flow must still be saved (#250).
 func expectWebOriginsClient(database *datamocks.Database) {
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, AuthorizationCodeEnabled: false}, nil).Once()
 }
 
 // expectStoredWebOrigins registers the read of the stored list on the save's transaction,
@@ -746,8 +746,8 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 	note := func(edge string) { order = append(order, edge) }
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredWebOrigins(database,
-		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
-		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://keep.example.com"},
+		record.WebOrigin{ID: 11, ClientID: 7, Origin: "https://old.example.com"},
+		record.WebOrigin{ID: 12, ClientID: 7, Origin: "https://keep.example.com"},
 	)
 	var deleted []int64
 	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
@@ -759,7 +759,7 @@ func TestHandleClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			wo := args.Get(2).(*record.WebOrigin)
-			assert.Equal(t, int64(7), wo.ClientId)
+			assert.Equal(t, int64(7), wo.ClientID)
 			created = append(created, wo.Origin)
 			order = append(order, "insert")
 		}).Return(nil).Once()
@@ -796,7 +796,7 @@ func TestHandleClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	expectWebOriginsClient(database)
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredWebOrigins(database, record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"})
+	expectStoredWebOrigins(database, record.WebOrigin{ID: 11, ClientID: 7, Origin: "https://old.example.com"})
 	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -954,7 +954,7 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 // cleanly and is refused purely on length, which is what separates this from the invalid-origin
 // path.
 //
-// The strict mock carries GetClientById and nothing else: reaching RunInTransaction fails the test,
+// The strict mock carries GetClientByID and nothing else: reaching RunInTransaction fails the test,
 // so the refusal is proved to happen before any write is attempted.
 func TestHandleClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := datamocks.NewDatabase(t)
@@ -1040,8 +1040,8 @@ func TestHandleClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	expectWebOriginsClient(database)
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredWebOrigins(database,
-		record.WebOrigin{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
-		record.WebOrigin{Id: 12, ClientId: 7, Origin: "https://added-meanwhile.example.com"},
+		record.WebOrigin{ID: 11, ClientID: 7, Origin: "https://a.example.com"},
+		record.WebOrigin{ID: 12, ClientID: 7, Origin: "https://added-meanwhile.example.com"},
 	)
 
 	rr := httptest.NewRecorder()
@@ -1070,8 +1070,8 @@ func TestHandleClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) 
 		{
 			name: "another order, a repeat and a non-canonical spelling",
 			stored: []record.WebOrigin{
-				{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
-				{Id: 12, ClientId: 7, Origin: "https://b.example.com"},
+				{ID: 11, ClientID: 7, Origin: "https://a.example.com"},
+				{ID: 12, ClientID: 7, Origin: "https://b.example.com"},
 			},
 			expected: []string{"https://b.example.com", " HTTPS://A.Example.com/ ", "https://b.example.com"},
 		},
@@ -1087,7 +1087,7 @@ func TestHandleClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) 
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			expectStoredWebOrigins(database, test.stored...)
 			for _, row := range test.stored {
-				database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
+				database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, row.ID).Return(nil).Once()
 			}
 			database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			stubClientResponseLoads(database)
@@ -1197,8 +1197,8 @@ func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request 
 // expectRedirectURIsClient registers the client read the save makes before it validates, for a
 // client whose authorization code flow is on, so the flow gate lets the request through.
 func expectRedirectURIsClient(database *datamocks.Database) {
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, AuthorizationCodeEnabled: true}, nil).Once()
 }
 
 // expectStoredRedirectURIs registers the read of the stored list on the save's transaction,
@@ -1237,9 +1237,9 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 	note := func(edge string) { order = append(order, edge) }
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectStoredRedirectURIs(database,
-		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"},
-		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/cb"},
-		record.RedirectURI{Id: 13, ClientId: 7, URI: "https://keep.example.com/cb"},
+		record.RedirectURI{ID: 11, ClientID: 7, URI: "https://old.example.com/cb"},
+		record.RedirectURI{ID: 12, ClientID: 7, URI: "https://keep.example.com/cb"},
+		record.RedirectURI{ID: 13, ClientID: 7, URI: "https://keep.example.com/cb"},
 	)
 	var deleted []int64
 	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
@@ -1251,7 +1251,7 @@ func TestHandleClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testin
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ru := args.Get(2).(*record.RedirectURI)
-			assert.Equal(t, int64(7), ru.ClientId)
+			assert.Equal(t, int64(7), ru.ClientID)
 			created = append(created, ru.URI)
 			order = append(order, "insert")
 		}).Return(nil).Once()
@@ -1283,7 +1283,7 @@ func TestHandleClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
 
 	expectRedirectURIsClient(database)
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	expectStoredRedirectURIs(database, record.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"})
+	expectStoredRedirectURIs(database, record.RedirectURI{ID: 11, ClientID: 7, URI: "https://old.example.com/cb"})
 	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	diskFull := errors.New("the disk is full")
 	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -1386,8 +1386,8 @@ func TestHandleClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T)
 	expectRedirectURIsClient(database)
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database,
-		record.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
-		record.RedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/cb"},
+		record.RedirectURI{ID: 11, ClientID: 7, URI: "https://a.example.com/cb"},
+		record.RedirectURI{ID: 12, ClientID: 7, URI: "https://added-meanwhile.example.com/cb"},
 	)
 
 	rr := httptest.NewRecorder()
@@ -1415,8 +1415,8 @@ func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T
 		{
 			name: "another order, a repeat and surrounding spaces",
 			stored: []record.RedirectURI{
-				{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
-				{Id: 12, ClientId: 7, URI: "https://b.example.com/cb"},
+				{ID: 11, ClientID: 7, URI: "https://a.example.com/cb"},
+				{ID: 12, ClientID: 7, URI: "https://b.example.com/cb"},
 			},
 			expected: []string{"https://b.example.com/cb", " https://a.example.com/cb ", "https://b.example.com/cb"},
 		},
@@ -1432,7 +1432,7 @@ func TestHandleClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			expectStoredRedirectURIs(database, test.stored...)
 			for _, row := range test.stored {
-				database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
+				database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, row.ID).Return(nil).Once()
 			}
 			database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			stubClientResponseLoads(database)

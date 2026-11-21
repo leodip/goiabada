@@ -3,9 +3,9 @@ package record
 import "database/sql"
 
 type GroupPermission struct {
-	Id           int64        `db:"id" fieldtag:"pk"`
+	ID           int64        `db:"id" fieldtag:"pk"`
 	CreatedAt    sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt    sql.NullTime `db:"updated_at"`
-	GroupId      int64        `db:"group_id"`
-	PermissionId int64        `db:"permission_id"`
+	GroupID      int64        `db:"group_id"`
+	PermissionID int64        `db:"permission_id"`
 }

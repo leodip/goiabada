@@ -157,7 +157,7 @@ func TestHandleAuthPwdPost_SavesTheAnswerWithThePassword(t *testing.T) {
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(passwordPageCeremony(), nil)
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "alice@example.com").
-				Return(&record.User{Id: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+				Return(&record.User{ID: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
 			auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return()
 			ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
 			var saved *ceremony.AuthContext
@@ -197,7 +197,7 @@ func TestHandleAuthPwdPost_ReadsTheBoxFromTheBodyAlone(t *testing.T) {
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(passwordPageCeremony(), nil)
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "alice@example.com").
-		Return(&record.User{Id: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+		Return(&record.User{ID: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return()
 	ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
 	ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {

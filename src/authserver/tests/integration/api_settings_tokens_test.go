@@ -17,7 +17,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -36,7 +36,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, body.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineMaxLifetimeInSeconds, body.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInAccessToken, body.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInIdToken, body.IncludeOpenIDConnectClaimsInIDToken)
+	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInIDToken, body.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 // PUT /api/v1/admin/settings/tokens - success
@@ -70,13 +70,13 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, body.IncludeOpenIDConnectClaimsInIDToken)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, req.TokenExpirationInSeconds, settings.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, settings.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, settings.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 // PUT /api/v1/admin/settings/tokens - validation errors

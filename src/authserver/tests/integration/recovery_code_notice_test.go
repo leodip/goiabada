@@ -38,7 +38,7 @@ func enrolledNoticeUser(t *testing.T, locale string, verified bool) (*record.Cli
 	user.EmailVerified = verified
 	user.Locale = locale
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	return client, redirectUri, user, password, secret, giveRecoveryCodes(t, user.Id)
+	return client, redirectUri, user, password, secret, giveRecoveryCodes(t, user.ID)
 }
 
 // assertNoCodeIn asserts that none of codes appears in the message.
@@ -94,7 +94,7 @@ func TestRecoveryCode_SigningInWithTheLastCodeSaysNoneAreLeft(t *testing.T) {
 	user.GivenName, user.MiddleName, user.FamilyName = "", "", ""
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	for _, code := range codes[1:] {
-		require.True(t, claimRecoveryCodeForTest(t, user.Id, code))
+		require.True(t, claimRecoveryCodeForTest(t, user.ID, code))
 	}
 
 	_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[0])
@@ -215,9 +215,9 @@ func TestAuthOtp_TheRefusalThatDisablesTheAuthenticatorTellsTheUserOnce(t *testi
 			client, redirectUri, user, password, secret, codes := enrolledNoticeUser(t, tc.locale, true)
 			// Seeded one short of the limit through the count's own statement, since reaching it
 			// through the form would take 99 refusals behind the otp rate tier.
-			for i := 0; i < record.OtpConsecutiveFailureLimit-1; i++ {
-				disabled, err := database.IncrementUserOtpConsecutiveFailures(context.Background(), nil, user.Id,
-					user.OtpConfigGeneration)
+			for i := 0; i < record.OTPConsecutiveFailureLimit-1; i++ {
+				disabled, err := database.IncrementUserOTPConsecutiveFailures(context.Background(), nil, user.ID,
+					user.OTPConfigGeneration)
 				require.NoError(t, err)
 				require.False(t, disabled)
 			}

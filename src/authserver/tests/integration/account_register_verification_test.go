@@ -127,7 +127,7 @@ func TestSelfRegister_WithVerificationEveryAddressGetsTheSamePage(t *testing.T) 
 
 	disabledEmail := registerAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	disableAccount(t, disabled.Id)
+	disableAccount(t, disabled.ID)
 
 	pendingEmail := registerAddress()
 	client := createHttpClient(t)
@@ -160,7 +160,7 @@ func TestSelfRegister_WithVerificationEveryAddressGetsTheSamePage(t *testing.T) 
 		require.Len(t, messages, 1)
 		message := messages[0]
 
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		forgotPasswordURL := appConfig.AuthServer.BaseURL + "/forgot-password"
 
@@ -238,7 +238,7 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 
 	disabledEmail := registerAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	disableAccount(t, disabled.Id)
+	disableAccount(t, disabled.ID)
 
 	client := createHttpClient(t)
 	loadRegisterPage(t, client)
@@ -262,10 +262,10 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 		preRegistrationId int64
 		outcome           string
 	}{
-		{name: "a new address", address: newAddress, preRegistrationId: preRegistration.Id, outcome: "link_issued"},
-		{name: "a verified, enabled account", address: verifiedEmail, userId: verified.Id, outcome: "notice_issued"},
-		{name: "an unverified account", address: unverifiedEmail, userId: unverified.Id, outcome: "unverified_address"},
-		{name: "a disabled account", address: disabledEmail, userId: disabled.Id, outcome: "account_disabled"},
+		{name: "a new address", address: newAddress, preRegistrationId: preRegistration.ID, outcome: "link_issued"},
+		{name: "a verified, enabled account", address: verifiedEmail, userId: verified.ID, outcome: "notice_issued"},
+		{name: "an unverified account", address: unverifiedEmail, userId: unverified.ID, outcome: "unverified_address"},
+		{name: "a disabled account", address: disabledEmail, userId: disabled.ID, outcome: "account_disabled"},
 		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

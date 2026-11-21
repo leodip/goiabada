@@ -108,7 +108,7 @@ func TestClientAdministrativeScopes_AGranularTokenIsRefused(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, allowed := range []bool{true, false} {
 		t.Run(fmt.Sprintf("an ordinary client switched to %v", allowed), func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestClientAdministrativeScopes_AdminReadDoesNotReachTheRoute(t *testing.T) 
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	readToken, caller := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	f := newTargetClient(t)
 
 	resp, requestId := putAdministrativeScopes(t, readToken, f.clientId, map[string]any{"allowed": true})
@@ -212,7 +212,7 @@ func TestClientAdministrativeScopes_AnAllowedClientIsAnAdministratorClient(t *te
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for _, route := range clientTargetCeilingRoutes {
@@ -288,7 +288,7 @@ func TestClientAdministrativeScopes_TheSwitchDecidesTheAuthorizationEndpointsAns
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	f := newAdministrativeScopeFixture(t, false)
-	switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": true})))
+	switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.ID, map[string]any{"allowed": true})))
 
 	resp := f.signInFrom(t, f.craftedLink("code", ""))
 	codeVal, state := getCodeAndStateFromUrl(t, resp)
@@ -296,7 +296,7 @@ func TestClientAdministrativeScopes_TheSwitchDecidesTheAuthorizationEndpointsAns
 	assert.Equal(t, administrativeScopeState, state)
 	assert.Equal(t, "openid authserver:manage", loadCodeFromDatabase(t, codeVal).Scope)
 
-	switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": false})))
+	switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.ID, map[string]any{"allowed": false})))
 
 	resp = f.get(t, f.craftedLink("code", ""))
 	defer func() { _ = resp.Body.Close() }()
@@ -318,7 +318,7 @@ func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesIt
 			requireDatabaseAuditLogs(t)
 			manageToken, _ := createAdminClientWithToken(t)
 			f := newAdministrativeScopeFixture(t, false)
-			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": true})))
+			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.ID, map[string]any{"allowed": true})))
 			f.client.ConsentRequired = true
 			f.client.AdministrativeScopesAllowed = true
 			require.NoError(t, database.UpdateClient(context.Background(), nil, f.client))
@@ -347,7 +347,7 @@ func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesIt
 			issueURL := assertRedirect(t, resp, "/auth/issue")
 			_ = resp.Body.Close()
 
-			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.Id, map[string]any{"allowed": false})))
+			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.ID, map[string]any{"allowed": false})))
 
 			resp = loadPage(t, f.browser, issueURL)
 			defer func() { _ = resp.Body.Close() }()
@@ -363,7 +363,7 @@ func TestClientAdministrativeScopes_AnAllowanceWithdrawnDuringTheSignInRefusesIt
 			rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 			require.Len(t, rows, 1)
 			assert.Equal(t, "issue", rows[0]["checkpoint"])
-			assert.InDelta(t, float64(f.user.Id), rows[0]["user_id"], 0)
+			assert.InDelta(t, float64(f.user.ID), rows[0]["user_id"], 0)
 			assert.Equal(t, []any{"authserver:manage"}, rows[0]["scopes"])
 		})
 	}

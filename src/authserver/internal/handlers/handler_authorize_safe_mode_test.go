@@ -81,7 +81,7 @@ func TestHandleAuthorizeGet_KeepsSafeModeOnTheSignInForTrueAlone(t *testing.T) {
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)

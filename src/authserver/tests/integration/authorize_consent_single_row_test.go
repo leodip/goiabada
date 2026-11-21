@@ -45,11 +45,11 @@ func newConsentFixture(t *testing.T) *consentFixture {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	password := fake.Password(8)
@@ -59,8 +59,8 @@ func newConsentFixture(t *testing.T) *consentFixture {
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	return &consentFixture{
 		client: client, redirectUri: redirectUri, user: user, password: password,
@@ -167,7 +167,7 @@ func TestAuthorize_Consent_ASecondSaveReplacesTheConsentAndRefreshesItsDate(t *t
 	defer func() { _ = resp.Body.Close() }()
 	assertRedirect(t, resp, "/auth/issue")
 
-	first := consentsOf(t, adminToken, f.user.Id, f.client.Id)
+	first := consentsOf(t, adminToken, f.user.ID, f.client.ID)
 	require.Len(t, first, 1, "the first save created the user's consent for the client")
 	assert.Equal(t, f.scope, first[0].Scope, "all three scopes were ticked")
 	require.NotNil(t, first[0].GrantedAt)
@@ -178,7 +178,7 @@ func TestAuthorize_Consent_ASecondSaveReplacesTheConsentAndRefreshesItsDate(t *t
 	defer func() { _ = resp2.Body.Close() }()
 	assertRedirect(t, resp2, "/auth/issue")
 
-	second := consentsOf(t, adminToken, f.user.Id, f.client.Id)
+	second := consentsOf(t, adminToken, f.user.ID, f.client.ID)
 	require.Len(t, second, 1, "the second save rewrote the consent, it did not add one")
 	assert.Equal(t, first[0].ID, second[0].ID, "the same row")
 	assert.Equal(t, "openid profile", second[0].Scope, "the scope is what the second save ticked: the permission the user unticked is gone")
@@ -221,7 +221,7 @@ func TestAuthorize_Consent_TwoSubmissionsAtOnceLeaveOneConsentForTheClient(t *te
 		assertRedirect(t, responses[i], "/auth/issue")
 	}
 
-	held := consentsOf(t, adminToken, f.user.Id, f.client.Id)
+	held := consentsOf(t, adminToken, f.user.ID, f.client.ID)
 	require.Len(t, held, 1, "one consent for the user and client however the two saves overlapped")
 	assert.Containsf(t, []string{"openid profile", f.scope}, held[0].Scope,
 		"the scope is what one of the two ticked, never a mixture; got %q", held[0].Scope)

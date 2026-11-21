@@ -21,7 +21,7 @@ func TestCreateResource(t *testing.T) {
 		t.Fatalf("Failed to create resource: %v", err)
 	}
 
-	if resource.Id == 0 {
+	if resource.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !resource.CreatedAt.Valid || resource.CreatedAt.Time.IsZero() {
@@ -31,7 +31,7 @@ func TestCreateResource(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
+	retrievedResource, err := database.GetResourceByID(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created resource: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestUpdateResource(t *testing.T) {
 		t.Fatalf("Failed to update resource: %v", err)
 	}
 
-	updatedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
+	updatedResource, err := database.GetResourceByID(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated resource: %v", err)
 	}
@@ -73,27 +73,27 @@ func TestUpdateResource(t *testing.T) {
 	}
 }
 
-func TestGetResourceById(t *testing.T) {
+func TestGetResourceByID(t *testing.T) {
 	resource := createTestResource(t)
 
-	retrievedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
+	retrievedResource, err := database.GetResourceByID(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Failed to get resource by ID: %v", err)
 	}
 
-	if retrievedResource.Id != resource.Id {
-		t.Errorf("Expected ID %d, got %d", resource.Id, retrievedResource.Id)
+	if retrievedResource.ID != resource.ID {
+		t.Errorf("Expected ID %d, got %d", resource.ID, retrievedResource.ID)
 	}
 	if retrievedResource.ResourceIdentifier != resource.ResourceIdentifier {
 		t.Errorf("Expected ResourceIdentifier %s, got %s", resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
 	}
 
-	nonExistentResource, err := database.GetResourceById(context.Background(), nil, 99999)
+	nonExistentResource, err := database.GetResourceByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent resource, got: %v", err)
 	}
 	if nonExistentResource != nil {
-		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.Id)
+		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.ID)
 	}
 }
 
@@ -105,8 +105,8 @@ func TestGetResourceByResourceIdentifier(t *testing.T) {
 		t.Fatalf("Failed to get resource by identifier: %v", err)
 	}
 
-	if retrievedResource.Id != resource.Id {
-		t.Errorf("Expected ID %d, got %d", resource.Id, retrievedResource.Id)
+	if retrievedResource.ID != resource.ID {
+		t.Errorf("Expected ID %d, got %d", resource.ID, retrievedResource.ID)
 	}
 	if retrievedResource.ResourceIdentifier != resource.ResourceIdentifier {
 		t.Errorf("Expected ResourceIdentifier %s, got %s", resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
@@ -117,16 +117,16 @@ func TestGetResourceByResourceIdentifier(t *testing.T) {
 		t.Errorf("Expected no error for non-existent resource, got: %v", err)
 	}
 	if nonExistentResource != nil {
-		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.Id)
+		t.Errorf("Expected nil for non-existent resource, got a resource with ID: %d", nonExistentResource.ID)
 	}
 }
 
-func TestGetResourcesByIds(t *testing.T) {
+func TestGetResourcesByIDs(t *testing.T) {
 	resource1 := createTestResource(t)
 	resource2 := createTestResource(t)
 
-	ids := []int64{resource1.Id, resource2.Id}
-	resources, err := database.GetResourcesByIds(context.Background(), nil, ids)
+	ids := []int64{resource1.ID, resource2.ID}
+	resources, err := database.GetResourcesByIDs(context.Background(), nil, ids)
 	if err != nil {
 		t.Fatalf("Failed to get resources by IDs: %v", err)
 	}
@@ -138,16 +138,16 @@ func TestGetResourcesByIds(t *testing.T) {
 	foundResource1 := false
 	foundResource2 := false
 	for _, resource := range resources {
-		if resource.Id == resource1.Id {
+		if resource.ID == resource1.ID {
 			foundResource1 = true
 		}
-		if resource.Id == resource2.Id {
+		if resource.ID == resource2.ID {
 			foundResource2 = true
 		}
 	}
 
 	if !foundResource1 || !foundResource2 {
-		t.Error("Not all created resources were found in GetResourcesByIds result")
+		t.Error("Not all created resources were found in GetResourcesByIDs result")
 	}
 }
 
@@ -158,7 +158,7 @@ func TestGetAllResources(t *testing.T) {
 		t.Fatalf("Failed to get existing resources: %v", err)
 	}
 	for _, resource := range existingResources {
-		deleteResourceErr := database.DeleteResource(context.Background(), nil, resource.Id)
+		deleteResourceErr := database.DeleteResource(context.Background(), nil, resource.ID)
 		if deleteResourceErr != nil {
 			t.Fatalf("Failed to delete existing resource: %v", deleteResourceErr)
 		}
@@ -185,12 +185,12 @@ func TestGetAllResources(t *testing.T) {
 	foundResource2 := false
 	foundResource3 := false
 	for _, resource := range resources {
-		switch resource.Id {
-		case resource1.Id:
+		switch resource.ID {
+		case resource1.ID:
 			foundResource1 = true
-		case resource2.Id:
+		case resource2.ID:
 			foundResource2 = true
-		case resource3.Id:
+		case resource3.ID:
 			foundResource3 = true
 		}
 	}
@@ -209,12 +209,12 @@ func TestGetAllResources(t *testing.T) {
 func TestDeleteResource(t *testing.T) {
 	resource := createTestResource(t)
 
-	err := database.DeleteResource(context.Background(), nil, resource.Id)
+	err := database.DeleteResource(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete resource: %v", err)
 	}
 
-	deletedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
+	deletedResource, err := database.GetResourceByID(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted resource: %v", err)
 	}
@@ -271,10 +271,10 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		lookup string
-		wantId int64
+		wantID int64
 	}{
-		{"the lowercase name resolves the lowercase resource", lower, lowerResource.Id},
-		{"the uppercase name resolves the uppercase resource", upper, upperResource.Id},
+		{"the lowercase name resolves the lowercase resource", lower, lowerResource.ID},
+		{"the uppercase name resolves the uppercase resource", upper, upperResource.ID},
 		{"a mis-cased name resolves nothing", "Case_Resource_" + strings.ToUpper(lower[14:]), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
 	} {
@@ -282,19 +282,19 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
-		if tc.wantId == 0 {
+		if tc.wantID == 0 {
 			if got != nil {
 				t.Errorf("%s: expected nil, got the resource with id %d and identifier %q",
-					tc.name, got.Id, got.ResourceIdentifier)
+					tc.name, got.ID, got.ResourceIdentifier)
 			}
 			continue
 		}
 		if got == nil {
-			t.Fatalf("%s: expected the resource with id %d, got nil", tc.name, tc.wantId)
+			t.Fatalf("%s: expected the resource with id %d, got nil", tc.name, tc.wantID)
 		}
-		if got.Id != tc.wantId {
+		if got.ID != tc.wantID {
 			t.Errorf("%s: expected the resource with id %d, got id %d (identifier %q)",
-				tc.name, tc.wantId, got.Id, got.ResourceIdentifier)
+				tc.name, tc.wantID, got.ID, got.ResourceIdentifier)
 		}
 	}
 }
@@ -315,14 +315,14 @@ func TestGetIdentifiersSharedByClientsAndResources(t *testing.T) {
 		if err := database.CreateClient(context.Background(), nil, client); err != nil {
 			t.Fatalf("Failed to create the client %q: %v", identifier, err)
 		}
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	}
 	for _, identifier := range resources {
 		resource := &record.Resource{ResourceIdentifier: identifier, Description: "Test Resource"}
 		if err := database.CreateResource(context.Background(), nil, resource); err != nil {
 			t.Fatalf("Failed to create the resource %q: %v", identifier, err)
 		}
-		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
+		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) })
 	}
 
 	identifiers, err := database.GetIdentifiersSharedByClientsAndResources(context.Background(), nil)

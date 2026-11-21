@@ -120,7 +120,7 @@ func TestBrandPaletteStylesheets_ACustomBrandWithNoPaletteIsAnUnknownTheme(t *te
 	brand := makeDefaultBrandOf(t, &broken)
 	base := appConfig.AuthServer.BaseURL
 	browser := createHttpClient(t)
-	id := strconv.FormatInt(brand.Id, 10)
+	id := strconv.FormatInt(brand.ID, 10)
 
 	page := loadPage(t, browser, base+"/no-such-page-"+fake.LetterN(8))
 	defer func() { _ = page.Body.Close() }()

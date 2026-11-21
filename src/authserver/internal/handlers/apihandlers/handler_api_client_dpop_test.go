@@ -27,7 +27,7 @@ import (
 func serveClientDPoP(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	stored *record.Client, body string, afterWrite func(database *datamocks.Database)) *httptest.ResponseRecorder {
 	t.Helper()
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(stored, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(stored, nil).Once()
 	if afterWrite != nil {
 		afterWrite(database)
 	}
@@ -41,7 +41,7 @@ func serveClientDPoP(t *testing.T, database *datamocks.Database, auditLogger *ha
 // collections the answer carries.
 func answeredAs(client *record.Client) func(database *datamocks.Database) {
 	return func(database *datamocks.Database) {
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 		database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 		database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
@@ -63,8 +63,8 @@ func TestClientDPoPPut_SetsTheRequirementBothWays(t *testing.T) {
 				body = `{"dpopBoundAccessTokens":true}`
 			}
 			rr := serveClientDPoP(t, database, auditLogger,
-				&record.Client{Id: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: !on}, body,
-				answeredAs(&record.Client{Id: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: on}))
+				&record.Client{ID: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: !on}, body,
+				answeredAs(&record.Client{ID: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: on}))
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			var answer map[string]map[string]any
@@ -94,7 +94,7 @@ func TestClientDPoPPut_TheBooleanIsRequired(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			rr := serveClientDPoP(t, database, auditLogger,
-				&record.Client{Id: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: true}, body, nil)
+				&record.Client{ID: targetClientId, ClientIdentifier: "dpop-client", DPoPBoundAccessTokens: true}, body, nil)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			var answer map[string]any
@@ -111,7 +111,7 @@ func TestClientDPoPPut_TheBooleanIsRequired(t *testing.T) {
 // Switching it off asks for what it already is, and is saved.
 func TestClientDPoPPut_TheAdminConsolesClientIsNeverSwitchedOn(t *testing.T) {
 	console := func() *record.Client {
-		return &record.Client{Id: targetClientId, ClientIdentifier: builtin.AdminConsoleClientIdentifier}
+		return &record.Client{ID: targetClientId, ClientIdentifier: builtin.AdminConsoleClientIdentifier}
 	}
 
 	t.Run("on is refused", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestClientDPoPPut_TheRequestsOwnRefusals(t *testing.T) {
 	t.Run("a body that is not JSON", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		rr := serveClientDPoP(t, database, handlersmocks.NewAuditLogger(t),
-			&record.Client{Id: targetClientId, ClientIdentifier: "dpop-client"}, `{not json`, nil)
+			&record.Client{ID: targetClientId, ClientIdentifier: "dpop-client"}, `{not json`, nil)
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assert.Contains(t, rr.Body.String(), "INVALID_REQUEST_BODY")
 	})
@@ -179,7 +179,7 @@ func TestClientDPoPPut_AFailedWriteIsNotAudited(t *testing.T) {
 		Return(errors.New("the write failed")).Once()
 
 	rr := serveClientDPoP(t, database, auditLogger,
-		&record.Client{Id: targetClientId, ClientIdentifier: "dpop-client"}, `{"dpopBoundAccessTokens":true}`, nil)
+		&record.Client{ID: targetClientId, ClientIdentifier: "dpop-client"}, `{"dpopBoundAccessTokens":true}`, nil)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

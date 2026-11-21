@@ -93,7 +93,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Nil(t, client.ClientSecretEncrypted)
 
 	// Verify redirect URIs saved
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Len(t, redirectURIs, 1)
 	assert.Equal(t, "http://localhost:8080/callback", redirectURIs[0].URI)
@@ -687,7 +687,7 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	require.NoError(t, err)
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Len(t, redirectURIs, 3)
 
@@ -722,10 +722,10 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	require.NoError(t, err)
 
-	assert.Equal(t, record.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
+	assert.Equal(t, record.ACRLevel2Optional, client.DefaultACRLevel, "Should default to level 2 optional")
 
 	// Verify token expiration uses global settings
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, settings.TokenExpirationInSeconds, client.TokenExpirationInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -821,10 +821,10 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 		client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 		require.NoError(t, err)
 		require.NotNil(t, client)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 		detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
-			strconv.FormatInt(client.Id, 10)
+			strconv.FormatInt(client.ID, 10)
 		detail := makeAPIRequest(t, "GET", detailURL, adminToken, nil)
 		defer func() { _ = detail.Body.Close() }()
 		require.Equal(t, http.StatusOK, detail.StatusCode)
@@ -954,10 +954,10 @@ func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
-		strconv.FormatInt(client.Id, 10), adminToken, nil)
+		strconv.FormatInt(client.ID, 10), adminToken, nil)
 	defer func() { _ = detail.Body.Close() }()
 	require.Equal(t, http.StatusOK, detail.StatusCode)
 
@@ -995,7 +995,7 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	user, password := createCeremonyUser(t)
 	httpClient := createHttpClient(t)
@@ -1095,10 +1095,10 @@ func TestDCR_SignOutRedirectURIsAreStoredAndEchoed(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
-		strconv.FormatInt(client.Id, 10), adminToken, nil)
+		strconv.FormatInt(client.ID, 10), adminToken, nil)
 	defer func() { _ = detail.Body.Close() }()
 	require.Equal(t, http.StatusOK, detail.StatusCode)
 

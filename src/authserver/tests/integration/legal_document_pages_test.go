@@ -44,7 +44,7 @@ func publishedForApps(t *testing.T, accessToken, prefix, title, markdown string,
 	if len(clients) > 0 {
 		clientIds := []int64{}
 		for _, c := range clients {
-			clientIds = append(clientIds, c.Id)
+			clientIds = append(clientIds, c.ID)
 		}
 		status, body := setApps(t, accessToken, id, "selected_apps", clientIds, []int64{})
 		require.Equal(t, http.StatusOK, status, "apps: %v", body)
@@ -85,12 +85,12 @@ func appWithRedirect(t *testing.T) (*record.Client, string) {
 	t.Helper()
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "legal-app-" + strings.ToLower(fake.LetterN(10)),
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultAcrLevel:  record.ACRLevel1,
 	})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	redirectURI := fake.URL()
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id, URI: redirectURI,
+		ClientID: client.ID, URI: redirectURI,
 	}))
 	return client, redirectURI
 }
@@ -109,7 +109,7 @@ func TestLegalDocumentPages_TheCurrentVersionAndEveryEarlierOne(t *testing.T) {
 	assert.Contains(t, text, "<em>address</em>", "the Markdown is rendered")
 	assert.NotContains(t, text, "What we keep", "the current version alone")
 	assert.Contains(t, page.Find("#legal-document-version").Text(), "Version 2")
-	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(context.Background(), nil, id)
 	require.NoError(t, err)
 	require.Len(t, versions, 2)
 	published, _ := page.Find("#legal-document-version time").Attr("datetime")

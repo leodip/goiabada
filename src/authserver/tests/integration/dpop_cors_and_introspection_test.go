@@ -38,18 +38,18 @@ func createDPoPService(t *testing.T) dpopService {
 	encrypted, err := dataCipher.Encrypt(secret)
 	require.NoError(t, err)
 	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    encrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	return dpopService{client: client, secret: secret, resource: resource}
 }
 
@@ -80,7 +80,7 @@ func registerWebOrigin(t *testing.T, client *record.Client) string {
 	t.Helper()
 	origin := "https://dpop-cors-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
-		ClientId: client.Id, Origin: origin,
+		ClientID: client.ID, Origin: origin,
 	}))
 	return origin
 }

@@ -59,7 +59,7 @@ type targetCeilingWrite struct {
 
 func storedUser(t *testing.T, userId int64) *record.User {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	return user
 }
@@ -73,33 +73,33 @@ func updateStoredUser(t *testing.T, userId int64, change func(user *record.User)
 
 func userPermissionIds(t *testing.T, userId int64) []int64 {
 	t.Helper()
-	rows, err := database.GetUserPermissionsByUserId(context.Background(), nil, userId)
+	rows, err := database.GetUserPermissionsByUserID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
-		ids = append(ids, row.PermissionId)
+		ids = append(ids, row.PermissionID)
 	}
 	return ids
 }
 
 func userGroupIds(t *testing.T, userId int64) []int64 {
 	t.Helper()
-	rows, err := database.GetUserGroupsByUserId(context.Background(), nil, userId)
+	rows, err := database.GetUserGroupsByUserID(context.Background(), nil, userId)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
-		ids = append(ids, row.GroupId)
+		ids = append(ids, row.GroupID)
 	}
 	return ids
 }
 
 func groupPermissionIds(t *testing.T, groupId int64) []int64 {
 	t.Helper()
-	rows, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, groupId)
+	rows, err := database.GetGroupPermissionsByGroupID(context.Background(), nil, groupId)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
-		ids = append(ids, row.PermissionId)
+		ids = append(ids, row.PermissionID)
 	}
 	return ids
 }
@@ -227,7 +227,7 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		name: "DELETE users profile picture", method: http.MethodDelete, route: "/api/v1/admin/users/{id}/profile-picture", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
 			require.NoError(t, database.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
-				UserId: f.userId, Picture: createTestPNGImage(8, 8), ContentType: "image/png",
+				UserID: f.userId, Picture: createTestPNGImage(8, 8), ContentType: "image/png",
 			}))
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
@@ -251,7 +251,7 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 				map[string]any{"userId": f.userId, "key": "tier", "value": "gold"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attributes, err := database.GetUserAttributesByUserId(context.Background(), nil, f.userId)
+			attributes, err := database.GetUserAttributesByUserID(context.Background(), nil, f.userId)
 			require.NoError(t, err)
 			return len(attributes) > 0
 		},
@@ -259,14 +259,14 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "PUT user attributes", method: http.MethodPut, route: "/api/v1/admin/user-attributes/{id}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").Id
+			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowId),
 				map[string]any{"key": "tier", "value": "platinum"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetUserAttributeById(context.Background(), nil, f.rowId)
+			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return attribute.Value == "platinum"
 		},
@@ -274,13 +274,13 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "DELETE user attributes", method: http.MethodDelete, route: "/api/v1/admin/user-attributes/{id}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").Id
+			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowId), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetUserAttributeById(context.Background(), nil, f.rowId)
+			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return attribute == nil
 		},
@@ -291,16 +291,16 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 			now := time.Now().UTC()
 			session := &record.UserSession{
 				SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthTime: now, PasswordAuthTime: now,
-				AuthMethods: "pwd", AcrLevel: "urn:goiabada:level1", IpAddress: "192.0.2.1", UserId: f.userId,
+				AuthMethods: "pwd", ACRLevel: "urn:goiabada:level1", IPAddress: "192.0.2.1", UserID: f.userId,
 			}
 			require.NoError(t, database.CreateUserSession(context.Background(), nil, session))
-			f.rowId = session.Id
+			f.rowId = session.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-sessions/%d", f.rowId), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			session, err := database.GetUserSessionById(context.Background(), nil, f.rowId)
+			session, err := database.GetUserSessionByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return session == nil
 		},
@@ -309,19 +309,19 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		name: "DELETE user consents", method: http.MethodDelete, route: "/api/v1/admin/user-consents/{id}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
 			client := createTestClient(t, "target-consent-"+strings.ToLower(fake.LetterN(8)))
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 			consent := &record.UserConsent{
-				ClientId: client.Id, UserId: f.userId, Scope: "openid",
+				ClientID: client.ID, UserID: f.userId, Scope: "openid",
 				GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 			}
 			require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
-			f.rowId = consent.Id
+			f.rowId = consent.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-consents/%d", f.rowId), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			consent, err := database.GetUserConsentById(context.Background(), nil, f.rowId)
+			consent, err := database.GetUserConsentByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return consent == nil
 		},
@@ -332,16 +332,16 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		route: "/api/v1/admin/users/{id}/connected-clients/{clientId}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
 			client := createTestClient(t, "target-connected-"+strings.ToLower(fake.LetterN(8)))
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 			holdRefreshToken(t, storedUser(t, f.userId), client, false, time.Now().UTC().Add(time.Hour))
-			f.rowId = client.Id
+			f.rowId = client.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete,
 				fmt.Sprintf("/api/v1/admin/users/%d/connected-clients/%d", f.userId, f.rowId), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			tokens, err := database.GetRefreshTokensByUserId(context.Background(), nil, f.userId)
+			tokens, err := database.GetRefreshTokensByUserID(context.Background(), nil, f.userId)
 			require.NoError(t, err)
 			require.Len(t, tokens, 1)
 			return tokens[0].Revoked
@@ -366,7 +366,7 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			current := userPermissionIds(t, f.userId)
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userId),
-				map[string]any{"permissionIds": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
 			for _, id := range userPermissionIds(t, f.userId) {
@@ -407,7 +407,7 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 				map[string]any{"groupIdentifier": f.before, "description": "Renamed"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			group, err := database.GetGroupById(context.Background(), nil, f.groupId)
+			group, err := database.GetGroupByID(context.Background(), nil, f.groupId)
 			require.NoError(t, err)
 			return group.GroupIdentifier == f.before
 		},
@@ -420,7 +420,7 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 				map[string]any{"groupId": f.groupId, "key": "tier", "value": "gold"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attributes, err := database.GetGroupAttributesByGroupId(context.Background(), nil, f.groupId)
+			attributes, err := database.GetGroupAttributesByGroupID(context.Background(), nil, f.groupId)
 			require.NoError(t, err)
 			return len(attributes) > 0
 		},
@@ -428,14 +428,14 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "PUT group attributes", method: http.MethodPut, route: "/api/v1/admin/group-attributes/{id}", kind: "group",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").Id
+			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowId),
 				map[string]any{"key": "tier", "value": "platinum"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetGroupAttributeById(context.Background(), nil, f.rowId)
+			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return attribute.Value == "platinum"
 		},
@@ -443,13 +443,13 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "DELETE group attributes", method: http.MethodDelete, route: "/api/v1/admin/group-attributes/{id}", kind: "group",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").Id
+			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowId), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetGroupAttributeById(context.Background(), nil, f.rowId)
+			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowId)
 			require.NoError(t, err)
 			return attribute == nil
 		},
@@ -461,7 +461,7 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			current := groupPermissionIds(t, f.groupId)
 			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupId),
-				map[string]any{"permissionIds": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
 			for _, id := range groupPermissionIds(t, f.groupId) {
@@ -478,8 +478,8 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 func ordinaryPermission(t *testing.T) int64 {
 	t.Helper()
 	resource := createTestResource(t, "target-res-"+strings.ToLower(fake.LetterN(8)), "Target ceiling")
-	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
-	return createTestPermission(t, resource.Id, "read", "Read").Id
+	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) })
+	return createTestPermission(t, resource.ID, "read", "Read").ID
 }
 
 // administratorUser is a fresh user holding the administrative permission identifier, directly or,
@@ -489,12 +489,12 @@ func administratorUser(t *testing.T, identifier string, throughGroup bool) int64
 	t.Helper()
 	userId := newMembershipUser(t)
 	require.NoError(t, database.CreateUserPermission(context.Background(), nil,
-		&record.UserPermission{UserId: userId, PermissionId: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
+		&record.UserPermission{UserID: userId, PermissionID: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
 	administrative := authServerPermissionId(t, identifier)
 	if throughGroup {
 		joinGroup(t, userId, newGroupHolding(t, administrative))
 	} else {
-		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: userId, PermissionId: administrative}))
+		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userId, PermissionID: administrative}))
 	}
 	return userId
 }
@@ -504,7 +504,7 @@ func ordinaryUser(t *testing.T) int64 {
 	t.Helper()
 	userId := newMembershipUser(t)
 	require.NoError(t, database.CreateUserPermission(context.Background(), nil,
-		&record.UserPermission{UserId: userId, PermissionId: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
+		&record.UserPermission{UserID: userId, PermissionID: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
 	joinGroup(t, userId, ordinaryGroup(t))
 	return userId
 }
@@ -546,7 +546,7 @@ func TestTargetCeiling_AGranularTokenCannotWriteToAnAdministratorUser(t *testing
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for i, write := range userTargetCeilingWrites {
@@ -576,7 +576,7 @@ func TestTargetCeiling_AGranularTokenCannotWriteToAnAdministrativeGroup(t *testi
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for i, write := range groupTargetCeilingWrites {
@@ -597,7 +597,7 @@ func TestTargetCeiling_AGranularTokenStillWritesToOrdinaryUsersAndGroups(t *test
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for _, write := range append(append([]targetCeilingWrite{}, userTargetCeilingWrites...), groupTargetCeilingWrites...) {

@@ -64,7 +64,7 @@ func giveRecoveryCodes(t *testing.T, userId int64) []string {
 
 // createPublicClientAt creates a public client asking for level, which redeems its codes with
 // testCodeVerifier alone.
-func createPublicClientAt(t *testing.T, level record.AcrLevel) (*record.Client, *record.RedirectURI) {
+func createPublicClientAt(t *testing.T, level record.ACRLevel) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 
 	client := &record.Client{
@@ -72,10 +72,10 @@ func createPublicClientAt(t *testing.T, level record.AcrLevel) (*record.Client, 
 		Enabled:                  true,
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          level,
+		DefaultACRLevel:          level,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 	return client, redirectUri
 }
@@ -213,9 +213,9 @@ func recoveryCodeEventsFor(t *testing.T, event string, userId int64) []map[strin
 // claims the same, and the audit log records the sign-in with the count and never the code.
 func TestRecoveryCode_SignsInAtLevel3(t *testing.T) {
 	requireDatabaseAuditLogs(t)
-	client, redirectUri := createPublicClientAt(t, record.AcrLevel2Mandatory)
+	client, redirectUri := createPublicClientAt(t, record.ACRLevel2Mandatory)
 	_, _, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 
 	typed := strings.ToUpper(strings.ReplaceAll(codes[3], "-", " "))
 	httpClient, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, typed)
@@ -226,18 +226,18 @@ func TestRecoveryCode_SignsInAtLevel3(t *testing.T) {
 		assert.Equal(t, []interface{}{"pwd", "recovery_code"}, claims["amr"], "%s's amr", name)
 	}
 
-	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.Id))
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.ID))
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel2Mandatory, sessions[0].AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, sessions[0].ACRLevel)
 	assert.Equal(t, "pwd recovery_code", sessions[0].AuthMethods)
 
-	events := recoveryCodeEventsFor(t, audit.EventAuthSuccessRecoveryCode, user.Id)
+	events := recoveryCodeEventsFor(t, audit.EventAuthSuccessRecoveryCode, user.ID)
 	require.Len(t, events, 1)
-	assert.Equal(t, map[string]any{"user_id": float64(user.Id), "remaining": float64(9)}, events[0],
+	assert.Equal(t, map[string]any{"user_id": float64(user.ID), "remaining": float64(9)}, events[0],
 		"the user and the count, never the code or its hash")
-	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventAuthSuccessOtp, user.Id),
+	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventAuthSuccessOtp, user.ID),
 		"a recovery-code sign-in is not counted as an authenticator sign-in")
 }
 
@@ -245,9 +245,9 @@ func TestRecoveryCode_SignsInAtLevel3(t *testing.T) {
 // authenticator for a code, takes a recovery code too, so a user who lost their phone reaches My
 // Account (decision 4).
 func TestRecoveryCode_SatisfiesLevel2Optional(t *testing.T) {
-	client, redirectUri := createPublicClientAt(t, record.AcrLevel2Optional)
+	client, redirectUri := createPublicClientAt(t, record.ACRLevel2Optional)
 	_, _, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 
 	httpClient, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[0])
 	idClaims, _ := finishSignIn(t, httpClient, resp)
@@ -261,7 +261,7 @@ func TestRecoveryCode_SatisfiesLevel2Optional(t *testing.T) {
 func TestRecoveryCode_ACodeWorksOnce(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 
 	_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[5])
 	assertRedirect(t, resp, "/auth/completed")
@@ -270,13 +270,13 @@ func TestRecoveryCode_ACodeWorksOnce(t *testing.T) {
 	_, resp, _ = recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[5])
 	assertRecoveryCodeRefused(t, resp)
 
-	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.Id))
-	replays := recoveryCodeEventsFor(t, audit.EventRecoveryCodeReplayDetected, user.Id)
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.ID))
+	replays := recoveryCodeEventsFor(t, audit.EventRecoveryCodeReplayDetected, user.ID)
 	require.Len(t, replays, 1)
-	assert.Equal(t, map[string]any{"user_id": float64(user.Id)}, replays[0])
-	failures := recoveryCodeEventsFor(t, audit.EventAuthFailedRecoveryCode, user.Id)
+	assert.Equal(t, map[string]any{"user_id": float64(user.ID)}, replays[0])
+	failures := recoveryCodeEventsFor(t, audit.EventAuthFailedRecoveryCode, user.ID)
 	require.Len(t, failures, 1)
-	assert.Equal(t, map[string]any{"user_id": float64(user.Id)}, failures[0])
+	assert.Equal(t, map[string]any{"user_id": float64(user.ID)}, failures[0])
 }
 
 // TestRecoveryCode_OfTwoSubmissionsOfOneCodeExactlyOneSignsIn: two browsers at the recovery-code form
@@ -284,7 +284,7 @@ func TestRecoveryCode_ACodeWorksOnce(t *testing.T) {
 // is refused (decision 3).
 func TestRecoveryCode_OfTwoSubmissionsOfOneCodeExactlyOneSignsIn(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 
 	type browser struct {
 		httpClient *http.Client
@@ -325,7 +325,7 @@ func TestRecoveryCode_OfTwoSubmissionsOfOneCodeExactlyOneSignsIn(t *testing.T) {
 
 	assert.ElementsMatch(t, []int{http.StatusSeeOther, http.StatusOK}, statuses,
 		"one signs in and the other is refused")
-	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.Id))
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.ID))
 }
 
 // TestRecoveryCode_ACodeOfAReplacedSetIsAWrongCode: once a new set replaces the old one, the old codes
@@ -333,15 +333,15 @@ func TestRecoveryCode_OfTwoSubmissionsOfOneCodeExactlyOneSignsIn(t *testing.T) {
 func TestRecoveryCode_ACodeOfAReplacedSetIsAWrongCode(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	old := giveRecoveryCodes(t, user.Id)
-	giveRecoveryCodes(t, user.Id)
+	old := giveRecoveryCodes(t, user.ID)
+	giveRecoveryCodes(t, user.ID)
 
 	_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, old[0])
 	assertRecoveryCodeRefused(t, resp)
 
-	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, user.Id), "the new set is untouched")
-	assert.Len(t, recoveryCodeEventsFor(t, audit.EventAuthFailedRecoveryCode, user.Id), 1)
-	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventRecoveryCodeReplayDetected, user.Id))
+	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, user.ID), "the new set is untouched")
+	assert.Len(t, recoveryCodeEventsFor(t, audit.EventAuthFailedRecoveryCode, user.ID), 1)
+	assert.Empty(t, recoveryCodeEventsFor(t, audit.EventRecoveryCodeReplayDetected, user.ID))
 }
 
 // TestRecoveryCode_WorksWhileTheAuthenticatorIsDisabled: an authenticator disabled after 100 wrong
@@ -350,10 +350,10 @@ func TestRecoveryCode_ACodeOfAReplacedSetIsAWrongCode(t *testing.T) {
 // (decision 6).
 func TestRecoveryCode_WorksWhileTheAuthenticatorIsDisabled(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
-	for i := 0; i < record.OtpConsecutiveFailureLimit; i++ {
-		_, err := database.IncrementUserOtpConsecutiveFailures(context.Background(), nil, user.Id,
-			user.OtpConfigGeneration)
+	codes := giveRecoveryCodes(t, user.ID)
+	for i := 0; i < record.OTPConsecutiveFailureLimit; i++ {
+		_, err := database.IncrementUserOTPConsecutiveFailures(context.Background(), nil, user.ID,
+			user.OTPConfigGeneration)
 		require.NoError(t, err)
 	}
 
@@ -372,10 +372,10 @@ func TestRecoveryCode_WorksWhileTheAuthenticatorIsDisabled(t *testing.T) {
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	stored, err := database.GetUserById(context.Background(), nil, user.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.True(t, stored.OTPEnabled)
-	assert.EqualValues(t, record.OtpConsecutiveFailureLimit, stored.OtpConsecutiveFailures,
+	assert.EqualValues(t, record.OTPConsecutiveFailureLimit, stored.OTPConsecutiveFailures,
 		"the authenticator stays disabled until it is rebound")
 }
 
@@ -384,7 +384,7 @@ func TestRecoveryCode_WorksWhileTheAuthenticatorIsDisabled(t *testing.T) {
 // what a password alone reaches (#542).
 func TestRecoveryCode_RemovingTheAuthenticatorLowersTheSession(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 	httpClient, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[7])
 	location := assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -392,14 +392,14 @@ func TestRecoveryCode_RemovingTheAuthenticatorLowersTheSession(t *testing.T) {
 	assertRedirect(t, resp, "/auth/issue")
 	_ = resp.Body.Close()
 
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel2Optional, sessions[0].AcrLevel)
+	assert.Equal(t, record.ACRLevel2Optional, sessions[0].ACRLevel)
 	assert.Equal(t, "pwd", sessions[0].AuthMethods, "the session no longer names the recovery code")
-	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, user.Id), "the codes went with the authenticator")
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, user.ID), "the codes went with the authenticator")
 }
 
 // TestRecoveryCode_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver: the recovery code was
@@ -408,18 +408,18 @@ func TestRecoveryCode_RemovingTheAuthenticatorLowersTheSession(t *testing.T) {
 // the password rather than creating a session that names it (#542).
 func TestRecoveryCode_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
-	codes := giveRecoveryCodes(t, user.Id)
+	codes := giveRecoveryCodes(t, user.ID)
 	httpClient, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[9])
 	completedLocation := assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
 	resp = loadPage(t, httpClient, completedLocation)
 	assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "no session was created on the removed authenticator's claim")
 }

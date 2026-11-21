@@ -69,12 +69,12 @@ func TestMigration000026_CodeRevoked(t *testing.T) {
 	// later migrations arrive; the assertions still run at 000026, which is what the
 	// round trip below restores.
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head before seeding through the ORM")
-	codeId := seedCode000026(t, h)
+	codeID := seedCode000026(t, h)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 25), "roll back to 000025")
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "re-apply 000026")
 
-	assert.False(t, readCodeRevoked000026(t, h, codeId),
+	assert.False(t, readCodeRevoked000026(t, h, codeID),
 		"a codes row that predates the column must land revoked = false")
 
 	// 4. The column survives the round trip with its shape intact.
@@ -108,8 +108,8 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 	// other three allow NULL. AuthenticatedAt, because a zero time.Time reaches MySQL
 	// as '0000-00-00', which it rejects outright.
 	code := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		CodeHash:            "mig26_hash_" + random,
 		CodeChallenge:       sql.NullString{String: "mig26_challenge_" + random, Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
@@ -117,23 +117,23 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 		Scope:               "openid profile",
 		State:               "mig26_state_" + random,
 		Nonce:               "mig26_nonce_" + random,
-		IpAddress:           "192.168.1.1",
+		IPAddress:           "192.168.1.1",
 		UserAgent:           "migration test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   "mig26_session_" + random,
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 	}
 	require.NoError(t, h.DB.CreateCode(context.Background(), nil, code), "seed code")
 
-	return code.Id
+	return code.ID
 }
 
-func readCodeRevoked000026(t *testing.T, h *isolatedDB, codeId int64) bool {
+func readCodeRevoked000026(t *testing.T, h *isolatedDB, codeID int64) bool {
 	t.Helper()
 	var revoked bool
-	q := fmt.Sprintf("SELECT revoked FROM codes WHERE id = %d", codeId)
+	q := fmt.Sprintf("SELECT revoked FROM codes WHERE id = %d", codeID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&revoked), "read codes.revoked")
 	return revoked
 }

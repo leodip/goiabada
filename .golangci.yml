@@ -293,12 +293,6 @@ linters:
       - {path: '^src/authserver/internal/cleanup/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/clientauth/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/config/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/commondb/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/mssqldb/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/mysqldb/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/postgresdb/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/data/sqlitedb/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/emaildelivery/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/emaillinks/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/errcode/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
@@ -313,7 +307,6 @@ linters:
       - {path: '^src/authserver/internal/otpcredential/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/permissions/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/protocolvalidation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/internal/record/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/recovery/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/render/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/reqctx/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
@@ -326,5 +319,4 @@ linters:
       - {path: '^src/authserver/internal/usercreation/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/userexport/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/internal/usersession/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/tests/data/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/authserver/tests/integration/[^/]+$', linters: [staticcheck], text: '^ST1003:'}

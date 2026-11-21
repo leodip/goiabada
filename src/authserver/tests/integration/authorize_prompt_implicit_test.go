@@ -32,7 +32,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*record.Client, *record.R
 		AuthorizationCodeEnabled: true, // Needed for establishing session
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -41,7 +41,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*record.Client, *record.R
 	}
 
 	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 

@@ -47,7 +47,7 @@ func (discardNotices) Send(*http.Request, accountnotice.Notice, accountnotice.Re
 // name.
 func adminDeletionNoticeRow() *record.User {
 	return &record.User{
-		Id:            adminDeletionNoticeUserId,
+		ID:            adminDeletionNoticeUserId,
 		Subject:       "the-deleted-user",
 		Enabled:       true,
 		GivenName:     "Elisa",
@@ -72,22 +72,22 @@ func adminDeletionNoticeRequest(settings *record.Settings) *http.Request {
 // administrators' lock, the row as the transaction reads it under its lock (locked) and the guard's
 // reads, which find that the user holds no manage.
 func stubAdminDeletionUpToTheWrite(database *datamocks.Database, before *record.User, locked *record.User) {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).Return(before, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).Return(before, nil).Once()
 	datamocks.ExpectRunInTransaction(database, guardTx)
 	expectAdministratorsLock(database, guardTx)
-	database.On("GetUserByIdForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).Return(locked, nil).Once()
-	database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, guardTx, adminDeletionNoticeUserId, permManage).
+	database.On("GetUserByIDForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).Return(locked, nil).Once()
+	database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, guardTx, adminDeletionNoticeUserId, permManage).
 		Return(nil, nil).Once()
-	database.On("GetUserGroupsByUserId", mock.Anything, guardTx, adminDeletionNoticeUserId).
+	database.On("GetUserGroupsByUserID", mock.Anything, guardTx, adminDeletionNoticeUserId).
 		Return([]record.UserGroup{}, nil).Once()
 }
 
 // stubAdminDeletionTellsNoApp answers the reads that name the apps the deletion tells, before the
 // delete: the user has no session and no grant, so no app is told.
 func stubAdminDeletionTellsNoApp(database *datamocks.Database) {
-	database.On("GetUserSessionsByUserId", mock.Anything, guardTx, adminDeletionNoticeUserId).
+	database.On("GetUserSessionsByUserID", mock.Anything, guardTx, adminDeletionNoticeUserId).
 		Return([]record.UserSession{}, nil).Once()
-	database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, guardTx, adminDeletionNoticeUserId, mock.Anything).
+	database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, guardTx, adminDeletionNoticeUserId, mock.Anything).
 		Return([]int64{}, nil).Once()
 }
 
@@ -206,29 +206,29 @@ func TestHandleUserDelete_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			}},
 		{"the user does not exist", http.StatusNotFound,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).Return(nil, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).Return(nil, nil).Once()
 			}},
 		{
 			// Another request deleted the user after this one read them: this one deleted nothing.
 			"the user was deleted meanwhile", http.StatusNotFound,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).
 					Return(adminDeletionNoticeRow(), nil).Once()
 				datamocks.ExpectRunInTransaction(database, guardTx)
 				expectAdministratorsLock(database, guardTx)
-				database.On("GetUserByIdForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).
+				database.On("GetUserByIDForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).
 					Return(nil, nil).Once()
 			}},
 		{"the user is the last administrator", http.StatusConflict,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), adminDeletionNoticeUserId).
 					Return(adminDeletionNoticeRow(), nil).Once()
 				datamocks.ExpectRunInTransaction(database, guardTx)
 				expectAdministratorsLock(database, guardTx)
-				database.On("GetUserByIdForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).
+				database.On("GetUserByIDForUpdate", mock.Anything, guardTx, adminDeletionNoticeUserId).
 					Return(adminDeletionNoticeRow(), nil).Once()
-				database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, guardTx, adminDeletionNoticeUserId, permManage).
-					Return(&record.UserPermission{Id: 9, UserId: adminDeletionNoticeUserId, PermissionId: permManage}, nil).Once()
+				database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, guardTx, adminDeletionNoticeUserId, permManage).
+					Return(&record.UserPermission{ID: 9, UserID: adminDeletionNoticeUserId, PermissionID: permManage}, nil).Once()
 				expectHoldersCounted(database, guardTx, 1, 0)
 				stubAdminDeletionTellsNoApp(database)
 				database.On("DeleteUser", mock.Anything, guardTx, adminDeletionNoticeUserId).Return(nil).Once()
