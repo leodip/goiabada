@@ -348,9 +348,11 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   labelled with the button label, which is plain text; `{{code}}` alone in its paragraph draws the
   box above, and is text elsewhere. `{{name}}` is
   `emailtemplate.RecipientName`, the address for a user with none, `{{expiry}}` a lifetime in
-  the email's language, and `{{codes_left}}` a number, which the recovery code notice words alike
-  for any count. `Email.Check` gives the refusals: a name the email does not offer, a required
-  one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
+  the email's language, its unit's name the one of the count's plural category, chosen by
+  `i18n.PluralCategory` among a name per category the language's whole counts reach, and
+  `{{codes_left}}` a number, which the recovery code notice words alike for any count.
+  `Email.Check` gives the refusals: a name the email does not offer, a required one the body
+  does not draw (`{{button}}` does not draw the link), the link or the button in the
   subject, the button not alone, a placeholder in a destination, a body with nothing to read
   besides the button, and the limits of a field: a subject blank, past 200 characters or on two
   lines, a button label blank or past 60 (or present on an email with no button), a body past
