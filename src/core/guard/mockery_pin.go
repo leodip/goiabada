@@ -14,9 +14,9 @@ import (
 // AssertGeneratedMocksArePinned holds three things to each other: the mockery version
 // versions.yaml pins, the header src/mockery-header.txt carries, and the header every
 // committed mock actually begins with. The middle one is inlined verbatim into each
-// generated file through template-data.boilerplate-file in the two .mockery.yaml files,
-// so a clone can read which generator wrote the tree instead of having to install one
-// and run it to find out.
+// generated file through template-data.boilerplate-file in the three .mockery.yaml files
+// (core, authserver and adminconsole), so a clone can read which generator wrote the tree
+// instead of having to install one and run it to find out.
 //
 // The drift this exists for is not hypothetical. Sixteen committed mocks predated the
 // mockery that versions.yaml pins, so generate-mocks.sh was not idempotent against its
