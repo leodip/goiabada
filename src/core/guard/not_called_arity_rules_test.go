@@ -280,6 +280,12 @@ func TestRules(t *testing.T) {
 	// against a CreateUser of three pass; one is a finding.
 	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", mock.Anything)
+
+	// Rows 16 and 17: matchers spread from a slice, whose length the call does not show. Counted
+	// as one argument, the empty spread would pass against a Send of two and the full one would
+	// be a finding against a CreateUser of three; both are refused, in both call forms.
+	sender.AssertNotCalled(t, "Send", []any{}...)
+	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", []any{mock.Anything, mock.Anything, mock.Anything}...)
 }
 `)
 	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
@@ -332,8 +338,8 @@ func TestSupport(t *testing.T) {
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 13, sites,
-		"every testify assertion is reached once, including the three the walk refuses, and "+
+	assert.Equal(t, 15, sites,
+		"every testify assertion is reached once, including the five the walk refuses, and "+
 			"neither call of a method merely spelled like it")
 
 	assert.Equal(t, []string{
@@ -346,10 +352,12 @@ func TestSupport(t *testing.T) {
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))
 
-	require.Len(t, blocked, 3)
+	require.Len(t, blocked, 5)
 	assert.Contains(t, blocked[0].why, "does not declare")
 	assert.Contains(t, blocked[1].why, "string literal")
 	assert.Contains(t, blocked[2].why, "variadic")
+	assert.Contains(t, blocked[3].why, "spreads its matchers")
+	assert.Contains(t, blocked[4].why, "spreads its matchers")
 }
 
 // TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass pins the one way this guard stops

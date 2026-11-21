@@ -46,7 +46,7 @@ const notCalledSelector = "AssertNotCalled"
 // generated from -- and when they ever disagree, the recorded list is the one testify compares
 // against.
 //
-// Three shapes are reported rather than passed over, because each one is an assertion that cannot
+// Four shapes are reported rather than passed over, because each one is an assertion that cannot
 // be shown to hold and a guard that skips what it cannot answer is a guard that narrows itself:
 //
 //   - a method named through anything but a string literal, which is an arity no walk can read.
@@ -56,7 +56,9 @@ const notCalledSelector = "AssertNotCalled"
 //     match anything and so passes unconditionally -- the same defect as a wrong count, reached by
 //     a typo instead;
 //   - a variadic method, whose recorded length testify's own matching rules decide rather than the
-//     signature. There is none in this tree, which is what makes refusing one free.
+//     signature. There is none in this tree, which is what makes refusing one free;
+//   - matchers spread from a slice with ..., whose number the call does not show. There is none
+//     in this tree either.
 //
 // It does not widen to AssertCalled, whose failure mode is the opposite and is loud: an arity
 // mismatch there makes the assertion fail on every run, so no such site can survive a green tier.
@@ -236,6 +238,14 @@ func notCalledSitesIn(
 		rel := relativeTo(root, position.Filename)
 		refuse := func(why string) {
 			refused = append(refused, notCalledRefusal{file: rel, line: position.Line, why: why})
+		}
+
+		// A spread final argument hands testify the slice's elements, whose number the call does
+		// not show: counted as one matcher, an empty spread would pass and a full one be a finding.
+		if call.Ellipsis.IsValid() {
+			refuse(notCalledSelector + " spreads its matchers from a slice with ..., so no walk " +
+				"can read how many it passes; pass each matcher as an argument of its own")
+			return true
 		}
 
 		// A method expression, (*doubles.Database).AssertNotCalled(db, t, ...), takes the receiver
