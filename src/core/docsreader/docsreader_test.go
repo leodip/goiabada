@@ -315,6 +315,32 @@ func TestTables_AFenceClosesOnlyOnABareRunOfItsCharacterAtLeastAsLong(t *testing
 	}
 }
 
+// TestTables_ARunOfTwoOpensNoFence: a fence opens on three backticks or tildes, so a prose line
+// that starts with a double-backtick code span or a strikethrough is prose. The heading after it
+// opens its section, and the table after it is read and blanked.
+func TestTables_ARunOfTwoOpensNoFence(t *testing.T) {
+	const after = "\n## Time zone\n\n| Event | Details |\n|---|---|\n| `real` | `payload_key` |\n"
+	for name, prose := range map[string]string{
+		"two backticks": "`` `TZ` `` names the zone.\n",
+		"two tildes":    "~~Retired~~ names nothing.\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			text := prose + after
+			if _, found := SectionText(text, "## Time zone"); !found {
+				t.Errorf("the heading after the prose opened no section:\n%s", text)
+			}
+			assertTables(t, Tables(text), []Table{
+				{Header: []string{"Event", "Details"}, Rows: [][]string{{"`real`", "`payload_key`"}}},
+			})
+			blanked := BlankColumn(text, "Details")
+			assertLinesKept(t, text, blanked, len(strings.Split(text, "\n"))-2)
+			assertTables(t, Tables(blanked), []Table{
+				{Header: []string{"Event", "Details"}, Rows: [][]string{{"`real`", ""}}},
+			})
+		})
+	}
+}
+
 // TestTables_ARowNoDelimiterFollowsIsData: a row a delimiter row does not follow is not a header,
 // so a table written without one reads as rows only.
 func TestTables_ARowNoDelimiterFollowsIsData(t *testing.T) {
