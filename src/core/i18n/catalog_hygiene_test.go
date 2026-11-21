@@ -126,7 +126,7 @@ func TestCountedForm(t *testing.T) {
 		assert.Equal(t, want, [2]string{family, category})
 	}
 	for _, key := range []string{"adminconsole.account.otp.recovery_codes.remaining.none", "adminconsole.account.profile.gender_other",
-		"other", ".other", "js.combobox.one_result", "a.others"} {
+		"other", ".other", "js.combobox.no_matches", "a.others"} {
 		_, _, ok := countedForm(key)
 		assert.Falsef(t, ok, "%q is not a counted form", key)
 	}

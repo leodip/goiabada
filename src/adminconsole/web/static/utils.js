@@ -6,9 +6,8 @@
 // so the order of the two elements in the page does not matter.
 let i18nTable = null;
 
-// t looks up a key among the client-side strings. It falls back to the key itself, so a missing
-// entry shows as its key rather than as nothing.
-function t(key) {
+// i18nStrings returns the client-side strings, reading the block on first use.
+function i18nStrings() {
   if (i18nTable === null) {
     const block = document.getElementById("js-i18n");
     try {
@@ -17,7 +16,13 @@ function t(key) {
       i18nTable = {};
     }
   }
-  return i18nTable[key] || key;
+  return i18nTable;
+}
+
+// t looks up a key among the client-side strings. It falls back to the key itself, so a missing
+// entry shows as its key rather than as nothing.
+function t(key) {
+  return i18nStrings()[key] || key;
 }
 
 // tFormat substitutes {{name}} placeholders in the catalog value with the
@@ -31,6 +36,37 @@ function tFormat(key, params) {
     }
   }
   return s;
+}
+
+// tCount writes the counted phrase key for count: the form "<key>.<category>" of the count's CLDR
+// plural category (pluralCategory), or "<key>.other" when the strings hold no key for that category,
+// with the count filling {{count}} and params the form's other placeholders, as tFormat fills them.
+// The page hands over only the forms its own catalog has, with its other form, so a form is never
+// another language's, and the chosen form is looked for before it is formatted, since t answers a
+// missing key with its own name (#665 decision 1). A sentence for nothing, "<key>.none", is the
+// caller's to choose.
+function tCount(key, count, params) {
+  const form = key + "." + pluralCategory(count);
+  const chosen = Object.prototype.hasOwnProperty.call(i18nStrings(), form) ? form : key + ".other";
+  return tFormat(chosen, Object.assign({}, params, { count: count }));
+}
+
+// pluralCategory returns the CLDR cardinal category, "zero", "one", "two", "few", "many" or "other",
+// that count takes by the browser's plural rules for the catalog this page rendered from,
+// data-catalog-lang, the language its strings are in: in Polish 1 is "one", 2 to 4 and 22 "few", and
+// 5 to 21 and 25 "many". Where the browser has no rules for that language, or the tag is missing or
+// one Intl refuses as malformed, it is English's, never the browser's own default language.
+function pluralCategory(count) {
+  const lang = document.documentElement.dataset.catalogLang;
+  let language = "en";
+  try {
+    if (lang && Intl.PluralRules.supportedLocalesOf(lang).length > 0) {
+      language = lang;
+    }
+  } catch (err) {
+    // A malformed tag, which Intl refuses with a RangeError.
+  }
+  return new Intl.PluralRules(language).select(count);
 }
 
 // escapeHtml renders a string as text in a place that expects markup. dialogMarkup and
@@ -579,8 +615,7 @@ function makeSearchable(select) {
       return match;
     });
     empty.hidden = shown.length > 0;
-    status.textContent = shown.length === 1 ? t("js.combobox.one_result")
-      : tFormat("js.combobox.results", { count: shown.length });
+    status.textContent = tCount("js.combobox.results", shown.length);
   }
 
   // place opens the list below the field, or above it when there is little room below and more

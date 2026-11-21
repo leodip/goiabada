@@ -15,7 +15,7 @@ func TestSpanish_RegionalPreferencesAndRefusals(t *testing.T) {
 			assert.Equal(t, "Iniciar sesión", T(ctx, "auth.pwd.title"))
 			assert.Equal(t, "La dirección de correo electrónico no puede superar los 254 caracteres.",
 				NewLocalizedError(ErrCodeEmailTooLong, map[string]any{"max": 254}).Localize(ctx))
-			assert.Equal(t, "{{count}} resultados", Raw(ctx, "js.combobox.results"))
+			assert.Equal(t, "{{count}} resultados", Raw(ctx, "js.combobox.results.other"))
 		})
 	}
 }

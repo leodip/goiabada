@@ -480,5 +480,7 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   name". A phrase with a count is a counted key, one form per CLDR plural category its language's
   whole counts reach (`<key>.one` and `.other` in English), each carrying the count's placeholder,
   and `i18n.TCount`, the console's `TCount` template function, chooses the form: nothing tests
-  `count == 1`. Its sentence for zero, `<key>.none`, is the caller's to choose. All built-in
-  catalogs change together.
+  `count == 1`. Its sentence for zero, `<key>.none`, is the caller's to choose. In the console's
+  script, `tCount` chooses the form by `Intl.PluralRules` for the page's catalog tag, among the
+  forms `JSBootstrap` hands over for a family listed in `jsBootstrapCountedKeys`: those the page's
+  own catalog has, with its other form. All built-in catalogs change together.

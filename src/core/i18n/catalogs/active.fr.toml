@@ -2576,5 +2576,5 @@
 "js.image_upload.delete_failed" = "Impossible de supprimer l’image. Réessayez."
 "js.image_upload.unreadable" = "Ce fichier n’a pas pu être lu comme une image. Choisissez-en un autre."
 "js.combobox.no_matches" = "Aucun résultat"
-"js.combobox.one_result" = "1 résultat"
-"js.combobox.results" = "{{count}} résultats"
+"js.combobox.results.one" = "{{count}} résultat"
+"js.combobox.results.other" = "{{count}} résultats"

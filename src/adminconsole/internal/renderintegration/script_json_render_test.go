@@ -103,6 +103,13 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(m[1]), &kv))
 			assert.Equal(t, builtInUnexpectedError, kv["js.error.unexpected"], "escaped once and no more")
 			assert.Equal(t, "Sessão expirada", kv["js.error.session_expired_title"])
+			// A counted phrase arrives as the forms the page's catalog has, placeholders unfilled, for
+			// the script's tCount to choose among.
+			assert.Equal(t, "{{count}} resultado", kv["js.combobox.results.one"])
+			assert.Equal(t, "{{count}} resultados", kv["js.combobox.results.other"])
+			for _, category := range []string{"zero", "two", "few", "many"} {
+				assert.NotContainsf(t, kv, "js.combobox.results."+category, "pt-BR has no %s form", category)
+			}
 		})
 	}
 }

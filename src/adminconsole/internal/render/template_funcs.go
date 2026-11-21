@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"maps"
 	"net/url"
 	"strconv"
 	"strings"
@@ -41,7 +42,14 @@ var jsBootstrapKeys = []string{
 	"js.image_upload.delete_failed",
 	"js.image_upload.unreadable",
 	"js.combobox.no_matches",
-	"js.combobox.one_result",
+}
+
+// jsBootstrapCountedKeys are the counted phrases JSBootstrap emits, each a family of forms that
+// utils.js's tCount() chooses among by the page's plural rules. The block carries only the forms the
+// page's own catalog has, with its other form, which i18n.RawCounted answers, so the script falls
+// back to the catalog's other form for a category it has no key for rather than taking English's
+// (#665 decision 1).
+var jsBootstrapCountedKeys = []string{
 	"js.combobox.results",
 }
 
@@ -206,7 +214,9 @@ var templateFuncMap = template.FuncMap{
 	//
 	// The set of bootstrap keys is fixed and small. Adding a new client-side
 	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
-	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS.
+	// jsBootstrapKeys list below, (3) consume via t()/tFormat() in JS. A counted
+	// phrase goes in jsBootstrapCountedKeys by its family's name instead, and
+	// the script writes it with tCount().
 	//
 	// Uses i18n.Raw (not T): several keys carry {{param}} placeholders that
 	// tFormat() substitutes client-side. T() would try to execute them as
@@ -216,6 +226,9 @@ var templateFuncMap = template.FuncMap{
 		m := make(map[string]string, len(jsBootstrapKeys))
 		for _, k := range jsBootstrapKeys {
 			m[k] = i18n.Raw(ctx, k)
+		}
+		for _, k := range jsBootstrapCountedKeys {
+			maps.Copy(m, i18n.RawCounted(ctx, k))
 		}
 		return m
 	},
