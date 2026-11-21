@@ -7,13 +7,15 @@
 #
 # It builds both servers from the release Dockerfiles, starts them on a new database beside Mailpit
 # and the browser of Playwright's image, captures the images listed in
-# e2e/playwright/screenshots/images.json, and removes everything it started. The committed images
-# are replaced only once the capture and that removal have both succeeded; a run that fails leaves
-# them as they were and says which step failed, with the servers' last log lines.
+# e2e/playwright/screenshots/images.json, and removes the containers, network and volumes it
+# started. It keeps the images it built, for the next run; e2e/README.md says how to remove them.
+# The committed images are replaced only once the capture and that removal have both succeeded; a
+# run that fails leaves them as they were and says which step failed, with the servers' last log
+# lines.
 set -euo pipefail
 
 case "${1:-}" in
-  -h | --help) sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h | --help) sed -n '2,14s/^# \{0,1\}//p' "$0"; exit 0 ;;
   "") ;;
   *) echo "screenshots: unknown argument: $1 (see --help)" >&2; exit 2 ;;
 esac

@@ -232,6 +232,23 @@ that fails says which step failed, with the servers' last log lines when they we
 leaves the committed images as they were. Run twice on the same tree on one machine, it writes the same bytes.
 `e2e/screenshots.sh --help` says the same in short.
 
+It keeps the three images it builds, so the next run rebuilds only what changed. They are named for
+the checkout: `goiabada-screenshots-<number>-authserver`, `-adminconsole`, and `-check`, the one
+the images are checked in. To remove this checkout's, from the repository root:
+
+```bash
+docker image ls -q "goiabada-screenshots-$(printf '%s' "$PWD" | cksum | cut -d ' ' -f 1)-*" | xargs -r docker image rm
+```
+
+To remove every checkout's, a deleted worktree's included:
+
+```bash
+docker image ls -q 'goiabada-screenshots-*' | xargs -r docker image rm
+```
+
+The Playwright and Mailpit images it pulls are ordinary pulls, which `docker image rm` removes like
+any other.
+
 To add an image, add its file name, starting with `screenshot`, to `images.json`, capture it in
 `capture.screenshots.ts` under that name, and show it on the home page or in the README. The core
 unit tier fails when a `screenshot*` file among the site's assets is not one the list names, when
