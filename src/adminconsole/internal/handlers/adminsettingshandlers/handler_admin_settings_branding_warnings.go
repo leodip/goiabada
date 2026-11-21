@@ -49,10 +49,10 @@ func NewBrandContrastWarnings(ctx context.Context, brand api.BrandResponse) *Bra
 	}
 	count := len(brand.ContrastWarnings)
 	warnings := &BrandContrastWarnings{
-		CountLine: countSentence(ctx, "adminconsole.admin_branding.palette.warnings.", count, nil),
+		CountLine: countSentence(ctx, "adminconsole.admin_branding.palette.warnings", count, nil),
 	}
 	if count > 0 {
-		warnings.Notice = oneOrOther(ctx, "adminconsole.admin_branding.brand.saved_warnings.", count)
+		warnings.Notice = i18n.TCount(ctx, "adminconsole.admin_branding.brand.saved_warnings", count)
 	}
 	for _, w := range brand.ContrastWarnings {
 		colors := brand.Colors.Light
@@ -81,17 +81,7 @@ func brandWarningsMarker(ctx context.Context, brand api.BrandResponse) string {
 	if len(brand.ContrastWarnings) == 0 {
 		return ""
 	}
-	return oneOrOther(ctx, "adminconsole.admin_branding.list.warnings.", len(brand.ContrastWarnings))
-}
-
-// oneOrOther is the message under prefix for a count of at least one: its one form for one and its
-// other form for more, chosen as countSentence chooses them.
-func oneOrOther(ctx context.Context, prefix string, count int) string {
-	form := "other"
-	if count == 1 {
-		form = "one"
-	}
-	return i18n.T(ctx, prefix+form, map[string]any{"count": count})
+	return i18n.TCount(ctx, "adminconsole.admin_branding.list.warnings", len(brand.ContrastWarnings))
 }
 
 // paletteColorName is a color token's plain label, as the Colors section's rows name it, or the token

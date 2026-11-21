@@ -127,7 +127,7 @@
     </div>
     {{ end }}
     {{ with .loggedInUser }}<input type="email" value="{{ .Email }}" autocomplete="username" aria-label="{{ T $.ctx "adminconsole.account.email.field.current_email" }}" hidden>{{ end }}
-    <p>{{ if not .recoveryCodesRemaining }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_none" }}{{ else if eq .recoveryCodesRemaining 1 }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_one" }}{{ else }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining_other" "count" .recoveryCodesRemaining }}{{ end }}</p>
+    <p>{{ if not .recoveryCodesRemaining }}{{ T $.ctx "adminconsole.account.otp.recovery_codes.remaining.none" }}{{ else }}{{ TCount $.ctx "adminconsole.account.otp.recovery_codes.remaining" .recoveryCodesRemaining }}{{ end }}</p>
     <p>{{ T $.ctx "adminconsole.account.otp.recovery_codes.new_set_lead" }}</p>
     <div class="form-grid">
       <div class="field">

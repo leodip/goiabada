@@ -15,7 +15,7 @@ import (
 )
 
 // This file is one of two. The auth server's copy declares the four entries its templates call --
-// T, Lang, args and versionComment -- and the twenty-one below include those four. The one map
+// T, Lang, args and versionComment -- and the twenty-five below include those four. The one map
 // both binaries parsed with lived in core until #385, so every page this server renders parsed
 // eighteen functions it could not reach, five of them predicates over this console's own URL
 // paths (#385).
@@ -130,6 +130,21 @@ var templateFuncMap = template.FuncMap{
 			args[k] = kv[i+1]
 		}
 		return i18n.T(ctx, key, args)
+	},
+	// TCount translates a counted phrase, the form of key its count's CLDR plural category takes in
+	// the page's language, the count filling {{.count}}; kv pairs fill its other values, as T's do:
+	//   {{ TCount $.ctx "adminconsole.admin_branding.delete.clients" .count "defaultBrand" .name }}
+	// A sentence for nothing is the template's own choice, a T call on the family's none key (#665).
+	"TCount": func(ctx context.Context, key string, count int, kv ...any) string {
+		args := map[string]any{}
+		for i := 0; i+1 < len(kv); i += 2 {
+			k, ok := kv[i].(string)
+			if !ok {
+				continue
+			}
+			args[k] = kv[i+1]
+		}
+		return i18n.TCount(ctx, key, count, args)
 	},
 	// Lang is the tag of the catalog the page rendered from, for the <html lang="..."> attribute,
 	// so the document advertises the language it is written in (screen readers, hyphenation,

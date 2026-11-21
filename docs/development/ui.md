@@ -477,4 +477,8 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   tense included: a question asked before an action says what will happen ("The key will be
   deleted"), a notice after it what was done, and help about standing behaviour the present.
   Sentence case; a button says what it does ("Save", "New user"); a page title reads "Page – app
-  name". All built-in catalogs change together.
+  name". A phrase with a count is a counted key, one form per CLDR plural category its language's
+  whole counts reach (`<key>.one` and `.other` in English), each carrying the count's placeholder,
+  and `i18n.TCount`, the console's `TCount` template function, chooses the form: nothing tests
+  `count == 1`. Its sentence for zero, `<key>.none`, is the caller's to choose. All built-in
+  catalogs change together.
