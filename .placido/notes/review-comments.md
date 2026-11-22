@@ -1,7 +1,7 @@
 # Review bots' comments on Goiabada's pull requests
 
-Two bots review every pull request: CodeRabbit, and Codex's security review. What
-their comments look like, so you can tell what each one asks.
+CodeRabbit reviews every pull request. What its comments look like, so you can tell
+what each one asks.
 
 ## CodeRabbit
 
@@ -44,28 +44,3 @@ CodeRabbit (`coderabbitai[bot]`) reviews every pull request, and again on each p
 - **It knows only the diff.** It often misses a decision the agreement or the
   decisions recorded, a guard elsewhere, or an engine-specific case it did not read: a
   comment that contradicts one of them is not valid, and the reply names it.
-
-## Codex's security review
-
-Codex (`chatgpt-codex-connector[bot]`) reviews a pull request for security when it
-opens, when it is marked ready, or when a comment asks it to. It does not review
-placido's later pushes, so its comments come once, possibly after CI concludes.
-
-- **A thread** is one finding on a line. It opens with "Codex Security Review ·
-  Automatically triggered", then a priority badge (P0 to P3, an image whose text reads
-  "P2 Badge") and a bold title starting "Security:". Its text states the condition
-  under which the problem can be exploited ("this is exploitable when an actor may push
-  a non-trusted repository branch…"), then how, then a remedy. The badge is Codex's:
-  give your own severity from the evidence. Check the condition against this
-  repository as it is (who can push a branch to it, which token permissions and
-  secrets a workflow gets on that event, what a fork's pull request can reach), rather
-  than take it or dismiss it on its say. The remedy is a suggestion, as CodeRabbit's
-  diffs are.
-- "Useful? React with 👍 / 👎." ends each of its comments: nothing to answer.
-- **Its review's text** ("Here are some automated security review suggestions for this
-  pull request", the commit it reviewed, and "About Codex security reviews in GitHub")
-  holds no comment of its own.
-- **Its "Codex Review Summary"** on the pull request's conversation lists its findings
-  again, with their links. It is not a review comment, and placido does not answer it.
-- **Never mention it** (`@codex`) in a reply or a note: a comment that names it asks
-  for a new review.

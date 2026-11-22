@@ -76,17 +76,15 @@ last  = ["e2e"]   # after the review, before the push: the browser suite against
 [pr]
 host_paths = [".placido", ".claude", ".codex", ".agents", ".gemini", ".mcp.json", "src/.devcontainer", "e2e"]
 
-# Two bots review every pull request. CodeRabbit's check is one of the pull request's,
-# so its review is in once CI concludes. Codex's security review reports no check and
-# runs only when the pull request opens: it took 7.5 minutes on #868, against CI's 10,
-# so placido waits until the pull request is 30 minutes old and reads a last time.
-# Placido answers their comments, fixes what holds in the pull request, drafts the rest
-# as follow-ups, and replies to every comment; what their comments look like is in
-# .placido/notes/review-comments.md. CodeRabbit reviews each push, so the passes loop:
-# two fix whatever holds, then up to five in all while blocking or significant
-# findings come up.
+# CodeRabbit reviews every pull request. Its check is one of the pull request's, so its
+# review is in once CI concludes, and placido waits for nothing more. (Codex's security
+# review went with the OpenAI subscription on 2026-11-21, and with it the 30 minutes
+# placido waited for a reviewer that reports no check.) Placido answers its comments,
+# fixes what holds in the pull request, drafts the rest as follow-ups, and replies to
+# every comment; what its comments look like is in .placido/notes/review-comments.md.
+# CodeRabbit reviews each push, so the passes loop: two fix whatever holds, then up to
+# five in all while blocking or significant findings come up.
 [review_comments]
-accounts   = ["coderabbitai[bot]", "chatgpt-codex-connector[bot]"]
-passes     = 2       # their first reviews, then CodeRabbit's review of placido's fixes
-max_passes = 5       # more of CodeRabbit's reviews of the fixes, while they find serious problems
-wait       = "30m"   # for Codex, which may comment after CI concludes
+accounts   = ["coderabbitai[bot]"]
+passes     = 2       # its first review, then its review of placido's fixes
+max_passes = 5       # more of its reviews of the fixes, while it finds serious problems
