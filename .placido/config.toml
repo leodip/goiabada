@@ -67,14 +67,14 @@ final = ["lint", "setup-wizard", "data-sqlite", "integration-sqlite"]
 last  = ["e2e"]   # after the review, before the push: the browser suite against an environment built from the branch
 
 # placido pr: reviewing contributors' pull requests. The reviewers are placido's
-# defaults (claude opus xhigh, then codex gpt-6.2-sol xhigh fast); the gates default to
-# the slice and final ones above. src/.devcontainer joins the host paths because
+# defaults (claude opus xhigh, then agy gemini-4-neon high); the gates default to the
+# slice and final ones above. src/.devcontainer joins the host paths because
 # stack.sh builds its image and its compose files decide what the containers mount
 # from this machine. e2e joins them because the last gate, which the menu offers, runs
 # the worktree's e2e/run.sh and its Playwright suite here, with the SSH key the VPS
 # accepts, and installs the suite's packages here.
 [pr]
-host_paths = [".placido", ".claude", ".codex", ".mcp.json", "src/.devcontainer", "e2e"]
+host_paths = [".placido", ".claude", ".codex", ".agents", ".gemini", ".mcp.json", "src/.devcontainer", "e2e"]
 
 # Two bots review every pull request. CodeRabbit's check is one of the pull request's,
 # so its review is in once CI concludes. Codex's security review reports no check and
