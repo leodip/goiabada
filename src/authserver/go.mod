@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/PuerkitoBio/goquery v1.14.0
-	github.com/boombuler/barcode v1.1.0
+	github.com/boombuler/barcode v1.1.1
 	github.com/go-sql-driver/mysql v1.10.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.13.0
