@@ -104,6 +104,7 @@ var pluralCategories = map[string][]string{
 	"id":    {"other"},
 	"it":    {"one", "other"},
 	"pl":    {"one", "few", "many", "other"},
+	"ru":    {"one", "few", "many", "other"},
 	"pt-BR": {"one", "other"},
 }
 
@@ -320,5 +321,66 @@ func TestCatalog_OtherConceptNamesMatchesOnlyTheOtherNames(t *testing.T) {
 	}
 	for _, v := range []string{"Two-factor authentication", "Your two-factor authentication settings changed", "with the auth server.", "authorization code"} {
 		assert.Emptyf(t, otherConceptNames.FindString(glossaryConceptNames.ReplaceAllString(v, "")), "%q should not match", v)
+	}
+}
+
+// TestCatalog_RussianWritesENeverYo holds the Russian catalog to е (#666 decision 4): a value that
+// spells ё or Ё, though correct Russian, would make the same word read two ways across the pages.
+func TestCatalog_RussianWritesENeverYo(t *testing.T) {
+	for k, v := range loadCatalogFlat(t, "active.ru.toml") {
+		assert.Falsef(t, spellsYo(v), "active.ru.toml: key %q says %q; the Russian catalog writes е, never ё", k, v)
+	}
+}
+
+// spellsYo reports whether s holds ё or Ё, written as one character or as е and its combining
+// diaeresis.
+func spellsYo(s string) bool {
+	return strings.ContainsAny(s, "ёЁ") || strings.Contains(s, "ё") || strings.Contains(s, "Ё")
+}
+
+func TestSpellsYo(t *testing.T) {
+	for _, v := range []string{"Срок истёк.", "ЁЛКА", "Ещё раз", "ёще"} {
+		assert.Truef(t, spellsYo(v), "%q spells ё", v)
+	}
+	for _, v := range []string{"Срок истек.", "Еще раз", "Sign in", "Ее"} {
+		assert.Falsef(t, spellsYo(v), "%q does not spell ё", v)
+	}
+}
+
+// TestCatalog_PhoneRefusalNamesTheBlankCountryOption holds every catalog's phone refusal to the
+// label of the Country select's blank option on both Phone pages: the refusal tells the reader to
+// choose that option to remove the number, so a label the select does not show sends them looking
+// for an option that is not there.
+func TestCatalog_PhoneRefusalNamesTheBlankCountryOption(t *testing.T) {
+	for _, name := range catalogNames(t) {
+		m := loadCatalogFlat(t, name)
+		refusal := m["validator.phone.number_required"]
+		for _, key := range []string{"adminconsole.account.phone.country_blank", "adminconsole.admin_users.phone.country_blank"} {
+			assert.Containsf(t, refusal, m[key], "%s: validator.phone.number_required says %q, which does not name %s, %q", name, refusal, key, m[key])
+		}
+	}
+}
+
+// russianOtherNames matches the words the Russian catalog's refusals once used beside other words
+// on the pages they refuse (#666 decision 3): краткое имя for a legal document's короткое имя,
+// выведен из действия for отозван, подвал for a brand's нижний колонтитул, and замостить and
+// полностью скругленные for the Плитка and Овальные options.
+var russianOtherNames = regexp.MustCompile(`(?i)кратк|выв\p{L}*(?: его)? из действия|подвал|замост|полностью скругл`)
+
+// TestCatalog_RussianNamesEachConceptAsItsPagesDo holds the Russian catalog to one word per
+// concept where a refusal names a field, an action or an option its page labels.
+func TestCatalog_RussianNamesEachConceptAsItsPagesDo(t *testing.T) {
+	for k, v := range loadCatalogFlat(t, "active.ru.toml") {
+		other := russianOtherNames.FindString(v)
+		assert.Emptyf(t, other, "active.ru.toml: key %q says %q; its page says короткое имя, отозван, нижний колонтитул, плитка and овальные", k, v)
+	}
+}
+
+func TestCatalog_RussianOtherNamesMatchesOnlyTheOtherNames(t *testing.T) {
+	for _, v := range []string{"Введите краткое имя.", "Документ выведен из действия.", "Вывести из действия можно", "Выведите его из действия.", "в подвале бренда", "или замостить.", "или полностью скругленные."} {
+		assert.NotEmptyf(t, russianOtherNames.FindString(v), "%q should match", v)
+	}
+	for _, v := range []string{"Введите короткое имя.", "Документ отозван.", "Записывать события аудита в вывод сервера", "Все остальное выводится как введено.", "в нижнем колонтитуле бренда", "«Плитка»", "Скругленные", "Овальные"} {
+		assert.Emptyf(t, russianOtherNames.FindString(v), "%q should not match", v)
 	}
 }

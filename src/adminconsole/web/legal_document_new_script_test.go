@@ -46,6 +46,30 @@ func TestLegalDocumentNewJS_SuggestsTheShortName(t *testing.T) {
 		{strings.Repeat("a", 70), strings.Repeat("a", 64)},
 		// The cut at 64 lands on a hyphen, which goes too.
 		{strings.Repeat("a", 63) + " b", strings.Repeat("a", 63)},
+
+		// Russian letters and Polish ł are written in Latin letters (#666 decision 8).
+		{"Политика конфиденциальности", "politika-konfidentsialnosti"},
+		{"Условия использования 2026", "usloviya-ispolzovaniya-2026"},
+		{"Российский май", "rossiyskiy-may"},
+		{"Йошкар-Ола", "yoshkar-ola"},
+		{"Объявление", "obyavlenie"},
+		{"Ещё вопросы", "eshche-voprosy"},
+		{"Hasło główne", "haslo-glowne"},
+		{"ŁÓDŹ", "lodz"},
+		// Each of the 33 letters, in lower and in upper case; ъ and ь are left out.
+		{"абвгдеёжзийклмнопрстуфхцчшщъыьэюя", "abvgdeezhziyklmnoprstufkhtschshshchyeyuya"},
+		{"АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ", "abvgdeezhziyklmnoprstufkhtschshshchyeyuya"},
+		{"ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ", "politika-konfidentsialnosti"},
+		// й and Й written as и and И with the combining breve, and ё as е with the combining
+		// diaeresis, read as the one character.
+		{"Российский май", "rossiyskiy-may"},
+		{"Йошкар-Ола", "yoshkar-ola"},
+		{"Ещё вопросы", "eshche-voprosy"},
+		// Russian and Latin letters in one title.
+		{"Политика DPoP и OAuth 2.0", "politika-dpop-i-oauth-2-0"},
+		// A letter of another alphabet is dropped, as before: Ukrainian's ї and Greek.
+		{"Київ", "ki-v"},
+		{"Όροι χρήσης", ""},
 	}
 
 	node, err := exec.LookPath("node")

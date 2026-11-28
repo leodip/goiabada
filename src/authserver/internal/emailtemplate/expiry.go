@@ -14,7 +14,9 @@ type expiryUnit struct{ minute, hour string }
 // category the language's whole counts reach, keyed as i18n.PluralCategory names it (#665
 // decision 2), so the rule for which name a count takes is the catalogs' rule. Polish's names are in
 // the accusative, the case its expiry sentences take ("Link wygaśnie za 5 minut.", "Link jest ważny
-// przez 24 godziny."), as an administrator's sentence is likelier to run (#665 decision 3).
+// przez 24 godziny."), as an administrator's sentence is likelier to run (#665 decision 3). Russian's
+// are in the accusative too ("Срок действия ссылки истечет через 21 минуту.", "Ссылка действует
+// 24 часа."): one for 1 and 21, few for 2 to 4 and 22 to 24, many for 0 and 5 to 20 (#666 decision 5).
 var expiryUnits = map[string]map[string]expiryUnit{
 	"en":    {"one": {"minute", "hour"}, "other": {"minutes", "hours"}},
 	"de":    {"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}},
@@ -24,6 +26,7 @@ var expiryUnits = map[string]map[string]expiryUnit{
 	"it":    {"one": {"minuto", "ora"}, "other": {"minuti", "ore"}},
 	"pl":    {"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}},
 	"pt-BR": {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},
+	"ru":    {"one": {"минуту", "час"}, "few": {"минуты", "часа"}, "many": {"минут", "часов"}},
 }
 
 // expiryIn writes a lifetime as {{expiry}} reads it (#818 decision 4): a number with its unit in

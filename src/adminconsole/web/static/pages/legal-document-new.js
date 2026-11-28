@@ -4,11 +4,26 @@
 // own it is left as they typed it, until they empty it again. The auth server decides what a
 // short name may be, and the form says its refusal at the field.
 
-// suggestShortName answers the short name a title suggests: its letters with their accents taken
-// off, lowercased, its digits, every other run of characters as one hyphen, at most 64 characters,
-// and no hyphen first or last, so a short name the auth server accepts as it is.
+// latinLetters writes each lower-case letter of Russian, and Polish ł, in Latin letters (#666
+// decision 8): ъ and ь are left out, and ё is e. A letter of another alphabet has no entry.
+const latinLetters = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  ł: "l",
+};
+
+// suggestShortName answers the short name a title suggests: its Russian letters and ł written in
+// Latin letters, its other letters with their accents taken off, lowercased, its digits, every
+// other run of characters as one hyphen, at most 64 characters, and no hyphen first or last, so a
+// short name the auth server accepts as it is. The title is composed first and written in Latin
+// letters before the accents go, so й is y, not the и its accent leaves, however it is spelled.
 function suggestShortName(title) {
   return title
+    .normalize("NFC")
+    .replace(/[а-яёА-ЯЁłŁ]/g, function (letter) {
+      return latinLetters[letter.toLowerCase()];
+    })
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()

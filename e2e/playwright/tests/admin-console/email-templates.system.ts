@@ -5,8 +5,9 @@
 // the next one. A text breaking a rule is refused naming the placeholder, in the preview and on
 // save, and nothing is saved; each other rule is refused at the field it is about. An edit in German
 // reaches a user who reads German, and every other language keeps the built-in text; an edited
-// email is still drawn in its brand (#817); and the audit log lists each save, reset and test email.
-// An edit is global, so this runs alone, and resets what it saved.
+// email is still drawn in its brand (#817); the editor's language tabs, an edited one marked, fit a
+// narrow page (#902); and the audit log lists each save, reset and test email. An edit is global, so
+// this runs alone, and resets what it saved.
 import type { Browser, Page } from "@playwright/test";
 import { setClientBrand, userUrl } from "../../lib/admin-console";
 import { mailLook, plumDarkMail, withBrand } from "../../lib/brands";
@@ -325,6 +326,84 @@ test("an edited email is still drawn in the brand of the sign-in it was asked fr
       await resetEmailTemplate(page, "password_reset_link", "en");
     }
   });
+});
+
+// The editor's language tabs are labelled with each language's own name beside its English name,
+// which no catalog can shorten, and an edited language's tab adds its marker. Once the bar has
+// wrapped into pills, a pill's text breaks inside it, so every tab fits a narrow page in any console
+// language (#902): a 320 px phone, and 305 px, a 320 px desktop window less a classic scrollbar,
+// where the Portuguese (Brazil) pill, the widest, used to end at 308 px. The edit is of that
+// language, so the widest tab carries the marker.
+const narrowWidths = [
+  { name: "a 320 px phone", width: 320 },
+  { name: "a 305 px usable width", width: 305 },
+];
+const editedMarkers = [
+  { tag: "en", marker: "Edited" },
+  { tag: "id", marker: "Diubah" },
+  { tag: "ru", marker: "Изменен" },
+];
+
+// Opens the editor in the console language at the usable width, which a classic scrollbar, where
+// the browser draws one, would narrow, and answers each language tab's overflow: how far it, or its
+// marker, reaches past the page or its text past the tab. The page does not scroll sideways.
+async function languageTabsAt(page: Page, consoleLanguage: string, width: number) {
+  await page.setViewportSize({ width, height: 740 });
+  await page.goto(`${emailTemplateUrl("password_reset_link", "en")}?ui_locales=${consoleLanguage}`);
+  await expect(page.locator("html")).toHaveAttribute("lang", consoleLanguage);
+  const scrollbar = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+  if (scrollbar > 0) await page.setViewportSize({ width: width + scrollbar, height: 740 });
+  const bar = page.locator("#emailTemplateLanguages");
+  await expect(bar, "the tabs have wrapped into pills").toHaveAttribute("data-wrapped", "");
+  // Let a resize's re-measure of the bar settle.
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const layout = await page.evaluate(() => ({
+    usable: document.documentElement.clientWidth,
+    sidewaysScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  }));
+  expect(layout.usable).toBe(width);
+  expect(layout.sidewaysScroll, "the page scrolls sideways").toBe(0);
+  return bar.locator("a.tab-item").evaluateAll((tabs) =>
+    tabs.map((tab) => {
+      const usable = document.documentElement.clientWidth;
+      const box = tab.getBoundingClientRect();
+      const marker = tab.querySelector(".tag");
+      const markerBox = marker?.getBoundingClientRect();
+      return {
+        href: tab.getAttribute("href") ?? "",
+        marker: marker?.textContent?.trim() ?? "",
+        past: Math.max(0, -box.left, box.right - usable, tab.scrollWidth - tab.clientWidth, markerBox ? Math.max(box.left - markerBox.left, markerBox.right - box.right) : 0),
+      };
+    }),
+  );
+}
+
+test("the editor's language tabs, with and without a marker, fit a 320 px phone and a 305 px usable width in English, Indonesian and Russian", async ({ page }) => {
+  leaveWithoutAsking(page);
+  const edited = "/admin/settings/email/templates/password_reset_link/pt-BR";
+  const check = async (marked: boolean) => {
+    for (const { name, width } of narrowWidths) {
+      for (const { tag, marker } of editedMarkers) {
+        await test.step(`${marked ? "an edited" : "no"} language, ${name}, in ${tag}`, async () => {
+          const tabs = await languageTabsAt(page, tag, width);
+          expect(tabs.map((tab) => tab.href.split("/").pop())).toEqual(expect.arrayContaining(["en", "pt-BR", "id", "ru"]));
+          expect(tabs.find((tab) => tab.href === edited)?.marker).toBe(marked ? marker : "");
+          expect(tabs.filter((tab) => tab.past > 0.5)).toEqual([]);
+        });
+      }
+    }
+  };
+
+  await check(false);
+  try {
+    await page.goto(emailTemplateUrl("password_reset_link", "pt-BR"));
+    await page.locator("#subject").fill(`Redefinição de senha ${uniqueIdentifier("mark")}`);
+    await page.locator("#btnSave").click();
+    await expect(page.locator("#btnReset")).toBeVisible();
+    await check(true);
+  } finally {
+    await resetEmailTemplate(page, "password_reset_link", "pt-BR");
+  }
 });
 
 test("a saved edit, its reset and a test email are each listed in the audit log", async ({ page }) => {

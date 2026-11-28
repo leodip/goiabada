@@ -90,7 +90,7 @@ function build(request) {
     footerFields.push(el("fieldset", { class: "footer-link", id: "footerLinks-" + row }, [
       field(prefix + "label", { type: "text" }),
       field(prefix + "url", { type: "url" }),
-      el("details", { class: "disclosure" }, ["en", "pt-BR", "es", "fr", "de", "it", "id", "pl"].map(function (tag) {
+      el("details", { class: "disclosure" }, ["en", "pt-BR", "es", "fr", "de", "it", "id", "pl", "ru"].map(function (tag) {
         return field(prefix + "labels-" + tag, { type: "text", lang: tag });
       })),
     ]));

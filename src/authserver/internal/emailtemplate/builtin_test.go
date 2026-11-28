@@ -13,7 +13,7 @@ import (
 )
 
 // The built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR"}
+var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"}
 
 func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
@@ -73,6 +73,8 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Aby zresetować hasło, kliknij poniższy link:", "Link wygaśnie za 5 minut."},
 		{"pt-BR", "Redefinição de senha", "Redefinir senha", "Olá Ana,",
 			"Você pode redefinir sua senha clicando no link abaixo:", "O link expira em 5 minutos."},
+		{"ru", "Сброс пароля", "Сбросить пароль", "Здравствуйте, Ana!",
+			"Чтобы сбросить пароль, перейдите по ссылке ниже:", "Срок действия ссылки истечет через 5 минут."},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			text := PasswordResetLink.BuiltIn[tc.lang]
@@ -169,6 +171,23 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"pt-BR", 0, "0 minuto"},
 		{"pt-BR", 24 * time.Hour, "24 horas"},
 		{"pt-BR", time.Hour, "1 hora"},
+		// Russian writes the unit in the accusative the expiry sentences take (#666 decision 5): one
+		// for 1, 21 and 31, few for 2 to 4 and 22 to 24, many for 0, 5 to 20 and 25 to 30.
+		{"ru", time.Minute, "1 минуту"},
+		{"ru", 2 * time.Minute, "2 минуты"},
+		{"ru", 4 * time.Minute, "4 минуты"},
+		{"ru", 5 * time.Minute, "5 минут"},
+		{"ru", 11 * time.Minute, "11 минут"},
+		{"ru", 21 * time.Minute, "21 минуту"},
+		{"ru", 22 * time.Minute, "22 минуты"},
+		{"ru", 25 * time.Minute, "25 минут"},
+		{"ru", 0, "0 минут"},
+		{"ru", time.Hour, "1 час"},
+		{"ru", 2 * time.Hour, "2 часа"},
+		{"ru", 5 * time.Hour, "5 часов"},
+		{"ru", 21 * time.Hour, "21 час"},
+		{"ru", 24 * time.Hour, "24 часа"},
+		{"ru", 48 * time.Hour, "48 часов"},
 		// A language with no unit names reads English's, by English's rule, even where its own
 		// rule differs: French Canadian's 0 is one, English's other.
 		{"nl", time.Minute, "1 minute"},
@@ -212,6 +231,9 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 		"en": "en", "en-GB": "en", "de": "de", "de-AT": "de", "es-MX": "es", "fr-CA": "fr", "fr-CH": "fr",
 		"it-CH": "it", "id": "id", "id-ID": "id", "in": "id", "ms": "en", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
 		"pt-PT": "pt-BR", "pl": "pl", "pl-PL": "pl",
+		"ru": "ru", "ru-RU": "ru", "ru-KZ": "ru", "ru-UA": "ru",
+		// Ukrainian reads English, not Russian, though the matcher rates them close.
+		"uk": "en", "uk-UA": "en",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.
 		"gl": "en", "eu": "en",
@@ -227,4 +249,32 @@ func TestRecipientName_FallsBackToTheAddress(t *testing.T) {
 	assert.Equal(t, "Ana Silva", RecipientName("Ana Silva", "ana@example.com"))
 	assert.Equal(t, "ana@example.com", RecipientName("", "ana@example.com"))
 	assert.Equal(t, "ana@example.com", RecipientName("  ", "ana@example.com"))
+}
+
+// Every email's built-in Russian text writes е, never ё (#666 decision 4): in its subject, its body
+// and its button's label.
+func TestBuiltIns_RussianWritesENeverYo(t *testing.T) {
+	for _, email := range BuiltIns() {
+		text, ok := email.BuiltIn["ru"]
+		if !assert.Truef(t, ok, "%s has Russian text", email.ID) {
+			continue
+		}
+		for part, value := range map[string]string{"subject": text.Subject, "body": text.Body, "button label": text.ButtonLabel} {
+			assert.Falsef(t, spellsYo(value), "%s: the Russian %s says %q; Russian is written with е, never ё", email.ID, part, value)
+		}
+	}
+}
+
+// spellsYo reports whether s holds ё or Ё, as one character or as е and its combining diaeresis.
+func spellsYo(s string) bool {
+	return strings.ContainsAny(s, "ёЁ") || strings.Contains(s, "е\u0308") || strings.Contains(s, "Е\u0308")
+}
+
+func TestSpellsYo(t *testing.T) {
+	for _, v := range []string{"Срок истёк.", "ЁЛКА", "е\u0308ще"} {
+		assert.Truef(t, spellsYo(v), "%q spells ё", v)
+	}
+	for _, v := range []string{"Срок истек.", "Еще раз", "Hello"} {
+		assert.Falsef(t, spellsYo(v), "%q does not spell ё", v)
+	}
 }

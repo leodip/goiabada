@@ -33,7 +33,7 @@ Goiabada is an open-source authentication server built on **OAuth 2.0** and **Op
 - **Control over access.** Give users, groups, and clients permissions; include groups and custom attributes in tokens when your apps need them.
 - **An admin console and API.** Manage users, clients, settings, and signing keys through the web UI or automate them through the API. Review changes in the audit log.
 - **Account self-service.** Users can manage their profile and security settings, recover a password, and review their sessions. You can enable self-registration and email verification.
-- **Your name, your users' language.** The pages come in English, Portuguese (Brazil), Spanish, French, German, Italian, Indonesian, and Polish, in light and dark themes. Put your app's name on them, give each client its own logo, and reword any text.
+- **Your name, your users' language.** The pages come in English, Portuguese (Brazil), Spanish, French, German, Italian, Indonesian, Polish, and Russian, in light and dark themes. Put your app's name on them, give each client its own logo, and reword any text.
 - **A choice of deployment.** The setup wizard prepares Docker Compose, Kubernetes, or native binary deployments. Use SQLite, PostgreSQL, MySQL, or SQL Server. Docker images support x86_64 and ARM64, and both servers can expose Prometheus metrics.
 
 ## Standards
