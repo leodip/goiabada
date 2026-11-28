@@ -1030,6 +1030,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "Itu terlalu lama. Masukkan durasi yang lebih pendek."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Masukkan bilangan bulat dalam detik."
 "adminconsole.admin_clients.tokens.duration_zero" = "Menggunakan pengaturan global"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Menggunakan pengaturan global ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Claim OpenID Connect dalam access token"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Claim seperti email atau profile, dari scope yang diberikan kepada token. Tanpanya, resource server membacanya dari /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Sertakan"

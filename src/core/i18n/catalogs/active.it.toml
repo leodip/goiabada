@@ -1030,6 +1030,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "La durata è troppo lunga. Inseriscine una più breve."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Inserisci un numero intero di secondi."
 "adminconsole.admin_clients.tokens.duration_zero" = "Usa l'impostazione globale"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Usa l'impostazione globale ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Claim OpenID Connect nel token di accesso"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Claim come email o profile, dagli scope concessi al token. In loro assenza, un server di risorse li legge da /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Includi"

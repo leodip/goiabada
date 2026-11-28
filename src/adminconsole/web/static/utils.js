@@ -799,8 +799,10 @@ function makeSearchable(select) {
 // as "2 hours, 30 minutes", in the page's language. messages carries the sentences the page gives
 // for a value that is not a whole number of seconds and for one too long to be meant, the form's
 // data-duration-invalid and data-duration-too-long, and, where zero means something other than no
-// time at all, such as the global setting, data-duration-zero, followed by the global setting's
-// own duration where data-duration-global gives it, as "Uses the global setting (1 hour)".
+// time at all, such as the global setting, data-duration-zero. Where data-duration-global gives
+// the global setting's own duration, the form's data-duration-zero-global says it instead, with
+// the duration in place of {duration}, as "Uses the global setting (1 hour)": the sentence, not
+// the script, punctuates it, so a Japanese page writes "グローバル設定を使用（1 時間）".
 function describeSeconds(value, messages) {
   const text = String(value).trim();
   if (!/^[0-9]+$/.test(text)) {
@@ -808,8 +810,9 @@ function describeSeconds(value, messages) {
   }
   const seconds = Number(text);
   if (seconds === 0 && messages.durationZero) {
-    if (/^[0-9]+$/.test(messages.durationGlobal || "")) {
-      return messages.durationZero + " (" + formatDuration(Number(messages.durationGlobal), settingsDurationUnits) + ")";
+    if (messages.durationZeroGlobal && /^[0-9]+$/.test(messages.durationGlobal || "")) {
+      const globalDuration = formatDuration(Number(messages.durationGlobal), settingsDurationUnits);
+      return messages.durationZeroGlobal.split("{duration}").join(globalDuration);
     }
     return messages.durationZero;
   }

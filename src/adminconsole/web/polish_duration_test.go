@@ -23,7 +23,9 @@ func TestPolish_DurationHintsAndVerificationWait(t *testing.T) {
 		"durationInvalid": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_invalid"),
 		"durationTooLong": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_too_long"),
 		"durationZero":    i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_zero"),
-		"durationGlobal":  "5400",
+		"durationZeroGlobal": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_zero_global",
+			map[string]any{"duration": "{duration}"}),
+		"durationGlobal": "5400",
 	})
 	require.NoError(t, err)
 	cases := []durationCase{

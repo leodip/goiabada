@@ -1042,6 +1042,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "長すぎます。より短い期間を入力してください。"
 "adminconsole.admin_clients.tokens.duration_invalid" = "秒数を整数で入力してください。"
 "adminconsole.admin_clients.tokens.duration_zero" = "グローバル設定を使用"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "グローバル設定を使用（{{.duration}}）"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Access token の OpenID Connect claim"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "token に付与された scope に基づく、email や profile などの claim です。含めない場合、リソースサーバーは /userinfo からそれらを読み取ります。"
 "adminconsole.admin_clients.tokens.access_yes" = "含める"

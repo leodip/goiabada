@@ -1025,6 +1025,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "Cette durée est trop longue. Saisissez une durée plus courte."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Saisissez un nombre entier de secondes."
 "adminconsole.admin_clients.tokens.duration_zero" = "Utilise le paramètre global"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Utilise le paramètre global ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Claims OpenID Connect dans le jeton d’accès"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Les claims comme email ou profile, issus des scopes accordés au jeton. Sans eux, un serveur de ressources les lit depuis /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Les inclure"

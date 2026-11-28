@@ -9,7 +9,7 @@
 
 {{/* errorField names the duration a refusal is about, which is marked invalid, described by the
      notice and focused. */}}
-<form class="panel" method="post" novalidate data-duration-too-long="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_too_long" }}" data-duration-invalid="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_invalid" }}" data-duration-zero="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_zero" }}"
+<form class="panel" method="post" novalidate data-duration-too-long="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_too_long" }}" data-duration-invalid="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_invalid" }}" data-duration-zero="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_zero" }}" data-duration-zero-global="{{ T $.ctx "adminconsole.admin_clients.tokens.duration_zero_global" "duration" "{duration}" }}"
   {{- if .client.IsSystemLevelClient }} data-confirm-dialog="confirmSave" data-confirm-title="{{ T $.ctx "adminconsole.admin_clients.modal.save_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_clients.modal.system_save_warning" }}"{{ end }}>
   <div class="panel-body stacked">
     <p class="text-ink-muted">{{ T $.ctx "adminconsole.admin_clients.tokens.lead" }} <a class="text-link" href="/admin/settings/tokens">{{ T $.ctx "adminconsole.admin_clients.tokens.global_link" }}</a></p>

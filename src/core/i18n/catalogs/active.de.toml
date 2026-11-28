@@ -1026,6 +1026,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "Die Dauer ist zu lang. Geben Sie eine kürzere Dauer ein."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Geben Sie eine ganze Anzahl von Sekunden ein."
 "adminconsole.admin_clients.tokens.duration_zero" = "Verwendet die globale Einstellung"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Verwendet die globale Einstellung ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "OpenID Connect Claims im Access Token"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Claims wie email oder profile aus den Scopes, die dem Token gewährt wurden. Ohne diese Claims liest ein Ressourcenserver sie von /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Einbeziehen"

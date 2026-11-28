@@ -15,15 +15,18 @@ import (
 
 // The console's duration hints and the verification wait read Japanese for a page asking for
 // ja-JP: the browser writes each unit with a half-width space after its number and between the
-// units (1 時間 30 分), the same unit at 1, 2 and 11, and the one sentence that embeds a duration
-// puts it before 後に with no space, as a Japanese word meets a Japanese word (#662 decision 6).
+// units (1 時間 30 分), the same unit at 1, 2 and 11, and the two sentences that embed a duration
+// meet it with no space, as a Japanese word or a full-width mark meets a Japanese word: the wait
+// puts it before 後に and the global setting's hint inside full-width parentheses (#662 decision 6).
 func TestJapanese_DurationHintsAndVerificationWait(t *testing.T) {
 	ctx := i18n.WithLocale(context.Background(), true, "ja-JP")
 	messages, err := json.Marshal(map[string]string{
 		"durationInvalid": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_invalid"),
 		"durationTooLong": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_too_long"),
 		"durationZero":    i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_zero"),
-		"durationGlobal":  "5400",
+		"durationZeroGlobal": i18n.T(ctx, "adminconsole.admin_clients.tokens.duration_zero_global",
+			map[string]any{"duration": "{duration}"}),
+		"durationGlobal": "5400",
 	})
 	require.NoError(t, err)
 	cases := []durationCase{
@@ -37,7 +40,7 @@ func TestJapanese_DurationHintsAndVerificationWait(t *testing.T) {
 		formatIn("ja", "90061", waitUnits, "25 時間 1 分 1 秒"),
 		formatIn("ja", "59.6", waitUnits, "1 分"),
 		formatIn("ja", "660", waitUnits, "11 分"),
-		describeIn("ja", `"0"`, string(messages), "グローバル設定を使用 (1 時間 30 分)"),
+		describeIn("ja", `"0"`, string(messages), "グローバル設定を使用（1 時間 30 分）"),
 		describeIn("ja", `"x"`, string(messages), "秒数を整数で入力してください。"),
 		describeIn("ja", `"160000001"`, string(messages), "長すぎます。より短い期間を入力してください。"),
 	}
