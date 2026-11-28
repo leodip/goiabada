@@ -280,6 +280,7 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 		// Ukrainian reads English, not Russian, though the matcher rates them close.
 		"uk": "en", "uk-UA": "en",
 		"ja": "ja", "ja-JP": "ja",
+		"zh": "zh-Hans", "zh-CN": "zh-Hans", "zh-SG": "zh-Hans", "zh-Hans": "zh-Hans", "zh-Hans-HK": "zh-Hans",
 		// Traditional Chinese and Korean read English, not Japanese or Simplified Chinese.
 		"zh-TW": "en", "zh-HK": "en", "zh-Hant": "en", "ko": "en", "ko-KR": "en",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician

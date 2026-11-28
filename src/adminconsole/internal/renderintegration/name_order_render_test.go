@@ -22,10 +22,10 @@ import (
 )
 
 // The three console forms that ask for a name draw the family name first, then the given name, then
-// the middle name, on a Japanese page, and the given, middle and family names in that order on every
-// other; the order drawn is the tab order, and a refused name is the field that takes the focus
-// whichever order it is drawn in. The fields keep their names, so what is posted does not change
-// (#662 decision 11).
+// the middle name, on a Japanese or Simplified Chinese page, and the given, middle and family names
+// in that order on every other; the order drawn is the tab order, and a refused name is the field
+// that takes the focus whichever order it is drawn in. The fields keep their names, so what is
+// posted does not change (#662 decision 11, #663 decision 2).
 
 // nameFormAPI is the auth server as the three name forms reach it: the user named 山田 太郎 as
 // stored, and every save refused with the refusal of one name field.
@@ -124,13 +124,14 @@ var nameInputRe = regexp.MustCompile(`<input[^>]* id="(givenName|middleName|fami
 // autofocusRe matches an element's autofocus attribute.
 var autofocusRe = regexp.MustCompile(`\sautofocus[\s>]`)
 
-// nameOrders are the two orders, each with a language that draws it and the labels it draws them
+// nameOrders are the two orders, with the languages that draw each and the labels they draw them
 // with, as each catalog writes them.
 var nameOrders = []struct {
 	tag    string
 	labels [][2]string
 }{
 	{"ja-JP", [][2]string{{"familyName", "姓"}, {"givenName", "名"}, {"middleName", "ミドルネーム"}}},
+	{"zh-Hans", [][2]string{{"familyName", "姓"}, {"givenName", "名"}, {"middleName", "中间名"}}},
 	{"en", [][2]string{{"givenName", "Given name"}, {"middleName", "Middle name"}, {"familyName", "Family name"}}},
 }
 

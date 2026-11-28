@@ -338,39 +338,33 @@ test("A Japanese page title breaks between phrases on a phone", async ({ page })
   expect(lines).toEqual(["新規ユーザーの", "セットアップ"]);
 });
 
-// A browser may break a Chinese line between any two characters, so at a phone width a label could
-// leave one character alone on its last line: the general settings' account deletion choice read
-// "允许用户删除自己的账 / 户". On a Chinese label the browser moves a break to keep a single character
+// A browser may break a Chinese line between any two characters, so at a phone width a short label
+// could leave one character alone on its last line: a client's legacy flows title read "旧版流程（在
+// OAuth 2.1 中已弃 / 用）". On a Chinese label the browser moves a break to keep a single character
 // from standing alone (#663 decision 7), which Chromium applies.
-test("A Chinese label does not end in one character alone on a phone", async ({ page }) => {
+test("A Chinese label does not end in one character alone on a phone", async ({ page, clients }) => {
+  const client = await clients.create();
   await page.setViewportSize({ width: 320, height: 740 });
-  await page.goto(`${env.adminUrl}/admin/settings/general?ui_locales=zh-Hans`);
-  const label = page.locator('label[for="accountDeletionEnabled"] .choice-label');
-  await expect(label).toHaveText("允许用户删除自己的账户");
-  // The label's text, one string for each line it is drawn on, read from where each character sits.
-  const lines = await label.evaluate((choice) => {
-    const text = choice.firstChild as Text;
-    const drawn: { top: number; text: string }[] = [];
-    for (let i = 0; i < text.length; i++) {
-      const range = document.createRange();
-      range.setStart(text, i);
-      range.setEnd(text, i + 1);
-      const top = Math.round(range.getBoundingClientRect().top);
-      if (drawn.at(-1)?.top !== top) drawn.push({ top, text: "" });
-      drawn.at(-1)!.text += text.data[i];
-    }
-    return drawn.map((line) => line.text);
-  });
-  // Still too long for one line, so the check reads where the label breaks.
-  expect(lines.length).toBeGreaterThan(1);
-  expect([...lines.at(-1)!].length).toBeGreaterThanOrEqual(2);
+  await page.goto(`${clientUrl(client.id, "oauth2-flows")}?ui_locales=zh-Hans`);
+  // Held at 320 px usable: a classic scrollbar, where the browser draws one, narrows the page and
+  // moves the break.
+  const scrollbar = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+  if (scrollbar > 0) await page.setViewportSize({ width: 320 + scrollbar, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.clientWidth)).toBe(320);
+  const title = page.getByRole("heading", { level: 2, name: "旧版流程（在 OAuth 2.1 中已弃用）", exact: true });
+  await expect(title).toBeVisible();
+  const lines = await drawnLines(title);
+  // Still too long for one line, so the check reads where the title breaks: its last line holds
+  // the word 弃用 whole, not 用 alone before the parenthesis.
+  expect(lines.length, lines.join(" / ")).toBeGreaterThan(1);
+  expect(lines.at(-1)!.match(/\p{Script=Han}/gu)?.length ?? 0, lines.join(" / ")).toBeGreaterThanOrEqual(2);
 });
 
-// The lines a choice label is drawn on, each the text of one line, read from where each character
-// of its own text sits.
-async function choiceLabelLines(label: Locator) {
-  return label.evaluate((choice) => {
-    const text = choice.firstChild as Text;
+// The lines a label is drawn on, each the text of one line, read from where each character of its
+// own text sits.
+async function drawnLines(label: Locator) {
+  return label.evaluate((element) => {
+    const text = element.firstChild as Text;
     const drawn: { top: number; text: string }[] = [];
     for (let i = 0; i < text.length; i++) {
       const range = document.createRange();
@@ -395,14 +389,14 @@ test("Chinese choice labels a phone once split inside a word fit it or break bet
   for (const [id, text] of [["auditLogsInConsoleEnabled", "写入服务器的输出"], ["auditLogsInDatabaseEnabled", "存储在数据库中"]]) {
     const label = page.locator(`label[for="${id}"] .choice-label`);
     await expect(label).toHaveText(text);
-    expect(await choiceLabelLines(label), id).toEqual([text]);
+    expect(await drawnLines(label), id).toEqual([text]);
   }
   await page.goto(`${env.adminUrl}/admin/clients/new?ui_locales=zh-Hans`);
   const flow = page.locator('label[for="authorizationCodeEnabled"] .choice-label');
   await expect(flow).toHaveText("Authorization code（含 PKCE）");
   // Broken between words, never between two Chinese characters or two Latin letters: at the space
   // before PKCE, or before the parenthesis where a classic scrollbar narrows the page.
-  const lines = await choiceLabelLines(flow);
+  const lines = await drawnLines(flow);
   const insideWords = lines.slice(1).filter((line, i) => (/\p{Script=Han}$/u.test(lines[i]) && /^\p{Script=Han}/u.test(line)) || (/[A-Za-z]$/.test(lines[i]) && /^[A-Za-z]/.test(line)));
   expect(insideWords, lines.join(" / ")).toEqual([]);
 });

@@ -157,7 +157,7 @@
 "auth.otp_enrollment.key_copied" = "密钥已复制"
 "auth.otp_enrollment.copy_failed" = "无法复制"
 "auth.otp_enrollment.copy_failed_status" = "无法复制密钥。密钥已选中，您可以自行复制。"
-"auth.otp_enrollment.step3" = "请输入应用显示的6位验证码。"
+"auth.otp_enrollment.step3" = "请输入应用显示的6位一次性验证码。"
 
 # --- Consent screen (auth/consent) ------------------------------------------
 
@@ -460,8 +460,8 @@
 "adminconsole.email_templates.email.otp_disabled.sent" = "告知用户其已关闭双因素认证。"
 "adminconsole.email_templates.email.otp_disabled_by_administrator.name" = "双因素认证已由管理员关闭"
 "adminconsole.email_templates.email.otp_disabled_by_administrator.sent" = "告知用户管理员关闭了其双因素认证。"
-"adminconsole.email_templates.email.otp_lockout.name" = "身份验证器已停用"
-"adminconsole.email_templates.email.otp_lockout.sent" = "告知用户因错误验证码过多，其身份验证器已被停用。"
+"adminconsole.email_templates.email.otp_lockout.name" = "身份验证器应用已停用"
+"adminconsole.email_templates.email.otp_lockout.sent" = "告知用户因错误的一次性验证码过多，其身份验证器应用已被停用。"
 "adminconsole.email_templates.email.recovery_code_used.name" = "恢复代码已使用"
 "adminconsole.email_templates.email.recovery_code_used.sent" = "告知用户有人使用恢复代码登录，以及剩余的数量。"
 "adminconsole.email_templates.email.recovery_codes_replaced.name" = "恢复代码已替换"
@@ -1334,7 +1334,7 @@
 "adminconsole.admin_users.authentication.otp_title" = "双因素认证"
 "adminconsole.admin_users.authentication.otp_enabled_hint" = "取消勾选即可关闭双因素认证。只有用户本人可以在其账户中重新开启。"
 "adminconsole.admin_users.authentication.otp_disable_warning" = "您正在关闭此用户的双因素认证，因此在其重新设置之前，仅凭密码即可登录。"
-"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "此用户的身份验证器在连续收到100个错误的一次性验证码后已被停用，因此所有验证码都会被拒绝，包括正确的验证码。发送这些验证码的人知道其密码或持有其某个会话，因此请将该密码视为已泄露。要让用户重新登录，请在同一次保存中设置新密码并关闭双因素认证。之后，用户即可使用新密码登录并设置新的身份验证器。"
+"adminconsole.admin_users.authentication.otp_authenticator_disabled" = "此用户的身份验证器应用在连续收到100个错误的一次性验证码后已被停用，因此所有一次性验证码都会被拒绝，正确的也不例外。发送这些一次性验证码的人知道其密码或持有其某个会话，因此请将该密码视为已泄露。要让用户重新登录，请在同一次保存中设置新密码并关闭双因素认证。之后，用户即可使用新密码登录并设置新的身份验证器应用。"
 "adminconsole.admin_users.authentication.otp_not_set_up" = "此用户尚未设置双因素认证。只有用户本人可以在其账户中设置。"
 
 "adminconsole.admin_users.connected_clients.intro" = "此用户已同意或持有其 refresh token 的 client，以及每个 client 的 scope。断开连接会删除用户对其给予的所有同意，并在所有设备上撤销其代表该用户持有的访问权限，包括离线 refresh token，但一些已签发的 access token 在过期前可能仍然有效。认证服务器会尝试通知它将该用户退出登录。用户仍保持登录，client 也可以请用户再次登录。"
@@ -1720,7 +1720,7 @@
 "adminconsole.admin_resources.groups_with_permission.granted" = "已将权限授予该群组。"
 "adminconsole.admin_resources.groups_with_permission.removed" = "已从该群组移除权限。"
 "adminconsole.admin_resources.groups_with_permission.empty" = "还没有群组。"
-"adminconsole.admin_resources.groups_with_permission.no_permissions" = "此资源还没有权限。请在“权限”选项卡中添加。"
+"adminconsole.admin_resources.groups_with_permission.no_permissions" = "此资源还没有权限。请在“权限”标签页中添加。"
 
 "adminconsole.admin_resources.users_with_permission.modal_remove_title" = "要移除此权限吗？"
 "adminconsole.admin_resources.users_with_permission.removed_label" = "已移除"
@@ -1734,7 +1734,7 @@
 "adminconsole.admin_resources.users_with_permission.remove_confirm" = "要从 {{.user}} 移除 {{.scope}} 吗？该用户将失去此权限，除非某个群组授予了它。"
 "adminconsole.admin_resources.users_with_permission.remove_dialog_button" = "移除权限"
 "adminconsole.admin_resources.users_with_permission.empty" = "没有用户直接拥有此权限。"
-"adminconsole.admin_resources.users_with_permission.no_permissions" = "此资源还没有权限。请在“权限”选项卡中添加。"
+"adminconsole.admin_resources.users_with_permission.no_permissions" = "此资源还没有权限。请在“权限”标签页中添加。"
 
 "adminconsole.admin_resources.users_with_permission_add.page_title_prefix" = "授予用户"
 "adminconsole.admin_resources.users_with_permission_add.field.permission" = "权限"
@@ -1794,9 +1794,9 @@
 "adminconsole.admin_settings.general.dynamic_client_registration_tooltip" = "client 可以在 /connect/register 自行注册（RFC 7591），发现文档随后会公布该地址。适用于 MCP 以及其他在运行时注册的集成。"
 "adminconsole.admin_settings.general.section_account_deletion" = "删除账户"
 "adminconsole.admin_settings.general.field.account_deletion_enabled" = "允许用户删除自己的账户"
-"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "用户在其账户页面删除账户，需要输入密码；如果开启了双因素认证，还需要输入验证码。无论是否开启此项，您都可以删除任何用户。"
+"adminconsole.admin_settings.general.account_deletion_enabled_tooltip" = "用户在其账户页面删除账户，需要输入密码；如果开启了双因素认证，还需要输入一次性验证码。无论是否开启此项，您都可以删除任何用户。"
 "adminconsole.admin_settings.general.section_flows" = "OAuth 流程"
-"adminconsole.admin_settings.general.flows_lead" = "除非 client 的“OAuth2 流程”选项卡另有设置，否则所有 client 都使用这些设置。"
+"adminconsole.admin_settings.general.flows_lead" = "除非 client 的“OAuth2 流程”标签页另有设置，否则所有 client 都使用这些设置。"
 "adminconsole.admin_settings.general.field.pkce_required" = "要求 PKCE"
 "adminconsole.admin_settings.general.pkce_required_tooltip" = "按照 OAuth 2.1 的建议，使用 authorization code 流程的机密 client 必须发送 PKCE。公共 client 始终必须发送。"
 "adminconsole.admin_settings.general.pkce_warning" = "没有 PKCE 时，被截获的 authorization code 可能被他人兑换。仅对无法发送 PKCE 的软件设为可选。"
@@ -1809,7 +1809,7 @@
 
 "adminconsole.admin_branding.list.page_title" = "品牌"
 "adminconsole.admin_branding.list.title" = "品牌"
-"adminconsole.admin_branding.list.lead" = "client 的页面使用其“设置”选项卡中选择的品牌绘制，未选择时使用默认品牌。此管理控制台使用其自身 client 的品牌绘制。"
+"adminconsole.admin_branding.list.lead" = "client 的页面使用其“设置”标签页中选择的品牌绘制，未选择时使用默认品牌。此管理控制台使用其自身 client 的品牌绘制。"
 "adminconsole.admin_branding.list.new_button" = "新建品牌"
 "adminconsole.admin_branding.list.col_name" = "品牌"
 "adminconsole.admin_branding.list.col_appearance" = "外观"
@@ -1951,7 +1951,7 @@
 "adminconsole.admin_branding.new.create_button" = "创建品牌"
 "adminconsole.admin_branding.brand.page_title_prefix" = "品牌"
 "adminconsole.admin_branding.brand.default_note" = "这是默认品牌。所有没有自己品牌的 client 的页面都使用它绘制，不属于任何 client 的页面也是如此。"
-"adminconsole.admin_branding.brand.other_note" = "在 client 的“设置”选项卡中选择它，即可使用它绘制该 client 的页面。"
+"adminconsole.admin_branding.brand.other_note" = "在 client 的“设置”标签页中选择它，即可使用它绘制该 client 的页面。"
 "adminconsole.admin_branding.brand.clients.none" = "没有 client 使用此品牌。"
 "adminconsole.admin_branding.brand.clients.other" = "{{.count}}个 client 使用此品牌。"
 "adminconsole.admin_branding.brand.saved" = "品牌已保存。"
@@ -1991,7 +1991,7 @@
 
 "adminconsole.admin_settings.tokens.page_title" = "Token 设置"
 "adminconsole.admin_settings.tokens.subtitle" = "Tokens"
-"adminconsole.admin_settings.tokens.lead" = "token 的有效时长以及其中包含的 claim。每个 client 都可以在其“Tokens”选项卡中覆盖这些设置。"
+"adminconsole.admin_settings.tokens.lead" = "token 的有效时长以及其中包含的 claim。每个 client 都可以在其“Tokens”标签页中覆盖这些设置。"
 "adminconsole.admin_settings.tokens.section_lifetimes" = "有效期"
 "adminconsole.admin_settings.tokens.field.token_expiration" = "Token 有效期（秒）"
 "adminconsole.admin_settings.tokens.token_expiration_tooltip" = "ID token 和 access token 的有效时长。"
@@ -2208,9 +2208,9 @@
 # --- OTP handler (LocalizedError-backed) -------------------------------------
 
 "handler.otp.account_disabled" = "您的账户已停用。"
-"handler.otp.clock_ahead" = "您设备的时钟似乎走快了。请检查其日期和时间是否设为自动，然后输入应用显示的验证码。"
+"handler.otp.clock_ahead" = "您设备的时钟似乎走快了。请检查其日期和时间是否设为自动，然后输入应用显示的一次性验证码。"
 "handler.otp.code_required" = "请输入身份验证器应用中的6位一次性验证码。"
-"handler.otp.incorrect_code" = "验证码不正确。验证码每30秒变化一次，请输入应用当前显示的验证码。"
+"handler.otp.incorrect_code" = "一次性验证码不正确。一次性验证码每30秒变化一次，请输入应用当前显示的一次性验证码。"
 "handler.otp.incorrect_recovery_code" = "恢复代码无效或已使用。"
 "handler.otp.recovery_code_required" = "请输入您的一个恢复代码。"
 
@@ -2425,7 +2425,7 @@
 "handler.account_otp.already_enabled" = "OTP 已启用"
 "handler.account_otp.secret_key_not_accepted" = "此 endpoint 不再接受 secretKey。请使用 GET /api/v1/account/otp/enrollment 开始注册，并只提交身份验证器应用中的一次性验证码。"
 "handler.account_otp.code_required" = "请输入身份验证器应用中的6位一次性验证码。"
-"handler.account_otp.code_invalid" = "验证码为6位数字。请输入身份验证器应用显示的验证码。"
+"handler.account_otp.code_invalid" = "一次性验证码为6位数字。请输入身份验证器应用显示的一次性验证码。"
 "handler.account_otp.enrollment_not_pending" = "没有待完成的 OTP 注册，或您开始的注册已过期。请使用 GET /api/v1/account/otp/enrollment 请求新的注册，然后重试。"
 "handler.account_deletion.disabled" = "账户删除功能已关闭。请联系管理员删除您的账户。"
 "handler.account_deletion.last_administrator" = "您是最后一位管理员，因此无法删除您的账户。请先将 authserver:manage 授予另一个用户。"

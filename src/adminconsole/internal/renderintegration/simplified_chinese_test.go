@@ -225,7 +225,7 @@ func TestSimplifiedChinese_ABrandsEditorCountsItsClientsAndFailingPairs(t *testi
 			require.Equal(t, http.StatusOK, w.Code)
 
 			out := html.UnescapeString(w.Body.String())
-			assert.Contains(t, out, `<p class="page-lead">在 client 的“设置”选项卡中选择它，即可使用它绘制该 client 的页面。`)
+			assert.Contains(t, out, `<p class="page-lead">在 client 的“设置”标签页中选择它，即可使用它绘制该 client 的页面。`)
 			assert.Contains(t, out, id+`个 client 使用此品牌。</p>`)
 			assert.Contains(t, out, `id="paletteWarningsCount" role="status">`+id+`对颜色低于最低要求。`+wcag+`</p>`)
 			assert.Regexp(t, `<p>品牌已保存。\s*该品牌有`+id+`对颜色低于对比度最低要求。\s*`+
