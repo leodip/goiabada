@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/typedcode"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -36,21 +37,36 @@ const (
 
 // HashRecoveryCode is the stored form of a code as a person typed it: the SHA-256, in lowercase
 // hex, of the code with spaces and hyphens taken out and letters lowered, so entry ignores case,
-// spaces and hyphens (#257 decision 2). Anything else typed, a mistyped letter included, hashes to
-// a value no set holds.
+// spaces and hyphens (#257 decision 2), and with its digits in any script and its full-width Latin
+// letters read as ASCII ones, so a code typed in full-width is the code it spells (#662 decision
+// 9). Anything else typed, a mistyped letter included, hashes to a value no set holds.
 func HashRecoveryCode(code string) string {
 	return hashutil.HashString(normalizeRecoveryCode(code))
 }
 
-// normalizeRecoveryCode drops every hyphen and every kind of space, a pasted tab or line break
-// included, and lowers the rest.
+// normalizeRecoveryCode drops every hyphen, as isRecoveryCodeHyphen reads one, and every kind of
+// space, a pasted tab or line break included, reads digits and full-width Latin letters as ASCII
+// ones, and lowers the rest.
 func normalizeRecoveryCode(code string) string {
 	return strings.Map(func(r rune) rune {
-		if r == '-' || unicode.IsSpace(r) {
+		if isRecoveryCodeHyphen(r) || unicode.IsSpace(r) {
 			return -1
 		}
 		return r
-	}, strings.ToLower(code))
+	}, strings.ToLower(typedcode.DigitsAndLatin(code)))
+}
+
+// isRecoveryCodeHyphen reports whether r is a hyphen as a person may type one between a code's
+// groups: the hyphen itself; what a Japanese input method types for the hyphen key, the full-width
+// hyphen-minus in full-width mode and the long-vowel mark, full or half width, in kana mode; and the
+// dashes and minus sign other keyboards and autocorrect put in its place. No code holds any of them,
+// so taking one out only ever reads a code as the code it would be without it.
+func isRecoveryCodeHyphen(r rune) bool {
+	switch r {
+	case '-', '\uFF0D', '\u30FC', '\uFF70', '\u2212':
+		return true
+	}
+	return r >= '\u2010' && r <= '\u2015'
 }
 
 // newRecoveryCodes draws a set of codes, as shown, and their hashes, as stored, index for index.

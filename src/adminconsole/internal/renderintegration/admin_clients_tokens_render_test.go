@@ -157,11 +157,13 @@ func TestRender_AdminClientTokens_TheFirstDrawShowsTheStoredClient(t *testing.T)
 
 	// Each "use the global setting" names what the global setting is now: the claims left out of the
 	// access token and included in the ID token, and each duration's own, which the script says
-	// beside a 0.
+	// beside a 0 in the catalog's sentence, with the duration in place of {duration}.
 	assert.Contains(t, out, `value="default" checked><span>Usar a configuração global (não incluir)</span>`)
 	assert.Equal(t, 1, strings.Count(out, `Usar a configuração global (incluir)`))
 	assert.Contains(t, out, `data-duration-for="tokenExpirationInSeconds" data-duration-global="3600"`)
 	assert.Contains(t, out, `data-duration-for="refreshTokenOfflineMaxLifetimeInSeconds" data-duration-global="2592000"`)
+	assert.Contains(t, out, `data-duration-zero="Usa a configuração global" `+
+		`data-duration-zero-global="Usa a configuração global ({duration})"`)
 }
 
 // A refused save draws the tab again with every input as the administrator submitted it: each

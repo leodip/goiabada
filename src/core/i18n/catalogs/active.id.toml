@@ -56,6 +56,15 @@
 "password_rules.passphrase_guidance" = "Beberapa kata yang tidak saling berkaitan menjadi kata sandi panjang yang mudah diingat."
 "password_rules.common_and_account_refused" = "Kata sandi yang umum, alamat email akun, dan nama aplikasi tidak diterima."
 
+# --- Names -------------------------------------------------------------------
+#
+# Not prose but a format: one of exactly two values, which the console's name
+# forms read to choose the name they ask for first. given_first draws the given,
+# middle and family names in that order; family_first draws the family name,
+# then the given name, then the middle name, for a language whose forms ask for
+# the family name first. Keep one of the two values exactly.
+"common.name_order" = "given_first"
+
 # --- Dates and durations -----------------------------------------------------
 #
 # The layout is a Go reference-time layout, translatable because Go formats
@@ -1021,6 +1030,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "Itu terlalu lama. Masukkan durasi yang lebih pendek."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Masukkan bilangan bulat dalam detik."
 "adminconsole.admin_clients.tokens.duration_zero" = "Menggunakan pengaturan global"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Menggunakan pengaturan global ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Claim OpenID Connect dalam access token"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Claim seperti email atau profile, dari scope yang diberikan kepada token. Tanpanya, resource server membacanya dari /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Sertakan"

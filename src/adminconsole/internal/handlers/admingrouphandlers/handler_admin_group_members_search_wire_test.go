@@ -20,10 +20,11 @@ import (
 // user.Id among its keys, written out by hand from what the handler sent before #482 respelled
 // the Go names. The keys are the contract with a script that may still be open in a browser
 // across a deploy, so they do not follow a field's Go name (#482 decision 7).
-const memberSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Username":"ana","Email":"ana@example.com","GivenName":"Ana","MiddleName":"Maria","FamilyName":"Silva","AddedToGroup":true}]}` + "\n"
+const memberSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Username":"ana","Email":"ana@example.com","GivenName":"Ana","MiddleName":"Maria","FamilyName":"Silva","FullName":"Ana Maria Silva","AddedToGroup":true},{"Id":8,"Subject":"9c1d2e3f-sub","Username":"yamada","Email":"yamada@example.com","GivenName":"太郎","MiddleName":"","FamilyName":"山田","FullName":"山田太郎","AddedToGroup":false}]}` + "\n"
 
-// memberSearchAPI answers the two calls the member search makes: the group, and one user the
-// search found, already a member.
+// memberSearchAPI answers the two calls the member search makes: the group, and two users the
+// search found: one already a member, named in Latin letters, and one named in kanji, whose full
+// name core/personname writes family name first (#662).
 type memberSearchAPI struct{}
 
 func (memberSearchAPI) AddUserToGroup(context.Context, string, int64, int64) error {
@@ -43,7 +44,14 @@ func (memberSearchAPI) SearchUsersWithGroupAnnotation(context.Context, string, s
 	user.GivenName = "Ana"
 	user.MiddleName = "Maria"
 	user.FamilyName = "Silva"
-	return []api.UserWithGroupMembershipResponse{user}, 1, nil
+	kanji := api.UserWithGroupMembershipResponse{}
+	kanji.ID = 8
+	kanji.Subject = "9c1d2e3f-sub"
+	kanji.Username = "yamada"
+	kanji.Email = "yamada@example.com"
+	kanji.GivenName = "太郎"
+	kanji.FamilyName = "山田"
+	return []api.UserWithGroupMembershipResponse{user, kanji}, 2, nil
 }
 
 func TestHandleMembersSearchGet_SendsTheKeysTheScriptReads(t *testing.T) {
@@ -62,7 +70,7 @@ func TestHandleMembersSearchGet_SendsTheKeysTheScriptReads(t *testing.T) {
 // tag with the key the script reads, so the key no longer rests on the Go name.
 func TestUserResult_EveryFieldDeclaresItsKey(t *testing.T) {
 	assert.Equal(t,
-		[]string{"Id", "Subject", "Username", "Email", "GivenName", "MiddleName", "FamilyName", "AddedToGroup"},
+		[]string{"Id", "Subject", "Username", "Email", "GivenName", "MiddleName", "FamilyName", "FullName", "AddedToGroup"},
 		jsonTags(t, reflect.TypeOf(UserResult{})))
 }
 

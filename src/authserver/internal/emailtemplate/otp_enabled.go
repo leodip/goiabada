@@ -87,6 +87,18 @@ Se l'hai configurata tu, non devi fare nulla. Conserva i codici di recupero in u
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "二要素認証が設定されました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントに二要素認証が設定されました。今後、二要素認証を使用するアプリケーションにログインするときは、設定された認証アプリのコードの入力が求められます。あわせて新しいリカバリーコードが発行されました。認証アプリを紛失した場合は、これらのコードでログインできます。
+
+ご自身で設定した場合は、対応は不要です。リカバリーコードは安全な場所に保管してください。
+
+**ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインして二要素認証の設定を確認するか、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Skonfigurowano uwierzytelnianie dwuskładnikowe",

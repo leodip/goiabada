@@ -104,6 +104,8 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 		{"no middle name", &api.UserResponse{ID: 7, GivenName: "Jane", FamilyName: "Doe"}, "Jane Doe"},
 		{"family name only", &api.UserResponse{ID: 7, FamilyName: "Doe"}, "Doe"},
 		{"no name at all", &api.UserResponse{ID: 7}, ""},
+		// core/personname writes it: a name in kanji family name first, with no space (#662).
+		{"a name in kanji", &api.UserResponse{ID: 7, GivenName: "太郎", FamilyName: "山田"}, "山田太郎"},
 	}
 
 	for _, tc := range testCases {

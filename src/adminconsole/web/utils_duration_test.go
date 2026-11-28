@@ -68,12 +68,17 @@ func formatIn(lang, seconds, units, want string) durationCase {
 // The sentences a settings form gives describeSeconds, in its data-duration-* attributes.
 const (
 	englishMessages = `{durationInvalid: "Enter a whole number of seconds.", durationTooLong: "That is too long.", ` +
-		`durationZero: "Uses the global setting", durationGlobal: "3600"}`
+		`durationZero: "Uses the global setting", durationZeroGlobal: "Uses the global setting ({duration})", ` +
+		`durationGlobal: "3600"}`
 	englishNoGlobal = `{durationInvalid: "Enter a whole number of seconds.", durationTooLong: "That is too long.", ` +
-		`durationZero: "Uses the global setting"}`
+		`durationZero: "Uses the global setting", durationZeroGlobal: "Uses the global setting ({duration})"}`
+	// A form that gives the global setting's duration but no sentence to say it in.
+	englishNoGlobalSentence = `{durationInvalid: "Enter a whole number of seconds.", ` +
+		`durationTooLong: "That is too long.", durationZero: "Uses the global setting", durationGlobal: "3600"}`
 	englishNoZero     = `{durationInvalid: "Enter a whole number of seconds.", durationTooLong: "That is too long."}`
 	portugueseMessage = `{durationInvalid: "Informe um número inteiro de segundos.", durationTooLong: "Longo demais.", ` +
-		`durationZero: "Usa a configuração global", durationGlobal: "5400"}`
+		`durationZero: "Usa a configuração global", durationZeroGlobal: "Usa a configuração global ({duration})", ` +
+		`durationGlobal: "5400"}`
 )
 
 // describeIn is a call of describeSeconds, as a settings field's readout makes it.
@@ -146,7 +151,9 @@ func durationCases() []durationCase {
 		formatIn("es", "90061", waitUnits, "25 horas, 1 minuto y 1 segundo"),
 		formatIn("es", "86400", settingsUnits, "1 día"),
 		formatIn("es", "172800", settingsUnits, "2 días"),
-		describeIn("es", `"0"`, `{durationZero: "Usa la configuración global", durationGlobal: "5400"}`, "Usa la configuración global (1 hora y 30 minutos)"),
+		describeIn("es", `"0"`, `{durationZero: "Usa la configuración global", `+
+			`durationZeroGlobal: "Usa la configuración global ({duration})", durationGlobal: "5400"}`,
+			"Usa la configuración global (1 hora y 30 minutos)"),
 		// A settings field's readout: trimmed, digits only, zero meaning the global setting where the
 		// form says so, and the cap of about five years.
 		describeIn("en", `" 5400 "`, englishMessages, "1 hour, 30 minutes"),
@@ -156,6 +163,8 @@ func durationCases() []durationCase {
 		describeIn("en", `""`, englishMessages, "Enter a whole number of seconds."),
 		describeIn("en", `"0"`, englishMessages, "Uses the global setting (1 hour)"),
 		describeIn("en", `"0"`, englishNoGlobal, "Uses the global setting"),
+		// The script never punctuates the duration itself: without the sentence, the bare one.
+		describeIn("en", `"0"`, englishNoGlobalSentence, "Uses the global setting"),
 		describeIn("en", `"0"`, englishNoZero, "0 seconds"),
 		describeIn("en", `"86400"`, englishMessages, "1 day"),
 		describeIn("en", `"160000000"`, englishMessages, "1,851 days, 20 hours, 26 minutes, 40 seconds"),

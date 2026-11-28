@@ -129,7 +129,7 @@ func TestWithPageLanguage_ALaterAutomaticGivesTheRequestsLanguageBack(t *testing
 		{"the English fallback", nil, "/auth/pwd", "", "Sign in", "en", false},
 	}
 	for _, tt := range tests {
-		for _, automatic := range []string{"", "ja"} {
+		for _, automatic := range []string{"", "sv"} {
 			t.Run(tt.name+"/"+automatic, func(t *testing.T) {
 				base := throughLocale(t, tt.reader, tt.target, tt.acceptLanguage)
 				ctx := WithPageLanguage(WithPageLanguage(base, "de"), automatic)
@@ -173,7 +173,7 @@ func TestWithPageLanguage_AWithLocaleBeneathAChoiceSurvivesALaterAutomatic(t *te
 func TestWithPageLanguage_AValueNamingNoCatalogIsAutomatic(t *testing.T) {
 	base := throughLocale(t, nil, "/auth/pwd?ui_locales=es", "en")
 
-	for _, value := range []string{"ja", "nl", "pt", "pt-br", " pt-BR", "pt_BR", "pt-BR-x-y"} {
+	for _, value := range []string{"sv", "nl", "pt", "pt-br", " pt-BR", "pt_BR", "pt-BR-x-y"} {
 		t.Run(value, func(t *testing.T) {
 			ctx := WithPageLanguage(base, value)
 			assert.Equal(t, base, ctx, "%q names no catalog, so the context is unchanged", value)
@@ -186,7 +186,7 @@ func TestWithPageLanguage_AValueNamingNoCatalogIsAutomatic(t *testing.T) {
 
 // CatalogTags lists the catalogs built into Goiabada, English first, and nothing else.
 func TestCatalogTags_ListsTheBuiltInCatalogs(t *testing.T) {
-	assert.Equal(t, []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"}, CatalogTags())
+	assert.Equal(t, []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"}, CatalogTags())
 }
 
 // The list is the caller's own: changing it changes nothing the next caller sees.
@@ -200,10 +200,10 @@ func TestCatalogTags_ReturnsACopy(t *testing.T) {
 // The built-in catalogs are the ones compiled in, and a tag names one only when it is spelt exactly as
 // its catalog is: a page language and a brand's footer link label are both checked against them.
 func TestIsCatalogTag(t *testing.T) {
-	for _, tag := range []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"} {
+	for _, tag := range []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"} {
 		assert.True(t, IsCatalogTag(tag), "%q is a built-in catalog", tag)
 	}
-	for _, tag := range []string{"", "ja", "nl", "pt", "pt-br", "PT-BR", " pt-BR", "pt-BR ", "en-US", "EN", "fr-CA", "in", "id-ID", "ID", "pl-PL", "PL", "ru-RU", "RU"} {
+	for _, tag := range []string{"", "sv", "nl", "pt", "pt-br", "PT-BR", " pt-BR", "pt-BR ", "en-US", "EN", "fr-CA", "in", "id-ID", "ID", "pl-PL", "PL", "ru-RU", "RU", "ja-JP", "JA", "jpn"} {
 		assert.False(t, IsCatalogTag(tag), "%q names no built-in catalog", tag)
 	}
 }

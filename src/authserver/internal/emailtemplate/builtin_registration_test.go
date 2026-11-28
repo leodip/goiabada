@@ -86,6 +86,12 @@ func TestActivationLink_InEachLanguage(t *testing.T) {
 		{"it", "Attiva il tuo account", "Attiva l'account", "Ciao,",
 			"Per completare la creazione del tuo account Acme Portal, apri questo link e scegli una password:",
 			"Il link scade tra 10 minuti. Se non riesci ad aprirlo, copialo e incollalo nel browser."},
+		// Japanese opens with no greeting where the email offers no name (#662 decision 3): its first
+		// paragraph is the sentence.
+		{"ja", "アカウントの有効化", "アカウントを有効化",
+			"Acme Portal のアカウント作成を完了するには、以下のリンクをクリックしてパスワードを設定してください。",
+			"Acme Portal のアカウント作成を完了するには、以下のリンクをクリックしてパスワードを設定してください。",
+			"このリンクの有効期限は 10 分です。リンクをクリックできない場合は、コピーしてブラウザーのアドレスバーに貼り付けてください。"},
 		{"pl", "Aktywuj konto", "Aktywuj konto", "Dzień dobry,",
 			"Aby dokończyć zakładanie konta w Acme Portal, kliknij poniższy link i wybierz hasło:",
 			"Link wygaśnie za 10 minut. Jeśli nie możesz go kliknąć, skopiuj go i wklej w pasku adresu przeglądarki."},
@@ -105,7 +111,7 @@ func TestActivationLink_InEachLanguage(t *testing.T) {
 			assert.Contains(t, body, ">"+tc.button+"</a>", "the button is labelled")
 			assert.Contains(t, body, "<p>"+linkTo(escapedLink, escapedLink)+"</p>", "the URL is written out, to copy")
 			assert.Contains(t, body, "<p>"+tc.expiry+"</p>\n")
-			assert.Contains(t, body, "<br>\nAcme Portal</p>", "signed with the app name")
+			assert.Contains(t, body, signature(tc.lang), "signed with the app name")
 		})
 	}
 }
@@ -123,6 +129,7 @@ func TestWelcome_InEachLanguage(t *testing.T) {
 			"Pour vous connecter, cliquez sur le lien ci-dessous\u00a0:"},
 		{"id", "Selamat datang!", "Masuk", "Selamat! Akun Anda telah dibuat.", "Anda dapat masuk melalui tautan di bawah ini:"},
 		{"it", "Benvenuto!", "Accedi", "Il tuo account è stato creato.", "Puoi accedere aprendo questo link:"},
+		{"ja", "ようこそ！", "ログイン", "アカウントが作成されました。", "以下のリンクからログインできます。"},
 		{"pl", "Witamy!", "Zaloguj się", "Gratulacje! Twoje konto zostało utworzone.", "Możesz się zalogować, klikając poniższy link:"},
 		{"pt-BR", "Bem-vindo(a)!", "Entrar", "Parabéns! Sua conta foi criada.", "Você pode entrar clicando no link abaixo:"},
 		{"ru", "Добро пожаловать!", "Войти", "Поздравляем! Ваш аккаунт создан.", "Войти можно по ссылке ниже:"},
@@ -134,7 +141,7 @@ func TestWelcome_InEachLanguage(t *testing.T) {
 			assert.True(t, strings.HasPrefix(body, "<p>"+tc.first+"</p>\n<p>"+tc.second+"</p>\n"), body)
 			assert.Contains(t, body, ">"+tc.button+"</a>", "the button is labelled")
 			assert.Contains(t, body, "<p>"+linkTo(escapedLink, escapedLink)+"</p>", "the URL is written out, to copy")
-			assert.Contains(t, body, "<br>\nAcme Portal</p>", "signed with the app name")
+			assert.Contains(t, body, signature(tc.lang), "signed with the app name")
 		})
 	}
 }
@@ -164,6 +171,10 @@ func TestRegistrationExistingAccount_InEachLanguage(t *testing.T) {
 		{"it", "Hai già un account", "Ciao,",
 			"Qualcuno, forse tu, ha provato a creare un nuovo account Acme Portal con questo indirizzo email. L'indirizzo ha già un account, quindi non ne è stato creato uno nuovo.",
 			"Se hai fatto tu la richiesta, accedi con il tuo account esistente. Se non ricordi la password, puoi reimpostarla qui: "},
+		{"ja", "アカウントはすでに存在します",
+			"どなたか（ご本人かもしれません）が、このメールアドレスで Acme Portal の新しいアカウントを作成しようとしました。このアドレスにはすでにアカウントがあるため、新しいアカウントは作成されていません。",
+			"どなたか（ご本人かもしれません）が、このメールアドレスで Acme Portal の新しいアカウントを作成しようとしました。このアドレスにはすでにアカウントがあるため、新しいアカウントは作成されていません。",
+			"ご本人の場合は、既存のアカウントでログインしてください。パスワードを忘れた場合は、こちらから再設定できます："},
 		{"pl", "Masz już konto", "Dzień dobry,",
 			"Próbowano założyć nowe konto w Acme Portal z użyciem tego adresu e-mail, być może z Twojej inicjatywy. Ten adres ma już konto, więc nie utworzono nowego.", //nolint:misspell // "nowe" is Polish, not a misspelling of "now"
 			"Jeśli to Ty, zaloguj się na istniejące konto. Jeśli nie pamiętasz hasła, możesz je zresetować tutaj: "},
@@ -207,6 +218,8 @@ func TestNewUserSetup_InEachLanguage(t *testing.T) {
 			"Anda dapat membuat kata sandi Anda melalui tautan di bawah ini:", "Tautan ini berlaku selama 48 jam. Jika sudah kedaluwarsa,"},
 		{"it", "Acme Portal - crea una password per il tuo nuovo account", "Crea la password", "Ciao Ana,",
 			"Per creare la tua password, apri questo link:", "Il link è valido per 48 ore. Se è scaduto,"},
+		{"ja", "【Acme Portal】新しいアカウントのパスワードを作成してください", "パスワードを作成", "Ana 様",
+			"以下のリンクから、パスワードを作成できます。", "このリンクの有効期間は 48 時間です。期限が切れている場合は、"},
 		{"pl", "Acme Portal – utwórz hasło do nowego konta", "Utwórz hasło", "Dzień dobry Ana,",
 			"Aby utworzyć hasło, kliknij poniższy link:", "Link jest ważny przez 48 godzin. Jeśli wygasł,"},
 		{"pt-BR", "Acme Portal - crie uma senha para sua nova conta", "Criar senha", "Olá Ana,",
@@ -223,7 +236,7 @@ func TestNewUserSetup_InEachLanguage(t *testing.T) {
 			assert.Contains(t, body, ">"+tc.button+"</a>", "the button is labelled")
 			assert.Contains(t, body, "<p>"+linkTo(escapedLink, escapedLink)+"</p>", "the URL is written out, to copy")
 			assert.Contains(t, body, "<p><strong>"+tc.lasts, "the lifetime sentence stays bold")
-			assert.Contains(t, body, "<br>\nAcme Portal</p>", "signed with the app name")
+			assert.Contains(t, body, signature(tc.lang), "signed with the app name")
 		})
 	}
 }
@@ -249,6 +262,8 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 			"Kode ini kedaluwarsa dalam 10 menit.", "Anda dapat memasukkan kode Anda di sini: "},
 		{"it", "Verifica email - codice 482915", "Ciao Ana,", "Ecco il tuo codice di verifica dell'indirizzo email:",
 			"Il codice scade tra 10 minuti.", "Puoi inserire il codice qui: "},
+		{"ja", "メールアドレスの確認コード：482915", "Ana 様", "メールアドレスの確認コードは次のとおりです。",
+			"このコードの有効期限は 10 分です。", "コードはこちらで入力できます："},
 		{"pl", "Weryfikacja adresu e-mail – kod 482915", "Dzień dobry Ana,", "Oto Twój kod weryfikacyjny adresu e-mail:",
 			"Kod wygaśnie za 10 minut.", "Kod możesz wpisać tutaj: "},
 		{"pt-BR", "Verificação de e-mail - código 482915", "Olá Ana,", "Este é o seu código de verificação de e-mail:",
@@ -264,7 +279,7 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 			assert.Contains(t, body, `text-align: center;">482915</p>`, "the code is boxed")
 			assert.Contains(t, body, "<p>"+tc.expiry+"</p>\n")
 			assert.Contains(t, body, "<p>"+tc.linkSentence+linkTo(escapedLink, escapedLink)+"</p>\n")
-			assert.Contains(t, body, "<br>\nAcme Portal</p>", "signed with the app name")
+			assert.Contains(t, body, signature(tc.lang), "signed with the app name")
 		})
 	}
 }
@@ -288,6 +303,8 @@ func TestTestEmail_InEachLanguage(t *testing.T) {
 			"Email ini dikirim dari pengaturan email untuk memeriksa bahwa email dapat dikirim. Jika Anda dapat membacanya, tidak ada lagi yang perlu dilakukan.", ""},
 		{"it", "Acme Portal - email di prova", "Questa è un’email di prova inviata da Acme Portal.",
 			"È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro.", ""},
+		{"ja", "【Acme Portal】テストメール", "これは Acme Portal からのテストメールです。",
+			"メールを送信できるかを確認するため、メール設定から送信されました。このメールが読めれば、ほかに行うことはありません。", ""},
 		{"pl", "Acme Portal – testowa wiadomość e-mail", "To jest testowa wiadomość e-mail z Acme Portal.",
 			"Została wysłana z ustawień poczty e-mail, aby sprawdzić, czy wysyłanie wiadomości działa. Jeśli możesz ją przeczytać, nie musisz nic więcej robić.",
 			"<p>Pozdrawiamy<br>\nAcme Portal</p>\n"},

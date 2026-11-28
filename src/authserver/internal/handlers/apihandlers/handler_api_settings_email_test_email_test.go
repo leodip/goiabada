@@ -68,6 +68,7 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 		{"pl-PL", "pl", "Acme Portal – testowa wiadomość e-mail", "To jest testowa wiadomość e-mail z Acme Portal."},
 		{"pt-BR", "pt-BR", "Acme Portal - e-mail de teste", "Este é um e-mail de teste enviado por Acme Portal."},
 		{"ru-RU", "ru", "Acme Portal — тестовое письмо", "Это тестовое письмо от Acme Portal."},
+		{"ja-JP", "ja", "【Acme Portal】テストメール", "これは Acme Portal からのテストメールです。"},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			plum := record.NewBrand("Default", record.BrandAppearanceLight, "plum")

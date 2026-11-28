@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/leodip/goiabada/core/requestid"
 	"github.com/leodip/goiabada/core/stylingcontract"
 )
@@ -216,13 +217,13 @@ func (h *Renderer) renderToBuffer(r *http.Request, layoutName string, templateNa
 				loggedInUser["Username"] = username
 			}
 
-			// The menu label, joined by the rule UserFullName applies to a user response, an absent
-			// claim reading as empty. An empty name has no email fallback here: the template shows the
-			// email on its own line (#440).
+			// The menu label, written from the ID token's three name claims by core/personname, as
+			// every other name the console shows is, an absent claim reading as empty. An empty name
+			// has no email fallback here: the template shows the email on its own line (#440, #662).
 			givenName, _ := claims["given_name"].(string)
 			middleName, _ := claims["middle_name"].(string)
 			familyName, _ := claims["family_name"].(string)
-			loggedInUser["GetFullName"] = fullName(givenName, middleName, familyName)
+			loggedInUser["GetFullName"] = personname.FullName(givenName, middleName, familyName)
 
 			data["loggedInUser"] = loggedInUser
 		}

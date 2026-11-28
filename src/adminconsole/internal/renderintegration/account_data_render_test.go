@@ -87,7 +87,7 @@ func TestRender_AccountData_ARefusal(t *testing.T) {
 // The page in another language reads its catalog, with no English left over.
 func TestRender_AccountData_IsTranslated(t *testing.T) {
 	bind := map[string]interface{}{"signedInAgain": true}
-	for _, locale := range []string{"pt-BR", "es", "fr", "de", "it", "id", "pl", "ru"} {
+	for _, locale := range []string{"pt-BR", "es", "fr", "de", "it", "id", "pl", "ru", "ja"} {
 		t.Run(locale, func(t *testing.T) {
 			out := renderDataPage(t, "/account/data", bind, locale, true)
 			for _, english := range []string{"Download your data", dataPageLead, "What's in it:", dataPageContents,

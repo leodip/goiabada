@@ -169,7 +169,7 @@ func TestInstantOf(t *testing.T) {
 	}
 }
 
-// TestTemplateFuncMap_IsThisApplicationsTwentyFive pins the split #385 made. The one map in core
+// TestTemplateFuncMap_IsThisApplicationsTwentySix pins the split #385 made. The one map in core
 // held twenty-two and the auth server parsed every template with all of them, though its pages
 // call four: T, Lang, args and versionComment, which are also here. The other nineteen -- the
 // five page predicates over this console's own URL paths, the JS bootstrap catalog, the
@@ -179,8 +179,9 @@ func TestInstantOf(t *testing.T) {
 // ScopeList came in #617, the scopes the account consents page names in words.
 // isAdminLegalDocumentPage came in #622, the sidebar's Legal documents section, and
 // isAdminBrandingPage in #810, the sidebar's Branding pages. TCount came in #665, the counted phrase
-// a template draws in its language's plural form; the auth server's templates draw none.
-func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
+// a template draws in its language's plural form; the auth server's templates draw none. FullName
+// came in #662, the users lists' full name, written by core/personname.
+func TestTemplateFuncMap_IsThisApplicationsTwentySix(t *testing.T) {
 	keys := make([]string, 0, len(templateFuncMap))
 	for k := range templateFuncMap {
 		keys = append(keys, k)
@@ -188,7 +189,7 @@ func TestTemplateFuncMap_IsThisApplicationsTwentyFive(t *testing.T) {
 	sort.Strings(keys)
 
 	want := []string{
-		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
+		"DateTime", "FullName", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
 		"RefTimezone", "ScopeList", "Since", "T", "TCount", "add", "addURLParam", "args", "concat", "deref",
 		"isAdminBrandingPage", "isAdminClientPage", "isAdminGroupPage", "isAdminLegalDocumentPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
 		"isAdminUserPage", "isLast", "versionComment",

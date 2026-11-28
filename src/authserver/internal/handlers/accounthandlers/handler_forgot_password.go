@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -291,7 +292,7 @@ func finishForgotPassword(
 	// account has no password (codeLifetime), and greets a user with no name by their address (#818
 	// decisions 4 and 15).
 	values := emailtemplate.Values{
-		Name:   emailtemplate.RecipientName(user.FullName(), user.Email),
+		Name:   emailtemplate.RecipientName(personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), user.Email),
 		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyID(r)),
 		Expiry: codeLifetime(user),
 	}

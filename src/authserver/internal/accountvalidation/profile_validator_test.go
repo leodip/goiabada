@@ -984,7 +984,7 @@ func TestValidateProfile_PageLanguage(t *testing.T) {
 		assert.NoError(t, validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: nil}))
 	})
 
-	for _, accepted := range []string{"", "en", "pt-BR", "es", "fr", "id", "it", "de", "pl", "ru"} {
+	for _, accepted := range []string{"", "en", "pt-BR", "es", "fr", "id", "it", "de", "pl", "ru", "ja"} {
 		t.Run("accepted/"+accepted, func(t *testing.T) {
 			pageLanguage := accepted
 			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{PageLanguage: &pageLanguage})
@@ -997,7 +997,8 @@ func TestValidateProfile_PageLanguage(t *testing.T) {
 		name  string
 		value string
 	}{
-		{"a language with no catalog", "ja"},
+		{"a language with no catalog", "sv"},
+		{"a regional tag of Japanese", "ja-JP"},
 		{"a regional tag of a catalog", "en-US"},
 		{"a tag differing only in case", "pt-br"},
 		{"a tag that only matches a catalog", "pt"},

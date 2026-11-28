@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/core/buildinfo"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // This file is one of two. The auth server's copy declares the four entries its templates call --
@@ -177,6 +178,11 @@ var templateFuncMap = template.FuncMap{
 	"Since": func(ctx context.Context, v any) string {
 		return formatSince(ctx, instantOf(v), time.Now().UTC())
 	},
+	// FullName writes a full name from its given, middle and family names by core/personname's
+	// rule, the one the name claim, the emails and every other name the console shows follow, so
+	// a list writes {{ FullName .GivenName .MiddleName .FamilyName }} and joins nothing itself
+	// (#662 decision 2).
+	"FullName": personname.FullName,
 
 	// RefCountry / RefPhoneCountry / RefTimezone resolve a country code,
 	// phone country, or IANA zone to its localized label. Country names come

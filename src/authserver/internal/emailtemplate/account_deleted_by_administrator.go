@@ -75,6 +75,16 @@ Se non te lo aspettavi, contatta il tuo amministratore.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "管理者があなたのアカウントを削除しました",
+			Body: `{{name}} 様
+
+管理者が {{app_name}} のアカウントを削除しました。このアカウントではログインできなくなりました。
+
+心当たりがない場合は、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject: "Administrator usunął Twoje konto",
 			Body: `Dzień dobry {{name}},

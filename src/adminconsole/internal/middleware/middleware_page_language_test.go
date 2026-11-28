@@ -74,7 +74,7 @@ func TestPageLanguage_TheChoiceWinsOverTheRequestAndAutomaticFollowsIt(t *testin
 			"/admin/users", "it", "Accedi", "it"},
 		{"no copy in the session, the browser", "", false,
 			"/admin/users", "it", "Accedi", "it"},
-		{"a tag with no catalog, the request", "ja", true,
+		{"a tag with no catalog, the request", "sv", true,
 			"/admin/users?ui_locales=es", "en", "Iniciar sesión", "es"},
 		{"a tag that only matches a catalog, the request", "pt-br", true,
 			"/admin/users", "en", "Sign in", "en"},

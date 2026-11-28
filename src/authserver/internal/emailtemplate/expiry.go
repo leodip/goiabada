@@ -17,6 +17,8 @@ type expiryUnit struct{ minute, hour string }
 // przez 24 godziny."), as an administrator's sentence is likelier to run (#665 decision 3). Russian's
 // are in the accusative too ("Срок действия ссылки истечет через 21 минуту.", "Ссылка действует
 // 24 часа."): one for 1 and 21, few for 2 to 4 and 22 to 24, many for 0 and 5 to 20 (#666 decision 5).
+// Japanese has one name per unit, other, with the space every number takes before Japanese (#662
+// decision 6): "30 分", "24 時間".
 var expiryUnits = map[string]map[string]expiryUnit{
 	"en":    {"one": {"minute", "hour"}, "other": {"minutes", "hours"}},
 	"de":    {"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}},
@@ -24,6 +26,7 @@ var expiryUnits = map[string]map[string]expiryUnit{
 	"fr":    {"one": {"minute", "heure"}, "other": {"minutes", "heures"}},
 	"id":    {"other": {"menit", "jam"}},
 	"it":    {"one": {"minuto", "ora"}, "other": {"minuti", "ore"}},
+	"ja":    {"other": {"分", "時間"}},
 	"pl":    {"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}},
 	"pt-BR": {"one": {"minuto", "hora"}, "other": {"minutos", "horas"}},
 	"ru":    {"one": {"минуту", "час"}, "few": {"минуты", "часа"}, "many": {"минут", "часов"}},

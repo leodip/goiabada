@@ -43,6 +43,12 @@ Email ini dikirim dari pengaturan email untuk memeriksa bahwa email dapat dikiri
 
 È stata inviata dalle impostazioni email per verificare che l’invio delle email funzioni. Se riesci a leggerla, non devi fare altro.`,
 		},
+		"ja": {
+			Subject: "【{{app_name}}】テストメール",
+			Body: `これは {{app_name}} からのテストメールです。
+
+メールを送信できるかを確認するため、メール設定から送信されました。このメールが読めれば、ほかに行うことはありません。`,
+		},
 		"pl": {
 			Subject: "{{app_name}} – testowa wiadomość e-mail",
 			Body: `To jest testowa wiadomość e-mail z {{app_name}}.

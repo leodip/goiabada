@@ -8,12 +8,12 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// UserFullName and SessionOwnerFullName join the same three name parts from two different wire
-// shapes, and they delegate to one helper rather than spelling the join out twice. The table is
-// driven through both so the delegation is proven from each side: a fourth hand-written copy is
-// what this file exists to keep from appearing, and the case that would expose one is a user
-// with a missing part, where a naive `given + " " + middle + " " + family` yields a doubled
-// space (#373).
+// UserFullName and SessionOwnerFullName write the same three name parts from two different wire
+// shapes, and both call core/personname rather than spelling a join out of their own. The table is
+// driven through both so the delegation is proven from each side: the case that would expose a
+// join of their own is a user with a missing part, where a naive `given + " " + middle + " " +
+// family` yields a doubled space (#373), and a name in kanji, which core/personname writes family
+// name first (#662).
 func TestFullNames_JoinTheSamePartsFromBothShapes(t *testing.T) {
 	for _, tc := range []struct {
 		name                              string
@@ -26,6 +26,8 @@ func TestFullNames_JoinTheSamePartsFromBothShapes(t *testing.T) {
 		{"family name only", "", "", "Doe", "Doe"},
 		{"middle name only", "", "Q", "", "Q"},
 		{"nothing at all", "", "", "", ""},
+		// core/personname writes it: a name in kanji family name first, with no space (#662).
+		{"a name in kanji", "太郎", "", "山田", "山田太郎"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, UserFullName(&api.UserResponse{

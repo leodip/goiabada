@@ -86,6 +86,18 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "アカウントが削除されました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントが、アカウント設定から削除されました。このアカウントではログインできなくなり、アプリケーションからこのアカウントにアクセスすることもできなくなりました。
+
+この変更をご自身で行った場合は、対応は不要です。
+
+**ご自身で行っていない場合は、第三者があなたのパスワードを知っていたことになります**。管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject: "Usunięto Twoje konto",
 			Body: `Dzień dobry {{name}},

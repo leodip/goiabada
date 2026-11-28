@@ -59,6 +59,18 @@ test("each duration is read back in Portuguese on a page in Portuguese", async (
   await expect(readout).toHaveText("Informe um número inteiro de segundos.");
 });
 
+// A page in Japanese puts the global setting's duration in full-width parentheses, with no space
+// before them, as its catalog's sentence writes it.
+test("the global setting's duration is in full-width parentheses on a page in Japanese", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(`${clientUrl(client.id, "tokens")}?ui_locales=ja`);
+  await expect(page.locator("html")).toHaveAttribute("data-catalog-lang", "ja");
+  const readout = page.locator('[data-duration-for="tokenExpirationInSeconds"]');
+  await expect(readout).toHaveText(/^グローバル設定を使用（\d[^（）]* (秒|分|時間|日)）$/);
+  await page.locator("#tokenExpirationInSeconds").fill("5400");
+  await expect(readout).toHaveText("1 時間 30 分");
+});
+
 // Back may bring the page back with what was typed put back in the field, without an input event, or
 // with the stored value: either way the readout says what the field then holds. Which one Chromium
 // does is its own choice, so the restoration itself is then played as a browser plays it: a value put

@@ -65,6 +65,7 @@ func TestRender_AdminUserProfile_ThePageLanguageSelect(t *testing.T) {
 		"fr| selected|fr – français (French)",
 		"id||id – Indonesia (Indonesian)",
 		"it||it – italiano (Italian)",
+		"ja||ja – 日本語 (Japanese)",
 		"pl||pl – polski (Polish)",
 		"pt-BR||pt-BR – português (Brasil) (Portuguese (Brazil))",
 		"ru||ru – русский (Russian)",

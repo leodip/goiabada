@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // accountEmailDatabase is what the account email endpoints need: the caller's own user row.
@@ -140,7 +141,7 @@ func HandleAccountEmailPut(
 			UserID:        user.ID,
 			Email:         previousEmail,
 			EmailVerified: previousEmailVerified,
-			Name:          user.FullName(),
+			Name:          personname.FullName(user.GivenName, user.MiddleName, user.FamilyName),
 			PageLanguage:  user.PageLanguage,
 			Locale:        user.Locale,
 		})

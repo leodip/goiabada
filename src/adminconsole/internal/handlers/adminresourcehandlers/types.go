@@ -56,6 +56,8 @@ type ValidatePermissionResult struct {
 
 // UserResult is one user the user search found, as the grant-permission script reads it. Each field
 // declares the key the script reads, so a field is respelled without moving its key (#482 decision 7).
+// FullName is the name the script draws, written by core/personname; the three names it is written
+// from stay under their keys for a page left open across an upgrade (#662 decision 2).
 type UserResult struct {
 	ID            int64  `json:"Id"`
 	Subject       string `json:"Subject"`
@@ -64,6 +66,7 @@ type UserResult struct {
 	GivenName     string `json:"GivenName"`
 	MiddleName    string `json:"MiddleName"`
 	FamilyName    string `json:"FamilyName"`
+	FullName      string `json:"FullName"`
 	HasPermission bool   `json:"HasPermission"`
 }
 

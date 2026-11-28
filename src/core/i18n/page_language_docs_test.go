@@ -65,14 +65,14 @@ func TestPageLanguageDocs_TheGuideSaysThePageLanguageComesFirst(t *testing.T) {
 // be written in, so a language added to or dropped from the built-in catalogs fails until the guide
 // follows.
 func TestPageLanguageDocs_TheGuideNamesTheBuiltInLanguages(t *testing.T) {
-	named := []string{"de", "en", "es", "fr", "id", "it", "pl", "pt-BR", "ru"}
+	named := []string{"de", "en", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"}
 	shipped := CatalogTags()
 	slices.Sort(shipped)
 	if !slices.Equal(shipped, named) {
 		t.Fatalf("the built-in catalogs are %q, but the guide names %q", shipped, named)
 	}
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuide, languageChosenTitle,
-		[]string{"The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish and Russian."}, nil)
+		[]string{"The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish, Russian and Japanese."}, nil)
 }
 
 // The authorize and sign-out pages' ui_locales rows say a user's page language wins over them.

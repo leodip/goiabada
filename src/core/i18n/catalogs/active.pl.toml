@@ -63,6 +63,15 @@
 "password_rules.passphrase_guidance" = "Kilka niezwiązanych ze sobą słów tworzy długie hasło, które łatwo zapamiętać."
 "password_rules.common_and_account_refused" = "Popularne hasła, adres e-mail konta i nazwa aplikacji są odrzucane."
 
+# --- Names -------------------------------------------------------------------
+#
+# Not prose but a format: one of exactly two values, which the console's name
+# forms read to choose the name they ask for first. given_first draws the given,
+# middle and family names in that order; family_first draws the family name,
+# then the given name, then the middle name, for a language whose forms ask for
+# the family name first. Keep one of the two values exactly.
+"common.name_order" = "given_first"
+
 # --- Dates and durations -----------------------------------------------------
 #
 # The layout is a Go reference-time layout, translatable because Go formats
@@ -1043,6 +1052,7 @@
 "adminconsole.admin_clients.tokens.duration_too_long" = "To za długo. Wpisz krótszy czas."
 "adminconsole.admin_clients.tokens.duration_invalid" = "Wpisz całkowitą liczbę sekund."
 "adminconsole.admin_clients.tokens.duration_zero" = "Używa ustawienia globalnego"
+"adminconsole.admin_clients.tokens.duration_zero_global" = "Używa ustawienia globalnego ({{.duration}})"
 "adminconsole.admin_clients.tokens.include_oidc_in_access" = "Claimy OpenID Connect w access tokenie"
 "adminconsole.admin_clients.tokens.include_oidc_in_access_tooltip" = "Claimy takie jak email czy profile, ze scope'ów przyznanych tokenowi. Bez nich serwer zasobów odczytuje je z /userinfo."
 "adminconsole.admin_clients.tokens.access_yes" = "Dołączaj je"

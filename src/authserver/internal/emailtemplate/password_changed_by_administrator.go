@@ -86,6 +86,18 @@ Se l'avevi chiesto tu, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "管理者があなたのパスワードを変更しました",
+			Body: `{{name}} 様
+
+管理者が {{app_name}} のアカウントのパスワードを変更しました。
+
+ご自身で依頼した場合は、対応は不要です。
+
+**心当たりがない場合は、管理者にお問い合わせください**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインして二要素認証の設定を確認することもできます。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Administrator zmienił Twoje hasło",

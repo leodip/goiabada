@@ -172,6 +172,8 @@ func TestUtilsJS_PluralCategoryFollowsThePagesCatalogTag(t *testing.T) {
 	runPlural(t, nil, []pluralCase{
 		category(tag("pl"), "many", "one", "few", "few", "few", "many", "many", "many", "many", "many", "few", "many", "many", "many", "few"),
 		category(tag("ru"), "many", "one", "few", "few", "few", "many", "many", "many", "many", "one", "few", "many", "many", "one", "few"),
+		// Japanese has one category, other, for every count.
+		category(tag("ja"), "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"),
 		category(tag("ar"), "zero", "one", "two", "few", "few", "few", "many", "many", "many", "many", "many", "many", "other", "other", "other"),
 		category(tag("pl-PL"), "many", "one", "few", "few", "few", "many", "many", "many", "many", "many", "few", "many", "many", "many", "few"),
 		// Zero takes the one form in French and Portuguese (Brazil).
@@ -230,7 +232,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		}
 	}
 	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru", "ja"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -248,6 +250,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("id", "0 hasil", "1 hasil", "2 hasil", "4 hasil", "5 hasil", "22 hasil"),
 		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
 		status("ru", "0 совпадений", "1 совпадение", "2 совпадения", "4 совпадения", "5 совпадений", "22 совпадения"),
+		status("ja", "0 件の一致", "1 件の一致", "2 件の一致", "4 件の一致", "5 件の一致", "22 件の一致"),
 	})
 }
 
@@ -276,5 +279,31 @@ func TestUtilsJS_SearchableStatusCountsTheMatchesInRussian(t *testing.T) {
 		Queries: []string{"zzz", "qa", "qb", "qc", "qd", "qe", "qf", "zone"},
 		want: []string{"0 совпадений", "1 совпадение", "2 совпадения", "5 совпадений", "11 совпадений",
 			"21 совпадение", "22 совпадения", "25 совпадений"},
+	}})
+}
+
+// A searchable select's status in Japanese has one form, a half-width space between the count and
+// its counter, at zero as at 1, 2 and 11 (#662 decision 6).
+func TestUtilsJS_SearchableStatusCountsTheMatchesInJapanese(t *testing.T) {
+	// Eleven zones. Each threshold's token marks the first that many of them, so the query for a
+	// token matches exactly that many, and "zone" matches all 11.
+	thresholds := []struct {
+		token string
+		count int
+	}{{"qa", 1}, {"qb", 2}}
+	options := []string{"選択してください"}
+	for i := 1; i <= 11; i++ {
+		option := fmt.Sprintf("Asia/Zone %02d", i)
+		for _, threshold := range thresholds {
+			if i <= threshold.count {
+				option += " " + threshold.token
+			}
+		}
+		options = append(options, option)
+	}
+	runPlural(t, map[string]map[string]string{"ja": comboboxStrings("ja")}, []pluralCase{{
+		Kind: "status", CatalogLang: tag("ja"), Strings: "ja", Options: options,
+		Queries: []string{"zzz", "qa", "qb", "zone"},
+		want:    []string{"0 件の一致", "1 件の一致", "2 件の一致", "11 件の一致"},
 	}})
 }

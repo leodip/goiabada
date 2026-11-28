@@ -242,7 +242,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndAVanishedOneIsAutomatic(t *t
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
 
-	HandleProfileGet(httpHelper, newFlashTestStore(), &accountProfileRecorder{pageLanguage: "ja"}).ServeHTTP(
+	HandleProfileGet(httpHelper, newFlashTestStore(), &accountProfileRecorder{pageLanguage: "sv"}).ServeHTTP(
 		httptest.NewRecorder(), handlertest.Request(http.MethodGet, "/account/profile", handlertest.WithAccessToken()))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -256,6 +256,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndAVanishedOneIsAutomatic(t *t
 		{Tag: "fr", Name: "French"},
 		{Tag: "id", Name: "Indonesian"},
 		{Tag: "it", Name: "Italian"},
+		{Tag: "ja", Name: "Japanese"},
 		{Tag: "pl", Name: "Polish"},
 		{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 		{Tag: "ru", Name: "Russian"},

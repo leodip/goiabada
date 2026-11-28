@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"io/fs"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -103,6 +104,7 @@ var pluralCategories = map[string][]string{
 	"fr":    {"one", "other"},
 	"id":    {"other"},
 	"it":    {"one", "other"},
+	"ja":    {"other"},
 	"pl":    {"one", "few", "many", "other"},
 	"ru":    {"one", "few", "many", "other"},
 	"pt-BR": {"one", "other"},
@@ -382,5 +384,32 @@ func TestCatalog_RussianOtherNamesMatchesOnlyTheOtherNames(t *testing.T) {
 	}
 	for _, v := range []string{"Введите короткое имя.", "Документ отозван.", "Записывать события аудита в вывод сервера", "Все остальное выводится как введено.", "в нижнем колонтитуле бренда", "«Плитка»", "Скругленные", "Овальные"} {
 		assert.Emptyf(t, russianOtherNames.FindString(v), "%q should not match", v)
+	}
+}
+
+// TestCatalog_NameOrderIsOneTheFormsKnow holds each catalog's name order, the format that says which
+// name the console's three name forms ask for first, to one of the two values the forms draw:
+// family name first in Japanese, given name first in every other built-in language (#662 decision
+// 11). Any other value would draw the forms given name first while the catalog meant otherwise.
+func TestCatalog_NameOrderIsOneTheFormsKnow(t *testing.T) {
+	want := map[string]string{
+		"active.de.toml":    "given_first",
+		"active.en.toml":    "given_first",
+		"active.es.toml":    "given_first",
+		"active.fr.toml":    "given_first",
+		"active.id.toml":    "given_first",
+		"active.it.toml":    "given_first",
+		"active.ja.toml":    "family_first",
+		"active.pl.toml":    "given_first",
+		"active.pt-BR.toml": "given_first",
+		"active.ru.toml":    "given_first",
+	}
+	assert.ElementsMatch(t, slices.Collect(maps.Keys(want)), catalogNames(t), "every built-in catalog has its order here")
+	for _, name := range catalogNames(t) {
+		got, ok := loadCatalogFlat(t, name)["common.name_order"]
+		if assert.Truef(t, ok, "%s carries no common.name_order", name) {
+			assert.Containsf(t, []string{"given_first", "family_first"}, got, "%s: common.name_order is %q, which no form draws", name, got)
+			assert.Equalf(t, want[name], got, "%s: common.name_order", name)
+		}
 	}
 }

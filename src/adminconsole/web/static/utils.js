@@ -504,6 +504,16 @@ function isAutofill(event) {
     event.inputType === "insertReplacementText";
 }
 
+// isCompositionKey tells a key that belongs to an input method's composition, such as the Enter
+// that accepts a kana-to-kanji candidate, from the page's own: it is the input method's, and no
+// handler acts on it (#662 decision 8). Browsers mark it differently. Chromium and Firefox set
+// isComposing (UI Events, KeyboardEvent), while Safari sends the Enter that ends a composition
+// after compositionend, isComposing false, with the keyCode 229 every browser gives a key the input
+// method processes.
+function isCompositionKey(event) {
+  return event.isComposing || event.keyCode === 229;
+}
+
 function makeSearchable(select) {
   const fold = function (text) {
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -704,7 +714,7 @@ function makeSearchable(select) {
         const step = event.key === "ArrowDown" ? 1 : -1;
         setActive((active + step + shown.length) % shown.length);
       }
-    } else if (event.key === "Enter" && !popup.hidden) {
+    } else if (event.key === "Enter" && !popup.hidden && !isCompositionKey(event)) {
       event.preventDefault();
       const entry = active >= 0 ? shown[active] : shown[0];
       if (entry) {
@@ -789,8 +799,10 @@ function makeSearchable(select) {
 // as "2 hours, 30 minutes", in the page's language. messages carries the sentences the page gives
 // for a value that is not a whole number of seconds and for one too long to be meant, the form's
 // data-duration-invalid and data-duration-too-long, and, where zero means something other than no
-// time at all, such as the global setting, data-duration-zero, followed by the global setting's
-// own duration where data-duration-global gives it, as "Uses the global setting (1 hour)".
+// time at all, such as the global setting, data-duration-zero. Where data-duration-global gives
+// the global setting's own duration, the form's data-duration-zero-global says it instead, with
+// the duration in place of {duration}, as "Uses the global setting (1 hour)": the sentence, not
+// the script, punctuates it, so a Japanese page writes "グローバル設定を使用（1 時間）".
 function describeSeconds(value, messages) {
   const text = String(value).trim();
   if (!/^[0-9]+$/.test(text)) {
@@ -798,8 +810,9 @@ function describeSeconds(value, messages) {
   }
   const seconds = Number(text);
   if (seconds === 0 && messages.durationZero) {
-    if (/^[0-9]+$/.test(messages.durationGlobal || "")) {
-      return messages.durationZero + " (" + formatDuration(Number(messages.durationGlobal), settingsDurationUnits) + ")";
+    if (messages.durationZeroGlobal && /^[0-9]+$/.test(messages.durationGlobal || "")) {
+      const globalDuration = formatDuration(Number(messages.durationGlobal), settingsDurationUnits);
+      return messages.durationZeroGlobal.split("{duration}").join(globalDuration);
     }
     return messages.durationZero;
   }

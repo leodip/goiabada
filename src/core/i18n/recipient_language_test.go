@@ -24,9 +24,9 @@ func TestWithRecipientLanguage_ChosenThenLanguageAndRegionThenEnglish(t *testing
 		{"English chosen over Language and region", "en", "pt-BR", "Reset your password", "en"},
 		{"Automatic: Language and region", "", "fr", "Réinitialiser votre mot de passe", "fr"},
 		{"Automatic: a regional Language and region keeps its own tag for the body copy", "", "es-MX", "Restablece tu contraseña", "es-MX"},
-		{"Automatic: a Language and region with no catalog keeps its tag, in English", "", "ja", "Reset your password", "ja"},
+		{"Automatic: a Language and region with no catalog keeps its tag, in English", "", "sv", "Reset your password", "sv"},
 		{"Automatic with no Language and region: English", "", "", "Reset your password", "en"},
-		{"a choice naming no catalog is Automatic: Language and region", "ja", "fr", "Réinitialiser votre mot de passe", "fr"},
+		{"a choice naming no catalog is Automatic: Language and region", "sv", "fr", "Réinitialiser votre mot de passe", "fr"},
 		{"a choice naming no catalog is Automatic: English", "pt-br", "", "Reset your password", "en"},
 	}
 

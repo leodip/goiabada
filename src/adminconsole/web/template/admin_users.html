@@ -44,8 +44,8 @@
           {{ if not .Enabled }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.admin_users.list.disabled_tag" }}</span>{{ end }}
         </td>
         <td class="cell-wrap sm:min-w-40" data-label="{{ T $.ctx "adminconsole.admin_users.list.col_name" }}">
-          {{ if or .GivenName .MiddleName .FamilyName }}
-          {{ .GivenName }} {{ .MiddleName }} {{ .FamilyName }}
+          {{ with FullName .GivenName .MiddleName .FamilyName }}
+          {{ . }}
           {{ else }}
           <span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_users.list.no_name" }}</span>
           {{ end }}

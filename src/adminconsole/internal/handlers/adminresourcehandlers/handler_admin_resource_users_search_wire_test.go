@@ -20,10 +20,11 @@ import (
 // it, user.Id among its keys, written out by hand from what the handler sent before #482
 // respelled the Go names. The keys are the contract with a script that may still be open in a
 // browser across a deploy, so they do not follow a field's Go name (#482 decision 7).
-const permissionUserSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Username":"ana","Email":"ana@example.com","GivenName":"Ana","MiddleName":"Maria","FamilyName":"Silva","HasPermission":true}]}` + "\n"
+const permissionUserSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Username":"ana","Email":"ana@example.com","GivenName":"Ana","MiddleName":"Maria","FamilyName":"Silva","FullName":"Ana Maria Silva","HasPermission":true},{"Id":8,"Subject":"9c1d2e3f-sub","Username":"yamada","Email":"yamada@example.com","GivenName":"太郎","MiddleName":"","FamilyName":"山田","FullName":"山田太郎","HasPermission":false}]}` + "\n"
 
 // permissionUserSearchAPI answers the three calls the user search makes: the resource, its one
-// permission, and one user the search found, already holding it.
+// permission, and two users the search found: one already holding it, named in Latin letters, and
+// one named in kanji, whose full name core/personname writes family name first (#662).
 type permissionUserSearchAPI struct{}
 
 func (permissionUserSearchAPI) GetPermissionsByResource(_ context.Context, _ string, resourceID int64) ([]api.PermissionResponse, error) {
@@ -51,7 +52,14 @@ func (permissionUserSearchAPI) SearchUsersWithPermissionAnnotation(context.Conte
 	user.GivenName = "Ana"
 	user.MiddleName = "Maria"
 	user.FamilyName = "Silva"
-	return []api.UserWithPermissionResponse{user}, 1, nil
+	kanji := api.UserWithPermissionResponse{}
+	kanji.ID = 8
+	kanji.Subject = "9c1d2e3f-sub"
+	kanji.Username = "yamada"
+	kanji.Email = "yamada@example.com"
+	kanji.GivenName = "太郎"
+	kanji.FamilyName = "山田"
+	return []api.UserWithPermissionResponse{user, kanji}, 2, nil
 }
 
 func (permissionUserSearchAPI) UpdateUserPermissions(context.Context, string, int64, *api.UpdateUserPermissionsRequest) error {
@@ -75,7 +83,7 @@ func TestHandleUsersWithPermissionSearchGet_SendsTheKeysTheScriptReads(t *testin
 // tag with the key the script reads, so the key no longer rests on the Go name.
 func TestUserResult_EveryFieldDeclaresItsKey(t *testing.T) {
 	assert.Equal(t,
-		[]string{"Id", "Subject", "Username", "Email", "GivenName", "MiddleName", "FamilyName", "HasPermission"},
+		[]string{"Id", "Subject", "Username", "Email", "GivenName", "MiddleName", "FamilyName", "FullName", "HasPermission"},
 		jsonTags(t, reflect.TypeOf(UserResult{})))
 }
 

@@ -121,6 +121,25 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject:     "パスワードの再設定",
+			ButtonLabel: "パスワードを再設定",
+			Body: `{{name}} 様
+
+以下のリンクから、パスワードを再設定できます。
+
+{{button}}
+
+{{link}}
+
+このリンクの有効期限は {{expiry}}です。
+
+リンクをクリックできない場合は、コピーしてブラウザーのアドレスバーに貼り付けてください。
+
+**パスワードの再設定を依頼していない場合は、このメールを無視してください。**
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject:     "Resetowanie hasła",
 			ButtonLabel: "Zresetuj hasło",

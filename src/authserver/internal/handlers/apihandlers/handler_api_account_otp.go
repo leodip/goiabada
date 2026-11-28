@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/typedcode"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -367,13 +368,15 @@ func HandleAccountOTPPut(
 				return
 			}
 
-			// OTP code must be 6 digits
-			if len(req.OTPCode) != 6 {
+			// OTP code must be 6 digits, read in any script as ASCII ones (#662 decision 9), and
+			// untrimmed, so a space around it is refused here as it always was.
+			otpCode := typedcode.Digits(req.OTPCode)
+			if len(otpCode) != 6 {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			}
 			for i := 0; i < 6; i++ {
-				if req.OTPCode[i] < '0' || req.OTPCode[i] > '9' {
+				if otpCode[i] < '0' || otpCode[i] > '9' {
 					writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 					return
 				}
@@ -417,7 +420,7 @@ func HandleAccountOTPPut(
 			// here, since the OTP_ALREADY_ENABLED check above refuses an enable when it is
 			// on (#111 decision 10).
 			verified, verifyErr := otpcredential.VerifySupplied(r.Context(), database, user, pendingSecret,
-				req.OTPCode, now)
+				otpCode, now)
 			if verifyErr != nil {
 				writeInternalServerError(w, r, verifyErr)
 				return

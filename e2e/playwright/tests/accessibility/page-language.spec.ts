@@ -3,7 +3,8 @@
 // <html lang>. A language with no catalog (sv) reads an English page, marked en; nl then pt-BR reads
 // a pt-BR page, marked pt-BR, not nl. Indonesian is asked for as id or as in, the tag older Android
 // and Java systems send; Malay (ms), which has no catalog, reads English. Ukrainian (uk), which has
-// no catalog, reads English, and uk then ru reads Russian. The console's country
+// no catalog, reads English, and uk then ru reads Russian. Chinese (zh), which has no catalog,
+// reads English, and zh then ja reads Japanese. The console's country
 // names follow the page too, so an English page asked for in Swedish names Germany in English.
 import { userUrl } from "../../lib/admin-console";
 import { openSignIn, testRedirectUri } from "../../lib/browser-sign-in";
@@ -31,6 +32,10 @@ const asked = [
   { uiLocales: "ru-RU", lang: "ru" },
   { uiLocales: "uk", lang: "en" },
   { uiLocales: "uk ru", lang: "ru" },
+  { uiLocales: "ja", lang: "ja" },
+  { uiLocales: "ja-JP", lang: "ja" },
+  { uiLocales: "zh", lang: "en" },
+  { uiLocales: "zh ja", lang: "ja" },
 ];
 
 for (const { uiLocales, lang } of asked) {

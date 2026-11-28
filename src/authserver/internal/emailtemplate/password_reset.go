@@ -86,6 +86,18 @@ Se l'hai reimpostata tu, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "パスワードが再設定されました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントのパスワードが、このメールアドレスに送信されたリンクから再設定されました。
+
+ご自身で再設定した場合は、対応は不要です。
+
+**ご自身で行っていない場合は、第三者があなたのメールを読み、アカウントを使用できる可能性があります**。メールアカウントの安全を確保したうえで、ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインして二要素認証の設定を確認するか、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "adres" and "nowe" are Polish, not a misspelling of "address" and "now"
 		"pl": {
 			Subject: "Zresetowano Twoje hasło",

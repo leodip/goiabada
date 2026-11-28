@@ -154,7 +154,7 @@ func TestRender_AccountDeleted(t *testing.T) {
 // The page in another language reads its catalog, with no English left over.
 func TestRender_AccountDelete_IsTranslated(t *testing.T) {
 	bind := map[string]interface{}{"otpEnabled": true, "useRecoveryCode": false}
-	for _, locale := range []string{"pt-BR", "es", "fr", "de", "it", "id", "pl", "ru"} {
+	for _, locale := range []string{"pt-BR", "es", "fr", "de", "it", "id", "pl", "ru", "ja"} {
 		t.Run(locale, func(t *testing.T) {
 			out := html.UnescapeString(renderPageWith(t, "/account/delete", "/layouts/menu_layout.html", "/account_delete.html",
 				bind, nil, locale, deletionOn(true)))

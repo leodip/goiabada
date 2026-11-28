@@ -86,6 +86,18 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "パスワードが変更されました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントのパスワードが、アカウント設定から変更されました。
+
+この変更をご自身で行った場合は、対応は不要です。
+
+**ご自身で行っていない場合は、第三者があなたのアカウントを使用している可能性があります**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインして二要素認証の設定を確認するか、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Zmieniono Twoje hasło",

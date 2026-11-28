@@ -30,6 +30,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // errUnknownNotice is a Notice that deliver has no email for, which only a new constant added
@@ -136,7 +137,7 @@ func To(user *record.User) Recipient {
 		UserID:        user.ID,
 		Email:         user.Email,
 		EmailVerified: user.EmailVerified,
-		Name:          user.FullName(),
+		Name:          personname.FullName(user.GivenName, user.MiddleName, user.FamilyName),
 		PageLanguage:  user.PageLanguage,
 		Locale:        user.Locale,
 	}

@@ -99,6 +99,21 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject:     "ようこそ！",
+			ButtonLabel: "ログイン",
+			Body: `アカウントが作成されました。
+
+以下のリンクからログインできます。
+
+{{button}}
+
+{{link}}
+
+リンクをクリックできない場合は、コピーしてブラウザーのアドレスバーに貼り付けてください。
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject:     "Witamy!",
 			ButtonLabel: "Zaloguj się",

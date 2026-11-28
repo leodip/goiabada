@@ -74,6 +74,16 @@ L'app di autenticazione del tuo account {{app_name}} è stata bloccata dopo trop
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "誤ったコードが続けて入力されたため、認証アプリが無効になりました",
+			Body: `{{name}} 様
+
+ログイン時に誤ったコードが続けて何度も入力されたため、{{app_name}} のアカウントの認証アプリが無効になりました。今後は、正しいコードであっても受け付けられません。
+
+**これらのコードはパスワードの入力後にしか入力できないため、第三者があなたのパスワードを知っている可能性があります**。リカバリーコードのいずれかでログインし、アカウント設定でパスワードを変更してから、二要素認証を無効にして新しい認証アプリを設定してください。リカバリーコードが残っていない場合は、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject: "Zablokowano Twoją aplikację uwierzytelniającą po zbyt wielu błędnych kodach",
 			Body: `Dzień dobry {{name}},

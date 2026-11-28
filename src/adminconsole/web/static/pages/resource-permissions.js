@@ -282,7 +282,7 @@ cancelButton.addEventListener("click", cancelEdit);
     clearRefusals();
   });
   input.addEventListener("keydown", function (event) {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !isCompositionKey(event)) {
       event.preventDefault();
       if (editingRow) {
         updateEntry();
