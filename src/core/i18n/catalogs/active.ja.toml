@@ -1951,7 +1951,7 @@
 "adminconsole.admin_branding.delete.page_title" = "ブランドを削除"
 "adminconsole.admin_branding.delete.lead" = "このブランドは削除されます。"
 "adminconsole.admin_branding.delete.clients.none" = "このブランドを使用している client はないため、ページは変わりません。"
-"adminconsole.admin_branding.delete.clients.other" = "{{.count}} 個の client がこのブランドを使用しています。これらはデフォルトのブランド「{{.defaultBrand}}」に移行します。"
+"adminconsole.admin_branding.delete.clients.other" = "{{.count}} 個の client がこのブランドを使用しています。削除後は、デフォルトのブランド「{{.defaultBrand}}」が使用されます。"
 "adminconsole.admin_branding.delete.confirm_field_label" = "確認のため、ブランド名を入力してください"
 "adminconsole.admin_branding.delete.delete_button" = "ブランドを削除"
 "adminconsole.admin_branding.delete.back_button" = "ブランド一覧に戻る"
