@@ -178,7 +178,7 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 		},
 		users: []api.SessionOwnerResponse{
 			{ID: 7, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"},
-			{ID: 9, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed"},
+			{ID: 9, Email: "yamada@example.com", GivenName: "太郎", FamilyName: "山田"},
 		},
 	}
 
@@ -195,8 +195,9 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 
 	// Sorted by session id, descending, so session 2 is first.
 	assert.Equal(t, int64(9), sessions[0].UserID)
-	assert.Equal(t, "sam@example.com", sessions[0].UserEmail)
-	assert.Equal(t, "Sam Reed", sessions[0].UserFullName)
+	assert.Equal(t, "yamada@example.com", sessions[0].UserEmail)
+	// core/personname writes the name: in kanji family name first, with no space (#662).
+	assert.Equal(t, "山田太郎", sessions[0].UserFullName)
 	assert.Equal(t, int64(7), sessions[1].UserID)
 	assert.Equal(t, "jane@example.com", sessions[1].UserEmail)
 	assert.Equal(t, "Jane Q Doe", sessions[1].UserFullName)

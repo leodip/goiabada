@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -98,7 +99,7 @@ func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_GlobalEnabled(t *te
 	assert.Equal(t, input.Nonce, claims["nonce"])
 
 	// OIDC profile scope claims
-	assert.Equal(t, input.User.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(input.User.GivenName, input.User.MiddleName, input.User.FamilyName), claims["name"])
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
 	assert.Equal(t, input.User.MiddleName, claims["middle_name"])
 	assert.Equal(t, input.User.FamilyName, claims["family_name"])
@@ -274,7 +275,7 @@ func TestGenerateIDToken_IncludeOpenIDConnectClaimsInIDToken_ClientOverrideOn(t 
 	// OIDC profile scope claims should be present
 	assert.Equal(t, input.User.GivenName, claims["given_name"])
 	assert.Equal(t, input.User.FamilyName, claims["family_name"])
-	assert.Equal(t, input.User.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(input.User.GivenName, input.User.MiddleName, input.User.FamilyName), claims["name"])
 
 	// OIDC email scope claims should be present
 	assert.Equal(t, input.User.Email, claims["email"])
@@ -610,7 +611,7 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIDToken_ClientO
 	assert.Equal(t, user.EmailVerified, idClaims["email_verified"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
-	assert.Equal(t, user.FullName(), idClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), idClaims["name"])
 
 	// Access token should NOT have them (global setting is false, no client override for access token)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)

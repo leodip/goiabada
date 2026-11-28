@@ -2,7 +2,6 @@ package record
 
 import (
 	"database/sql"
-	"strings"
 )
 
 // OTPConsecutiveFailureLimit is the number of consecutive failed attempts against one
@@ -145,25 +144,4 @@ type User struct {
 // clears it.
 func (u *User) OTPAuthenticatorDisabled() bool {
 	return u.OTPEnabled && u.OTPConsecutiveFailures >= OTPConsecutiveFailureLimit
-}
-
-func (u *User) FullName() string {
-	fullName := ""
-
-	if u != nil {
-		if len(u.GivenName) > 0 {
-			fullName += u.GivenName
-		}
-
-		if len(u.MiddleName) > 0 {
-			fullName += " " + u.MiddleName
-		}
-
-		if len(u.FamilyName) > 0 {
-			fullName += " " + u.FamilyName
-		}
-		fullName = strings.TrimSpace(fullName)
-	}
-
-	return fullName
 }

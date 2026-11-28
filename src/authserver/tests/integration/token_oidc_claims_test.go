@@ -235,7 +235,63 @@ func TestToken_IDToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 }
 
 // createAuthCodeWithUserProfile creates a user with full profile data and completes auth code flow
+// The name claim an application receives in the ID token and from /userinfo is the full name
+// core/personname writes: family name first with no space for a name in kanji, and given, middle,
+// family joined by spaces for a Latin name, as before (#662 decision 1). The three parts it is
+// written from are sent as they are stored.
+func TestToken_NameClaim_IsTheFullName(t *testing.T) {
+	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = true })
+
+	for _, tc := range []struct {
+		name                              string
+		givenName, middleName, familyName string
+		want                              string
+	}{
+		{"a name in kanji", "太郎", "", "山田", "山田太郎"},
+		{"a Latin name", "John", "Quincy", "Smith", "John Quincy Smith"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clientSecret := fake.LetterN(32)
+			httpClient, code := createAuthCodeWithNamedUser(t, clientSecret, "openid profile",
+				tc.givenName, tc.middleName, tc.familyName)
+
+			data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+				"grant_type":    {"authorization_code"},
+				"client_id":     {code.Client.ClientIdentifier},
+				"code":          {code.Code},
+				"redirect_uri":  {code.RedirectURI},
+				"code_verifier": {testCodeVerifier},
+				"client_secret": {clientSecret},
+			})
+
+			idClaims := decodeJWTPayload(t, data["id_token"].(string))
+			assert.Equal(t, tc.want, idClaims["name"], "the ID token's name claim")
+			assert.Equal(t, tc.givenName, idClaims["given_name"])
+			assert.Equal(t, tc.familyName, idClaims["family_name"])
+
+			req, err := http.NewRequest("GET", appConfig.AuthServer.BaseURL+"/userinfo", nil)
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer "+data["access_token"].(string))
+			resp, err := httpClient.Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var userinfo map[string]interface{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&userinfo))
+			assert.Equal(t, tc.want, userinfo["name"], "the UserInfo answer's name claim")
+			assert.Equal(t, tc.givenName, userinfo["given_name"])
+			assert.Equal(t, tc.familyName, userinfo["family_name"])
+		})
+	}
+}
+
 func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope string) (*http.Client, *record.Code) {
+	return createAuthCodeWithNamedUser(t, clientSecret, scope, fake.FirstName(), fake.MiddleName(), fake.LastName())
+}
+
+// createAuthCodeWithNamedUser is createAuthCodeWithUserProfile for a user whose given, middle and
+// family names are the ones named.
+func createAuthCodeWithNamedUser(t *testing.T, clientSecret, scope, givenName, middleName, familyName string) (*http.Client, *record.Code) {
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
@@ -292,9 +348,9 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		Email:               fake.Email(),
 		EmailVerified:       true,
 		PasswordHash:        passwordHashed,
-		GivenName:           fake.FirstName(),
-		FamilyName:          fake.LastName(),
-		MiddleName:          fake.MiddleName(),
+		GivenName:           givenName,
+		FamilyName:          familyName,
+		MiddleName:          middleName,
 		Nickname:            fake.Username(),
 		Website:             fake.URL(),
 		Gender:              genderValue,

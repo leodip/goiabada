@@ -843,6 +843,7 @@ command itself and fails on a tree it changed.
 | `core/passwordblocklist` | `IsCommon` | kernel | — |
 | `core/passwordblocklist` | `IsTooClose` | kernel | — |
 | `core/passwordrules` | `Describe` | both-apps | — |
+| `core/personname` | `FullName` | both-apps | — |
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |

@@ -121,6 +121,26 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 			},
 		},
 		{
+			// The name claim is written family name first, with no space, for a name in kanji (#662
+			// decision 1); the three parts it is written from do not change.
+			name: "Profile scope with a name in kanji",
+			user: &record.User{
+				Username:   "yamada",
+				GivenName:  "太郎",
+				FamilyName: "山田",
+				UpdatedAt:  sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+			},
+			scopes: []string{"openid", "profile"},
+			expected: jwt.MapClaims{
+				"name":               "山田太郎",
+				"given_name":         "太郎",
+				"family_name":        "山田",
+				"preferred_username": "yamada",
+				"profile":            "http://localhost:9091/account/profile",
+				"updated_at":         now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
 			name: "Email scope only",
 			user: &record.User{
 				Email:         "email@example.com",

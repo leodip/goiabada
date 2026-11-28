@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -153,7 +154,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), idClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), idClaims["name"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.MiddleName, idClaims["middle_name"])
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
@@ -215,7 +216,7 @@ func TestMintAuthorizationCodeTokens_FullOpenIDConnect(t *testing.T) {
 	_, err = uuidtest.Parse(accessClaims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), accessClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), accessClaims["name"])
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
 	assert.Equal(t, user.MiddleName, accessClaims["middle_name"])
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
@@ -645,7 +646,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
-	assert.Equal(t, user.FullName(), idClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), idClaims["name"])
 	assert.Equal(t, "http://localhost:9091/account/profile", idClaims["profile"])
 
 	assert.NotContains(t, idClaims, "groups")
@@ -677,7 +678,7 @@ func TestMintAuthorizationCodeTokens_ClientOverrideAndMixedScopes(t *testing.T) 
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
-	assert.Equal(t, user.FullName(), accessClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), accessClaims["name"])
 	assert.Equal(t, "http://localhost:9091/account/profile", accessClaims["profile"])
 
 	assert.NotContains(t, accessClaims, "groups")

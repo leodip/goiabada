@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // groupMembersAddAPI is what the add member page needs: the group, the annotated user search, and
@@ -128,6 +129,7 @@ func HandleMembersSearchGet(
 				GivenName:    user.GivenName,
 				MiddleName:   user.MiddleName,
 				FamilyName:   user.FamilyName,
+				FullName:     personname.FullName(user.GivenName, user.MiddleName, user.FamilyName),
 				AddedToGroup: user.InGroup,
 			})
 		}

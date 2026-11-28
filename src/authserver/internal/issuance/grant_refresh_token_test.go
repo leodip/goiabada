@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -130,7 +131,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assertTimeClaimWithinRange(t, idClaims, "nbf", 0*time.Second, testStart, "nbf should be now")
 	assert.Equal(t, user.FamilyName, idClaims["family_name"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])
-	assert.Equal(t, user.FullName(), idClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), idClaims["name"])
 	assert.Equal(t, user.Username, idClaims["preferred_username"])
 	assert.Equal(t, "http://localhost:9091/account/profile", idClaims["profile"])
 	_, err = uuidtest.Parse(idClaims["jti"].(string))
@@ -150,7 +151,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
 	assert.Equal(t, user.GivenName, accessClaims["given_name"])
-	assert.Equal(t, user.FullName(), accessClaims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), accessClaims["name"])
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
 	assert.Equal(t, "http://localhost:9091/account/profile", accessClaims["profile"])
 	assert.Equal(t, "openid profile resource1:read", accessClaims["scope"])

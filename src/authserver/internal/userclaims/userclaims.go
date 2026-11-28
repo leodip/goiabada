@@ -26,9 +26,10 @@
 // /userinfo's decision to answer at all -- together with iss, aud, exp, nonce and everything else
 // a token carries that is not read off the user row.
 //
-// Staying on record.User: FullName, which also names the user in the emails the auth server
-// sends. The birthdate claim's YYYY-MM-DD format has no reader but the claim, so it is written
-// here, as the claim construction it is (#424).
+// The name claim is written by core/personname, which also names the user in the emails the auth
+// server sends and in the admin console, so the three read the same (#662 decision 2). The
+// birthdate claim's YYYY-MM-DD format has no reader but the claim, so it is written here, as the
+// claim construction it is (#424).
 //
 // Nothing here takes an http.ResponseWriter, a *http.Request, template data or a status code, and
 // nothing here imports a handler package.
@@ -44,6 +45,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // Database is what claim construction needs: the one row behind the picture claim.
@@ -120,7 +122,7 @@ func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims j
 
 	if slices.Contains(scopes, "profile") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
-		addClaimIfNotEmpty(claims, "name", user.FullName())
+		addClaimIfNotEmpty(claims, "name", personname.FullName(user.GivenName, user.MiddleName, user.FamilyName))
 		addClaimIfNotEmpty(claims, "given_name", user.GivenName)
 		addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)
 		addClaimIfNotEmpty(claims, "family_name", user.FamilyName)

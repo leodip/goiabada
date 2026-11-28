@@ -33,6 +33,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/inputvalidation"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/leodip/goiabada/core/securerandom"
 )
 
@@ -618,7 +619,7 @@ func renderSetupEmail(r *http.Request, pageRenderer PageRenderer,
 	// The email greets a user with no name by their address and says how long the link works
 	// (#818 decisions 4 and 15).
 	values := emailtemplate.Values{
-		Name:   emailtemplate.RecipientName(newUser.FullName(), newUser.Email),
+		Name:   emailtemplate.RecipientName(personname.FullName(newUser.GivenName, newUser.MiddleName, newUser.FamilyName), newUser.Email),
 		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, ""),
 		Expiry: emaillinks.SetupLinkLifetime,
 	}

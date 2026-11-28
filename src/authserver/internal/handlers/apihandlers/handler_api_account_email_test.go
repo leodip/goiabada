@@ -383,16 +383,20 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 		renderLocale  string
 		expectSubject string
 		noName        bool
+		kanjiName     bool
 		expectName    string
 	}{
-		{"an English user", "", "en", "en", "Your email address was changed", false, "Ana Silva"},
-		{"a Brazilian Portuguese user", "", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado", false, "Ana Silva"},
-		{"a user with no stored locale", "", "", "en", "Your email address was changed", false, "Ana Silva"},
-		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Seu endereço de e-mail foi alterado", false, "Ana Silva"},
-		{"a user on Automatic, with a French locale", "", "fr", "fr", "Votre adresse e-mail a été modifiée", false, "Ana Silva"},
+		{"an English user", "", "en", "en", "Your email address was changed", false, false, "Ana Silva"},
+		{"a Brazilian Portuguese user", "", "pt-BR", "pt-BR", "Seu endereço de e-mail foi alterado", false, false, "Ana Silva"},
+		{"a user with no stored locale", "", "", "en", "Your email address was changed", false, false, "Ana Silva"},
+		{"a user who chose Portuguese, over a French locale", "pt-BR", "fr", "pt-BR", "Seu endereço de e-mail foi alterado", false, false, "Ana Silva"},
+		{"a user on Automatic, with a French locale", "", "fr", "fr", "Votre adresse e-mail a été modifiée", false, false, "Ana Silva"},
 		// {{name}} is never empty (#818 decision 15): a user with no name is greeted by the address
 		// the notice goes to, the previous one, so the new one is never shown.
-		{"a user with no name", "", "en", "en", "Your email address was changed", true, "old@example.com"},
+		{"a user with no name", "", "en", "en", "Your email address was changed", true, false, "old@example.com"},
+		// {{name}} is the full name core/personname writes: family name first, with no space, for
+		// a name in kanji (#662 decision 1).
+		{"a user named in kanji", "", "en", "en", "Your email address was changed", false, true, "山田太郎"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -404,6 +408,9 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			user.PageLanguage = tc.pageLanguage
 			if tc.noName {
 				user.GivenName, user.FamilyName = "", ""
+			}
+			if tc.kanjiName {
+				user.GivenName, user.FamilyName = "太郎", "山田"
 			}
 			stubSuccessfulChange(t, database, auditLogger, user)
 

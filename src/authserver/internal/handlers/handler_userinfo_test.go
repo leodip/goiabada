@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/render"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -227,7 +228,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, user.Locale, claims["locale"])
 			assert.Equal(t, "+351912345678", claims["phone_number"])
 			assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
-			assert.Equal(t, user.FullName(), claims["name"])
+			assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 
 			// A literal rather than the builder's own output: comparing the handler's
 			// own input to the handler's output cannot fail, so this assertion held
@@ -353,7 +354,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
-			assert.Equal(t, user.FullName(), claims["name"])
+			assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 			assert.NotContains(t, claims, "email")
 			assert.NotContains(t, claims, "email_verified")
 			return true

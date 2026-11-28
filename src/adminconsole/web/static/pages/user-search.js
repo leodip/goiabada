@@ -20,12 +20,6 @@ const resultsNote = document.querySelector("[data-results-note]");
 
 let searchRequest = 0;
 
-function nameOf(user) {
-  return [user.GivenName, user.MiddleName, user.FamilyName].filter(function (part) {
-    return part;
-  }).join(" ");
-}
-
 // The row a user is drawn in, built with DOM calls, so every value is shown as text (#120).
 function resultRow(user) {
   const row = document.createElement("tr");
@@ -37,7 +31,9 @@ function resultRow(user) {
   link.href = "/admin/users/" + Number(user.Id) + "/details";
   link.textContent = user.Email;
   who.appendChild(link);
-  const name = nameOf(user);
+  // The full name as the console's server wrote it, by the one rule every name the console shows
+  // follows; the script joins no name of its own, so an answer with none draws none (#662).
+  const name = user.FullName || "";
   if (name || user.Username) {
     const secondary = document.createElement("span");
     secondary.className = "cell-secondary";

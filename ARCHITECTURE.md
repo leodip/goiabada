@@ -122,6 +122,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/palette` | kernel | — |
 | `core/passwordblocklist` | kernel | — |
 | `core/passwordrules` | kernel | — |
+| `core/personname` | kernel | — |
 | `core/phonecountries` | kernel | — |
 | `core/pkgload` | kernel | — |
 | `core/requestid` | kernel | — |
@@ -239,6 +240,13 @@ Notes on rows that are not self-evident:
   both word them through its one function from the rules the public settings carry, so the two
   cannot word the same rules differently. It is a package of its own rather than part of `core/api`,
   which declares and does nothing, and of `core/i18n`, which owns no message of a domain (#550).
+- `core/personname` is kernel because both applications write a full name and must write the
+  same one: the auth server for the `name` claim and the emails' `{{name}}`, the admin console for
+  every name it shows, its user search's answer among them. Its one function holds the rule that
+  writes a name in Han, Hiragana, Katakana or Hangul family name first with no space, so a user
+  reads the same in a token, an email and the console. It is a package of its own rather than part
+  of `core/api`, which declares and does nothing, and the console reaches no auth server package
+  (#662).
 - `core/brandkit` is kernel because both applications draw a brand's corners, font family, uploaded
   font and background fit from it: the auth server in the brand's full stylesheet, and the admin
   console's brand editor on its sample of a sign-in page as they are picked, before the brand is

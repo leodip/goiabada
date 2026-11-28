@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // resourceUsersWithPermissionAPI is what the users-with-permission page needs: the resource and
@@ -350,6 +351,7 @@ func HandleUsersWithPermissionSearchGet(
 				GivenName:     u.GivenName,
 				MiddleName:    u.MiddleName,
 				FamilyName:    u.FamilyName,
+				FullName:      personname.FullName(u.GivenName, u.MiddleName, u.FamilyName),
 				HasPermission: u.HasPermission,
 			})
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuid/uuidtest"
 	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/personname"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -98,7 +99,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
 	assert.Equal(t, user.FamilyName, claims["family_name"])
 	assert.Equal(t, user.Username, claims["preferred_username"])
@@ -272,7 +273,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
 	assert.Equal(t, user.FamilyName, claims["family_name"])
 	assert.Equal(t, user.Username, claims["preferred_username"])
@@ -444,7 +445,7 @@ func TestGenerateIDToken_FullScope(t *testing.T) {
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
 	assert.Equal(t, user.MiddleName, claims["middle_name"])
 	assert.Equal(t, user.FamilyName, claims["family_name"])
@@ -627,7 +628,7 @@ func TestGenerateIDToken_ClientOverride(t *testing.T) {
 	_, err = uuidtest.Parse(claims["jti"].(string))
 	require.NoError(t, err)
 
-	assert.Equal(t, user.FullName(), claims["name"])
+	assert.Equal(t, personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), claims["name"])
 	assert.Equal(t, user.GivenName, claims["given_name"])
 	assert.Equal(t, user.FamilyName, claims["family_name"])
 	assert.Equal(t, user.Username, claims["preferred_username"])

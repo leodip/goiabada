@@ -401,10 +401,10 @@ func TestRenderTemplate_NilDataMap(t *testing.T) {
 	assert.Equal(t, "<html>sentinel app|/some/page</html>", body)
 }
 
-// The menu's full name is joined from the ID token's three name claims by the same rule
+// The menu's full name is written from the ID token's three name claims by core/personname, the rule
 // UserFullName applies to a user response, and the rows are TestFullNames_JoinTheSamePartsFromBothShapes'
-// own: the one that would expose a separate join is a missing part, where a hand-written
-// concatenation leaves a doubled or a dangling space (#373, #440).
+// own: the ones that would expose a separate join are a missing part, where a hand-written
+// concatenation leaves a doubled or a dangling space (#373, #440), and a name in kanji (#662).
 func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
 	templateFS := fstest.MapFS{
 		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
@@ -423,6 +423,8 @@ func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
 		{"family name only", "", "", "Doe", "Doe"},
 		{"middle name only", "", "Q", "", "Q"},
 		{"nothing at all", "", "", "", ""},
+		// core/personname writes it: a name in kanji family name first, with no space (#662).
+		{"a name in kanji", "太郎", "", "山田", "山田太郎"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := newRequest("GET", "/", nil)

@@ -29,7 +29,7 @@
       <tr>
         <td class="cell-wrap sm:whitespace-nowrap">
           <a class="text-link" href="/admin/users/{{ .ID }}/details">{{ .Email }}</a>
-          {{ if or .GivenName .MiddleName .FamilyName .Username }}<span class="cell-secondary">{{ .GivenName }} {{ .MiddleName }} {{ .FamilyName }}{{ if .Username }}{{ if or .GivenName .MiddleName .FamilyName }} · {{ end }}{{ .Username }}{{ end }}</span>{{ end }}
+          {{ $name := FullName .GivenName .MiddleName .FamilyName }}{{ if or $name .Username }}<span class="cell-secondary">{{ $name }}{{ if .Username }}{{ if $name }} · {{ end }}{{ .Username }}{{ end }}</span>{{ end }}
         </td>
         <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_groups.members.col_subject" }}">{{ .Subject }}</td>
         <td class="cell-actions">

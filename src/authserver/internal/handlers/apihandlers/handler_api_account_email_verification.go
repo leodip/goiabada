@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/personname"
 )
 
 // accountEmailVerificationDatabase is what the account email verification endpoints need: the
@@ -121,7 +122,7 @@ func HandleAccountEmailVerificationSendPost(
 		// The email greets a user with no name by their address and says how long the code
 		// lasts (#818 decisions 4 and 15).
 		values := emailtemplate.Values{
-			Name:   emailtemplate.RecipientName(user.FullName(), user.Email),
+			Name:   emailtemplate.RecipientName(personname.FullName(user.GivenName, user.MiddleName, user.FamilyName), user.Email),
 			Link:   adminConsoleBaseURL + "/account/email-verification",
 			Code:   verificationCode,
 			Expiry: emailVerificationCodeLifetime,
