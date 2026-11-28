@@ -411,7 +411,7 @@ func TestPageLanguage_TheSignInsUserOnAutomaticReplacesTheSessionsUsersChoice(t 
 		lang         string
 	}{
 		{"Automatic", "", "Tu cuenta de usuario está desactivada.", "es"},
-		{"a catalog that has gone", "ja", "Tu cuenta de usuario está desactivada.", "es"},
+		{"a catalog that has gone", "sv", "Tu cuenta de usuario está desactivada.", "es"},
 		{"chosen de", "de", "Ihr Benutzerkonto ist deaktiviert.", "de"},
 		{"chosen id", "id", "Akun pengguna Anda dinonaktifkan.", "id"},
 	}
@@ -451,7 +451,7 @@ func TestPageLanguage_TheResetLinksUserOnAutomaticReplacesTheSessionsUsersChoice
 		done         string
 	}{
 		{"Automatic", "", pageIn{"Establece tu contraseña", "es"}, "Tu contraseña está lista. Ya puedes iniciar sesión con:"},
-		{"a catalog that has gone", "ja", pageIn{"Establece tu contraseña", "es"}, "Tu contraseña está lista. Ya puedes iniciar sesión con:"},
+		{"a catalog that has gone", "sv", pageIn{"Establece tu contraseña", "es"}, "Tu contraseña está lista. Ya puedes iniciar sesión con:"},
 		{"chosen de", "de", pageIn{"Passwort festlegen", "de"}, "Ihr Passwort ist festgelegt. Sie können sich jetzt mit dieser E-Mail-Adresse anmelden:"},
 	}
 	for _, tc := range cases {

@@ -85,6 +85,16 @@ Altrimenti, puoi ignorare questo messaggio. Il tuo account non è stato modifica
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "アカウントはすでに存在します",
+			Body: `どなたか（ご本人かもしれません）が、このメールアドレスで {{app_name}} の新しいアカウントを作成しようとしました。このアドレスにはすでにアカウントがあるため、新しいアカウントは作成されていません。
+
+ご本人の場合は、既存のアカウントでログインしてください。パスワードを忘れた場合は、こちらから再設定できます：{{link}}
+
+ご本人でない場合は、このメールを無視してください。アカウントは変更されていません。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Masz już konto",

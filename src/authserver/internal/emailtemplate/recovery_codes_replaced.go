@@ -86,6 +86,18 @@ Se l'hai creato tu, non devi fare nulla. Conserva i nuovi codici in un posto sic
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "リカバリーコードが再発行されました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントの新しいリカバリーコードが、アカウント設定から発行されました。以前のリカバリーコードは、使用済みかどうかにかかわらず使用できなくなりました。
+
+ご自身で発行した場合は、対応は不要です。新しいコードは安全な場所に保管してください。
+
+**ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインしてアカウント設定で新しいリカバリーコードを取得するか、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Zastąpiono Twoje kody odzyskiwania",

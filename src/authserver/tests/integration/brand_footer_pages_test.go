@@ -155,7 +155,7 @@ func TestPages_TheDefaultBrandsFooterIsDrawnUnderTheCard(t *testing.T) {
 	assert.Equal(t, "https://acme.example/privacy", published.Brand.FooterLinks[0].URL)
 	assert.Equal(t, "Privacy", published.Brand.FooterLinks[0].Label)
 	assert.Equal(t, map[string]string{"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad",
-		"fr": "Confidentialité", "id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}, published.Brand.FooterLinks[0].Labels)
+		"fr": "Confidentialité", "id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}, published.Brand.FooterLinks[0].Labels)
 	assert.Equal(t, map[string]string{}, published.Brand.FooterLinks[1].Labels)
 	assert.Equal(t, "help+desk%2@acme.example", published.Brand.SupportEmail)
 	assert.Equal(t, "https://help.acme.example/contact", published.Brand.SupportURL)

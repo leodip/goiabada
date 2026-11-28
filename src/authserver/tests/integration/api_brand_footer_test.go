@@ -24,7 +24,7 @@ func footerBrandBody(name string) map[string]any {
 		"footerLinks": []any{
 			map[string]any{"url": "https://acme.example/privacy", "label": " Privacy ", "labels": map[string]any{
 				"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité",
-				"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}},
+				"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}},
 			map[string]any{"url": "https://status.acme.example", "label": "Status", "labels": map[string]any{"de": "  "}},
 			map[string]any{"url": "https://acme.example", "label": "Acme & Co"},
 		},
@@ -48,7 +48,7 @@ func TestAPIBrandFooter_StoredReadAndWrittenBackUnchanged(t *testing.T) {
 	assert.Equal(t, []any{
 		map[string]any{"url": "https://acme.example/privacy", "label": "Privacy", "labels": map[string]any{
 			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité",
-			"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}},
+			"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}},
 		map[string]any{"url": "https://status.acme.example", "label": "Status", "labels": map[string]any{}},
 		map[string]any{"url": "https://acme.example", "label": "Acme & Co", "labels": map[string]any{}},
 	}, brand["footerLinks"])
@@ -62,7 +62,7 @@ func TestAPIBrandFooter_StoredReadAndWrittenBackUnchanged(t *testing.T) {
 	assert.Equal(t, record.BrandFooterLinks{
 		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{
 			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité",
-			"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}},
+			"id": "Privasi", "it": "Riservatezza", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}},
 		{URL: "https://status.acme.example", Label: "Status"},
 		{URL: "https://acme.example", Label: "Acme & Co"},
 	}, stored.FooterLinks)

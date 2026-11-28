@@ -111,6 +111,21 @@ Se non hai chiesto di creare un account, ignora questo messaggio: non viene crea
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject:     "アカウントの有効化",
+			ButtonLabel: "アカウントを有効化",
+			Body: `{{app_name}} のアカウント作成を完了するには、以下のリンクをクリックしてパスワードを設定してください。
+
+{{button}}
+
+{{link}}
+
+このリンクの有効期限は {{expiry}}です。リンクをクリックできない場合は、コピーしてブラウザーのアドレスバーに貼り付けてください。
+
+アカウントの作成を依頼していない場合は、このメールを無視してください。リンクが使用されない限り、アカウントは作成されません。
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject:     "Aktywuj konto",
 			ButtonLabel: "Aktywuj konto",

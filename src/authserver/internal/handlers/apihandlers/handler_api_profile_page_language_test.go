@@ -136,7 +136,7 @@ func TestProfilePuts_ApplyThePageLanguage(t *testing.T) {
 
 func TestProfilePuts_RefuseAPageLanguageNotInTheList(t *testing.T) {
 	for _, route := range profilePageLanguageRoutes() {
-		for _, sent := range []string{"ja", "pt-br", "fr-CA", "pt", "id-ID", "in"} {
+		for _, sent := range []string{"sv", "ja-JP", "pt-br", "fr-CA", "pt", "id-ID", "in"} {
 			t.Run(route.name+", sent "+sent, func(t *testing.T) {
 				database := datamocks.NewDatabase(t)
 				auditLogger := handlersmocks.NewAuditLogger(t)
@@ -166,7 +166,7 @@ func TestProfilePuts_RefuseInTheRequestsLanguage(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			route.expectRead(database, pageLanguageStoredUser())
 
-			sent := "ja"
+			sent := "sv"
 			req := route.request(t, pageLanguageBody(t, &sent))
 			req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 

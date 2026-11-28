@@ -110,6 +110,23 @@ Se non riesci ad aprire il link, copialo e incollalo nel browser.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject:     "【{{app_name}}】新しいアカウントのパスワードを作成してください",
+			ButtonLabel: "パスワードを作成",
+			Body: `{{name}} 様
+
+以下のリンクから、パスワードを作成できます。
+
+{{button}}
+
+{{link}}
+
+リンクをクリックできない場合は、コピーしてブラウザーのアドレスバーに貼り付けてください。
+
+**このリンクの有効期間は {{expiry}}です。期限が切れている場合は、管理者にお問い合わせください。管理者がパスワードを設定するか、ログインページから新しいリンクを申請できるようにします。**
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject:     "{{app_name}} – utwórz hasło do nowego konta",
 			ButtonLabel: "Utwórz hasło",

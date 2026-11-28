@@ -198,7 +198,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndSelectsTheStoredPageLanguage
 	}{
 		{"a language chosen", "es", "es"},
 		{"Automatic", "", ""},
-		{"a catalog that has gone", "ja", ""},
+		{"a catalog that has gone", "sv", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := handlersmocks.NewHTTPHelper(t)
@@ -221,6 +221,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndSelectsTheStoredPageLanguage
 				{Tag: "fr", Name: "French"},
 				{Tag: "id", Name: "Indonesian"},
 				{Tag: "it", Name: "Italian"},
+				{Tag: "ja", Name: "Japanese"},
 				{Tag: "pl", Name: "Polish"},
 				{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 				{Tag: "ru", Name: "Russian"},

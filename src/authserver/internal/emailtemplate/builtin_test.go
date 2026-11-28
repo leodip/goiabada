@@ -13,7 +13,7 @@ import (
 )
 
 // The built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"}
+var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"}
 
 func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
@@ -69,6 +69,8 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:", "Tautan ini kedaluwarsa dalam 5 menit."},
 		{"it", "Reimpostazione della password", "Reimposta la password", "Ciao Ana,",
 			"Per reimpostare la password, apri questo link:", "Il link scade tra 5 minuti."},
+		{"ja", "パスワードの再設定", "パスワードを再設定", "Ana 様",
+			"以下のリンクから、パスワードを再設定できます。", "このリンクの有効期限は 5 分です。"},
 		{"pl", "Resetowanie hasła", "Zresetuj hasło", "Dzień dobry Ana,",
 			"Aby zresetować hasło, kliknij poniższy link:", "Link wygaśnie za 5 minut."},
 		{"pt-BR", "Redefinição de senha", "Redefinir senha", "Olá Ana,",
@@ -91,7 +93,7 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			assert.Contains(t, body, ">"+tc.button+"</a>", "the button is labelled")
 			assert.Contains(t, body, "<p>"+linkTo(escapedLink, escapedLink)+"</p>", "the URL is written out, to copy")
 			assert.Contains(t, body, "<strong>", "the warning sentence stays bold")
-			assert.Contains(t, body, "<br>\nAcme Portal</p>", "signed with the app name")
+			assert.Contains(t, body, signature(tc.lang), "signed with the app name")
 		})
 	}
 }
@@ -150,6 +152,15 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"it", 0, "0 minuti"},
 		{"it", 24 * time.Hour, "24 ore"},
 		{"it", time.Hour, "1 ora"},
+		// Japanese has one form, other, and a space between the number and its unit (#662 decision 6).
+		{"ja", 5 * time.Minute, "5 分"},
+		{"ja", time.Minute, "1 分"},
+		{"ja", 30 * time.Minute, "30 分"},
+		{"ja", 0, "0 分"},
+		{"ja", 90 * time.Minute, "90 分"},
+		{"ja", time.Hour, "1 時間"},
+		{"ja", 24 * time.Hour, "24 時間"},
+		{"ja", 48 * time.Hour, "48 時間"},
 		// Polish writes the unit in the accusative the expiry sentences take (#665 decision 3): one
 		// for 1, few for 2 to 4 and 22 to 24, many for 0, 5 to 21 and 25 on.
 		{"pl", time.Minute, "1 minutę"},
@@ -234,6 +245,9 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 		"ru": "ru", "ru-RU": "ru", "ru-KZ": "ru", "ru-UA": "ru",
 		// Ukrainian reads English, not Russian, though the matcher rates them close.
 		"uk": "en", "uk-UA": "en",
+		"ja": "ja", "ja-JP": "ja",
+		// Chinese and Korean read English, not Japanese.
+		"zh": "en", "zh-CN": "en", "zh-TW": "en", "ko": "en", "ko-KR": "en",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.
 		"gl": "en", "eu": "en",
@@ -276,5 +290,46 @@ func TestSpellsYo(t *testing.T) {
 	}
 	for _, v := range []string{"Срок истек.", "Еще раз", "Hello"} {
 		assert.Falsef(t, spellsYo(v), "%q does not spell ё", v)
+	}
+}
+
+// signature is how a body in lang signs off: a closing phrase with the app name on the next line, or
+// in Japanese, which closes with no phrase (#662 decision 3), the app name alone in its paragraph.
+func signature(lang string) string {
+	if lang == "ja" {
+		return "</p>\n<p>Acme Portal</p>"
+	}
+	return "<br>\nAcme Portal</p>"
+}
+
+// Every Japanese email that offers {{name}} opens with "{{name}} 様" alone on its line, and the four
+// that offer none open with their text; each that closes does so with the app name alone, with no
+// closing phrase; and each bold sentence is drawn bold, never as asterisks (#662 decision 3).
+func TestBuiltIns_JapaneseGreetsByNameAndClosesWithTheAppName(t *testing.T) {
+	for _, email := range BuiltIns() {
+		t.Run(email.ID, func(t *testing.T) {
+			text, ok := email.BuiltIn["ja"]
+			require.Truef(t, ok, "%s has Japanese text", email.ID)
+			offersName := slices.ContainsFunc(email.Placeholders, func(p Placeholder) bool { return p.Name == Name })
+			first, _, _ := strings.Cut(text.Body, "\n")
+			if offersName {
+				assert.Equal(t, "{{name}} 様", first)
+			} else {
+				assert.NotContains(t, text.Body, "様", "an email that offers no name greets no one")
+			}
+
+			rendered, err := email.Render("ja", text, testValues, testLook)
+			require.NoError(t, err)
+			body := string(rendered.Body)
+			if email.ID != "test" { // which, as in English, does not close
+				assert.True(t, strings.HasSuffix(text.Body, "\n\n{{app_name}}"), "closes with the app name alone: %q", text.Body)
+				assert.True(t, strings.HasSuffix(body, signature("ja")+"\n"), body)
+			}
+			assert.NotContains(t, body, "*", "every bold sentence is drawn bold")
+			assert.Equal(t, strings.Count(text.Body, "**")/2, strings.Count(body, "<strong>"))
+			if offersName {
+				assert.True(t, strings.HasPrefix(body, "<p>Ana 様</p>\n"), body)
+			}
+		})
 	}
 }

@@ -71,7 +71,7 @@ func emailTemplatesStore(t *testing.T) sessionstore.Store {
 // summary is one email as the list gives it, every language at the built-in text but those named.
 func summary(id string, statuses map[string]string) api.EmailTemplateSummaryResponse {
 	s := api.EmailTemplateSummaryResponse{ID: id}
-	for _, tag := range []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"} {
+	for _, tag := range []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"} {
 		status := "default"
 		if named, ok := statuses[tag]; ok {
 			status = named
@@ -174,7 +174,7 @@ func emailTemplate() *api.EmailTemplateResponse {
 		},
 		Languages: []api.EmailTemplateLanguageResponse{
 			language("en", "default"), language("de", "default"), language("es", "default"),
-			language("fr", "edited"), language("id", "default"), language("it", "default"), language("pl", "default"), ptBR, language("ru", "default"),
+			language("fr", "edited"), language("id", "default"), language("it", "default"), language("pl", "default"), ptBR, language("ru", "default"), language("ja", "default"),
 		},
 	}
 }
@@ -216,10 +216,11 @@ func TestRender_AdminSettingsEmailTemplate(t *testing.T) {
 	nav := regexp.MustCompile(`(?s)<nav class="tab-bar" id="emailTemplateLanguages".*?</nav>`).FindString(out)
 	require.NotEmpty(t, nav, "the language selector is drawn")
 	assert.Contains(t, nav, `aria-label="Idioma"`)
-	assert.Equal(t, 9, strings.Count(nav, `class="tab-item"`))
+	assert.Equal(t, 10, strings.Count(nav, `class="tab-item"`))
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/id">Indonesia (Indonesian)</a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/pl">polski (Polish)</a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/ru">русский (Russian)</a>`)
+	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/ja">日本語 (Japanese)</a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/fr" aria-current="page">français (French) <span class="tag tag-note">Editado</span></a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/pt-BR">português (Brasil) (Portuguese (Brazil)) <span class="tag tag-caution">Requer atenção</span></a>`)
 	assert.Contains(t, nav, `href="/admin/settings/email/templates/password_reset_link/en">English</a>`)

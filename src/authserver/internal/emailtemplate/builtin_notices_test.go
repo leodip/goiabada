@@ -25,6 +25,8 @@ var noticeTexts = []struct {
 	langs map[string]noticeText
 }{
 	{"email_address_changed", map[string]noticeText{
+		"ja": {"メールアドレスが変更されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your email address was changed", "Hello Ana,",
 			"If you didn't, someone else may know your password."},
 		"de": {"Ihre E-Mail-Adresse wurde geändert", "Guten Tag Ana,",
@@ -45,6 +47,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"password_changed", map[string]noticeText{
+		"ja": {"パスワードが変更されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのアカウントを使用している可能性があります"},
 		"en": {"Your password was changed", "Hello Ana,",
 			"If you didn't, someone else may be using your account."},
 		"de": {"Ihr Passwort wurde geändert", "Guten Tag Ana,",
@@ -65,6 +69,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, вашим аккаунтом пользуется кто-то другой."},
 	}},
 	{"password_changed_by_administrator", map[string]noticeText{
+		"ja": {"管理者があなたのパスワードを変更しました", "Ana 様",
+			"心当たりがない場合は、管理者にお問い合わせください"},
 		"en": {"An administrator changed your password", "Hello Ana,",
 			"If you weren't expecting it, contact your administrator."},
 		"de": {"Ihr Passwort wurde von der Administration geändert", "Guten Tag Ana,",
@@ -85,6 +91,8 @@ var noticeTexts = []struct {
 			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"password_reset", map[string]noticeText{
+		"ja": {"パスワードが再設定されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのメールを読み、アカウントを使用できる可能性があります"},
 		"en": {"Your password was reset", "Hello Ana,",
 			"If you didn't, someone else may be able to read your email and use your account."},
 		"de": {"Ihr Passwort wurde zurückgesetzt", "Guten Tag Ana,",
@@ -105,6 +113,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, кто-то другой может читать вашу почту и пользоваться вашим аккаунтом."},
 	}},
 	{"otp_enabled", map[string]noticeText{
+		"ja": {"二要素認証が設定されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Two-factor authentication was set up", "Hello Ana,",
 			"If you didn't, someone else may know your password."},
 		"de": {"Die Zwei-Faktor-Authentifizierung wurde eingerichtet", "Guten Tag Ana,",
@@ -125,6 +135,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled", map[string]noticeText{
+		"ja": {"二要素認証が無効になりました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Two-factor authentication was turned off", "Hello Ana,",
 			"If you didn't, someone else may know your password."},
 		"de": {"Die Zwei-Faktor-Authentifizierung wurde deaktiviert", "Guten Tag Ana,",
@@ -145,6 +157,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled_by_administrator", map[string]noticeText{
+		"ja": {"管理者があなたの二要素認証を無効にしました", "Ana 様",
+			"心当たりがない場合は、管理者にお問い合わせください"},
 		"en": {"An administrator turned off your two-factor authentication", "Hello Ana,",
 			"If you weren't expecting it, contact your administrator."},
 		"de": {"Ihre Zwei-Faktor-Authentifizierung wurde von der Administration deaktiviert", "Guten Tag Ana,",
@@ -165,6 +179,8 @@ var noticeTexts = []struct {
 			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"otp_lockout", map[string]noticeText{
+		"ja": {"誤ったコードが続けて入力されたため、認証アプリが無効になりました", "Ana 様",
+			"これらのコードはパスワードの入力後にしか入力できないため、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your authenticator was disabled after too many wrong codes", "Hello Ana,",
 			"Those codes could only be entered after your password, so someone else may know it."},
 		"de": {"Ihre Authenticator-App wurde nach zu vielen falschen Codes gesperrt", "Guten Tag Ana,",
@@ -185,6 +201,8 @@ var noticeTexts = []struct {
 			"Эти коды можно было ввести только после пароля, поэтому, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"recovery_code_used", map[string]noticeText{
+		"ja": {"ログインにリカバリーコードが使用されました", "Ana 様",
+			"ご自身でない場合は、第三者があなたのパスワードを知っていて、リカバリーコードも持っている可能性があります"},
 		"en": {"A recovery code was used to sign in", "Hello Ana,",
 			"If it wasn't you, someone else may know your password and have your recovery codes."},
 		"de": {"Für die Anmeldung wurde ein Wiederherstellungscode verwendet", "Guten Tag Ana,",
@@ -205,6 +223,8 @@ var noticeTexts = []struct {
 			"Если это были не вы, возможно, кто-то другой знает ваш пароль и имеет ваши коды восстановления."},
 	}},
 	{"recovery_codes_replaced", map[string]noticeText{
+		"ja": {"リカバリーコードが再発行されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your recovery codes were replaced", "Hello Ana,",
 			"If you didn't, someone else may know your password."},
 		"de": {"Ihre Wiederherstellungscodes wurden ersetzt", "Guten Tag Ana,",
@@ -225,6 +245,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"account_deleted", map[string]noticeText{
+		"ja": {"アカウントが削除されました", "Ana 様",
+			"ご自身で行っていない場合は、第三者があなたのパスワードを知っていたことになります"},
 		"en": {"Your account was deleted", "Hello Ana,",
 			"If you didn't, someone else knew your password."},
 		"de": {"Ihr Konto wurde gelöscht", "Guten Tag Ana,",
@@ -245,6 +267,8 @@ var noticeTexts = []struct {
 			"Если нет, значит, ваш пароль был известен кому-то еще."},
 	}},
 	{"account_deleted_by_administrator", map[string]noticeText{
+		"ja": {"管理者があなたのアカウントを削除しました", "Ana 様",
+			"管理者が Acme Portal のアカウントを削除しました。このアカウントではログインできなくなりました。"},
 		"en": {"An administrator deleted your account", "Hello Ana,",
 			"An administrator deleted your Acme Portal account. You can no longer sign in with it."},
 		"de": {"Ihr Konto wurde von der Administration gelöscht", "Guten Tag Ana,",
@@ -290,7 +314,7 @@ func TestBuiltIns_TheTwelveNotices(t *testing.T) {
 					} else {
 						assert.Equal(t, text.warning, doc.Find("strong").Text(), "the warning sentence stays bold")
 					}
-					assert.True(t, strings.HasSuffix(body, "<br>\nAcme Portal</p>\n"), "signed with the app name: %s", body)
+					assert.True(t, strings.HasSuffix(body, signature(lang)+"\n"), "signed with the app name: %s", body)
 					assert.Zero(t, doc.Find("a").Length(), "a notice carries no link")
 				})
 			}
@@ -317,6 +341,8 @@ func TestRecoveryCodeUsed_OneWordingForEveryCount(t *testing.T) {
 			"Jika Anda masih memiliki aplikasi tersebut, buat satu set kode pemulihan baru di sana, agar Anda tetap dapat masuk jika aplikasi itu hilang."},
 		{"it", "Codici di recupero inutilizzati rimasti: %s.",
 			"Se hai ancora l'app, ottieni lì un nuovo set di codici di recupero, per poter accedere se la perdi."},
+		{"ja", "未使用のリカバリーコードは残り %s 個です。",
+			"認証アプリがまだ手元にある場合は、紛失してもログインできるよう、アカウント設定で新しいリカバリーコードを取得してください。"},
 		{"pl", "Pozostałe nieużyte kody odzyskiwania: %s.",
 			"Jeśli nadal masz tę aplikację, wygeneruj nowy zestaw kodów odzyskiwania w ustawieniach konta, aby móc się zalogować, jeśli ją stracisz."},
 		{"pt-BR", "Códigos de recuperação sem uso restantes: %s.",

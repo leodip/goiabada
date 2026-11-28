@@ -230,7 +230,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		}
 	}
 	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru", "ja"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -248,6 +248,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("id", "0 hasil", "1 hasil", "2 hasil", "4 hasil", "5 hasil", "22 hasil"),
 		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
 		status("ru", "0 совпадений", "1 совпадение", "2 совпадения", "4 совпадения", "5 совпадений", "22 совпадения"),
+		status("ja", "0 件の一致", "1 件の一致", "2 件の一致", "4 件の一致", "5 件の一致", "22 件の一致"),
 	})
 }
 

@@ -93,6 +93,20 @@ Puoi inserire il codice qui: {{link}}
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "メールアドレスの確認コード：{{code}}",
+			Body: `{{name}} 様
+
+メールアドレスの確認コードは次のとおりです。
+
+{{code}}
+
+このコードの有効期限は {{expiry}}です。
+
+コードはこちらで入力できます：{{link}}
+
+{{app_name}}`,
+		},
 		"pl": {
 			Subject: "Weryfikacja adresu e-mail – kod {{code}}",
 			Body: `Dzień dobry {{name}},

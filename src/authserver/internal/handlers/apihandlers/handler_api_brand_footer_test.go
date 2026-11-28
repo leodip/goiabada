@@ -425,13 +425,13 @@ func TestBrandFooter_LabelsLeftOutNullOrBlankAreNone(t *testing.T) {
 		expectCreate(database, &stored)
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedBrand, mock.Anything).Once()
-		labels := map[string]any{"en": "Help", "de": "Hilfe", "es": "Ayuda", "fr": "Aide", "id": "Bantuan", "it": "Aiuto", "pl": "Pomoc", "pt-BR": "Ajuda", "ru": "Помощь"}
+		labels := map[string]any{"en": "Help", "de": "Hilfe", "es": "Ayuda", "fr": "Aide", "id": "Bantuan", "it": "Aiuto", "pl": "Pomoc", "pt-BR": "Ajuda", "ru": "Помощь", "ja": "ヘルプ"}
 
 		status, answer := serveBrand(HandleBrandCreatePost(database, auditLogger, brandBaseURL),
 			brandRequest(t, http.MethodPost, withFooterLinks(footerLink("https://help.acme.example", "Help", labels))))
 
 		require.Equal(t, http.StatusCreated, status, "%v", answer)
-		assert.Equal(t, map[string]string{"en": "Help", "de": "Hilfe", "es": "Ayuda", "fr": "Aide", "id": "Bantuan", "it": "Aiuto", "pl": "Pomoc", "pt-BR": "Ajuda", "ru": "Помощь"},
+		assert.Equal(t, map[string]string{"en": "Help", "de": "Hilfe", "es": "Ayuda", "fr": "Aide", "id": "Bantuan", "it": "Aiuto", "pl": "Pomoc", "pt-BR": "Ajuda", "ru": "Помощь", "ja": "ヘルプ"},
 			stored.FooterLinks[0].Labels)
 	})
 }
@@ -442,7 +442,7 @@ func storedFooterBrand() *record.Brand {
 	stored := storedBrand(5, "Acme", record.BrandAppearanceLight, "guava")
 	stored.FooterLinks = record.BrandFooterLinks{
 		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{
-			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité", "id": "Privasi", "it": "Privacy", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}},
+			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité", "id": "Privasi", "it": "Privacy", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}},
 		{URL: "https://status.acme.example", Label: "Status"},
 		{URL: "https://acme.example", Label: "Acme & Co"},
 	}
@@ -471,7 +471,7 @@ func TestBrandFooter_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, []any{
 		map[string]any{"url": "https://acme.example/privacy", "label": "Privacy", "labels": map[string]any{
-			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité", "id": "Privasi", "it": "Privacy", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность"}},
+			"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad", "fr": "Confidentialité", "id": "Privasi", "it": "Privacy", "pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность", "ja": "プライバシー"}},
 		map[string]any{"url": "https://status.acme.example", "label": "Status", "labels": map[string]any{}},
 		map[string]any{"url": "https://acme.example", "label": "Acme & Co", "labels": map[string]any{}},
 	}, brandAt(read, "brand", "footerLinks"))

@@ -63,7 +63,7 @@ func assertPageLanguageSaves(t *testing.T, putURL, accessToken string, userID in
 	assert.Equal(t, "pt-BR", stored(), "a save that leaves the field out keeps the page language")
 
 	status, _, refusal := putPageLanguageProfile(t, putURL, accessToken,
-		map[string]any{"givenName": "Ada", "familyName": "Lovelace", "pageLanguage": "ja"})
+		map[string]any{"givenName": "Ada", "familyName": "Lovelace", "pageLanguage": "sv"})
 	assert.Equal(t, http.StatusBadRequest, status, "a language with no catalog is refused")
 	assert.Equal(t, "Choose a language from the list.", refusal)
 	assert.Equal(t, "pt-BR", stored(), "a refused save writes nothing")

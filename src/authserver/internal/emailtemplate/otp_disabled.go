@@ -86,6 +86,18 @@ Se hai effettuato tu la modifica, non devi fare nulla.
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "二要素認証が無効になりました",
+			Body: `{{name}} 様
+
+{{app_name}} のアカウントの二要素認証が、アカウント設定から無効にされました。認証アプリとリカバリーコードは、ログインに使用できなくなりました。
+
+この変更をご自身で行った場合は、対応は不要です。
+
+**ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインしてもう一度二要素認証を設定するか、管理者にお問い合わせください。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Wyłączono uwierzytelnianie dwuskładnikowe",

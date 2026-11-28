@@ -88,6 +88,18 @@ Se l'avevi chiesto tu, non devi fare nulla. Puoi configurare una nuova app di au
 Un saluto,
 {{app_name}}`,
 		},
+		"ja": {
+			Subject: "管理者があなたの二要素認証を無効にしました",
+			Body: `{{name}} 様
+
+管理者が {{app_name}} のアカウントの二要素認証を無効にしました。認証アプリとリカバリーコードは、ログインに使用できなくなりました。
+
+ご自身で依頼した場合は、対応は不要です。新しい認証アプリは、アカウント設定で設定できます。
+
+**心当たりがない場合は、管理者にお問い合わせください**。ログインページの「パスワードをお忘れですか？」から新しいパスワードを設定し、ログインして二要素認証の設定を確認することもできます。
+
+{{app_name}}`,
+		},
 		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
 		"pl": {
 			Subject: "Administrator wyłączył Twoje uwierzytelnianie dwuskładnikowe",
