@@ -247,3 +247,27 @@ func TestHashRecoveryCode_IgnoresCaseSpacesAndHyphens(t *testing.T) {
 	}
 	assert.NotEqual(t, want, HashRecoveryCode("7kq2-m9xh-4trw-b3np-j6vd-egab"), "another code is another hash")
 }
+
+// A recovery code typed in full-width, or with the digits of another script, is the code it spells
+// (#662 decision 9): every decimal digit reads as its ASCII digit and a full-width Latin letter as
+// its ordinary letter, before the hyphens and spaces are taken out as they always were. The
+// expected value is the example code's hash above.
+func TestHashRecoveryCode_ReadsFullWidthLettersAndTheDigitsOfAnyScript(t *testing.T) {
+	const want = "c6fc89366c85e65574ae4e7611c099de58437a2d479455bb7d15876a606c0472"
+
+	for _, typed := range []string{
+		"7kq2-ｍ9xh-4trw-b3np-j6vd-egac",
+		"７ｋｑ２-ｍ９ｘｈ-４ｔｒｗ-ｂ３ｎｐ-ｊ６ｖｄ-ｅｇａｃ",
+		"７ＫＱ２-Ｍ９ＸＨ-４ＴＲＷ-Ｂ３ＮＰ-Ｊ６ＶＤ-ＥＧＡＣ",
+		"٧kq٢-m٩xh-٤trw-b٣np-j٦vd-egac",
+		"७kq२-m९xh-४trw-b३np-j६vd-egac",
+		"　７ｋｑ２ ｍ９ｘｈ ４ｔｒｗ　ｂ３ｎｐ ｊ６ｖｄ ｅｇａｃ　",
+	} {
+		assert.Equal(t, want, HashRecoveryCode(typed), "%q", typed)
+	}
+
+	// The full-width hyphen is not the hyphen, so it is not taken out, and the code is another.
+	assert.NotEqual(t, want, HashRecoveryCode("7kq2－m9xh－4trw－b3np－j6vd－egac"))
+	assert.NotEqual(t, want, HashRecoveryCode("７ｋｑ２-ｍ９ｘｈ-４ｔｒｗ-ｂ３ｎｐ-ｊ６ｖｄ-ｅｇａｂ"),
+		"a wrong letter in full-width is another code")
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/typedcode"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -212,7 +213,9 @@ func HandleAccountEmailVerificationPost(
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		code := strings.TrimSpace(req.VerificationCode)
+		// Trimmed as before, with its digits in any script and its full-width letters read as
+		// ASCII ones, so ＡＢＣＤ１２３４ is the code ABCD1234 (#662 decision 9).
+		code := typedcode.DigitsAndLatin(strings.TrimSpace(req.VerificationCode))
 
 		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {

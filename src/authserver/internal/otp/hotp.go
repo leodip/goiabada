@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/leodip/goiabada/authserver/internal/typedcode"
 )
 
 // passcodeDigits is the length of a passcode, the six digits of RFC 4226 section 5.3 that every
@@ -73,11 +75,12 @@ func hotpCode(key []byte, counter uint64) string {
 }
 
 // passcodeMatches reports whether a passcode is the code a secret gives at a counter. The passcode
-// is trimmed and must then be exactly six characters, and the comparison is constant-time, so a
-// near miss takes as long as a far one. A wrong length and an unreadable secret are errors, which
-// MatchStep turns into the same refusal as a wrong code.
+// is trimmed, its digits in any script are read as ASCII ones (#662 decision 9), and it must then be
+// exactly six bytes, and the comparison is constant-time, so a near miss takes as long as a far
+// one. A wrong length and an unreadable secret are errors, which MatchStep turns into the same
+// refusal as a wrong code.
 func passcodeMatches(passcode string, counter uint64, secret string) (bool, error) {
-	passcode = strings.TrimSpace(passcode)
+	passcode = typedcode.Digits(strings.TrimSpace(passcode))
 	if len(passcode) != passcodeDigits {
 		return false, errPasscodeLength
 	}

@@ -407,6 +407,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   authenticator it came from, which `/auth/completed` and `/auth/issue` ask, and the session writes
   and both issuers ask again under the user's row lock (`Recheck`, #542). `internal/otp` underneath
   stays the stateless primitive (#387)
+- `internal/typedcode/` - How a typed code's characters are read before it is compared: every
+  Unicode decimal digit as its ASCII digit, for a one-time code, and full-width Latin letters as
+  ASCII ones too, for a recovery code and a verification code. Each check keeps its own trimming
+  and refusals around it (#662 decision 9)
 - `internal/userclaims/` - The one stored-user-to-OIDC-claims conversion, serving `/userinfo` and
   issuance from the same mapper, with the two places those two disagree — the base URLs, the auth
   server's that `picture` is built on and the admin console's that `profile` is (#527), and which

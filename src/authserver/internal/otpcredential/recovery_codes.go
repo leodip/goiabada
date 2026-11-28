@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/typedcode"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 )
@@ -36,21 +37,22 @@ const (
 
 // HashRecoveryCode is the stored form of a code as a person typed it: the SHA-256, in lowercase
 // hex, of the code with spaces and hyphens taken out and letters lowered, so entry ignores case,
-// spaces and hyphens (#257 decision 2). Anything else typed, a mistyped letter included, hashes to
-// a value no set holds.
+// spaces and hyphens (#257 decision 2), and with its digits in any script and its full-width Latin
+// letters read as ASCII ones, so a code typed in full-width is the code it spells (#662 decision
+// 9). Anything else typed, a mistyped letter included, hashes to a value no set holds.
 func HashRecoveryCode(code string) string {
 	return hashutil.HashString(normalizeRecoveryCode(code))
 }
 
 // normalizeRecoveryCode drops every hyphen and every kind of space, a pasted tab or line break
-// included, and lowers the rest.
+// included, reads digits and full-width Latin letters as ASCII ones, and lowers the rest.
 func normalizeRecoveryCode(code string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '-' || unicode.IsSpace(r) {
 			return -1
 		}
 		return r
-	}, strings.ToLower(code))
+	}, strings.ToLower(typedcode.DigitsAndLatin(code)))
 }
 
 // newRecoveryCodes draws a set of codes, as shown, and their hashes, as stored, index for index.
