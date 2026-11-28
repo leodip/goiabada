@@ -1030,6 +1030,13 @@
       font-weight: 600;
     }
 
+    /* Chinese and Japanese write a full-width colon with no space after it: "外观：自动". A cell's
+       label is in the page's language, so the cell's own language picks the separator. */
+    .data-table-stack td[data-label]:lang(ja)::before,
+    .data-table-stack td[data-label]:lang(zh)::before {
+      content: attr(data-label) "：";
+    }
+
     .data-table-stack .cell-actions {
       padding-top: 0.5rem;
       text-align: start;

@@ -1300,6 +1300,9 @@
       font-size: 0.875rem;
       font-weight: 600;
     }
+    .data-table-stack td[data-label]:lang(ja)::before, .data-table-stack td[data-label]:lang(zh)::before {
+      content: attr(data-label) "：";
+    }
     .data-table-stack .cell-actions {
       padding-top: 0.5rem;
       text-align: start;
