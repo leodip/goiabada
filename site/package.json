@@ -16,7 +16,7 @@
     "astro": "^7.4.12",
     "hast-util-from-html": "^2.1.0",
     "hast-util-select": "^6.0.4",
-    "hast-util-to-mdast": "^10.1.3",
+    "hast-util-to-mdast": "^10.1.4",
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm-strikethrough": "^2.0.1",
     "mdast-util-gfm-table": "^2.0.1",
