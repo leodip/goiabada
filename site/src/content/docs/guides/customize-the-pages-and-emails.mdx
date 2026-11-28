@@ -406,9 +406,9 @@ A user on **Automatic**, where everyone starts, skips the first. So does a page 
 
 The auth server reads the page language each time it draws a page, so a change shows on its next page. The admin console reads it when the user signs in to it. A change they save there shows on their next page, and one made elsewhere, such as by an administrator, reaches them when they next sign in or open their profile.
 
-For `ui_locales` and `Accept-Language`, the first of their languages Goiabada has text for wins, or English when it has none of them: `ui_locales=sv fr` shows French, and `ui_locales=sv` alone shows English. A regional tag reads its language, so `fr-CA` shows French.
+For `ui_locales` and `Accept-Language`, the first of their languages Goiabada has text for wins, or English when it has none of them: `ui_locales=sv fr` shows French, and `ui_locales=sv` alone shows English. A regional tag reads its language, so `fr-CA` shows French and `zh-CN` shows Simplified Chinese. There's no Traditional Chinese: `zh-TW`, `zh-HK` or `zh-Hant` alone shows English, while a browser sending `zh-TW,zh;q=0.9` gets Simplified Chinese, from its `zh`.
 
-An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. A regional language reads its language's email, so `fr-CA` gets the French one, and a language with no built-in emails gets the English one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
+An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. A regional language reads its language's email, so `fr-CA` gets the French one and `zh-CN` the Simplified Chinese one, while `zh-TW`, `zh-HK` and a language with no built-in emails get the English one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
 
 ## Email templates
 
