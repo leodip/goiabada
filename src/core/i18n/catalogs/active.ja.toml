@@ -1976,7 +1976,7 @@
 "adminconsole.admin_branding.preview.view_signin" = "ログイン"
 "adminconsole.admin_branding.preview.view_messages" = "メッセージ"
 "adminconsole.admin_branding.preview.sample_positive" = "変更を保存しました。"
-"adminconsole.admin_branding.preview.sample_caution" = "パスワードの有効期限が近づいています。"
+"adminconsole.admin_branding.preview.sample_caution" = "パスワードの期限が間近です。"
 "adminconsole.admin_branding.preview.sample_caution_link" = "変更する"
 "adminconsole.admin_branding.preview.sample_note" = "利用規約が変更されました。"
 "adminconsole.admin_branding.preview.sample_note_link" = "確認する"
