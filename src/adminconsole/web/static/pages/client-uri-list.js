@@ -130,7 +130,7 @@ function save() {
 
 listForm.querySelector("[data-list-add]").addEventListener("click", addEntry);
 listInput.addEventListener("keydown", function (event) {
-  if (event.key === "Enter") {
+  if (event.key === "Enter" && !isCompositionKey(event)) {
     event.preventDefault();
     addEntry();
   }

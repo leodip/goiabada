@@ -504,6 +504,16 @@ function isAutofill(event) {
     event.inputType === "insertReplacementText";
 }
 
+// isCompositionKey tells a key that belongs to an input method's composition, such as the Enter
+// that accepts a kana-to-kanji candidate, from the page's own: it is the input method's, and no
+// handler acts on it (#662 decision 8). Browsers mark it differently. Chromium and Firefox set
+// isComposing (UI Events, KeyboardEvent), while Safari sends the Enter that ends a composition
+// after compositionend, isComposing false, with the keyCode 229 every browser gives a key the input
+// method processes.
+function isCompositionKey(event) {
+  return event.isComposing || event.keyCode === 229;
+}
+
 function makeSearchable(select) {
   const fold = function (text) {
     return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -704,7 +714,7 @@ function makeSearchable(select) {
         const step = event.key === "ArrowDown" ? 1 : -1;
         setActive((active + step + shown.length) % shown.length);
       }
-    } else if (event.key === "Enter" && !popup.hidden) {
+    } else if (event.key === "Enter" && !popup.hidden && !isCompositionKey(event)) {
       event.preventDefault();
       const entry = active >= 0 ? shown[active] : shown[0];
       if (entry) {
