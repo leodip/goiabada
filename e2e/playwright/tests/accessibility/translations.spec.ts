@@ -336,3 +336,31 @@ test("A Japanese page title breaks between phrases on a phone", async ({ page })
   });
   expect(lines).toEqual(["新規ユーザーの", "セットアップ"]);
 });
+
+// A browser may break a Chinese line between any two characters, so at a phone width a label could
+// leave one character alone on its last line: the general settings' account deletion choice read
+// "允许用户删除自己的账 / 户". On a Chinese label the browser moves a break to keep a single character
+// from standing alone (#663 decision 7), which Chromium applies.
+test("A Chinese label does not end in one character alone on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto(`${env.adminUrl}/admin/settings/general?ui_locales=zh-Hans`);
+  const label = page.locator('label[for="accountDeletionEnabled"] .choice-label');
+  await expect(label).toHaveText("允许用户删除自己的账户");
+  // The label's text, one string for each line it is drawn on, read from where each character sits.
+  const lines = await label.evaluate((choice) => {
+    const text = choice.firstChild as Text;
+    const drawn: { top: number; text: string }[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const range = document.createRange();
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const top = Math.round(range.getBoundingClientRect().top);
+      if (drawn.at(-1)?.top !== top) drawn.push({ top, text: "" });
+      drawn.at(-1)!.text += text.data[i];
+    }
+    return drawn.map((line) => line.text);
+  });
+  // Still too long for one line, so the check reads where the label breaks.
+  expect(lines.length).toBeGreaterThan(1);
+  expect([...lines.at(-1)!].length).toBeGreaterThanOrEqual(2);
+});

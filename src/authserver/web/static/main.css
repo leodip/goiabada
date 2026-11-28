@@ -2312,6 +2312,9 @@
   :where( .page-title, .panel-title, .auth-title, .auth-section-title, .dialog-title, .brand-preview-title, .nav-section, .button, .tab-item, .field-label, .choice-label, .detail-list dt, .nav-link, .user-menu-link, .link-row-title, .data-table th ):lang(ja) {
     word-break: auto-phrase;
   }
+  :where( .page-title, .panel-title, .auth-title, .auth-section-title, .dialog-title, .brand-preview-title, .nav-section, .button, .tab-item, .field-label, .choice-label, .detail-list dt, .nav-link, .user-menu-link, .link-row-title, .data-table th ):lang(zh) {
+    text-wrap-style: pretty;
+  }
   @media (forced-colors: active) {
     .switch {
       border-color: CanvasText;
