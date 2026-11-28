@@ -8,16 +8,9 @@ import (
 	"testing"
 )
 
-// A browser may break a Japanese line between any two characters, so a title or a label breaks in
-// the middle of a word at a phone width: "管理者による二要素認証の無 / 効化". On a page whose
-// language is Japanese, the short labels break between phrases instead (#662 decision 7): page
-// titles and headings, buttons, tabs, field labels, menu entries and table headers. Paragraphs,
-// hints and refusals break as they do today, since phrase breaking makes a long text ragged, and
-// every other language is untouched. The rule asks for the language of the label itself, so a
-// label marked as another language on a Japanese page, such as an email template's language tab,
-// keeps its own. ui.css is one file in both servers, so both copies and both generated stylesheets
-// are held to it.
-func TestUICSS_JapaneseLabelsBreakBetweenPhrases(t *testing.T) {
+// shortLabels returns, sorted, the selectors of the short labels a language's line-break rule
+// covers: page titles and headings, buttons, tabs, field labels, menu entries and table headers.
+func shortLabels() []string {
 	labels := []string{
 		// Page titles and headings.
 		".page-title", ".panel-title", ".auth-title", ".auth-section-title", ".dialog-title",
@@ -32,6 +25,20 @@ func TestUICSS_JapaneseLabelsBreakBetweenPhrases(t *testing.T) {
 		".data-table th",
 	}
 	slices.Sort(labels)
+	return labels
+}
+
+// A browser may break a Japanese line between any two characters, so a title or a label breaks in
+// the middle of a word at a phone width: "管理者による二要素認証の無 / 効化". On a page whose
+// language is Japanese, the short labels break between phrases instead (#662 decision 7): page
+// titles and headings, buttons, tabs, field labels, menu entries and table headers. Paragraphs,
+// hints and refusals break as they do today, since phrase breaking makes a long text ragged, and
+// every other language is untouched. The rule asks for the language of the label itself, so a
+// label marked as another language on a Japanese page, such as an email template's language tab,
+// keeps its own. ui.css is one file in both servers, so both copies and both generated stylesheets
+// are held to it.
+func TestUICSS_JapaneseLabelsBreakBetweenPhrases(t *testing.T) {
+	labels := shortLabels()
 	rule := regexp.MustCompile(`([^{}]*)\{([^{}]*)\}`)
 	japanese := regexp.MustCompile(`^:where\((.*)\):lang\(ja\)$`)
 	space := regexp.MustCompile(`\s+`)

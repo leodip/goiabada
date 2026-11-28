@@ -10,16 +10,16 @@ import (
 )
 
 // A request asking for Japanese, through ui_locales or the browser's Accept-Language, reads the
-// pages and the refusals in Japanese, and so does one listing Japanese after Chinese or Korean
+// pages and the refusals in Japanese, and so does one listing Japanese after Swedish or Korean
 // (#662).
 func TestJapanese_RequestPreferencesAndRefusals(t *testing.T) {
 	for _, tc := range []struct{ target, accept string }{
 		{"/auth/pwd?ui_locales=ja", "en"},
 		{"/auth/pwd?ui_locales=ja-JP", "en"},
-		{"/auth/pwd?ui_locales=zh%20ja", "en"},
+		{"/auth/pwd?ui_locales=sv%20ja", "en"},
 		{"/auth/pwd", "ja-JP"},
 		{"/auth/pwd", "ja-JP,ja;q=0.9,en;q=0.8"},
-		{"/auth/pwd", "zh-CN,ja;q=0.9"},
+		{"/auth/pwd", "sv-SE,ja;q=0.9"},
 		{"/auth/pwd", "ko-KR,ja;q=0.9"},
 	} {
 		t.Run(tc.target+tc.accept, func(t *testing.T) {
@@ -37,9 +37,10 @@ func TestJapanese_RequestPreferencesAndRefusals(t *testing.T) {
 	}
 }
 
-// A request asking for Chinese or Korean alone reads English: Japanese is not a stand-in for them.
-func TestJapanese_ChineseOrKoreanAloneReadEnglish(t *testing.T) {
-	for _, accept := range []string{"zh", "zh-CN", "zh-TW", "ko", "ko-KR"} {
+// A request asking for Traditional Chinese or Korean alone reads English: Japanese is not a stand-in
+// for them.
+func TestJapanese_TraditionalChineseOrKoreanAloneReadEnglish(t *testing.T) {
+	for _, accept := range []string{"zh-TW", "zh-Hant", "ko", "ko-KR"} {
 		t.Run(accept, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/auth/pwd", nil)
 			req.Header.Set("Accept-Language", accept)

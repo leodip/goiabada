@@ -1030,6 +1030,13 @@
       font-weight: 600;
     }
 
+    /* Chinese and Japanese write a full-width colon with no space after it: "外观：自动". A cell's
+       label is in the page's language, so the cell's own language picks the separator. */
+    .data-table-stack td[data-label]:lang(ja)::before,
+    .data-table-stack td[data-label]:lang(zh)::before {
+      content: attr(data-label) "：";
+    }
+
     .data-table-stack .cell-actions {
       padding-top: 0.5rem;
       text-align: start;
@@ -2747,8 +2754,8 @@
      field labels, menu entries and table headers. Paragraphs, hints and refusals are left to break
      as they do today, since phrase breaking makes a long text ragged. The rule asks for the label's
      own language, so a label marked as another language keeps its own breaks. A browser that does
-     not know the value ignores it; Chinese and Korean need rules of their own, since the value
-     covers Japanese alone. */
+     not know the value ignores it; Chinese has the rule below, and Korean needs one of its own,
+     since the value covers Japanese alone. */
   :where(
       .page-title,
       .panel-title,
@@ -2768,6 +2775,36 @@
       .data-table th
     ):lang(ja) {
     word-break: auto-phrase;
+  }
+
+  /* A browser may break a Chinese line between any two characters, so at a phone width a short
+     label can leave one character alone on its last line: "删除此账 / 户". On a Chinese label,
+     text-wrap: pretty moves a break only to keep a single character from standing alone
+     ("删除此 / 账户") and leaves every other break where it is (#663 decision 7): the labels the
+     Japanese rule covers. Paragraphs, hints and refusals break as they do today. No rule breaks a
+     Chinese line between words, since phrase breaking covers Japanese alone. The longhand sets the
+     style alone: the text-wrap shorthand would also reset the wrap mode, so a label another rule
+     keeps on one line with white-space: nowrap, such as a table's remove button, would wrap. A
+     browser that does not know the property ignores it. */
+  :where(
+      .page-title,
+      .panel-title,
+      .auth-title,
+      .auth-section-title,
+      .dialog-title,
+      .brand-preview-title,
+      .nav-section,
+      .button,
+      .tab-item,
+      .field-label,
+      .choice-label,
+      .detail-list dt,
+      .nav-link,
+      .user-menu-link,
+      .link-row-title,
+      .data-table th
+    ):lang(zh) {
+    text-wrap-style: pretty;
   }
 
   /* Windows high-contrast mode, and any other forced palette: draw with the system's colors where

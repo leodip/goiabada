@@ -32,7 +32,7 @@ func TestJapanese_AdminPageUsesQueryOrJapaneseHeader(t *testing.T) {
 	for _, tc := range []struct{ target, accept string }{
 		{"/admin/clients?ui_locales=ja", "en"},
 		{"/admin/clients", "ja-JP"},
-		{"/admin/clients", "zh-CN,ja;q=0.8"},
+		{"/admin/clients", "sv-SE,ja;q=0.8"},
 	} {
 		t.Run(tc.target+tc.accept, func(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, tc.target,

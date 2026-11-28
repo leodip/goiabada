@@ -163,5 +163,20 @@ Atenciosamente,
 С уважением,
 {{app_name}}`,
 		},
+		"zh-Hans": {
+			Subject:     "欢迎！",
+			ButtonLabel: "登录",
+			Body: `恭喜！您的账户已创建。
+
+您可以点击下面的链接登录：
+
+{{button}}
+
+{{link}}
+
+如果无法点击链接，请将其复制并粘贴到浏览器的地址栏中。
+
+{{app_name}}`,
+		},
 	},
 }

@@ -20,13 +20,13 @@ import (
 )
 
 // The sign-in page asked for in Japanese, through ui_locales or the browser, or listed after
-// Chinese, is drawn in Japanese with its refusal (#662).
+// Swedish, is drawn in Japanese with its refusal (#662).
 func TestJapanese_SignInPageUsesQueryOrJapaneseHeader(t *testing.T) {
 	for _, tc := range []struct{ target, accept string }{
 		{"/auth/pwd?ui_locales=ja", "en"},
 		{"/auth/pwd?ui_locales=ja-JP", "en"},
 		{"/auth/pwd", "ja-JP"},
-		{"/auth/pwd", "zh-CN,ja;q=0.8"},
+		{"/auth/pwd", "sv-SE,ja;q=0.8"},
 	} {
 		t.Run(tc.target+tc.accept, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tc.target, nil)

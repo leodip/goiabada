@@ -106,7 +106,7 @@ func TestRender_AdminClientSettings_TickingRememberConsentAsksFirst(t *testing.T
 // them falls back to the English text.
 func TestRender_AdminClientSettings_RememberConsentIsTranslated(t *testing.T) {
 	client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true}
-	for _, locale := range []string{"de", "es", "fr", "it", "pt-BR", "id", "pl", "ru", "ja"} {
+	for _, locale := range []string{"de", "es", "fr", "it", "pt-BR", "id", "pl", "ru", "ja", "zh-Hans"} {
 		out := html.UnescapeString(renderClientSettingsIn(t, locale, client, client))
 		require.NotEmpty(t, rememberConsentRe.FindString(out), "%s: the checkbox is drawn", locale)
 		assert.NotContains(t, out, ">"+rememberConsentLabel+"<", locale)

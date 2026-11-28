@@ -174,6 +174,8 @@ func TestUtilsJS_PluralCategoryFollowsThePagesCatalogTag(t *testing.T) {
 		category(tag("ru"), "many", "one", "few", "few", "few", "many", "many", "many", "many", "one", "few", "many", "many", "one", "few"),
 		// Japanese has one category, other, for every count.
 		category(tag("ja"), "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"),
+		// And so has Simplified Chinese.
+		category(tag("zh-Hans"), "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"),
 		category(tag("ar"), "zero", "one", "two", "few", "few", "few", "many", "many", "many", "many", "many", "many", "other", "other", "other"),
 		category(tag("pl-PL"), "many", "one", "few", "few", "few", "many", "many", "many", "many", "many", "few", "many", "many", "many", "few"),
 		// Zero takes the one form in French and Portuguese (Brazil).
@@ -232,7 +234,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		}
 	}
 	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru", "ja"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru", "ja", "zh-Hans"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -251,6 +253,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
 		status("ru", "0 совпадений", "1 совпадение", "2 совпадения", "4 совпадения", "5 совпадений", "22 совпадения"),
 		status("ja", "0 件の一致", "1 件の一致", "2 件の一致", "4 件の一致", "5 件の一致", "22 件の一致"),
+		status("zh-Hans", "0个匹配项", "1个匹配项", "2个匹配项", "4个匹配项", "5个匹配项", "22个匹配项"),
 	})
 }
 

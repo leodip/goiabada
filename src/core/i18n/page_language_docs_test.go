@@ -11,10 +11,11 @@ package i18n
 // user picked, not the language of Goiabada's own pages. The labels each page quotes are the English
 // catalog's, so a page naming a field the console does not show fails.
 //
-// It reads files and nothing else.
+// It reads files, and runs the language matcher on the examples the guide names.
 
 import (
 	"context"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -65,14 +66,43 @@ func TestPageLanguageDocs_TheGuideSaysThePageLanguageComesFirst(t *testing.T) {
 // be written in, so a language added to or dropped from the built-in catalogs fails until the guide
 // follows.
 func TestPageLanguageDocs_TheGuideNamesTheBuiltInLanguages(t *testing.T) {
-	named := []string{"de", "en", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"}
+	named := []string{"de", "en", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru", "zh-Hans"}
 	shipped := CatalogTags()
 	slices.Sort(shipped)
 	if !slices.Equal(shipped, named) {
 		t.Fatalf("the built-in catalogs are %q, but the guide names %q", shipped, named)
 	}
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuide, languageChosenTitle,
-		[]string{"The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish, Russian and Japanese."}, nil)
+		[]string{"The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish, Russian, Japanese and Simplified Chinese."}, nil)
+}
+
+// The guide says a Traditional Chinese tag alone reads English, in the pages and the emails, while a
+// list that adds a bare zh, as Chrome set to Chinese (Taiwan) sends, reads Simplified Chinese
+// (#663 decision 3). Each example the guide names reads what it says it does, so a guide predicting
+// Simplified Chinese for zh-TW, or a matcher that started to, fails.
+func TestPageLanguageDocs_TheGuideSaysTraditionalChineseReadsEnglish(t *testing.T) {
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuide, languageChosenTitle,
+		[]string{
+			"`zh-CN` shows Simplified Chinese",
+			"`zh-TW`, `zh-HK` or `zh-Hant` alone shows English",
+			"`zh-TW,zh;q=0.9` gets Simplified Chinese",
+			"`zh-CN` the Simplified Chinese one, while `zh-TW`, `zh-HK` and a language with no built-in emails get the English one",
+		}, nil)
+
+	for accept, want := range map[string]string{
+		"zh-CN": "zh-Hans", "zh-TW": "en", "zh-HK": "en", "zh-Hant": "en", "zh-TW,zh;q=0.9": "zh-Hans",
+	} {
+		req := httptest.NewRequest("GET", "/auth/pwd", nil)
+		req.Header.Set("Accept-Language", accept)
+		if got := CatalogTag(throughLocaleMiddleware(t, req).Context()); got != want {
+			t.Errorf("the guide says Accept-Language %q reads %q, but it reads %q", accept, want, got)
+		}
+	}
+	for locale, want := range map[string]string{"zh-CN": "zh-Hans", "zh-TW": "en", "zh-HK": "en"} {
+		if got := CatalogTag(WithRecipientLanguage(context.Background(), "", locale)); got != want {
+			t.Errorf("the guide says a recipient on Automatic with %q reads %q, but they read %q", locale, want, got)
+		}
+	}
 }
 
 // The authorize and sign-out pages' ui_locales rows say a user's page language wins over them.

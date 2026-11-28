@@ -21,6 +21,7 @@ func TestLocaleLabel(t *testing.T) {
 	// Bare language (no explicit region): native name only, no invented region.
 	assert.Equal(t, "português (Portuguese)", localeLabel("pt", "Portuguese"))
 	assert.Equal(t, "日本語 (Japanese)", localeLabel("ja", "Japanese"))
+	assert.Equal(t, "简体中文 (Chinese (Simplified))", localeLabel("zh-Hans", "Chinese (Simplified)"))
 
 	// Native == English: no redundant "English (English)".
 	assert.Equal(t, "English", localeLabel("en", "English"))

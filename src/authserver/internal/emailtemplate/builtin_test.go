@@ -13,7 +13,7 @@ import (
 )
 
 // The built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru"}
+var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "ja", "pl", "pt-BR", "ru", "zh-Hans"}
 
 func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
@@ -77,6 +77,7 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Você pode redefinir sua senha clicando no link abaixo:", "O link expira em 5 minutos."},
 		{"ru", "Сброс пароля", "Сбросить пароль", "Здравствуйте, Ana!",
 			"Чтобы сбросить пароль, перейдите по ссылке ниже:", "Срок действия ссылки истечет через 5 минут."},
+		{"zh-Hans", "重置密码", "重置密码", "Ana，您好：", "您可以点击下面的链接重置密码：", "该链接将在5分钟后过期。"},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			text := PasswordResetLink.BuiltIn[tc.lang]
@@ -199,6 +200,15 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"ru", 21 * time.Hour, "21 час"},
 		{"ru", 24 * time.Hour, "24 часа"},
 		{"ru", 48 * time.Hour, "48 часов"},
+		// Simplified Chinese has one form, other, and joins the number to its unit (#663 decision 4).
+		{"zh-Hans", 5 * time.Minute, "5分钟"},
+		{"zh-Hans", time.Minute, "1分钟"},
+		{"zh-Hans", 30 * time.Minute, "30分钟"},
+		{"zh-Hans", 0, "0分钟"},
+		{"zh-Hans", 90 * time.Minute, "90分钟"},
+		{"zh-Hans", time.Hour, "1小时"},
+		{"zh-Hans", 24 * time.Hour, "24小时"},
+		{"zh-Hans", 48 * time.Hour, "48小时"},
 		// A language with no unit names reads English's, by English's rule, even where its own
 		// rule differs: French Canadian's 0 is one, English's other.
 		{"nl", time.Minute, "1 minute"},
@@ -217,16 +227,40 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 	}
 }
 
+// A language whose entry joins a number to its unit with no space writes them joined, in hours and
+// in minutes, in the subject and the body (#663 decision 4). Korean stands in, as a language that
+// writes "30분" and that no built-in entry names yet.
+func TestRender_TheExpiryJoinedAsTheLanguagesEntrySays(t *testing.T) {
+	expiryLanguages["ko"] = expiryNames{"", map[string]expiryUnit{"other": {"분", "시간"}}}
+	t.Cleanup(func() { delete(expiryLanguages, "ko") })
+	for duration, want := range map[time.Duration]string{
+		5 * time.Minute:  "5분",
+		30 * time.Minute: "30분",
+		90 * time.Minute: "90분",
+		time.Hour:        "1시간",
+		24 * time.Hour:   "24시간",
+	} {
+		t.Run(want, func(t *testing.T) {
+			values := testValues
+			values.Expiry = duration
+			rendered, err := everything.Render("ko", Text{Subject: "{{expiry}}", ButtonLabel: "Go", Body: "{{expiry}}"}, values, testLook)
+			require.NoError(t, err)
+			assert.Equal(t, want, rendered.Subject)
+			assert.Equal(t, "<p>"+want+"</p>\n", string(rendered.Body))
+		})
+	}
+}
+
 // Each language's units name exactly the plural categories its whole counts reach, so every count
 // finds its name and no name waits on a count that never comes.
 func TestExpiryUnits_NameEachCategoryTheLanguagesCountsReach(t *testing.T) {
-	require.ElementsMatch(t, Languages, slices.Collect(maps.Keys(expiryUnits)), "every email language has its unit names")
+	require.ElementsMatch(t, Languages, slices.Collect(maps.Keys(expiryLanguages)), "every email language has its unit names")
 	for _, lang := range Languages {
 		reached := map[string]bool{}
 		for count := 0; count <= 1000; count++ {
 			reached[i18n.PluralCategory(lang, count)] = true
 		}
-		units := expiryUnits[lang]
+		units := expiryLanguages[lang].units
 		assert.ElementsMatch(t, slices.Collect(maps.Keys(reached)), slices.Collect(maps.Keys(units)), "%s's unit names", lang)
 		for category, unit := range units {
 			assert.NotEmpty(t, unit.minute, "%s %s minute", lang, category)
@@ -246,8 +280,9 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 		// Ukrainian reads English, not Russian, though the matcher rates them close.
 		"uk": "en", "uk-UA": "en",
 		"ja": "ja", "ja-JP": "ja",
-		// Chinese and Korean read English, not Japanese.
-		"zh": "en", "zh-CN": "en", "zh-TW": "en", "ko": "en", "ko-KR": "en",
+		"zh": "zh-Hans", "zh-CN": "zh-Hans", "zh-SG": "zh-Hans", "zh-Hans": "zh-Hans", "zh-Hans-HK": "zh-Hans",
+		// Traditional Chinese and Korean read English, not Japanese or Simplified Chinese.
+		"zh-TW": "en", "zh-HK": "en", "zh-Hant": "en", "ko": "en", "ko-KR": "en",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.
 		"gl": "en", "eu": "en",
@@ -294,9 +329,10 @@ func TestSpellsYo(t *testing.T) {
 }
 
 // signature is how a body in lang signs off: a closing phrase with the app name on the next line, or
-// in Japanese, which closes with no phrase (#662 decision 3), the app name alone in its paragraph.
+// in Japanese and Simplified Chinese, which close with no phrase (#662 decision 3, #663 decision 5),
+// the app name alone in its paragraph.
 func signature(lang string) string {
-	if lang == "ja" {
+	if lang == "ja" || lang == "zh-Hans" {
 		return "</p>\n<p>Acme Portal</p>"
 	}
 	return "<br>\nAcme Portal</p>"

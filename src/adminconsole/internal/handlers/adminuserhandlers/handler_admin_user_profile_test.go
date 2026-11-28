@@ -225,6 +225,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndSelectsTheStoredPageLanguage
 				{Tag: "pl", Name: "Polish"},
 				{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 				{Tag: "ru", Name: "Russian"},
+				{Tag: "zh-Hans", Name: "Chinese (Simplified)"},
 			}, bind["pageLanguages"])
 		})
 	}

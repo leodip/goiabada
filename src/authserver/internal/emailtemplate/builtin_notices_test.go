@@ -25,6 +25,8 @@ var noticeTexts = []struct {
 	langs map[string]noticeText
 }{
 	{"email_address_changed", map[string]noticeText{
+		"zh-Hans": {"您的电子邮件地址已更改", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人知道您的密码"},
 		"ja": {"メールアドレスが変更されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your email address was changed", "Hello Ana,",
@@ -47,6 +49,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"password_changed", map[string]noticeText{
+		"zh-Hans": {"您的密码已更改", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人正在使用您的账户"},
 		"ja": {"パスワードが変更されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのアカウントを使用している可能性があります"},
 		"en": {"Your password was changed", "Hello Ana,",
@@ -69,6 +73,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, вашим аккаунтом пользуется кто-то другой."},
 	}},
 	{"password_changed_by_administrator", map[string]noticeText{
+		"zh-Hans": {"管理员更改了您的密码", "Ana，您好：",
+			"如果您没有预料到此事，请联系您的管理员"},
 		"ja": {"管理者があなたのパスワードを変更しました", "Ana 様",
 			"心当たりがない場合は、管理者にお問い合わせください"},
 		"en": {"An administrator changed your password", "Hello Ana,",
@@ -91,6 +97,8 @@ var noticeTexts = []struct {
 			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"password_reset", map[string]noticeText{
+		"zh-Hans": {"您的密码已重置", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人能够阅读您的电子邮件并使用您的账户"},
 		"ja": {"パスワードが再設定されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのメールを読み、アカウントを使用できる可能性があります"},
 		"en": {"Your password was reset", "Hello Ana,",
@@ -113,6 +121,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, кто-то другой может читать вашу почту и пользоваться вашим аккаунтом."},
 	}},
 	{"otp_enabled", map[string]noticeText{
+		"zh-Hans": {"已设置双因素认证", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人知道您的密码"},
 		"ja": {"二要素認証が設定されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Two-factor authentication was set up", "Hello Ana,",
@@ -135,6 +145,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled", map[string]noticeText{
+		"zh-Hans": {"双因素认证已关闭", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人知道您的密码"},
 		"ja": {"二要素認証が無効になりました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Two-factor authentication was turned off", "Hello Ana,",
@@ -157,6 +169,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled_by_administrator", map[string]noticeText{
+		"zh-Hans": {"管理员关闭了您的双因素认证", "Ana，您好：",
+			"如果您没有预料到此事，请联系您的管理员"},
 		"ja": {"管理者があなたの二要素認証を無効にしました", "Ana 様",
 			"心当たりがない場合は、管理者にお問い合わせください"},
 		"en": {"An administrator turned off your two-factor authentication", "Hello Ana,",
@@ -179,6 +193,8 @@ var noticeTexts = []struct {
 			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"otp_lockout", map[string]noticeText{
+		"zh-Hans": {"多次输入错误的一次性验证码后，您的身份验证器应用已被停用", "Ana，您好：",
+			"这些一次性验证码只有在输入密码之后才能输入，因此可能有其他人知道您的密码"},
 		"ja": {"誤ったコードが続けて入力されたため、認証アプリが無効になりました", "Ana 様",
 			"これらのコードはパスワードの入力後にしか入力できないため、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your authenticator was disabled after too many wrong codes", "Hello Ana,",
@@ -201,6 +217,8 @@ var noticeTexts = []struct {
 			"Эти коды можно было ввести только после пароля, поэтому, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"recovery_code_used", map[string]noticeText{
+		"zh-Hans": {"已使用恢复代码登录", "Ana，您好：",
+			"如果不是您本人，可能有其他人知道您的密码并持有您的恢复代码"},
 		"ja": {"ログインにリカバリーコードが使用されました", "Ana 様",
 			"ご自身でない場合は、第三者があなたのパスワードを知っていて、リカバリーコードも持っている可能性があります"},
 		"en": {"A recovery code was used to sign in", "Hello Ana,",
@@ -223,6 +241,8 @@ var noticeTexts = []struct {
 			"Если это были не вы, возможно, кто-то другой знает ваш пароль и имеет ваши коды восстановления."},
 	}},
 	{"recovery_codes_replaced", map[string]noticeText{
+		"zh-Hans": {"您的恢复代码已更换", "Ana，您好：",
+			"如果不是您本人操作，可能有其他人知道您的密码"},
 		"ja": {"リカバリーコードが再発行されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのパスワードを知っている可能性があります"},
 		"en": {"Your recovery codes were replaced", "Hello Ana,",
@@ -245,6 +265,8 @@ var noticeTexts = []struct {
 			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"account_deleted", map[string]noticeText{
+		"zh-Hans": {"您的账户已被删除", "Ana，您好：",
+			"如果不是您本人操作，说明有其他人知道您的密码"},
 		"ja": {"アカウントが削除されました", "Ana 様",
 			"ご自身で行っていない場合は、第三者があなたのパスワードを知っていたことになります"},
 		"en": {"Your account was deleted", "Hello Ana,",
@@ -267,6 +289,8 @@ var noticeTexts = []struct {
 			"Если нет, значит, ваш пароль был известен кому-то еще."},
 	}},
 	{"account_deleted_by_administrator", map[string]noticeText{
+		"zh-Hans": {"管理员删除了您的账户", "Ana，您好：",
+			"管理员删除了您的 Acme Portal 账户。您无法再使用该账户登录。"},
 		"ja": {"管理者があなたのアカウントを削除しました", "Ana 様",
 			"管理者が Acme Portal のアカウントを削除しました。このアカウントではログインできなくなりました。"},
 		"en": {"An administrator deleted your account", "Hello Ana,",
@@ -349,6 +373,8 @@ func TestRecoveryCodeUsed_OneWordingForEveryCount(t *testing.T) {
 			"Se você ainda tem o aplicativo, gere lá um novo conjunto de códigos de recuperação, para poder entrar se perdê-lo."},
 		{"ru", "Осталось неиспользованных кодов восстановления: %s.",
 			"Если приложение у вас еще есть, создайте в настройках аккаунта новый набор кодов восстановления, чтобы сохранить возможность войти, если вы его потеряете."},
+		{"zh-Hans", "还剩%s个未使用的恢复代码。",
+			"如果您仍拥有该应用，请在账户设置中获取一组新的恢复代码，以便在丢失该应用时仍能登录。"},
 	} {
 		for _, left := range []struct {
 			count int
