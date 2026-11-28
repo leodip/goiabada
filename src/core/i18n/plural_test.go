@@ -24,7 +24,9 @@ func TestPluralCategory_CLDRCardinalRules(t *testing.T) {
 		"id": {"other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
 		// Japanese, too, has one category, other, for every count.
 		"ja": {"other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
-		"en": {"other", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
+		// And Simplified Chinese.
+		"zh-Hans": {"other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
+		"en":      {"other", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
 		// Zero takes the one form in French and Portuguese (Brazil).
 		"fr":    {"one", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},
 		"pt-BR": {"one", "one", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other", "other"},

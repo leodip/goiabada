@@ -390,7 +390,7 @@ You can also turn it on:
 
 ## How the language is chosen
 
-The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish, Russian and Japanese. On the auth server's pages and in the admin console, the language is the first of these that names one:
+The pages come in English, Portuguese (Brazil), Spanish, French, Italian, German, Indonesian, Polish, Russian, Japanese and Simplified Chinese. On the auth server's pages and in the admin console, the language is the first of these that names one:
 
 1. The user's **Page language**, which they choose under **Account**, **Profile** in the admin console. An administrator can set it too, on the user's **Profile** page.
 2. A `ui_locales` parameter: one or more language tags in order of preference, separated by single spaces, such as `ui_locales=es pt-BR`. On the auth server, it's the authorization request's or the [sign-out](/reference/endpoints/logout/)'s. It's kept for the rest of that sign-in, and applies to the error page the auth server shows when it refuses the request outright. In the admin console, it's `?ui_locales=` in the page's address.
@@ -498,7 +498,7 @@ A placeholder is a name between double braces, such as `{{name}}`, and the email
 | Preview a text, saved or not, with sample values | [`POST /api/v1/admin/email-templates/{email}/{language}/preview`](/reference/api/admin/operations/previewemailtemplate/) | `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage` |
 | Send a test of a text, saved or not | [`POST /api/v1/admin/email-templates/{email}/{language}/send-test`](/reference/api/admin/operations/sendemailtemplatetest/) | `authserver:manage` |
 
-`{email}` is the email's [identifier](#each-emails-placeholders), and `{language}` one of `en`, `de`, `es`, `fr`, `id`, `it`, `ja`, `pl`, `pt-BR` and `ru`.
+`{email}` is the email's [identifier](#each-emails-placeholders), and `{language}` one of `en`, `de`, `es`, `fr`, `id`, `it`, `ja`, `pl`, `pt-BR`, `ru` and `zh-Hans`.
 
 A save sends the whole text of the language, with `buttonLabel` only for an email with a button:
 

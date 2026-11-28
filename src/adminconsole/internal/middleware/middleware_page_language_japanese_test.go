@@ -21,7 +21,7 @@ func TestJapanese_ThePageLanguageWinsAndAutomaticFollowsTheRequest(t *testing.T)
 		{"ja chosen, over ui_locales and the browser", "ja", "/admin/users?ui_locales=de", "it", "ログイン", "ja"},
 		{"Automatic, ui_locales=ja", "", "/admin/users?ui_locales=ja", "it", "ログイン", "ja"},
 		{"Automatic, the browser's ja-JP", "", "/admin/users", "ja-JP", "ログイン", "ja"},
-		{"Automatic, the browser's Chinese then Japanese", "", "/admin/users", "zh-CN,ja;q=0.8", "ログイン", "ja"},
+		{"Automatic, the browser's Swedish then Japanese", "", "/admin/users", "sv-SE,ja;q=0.8", "ログイン", "ja"},
 		{"German chosen over the browser's ja-JP", "de", "/admin/users", "ja-JP", "Anmelden", "de"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

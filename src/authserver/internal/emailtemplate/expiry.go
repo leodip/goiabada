@@ -20,24 +20,26 @@ type expiryNames struct {
 // expiryLanguages are a minute's and an hour's names in each built-in language, one per CLDR cardinal
 // category the language's whole counts reach (#665 decision 2), so the rule for which name a count
 // takes is the catalogs' rule, with how the language joins a number to its unit beside them (#663
-// decision 4): a space in each of these languages, Japanese's too, since every number takes one
-// before Japanese (#662 decision 6). Polish's names are in the accusative, the case its expiry
+// decision 4): a space in each of these languages but Simplified Chinese, Japanese's too, since every
+// number takes one before Japanese (#662 decision 6). Polish's names are in the accusative, the case its expiry
 // sentences take ("Link wygaśnie za 5 minut.", "Link jest ważny przez 24 godziny."), as an
 // administrator's sentence is likelier to run (#665 decision 3). Russian's are in the accusative too
 // ("Срок действия ссылки истечет через 21 минуту.", "Ссылка действует 24 часа."): one for 1 and 21,
 // few for 2 to 4 and 22 to 24, many for 0 and 5 to 20 (#666 decision 5). Japanese has one name per
-// unit, other: "30 分", "24 時間".
+// unit, other: "30 分", "24 時間". So has Simplified Chinese, which joins the number to its unit with
+// no space, as it writes a number with its measure word: "30分钟", "24小时" (#663 decision 4).
 var expiryLanguages = map[string]expiryNames{
-	"en":    {" ", map[string]expiryUnit{"one": {"minute", "hour"}, "other": {"minutes", "hours"}}},
-	"de":    {" ", map[string]expiryUnit{"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}}},
-	"es":    {" ", map[string]expiryUnit{"one": {"minuto", "hora"}, "other": {"minutos", "horas"}}},
-	"fr":    {" ", map[string]expiryUnit{"one": {"minute", "heure"}, "other": {"minutes", "heures"}}},
-	"id":    {" ", map[string]expiryUnit{"other": {"menit", "jam"}}},
-	"it":    {" ", map[string]expiryUnit{"one": {"minuto", "ora"}, "other": {"minuti", "ore"}}},
-	"ja":    {" ", map[string]expiryUnit{"other": {"分", "時間"}}},
-	"pl":    {" ", map[string]expiryUnit{"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}}},
-	"pt-BR": {" ", map[string]expiryUnit{"one": {"minuto", "hora"}, "other": {"minutos", "horas"}}},
-	"ru":    {" ", map[string]expiryUnit{"one": {"минуту", "час"}, "few": {"минуты", "часа"}, "many": {"минут", "часов"}}},
+	"en":      {" ", map[string]expiryUnit{"one": {"minute", "hour"}, "other": {"minutes", "hours"}}},
+	"de":      {" ", map[string]expiryUnit{"one": {"Minute", "Stunde"}, "other": {"Minuten", "Stunden"}}},
+	"es":      {" ", map[string]expiryUnit{"one": {"minuto", "hora"}, "other": {"minutos", "horas"}}},
+	"fr":      {" ", map[string]expiryUnit{"one": {"minute", "heure"}, "other": {"minutes", "heures"}}},
+	"id":      {" ", map[string]expiryUnit{"other": {"menit", "jam"}}},
+	"it":      {" ", map[string]expiryUnit{"one": {"minuto", "ora"}, "other": {"minuti", "ore"}}},
+	"ja":      {" ", map[string]expiryUnit{"other": {"分", "時間"}}},
+	"pl":      {" ", map[string]expiryUnit{"one": {"minutę", "godzinę"}, "few": {"minuty", "godziny"}, "many": {"minut", "godzin"}}},
+	"pt-BR":   {" ", map[string]expiryUnit{"one": {"minuto", "hora"}, "other": {"minutos", "horas"}}},
+	"ru":      {" ", map[string]expiryUnit{"one": {"минуту", "час"}, "few": {"минуты", "часа"}, "many": {"минут", "часов"}}},
+	"zh-Hans": {"", map[string]expiryUnit{"other": {"分钟", "小时"}}},
 }
 
 // expiryIn writes a lifetime as {{expiry}} reads it (#818 decision 4): a number with its unit in

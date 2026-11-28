@@ -65,7 +65,7 @@ func TestRenderEmail_ThePasswordResetLinkFollowsTheRecipient(t *testing.T) {
 		{"uk", "en", "Password reset", "You can reset your password by clicking the link below:"},
 		{"ja", "ja", "パスワードの再設定", "以下のリンクから、パスワードを再設定できます。"},
 		{"ja-JP", "ja", "パスワードの再設定", "以下のリンクから、パスワードを再設定できます。"},
-		{"zh-CN", "en", "Password reset", "You can reset your password by clicking the link below:"},
+		{"zh-TW", "en", "Password reset", "You can reset your password by clicking the link below:"},
 		{"ko", "en", "Password reset", "You can reset your password by clicking the link below:"},
 		{"pt", "pt-BR", "Redefinição de senha", "Você pode redefinir sua senha clicando no link abaixo:"},
 		{"nl", "en", "Password reset", "You can reset your password by clicking the link below:"},

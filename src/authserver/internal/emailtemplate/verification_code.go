@@ -152,5 +152,19 @@ Atenciosamente,
 С уважением,
 {{app_name}}`,
 		},
+		"zh-Hans": {
+			Subject: "电子邮件地址验证码：{{code}}",
+			Body: `{{name}}，您好：
+
+您的电子邮件地址验证码是：
+
+{{code}}
+
+该验证码将在{{expiry}}后过期。
+
+您可以在此输入验证码：{{link}}
+
+{{app_name}}`,
+		},
 	},
 }

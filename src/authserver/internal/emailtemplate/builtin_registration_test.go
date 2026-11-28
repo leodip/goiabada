@@ -101,6 +101,10 @@ func TestActivationLink_InEachLanguage(t *testing.T) {
 		{"ru", "Активируйте аккаунт", "Активировать аккаунт", "Здравствуйте!",
 			"Чтобы завершить создание аккаунта в Acme Portal, перейдите по ссылке ниже и задайте пароль:",
 			"Срок действия ссылки истечет через 10 минут. Если ссылка не открывается, скопируйте ее и вставьте в адресную строку браузера."},
+		// Simplified Chinese opens "您好：" where English opens "Hello," (#663 decision 5).
+		{"zh-Hans", "激活您的账户", "激活账户", "您好：",
+			"要完成 Acme Portal 账户的创建，请点击下面的链接并设置密码：",
+			"该链接将在10分钟后过期。如果无法点击链接，请将其复制并粘贴到浏览器的地址栏中。"},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			assert.Equal(t, tc.button, email.BuiltIn[tc.lang].ButtonLabel)
@@ -133,6 +137,7 @@ func TestWelcome_InEachLanguage(t *testing.T) {
 		{"pl", "Witamy!", "Zaloguj się", "Gratulacje! Twoje konto zostało utworzone.", "Możesz się zalogować, klikając poniższy link:"},
 		{"pt-BR", "Bem-vindo(a)!", "Entrar", "Parabéns! Sua conta foi criada.", "Você pode entrar clicando no link abaixo:"},
 		{"ru", "Добро пожаловать!", "Войти", "Поздравляем! Ваш аккаунт создан.", "Войти можно по ссылке ниже:"},
+		{"zh-Hans", "欢迎！", "登录", "恭喜！您的账户已创建。", "您可以点击下面的链接登录："},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			assert.Equal(t, tc.button, email.BuiltIn[tc.lang].ButtonLabel)
@@ -184,6 +189,9 @@ func TestRegistrationExistingAccount_InEachLanguage(t *testing.T) {
 		{"ru", "У вас уже есть аккаунт", "Здравствуйте!",
 			"Кто-то, возможно вы, попытался создать новый аккаунт в Acme Portal с этим адресом электронной почты. С этим адресом уже связан аккаунт, поэтому новый аккаунт не создан.",
 			"Если это были вы, войдите в существующий аккаунт. Если вы не помните пароль, его можно сбросить здесь: "},
+		{"zh-Hans", "您已有账户", "您好：",
+			"有人（可能是您本人）尝试使用此电子邮件地址创建新的 Acme Portal 账户。此地址已有账户，因此未创建新账户。",
+			"如果是您本人，请使用现有账户登录。如果您忘记了密码，可以在此重置："},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			assert.Empty(t, email.BuiltIn[tc.lang].ButtonLabel, "the notice has no button")
@@ -226,6 +234,8 @@ func TestNewUserSetup_InEachLanguage(t *testing.T) {
 			"Você pode criar sua senha clicando no link abaixo:", "O link funciona por 48 horas. Se ele tiver expirado,"},
 		{"ru", "Acme Portal — создайте пароль для нового аккаунта", "Создать пароль", "Здравствуйте, Ana!",
 			"Чтобы создать пароль, перейдите по ссылке ниже:", "Ссылка действует 48 часов. Если срок ее действия истек,"},
+		{"zh-Hans", "【Acme Portal】为您的新账户创建密码", "创建密码", "Ana，您好：",
+			"您可以点击下面的链接创建密码：", "该链接的有效期为48小时。如果链接已过期，"},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			assert.Equal(t, tc.button, email.BuiltIn[tc.lang].ButtonLabel)
@@ -270,6 +280,8 @@ func TestVerificationCode_InEachLanguage(t *testing.T) {
 			"O código expira em 10 minutos.", "Você pode inserir o código aqui: "},
 		{"ru", "Подтверждение адреса электронной почты — код 482915", "Здравствуйте, Ana!", "Ваш код подтверждения адреса электронной почты:",
 			"Срок действия кода истечет через 10 минут.", "Ввести код можно здесь: "},
+		{"zh-Hans", "电子邮件地址验证码：482915", "Ana，您好：", "您的电子邮件地址验证码是：",
+			"该验证码将在10分钟后过期。", "您可以在此输入验证码："},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			assert.Empty(t, email.BuiltIn[tc.lang].ButtonLabel, "the email has no button")
@@ -312,6 +324,8 @@ func TestTestEmail_InEachLanguage(t *testing.T) {
 			"Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada.", ""},
 		{"ru", "Acme Portal — тестовое письмо", "Это тестовое письмо от Acme Portal.",
 			"Оно отправлено из настроек электронной почты, чтобы проверить, что письма отправляются. Если вы его читаете, больше ничего делать не нужно.", ""},
+		{"zh-Hans", "【Acme Portal】测试电子邮件", "这是一封来自 Acme Portal 的测试电子邮件。",
+			"它是从电子邮件设置中发送的，用于检查能否发送电子邮件。如果您能阅读此电子邮件，则无需进行其他操作。", ""},
 	} {
 		t.Run(tc.lang, func(t *testing.T) {
 			subject, body := renderedIn(t, email, tc.lang, testValues)

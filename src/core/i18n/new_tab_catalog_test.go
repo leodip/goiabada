@@ -10,16 +10,17 @@ import (
 // language (#814 decision 13). The text is read after the link's own, as part of its name.
 func TestCatalog_NewTabNoticeInEveryBuiltInLanguage(t *testing.T) {
 	want := map[string]string{
-		"active.en.toml":    "(opens in a new tab)",
-		"active.pt-BR.toml": "(abre em uma nova aba)",
-		"active.es.toml":    "(se abre en una pestaña nueva)",
-		"active.fr.toml":    "(s’ouvre dans un nouvel onglet)",
-		"active.it.toml":    "(si apre in una nuova scheda)",
-		"active.de.toml":    "(öffnet sich in einem neuen Tab)",
-		"active.id.toml":    "(terbuka di tab baru)",
-		"active.pl.toml":    "(otwiera się w nowej karcie)",
-		"active.ru.toml":    "(открывается в новой вкладке)",
-		"active.ja.toml":    "（新しいタブで開きます）",
+		"active.en.toml":      "(opens in a new tab)",
+		"active.pt-BR.toml":   "(abre em uma nova aba)",
+		"active.es.toml":      "(se abre en una pestaña nueva)",
+		"active.fr.toml":      "(s’ouvre dans un nouvel onglet)",
+		"active.it.toml":      "(si apre in una nuova scheda)",
+		"active.de.toml":      "(öffnet sich in einem neuen Tab)",
+		"active.id.toml":      "(terbuka di tab baru)",
+		"active.pl.toml":      "(otwiera się w nowej karcie)",
+		"active.ru.toml":      "(открывается в новой вкладке)",
+		"active.ja.toml":      "（新しいタブで開きます）",
+		"active.zh-Hans.toml": "（在新标签页中打开）",
 	}
 	assert.ElementsMatch(t, catalogNames(t), keysOf(want), "every built-in catalog has its expected text")
 	for name, value := range want {
