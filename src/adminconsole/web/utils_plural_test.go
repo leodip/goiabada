@@ -230,7 +230,7 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		}
 	}
 	queries := []string{"zzz", "lisb", "europe", "o", "isle", "area"}
-	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl"}
+	langs := []string{"en", "fr", "pt-BR", "es", "it", "de", "id", "pl", "ru"}
 	strings := map[string]map[string]string{}
 	for _, lang := range langs {
 		strings[lang] = comboboxStrings(lang)
@@ -247,5 +247,34 @@ func TestUtilsJS_SearchableStatusCountsTheMatches(t *testing.T) {
 		status("de", "0 Treffer", "1 Treffer", "2 Treffer", "4 Treffer", "5 Treffer", "22 Treffer"),
 		status("id", "0 hasil", "1 hasil", "2 hasil", "4 hasil", "5 hasil", "22 hasil"),
 		status("pl", "0 wyników", "1 wynik", "2 wyniki", "4 wyniki", "5 wyników", "22 wyniki"),
+		status("ru", "0 совпадений", "1 совпадение", "2 совпадения", "4 совпадения", "5 совпадений", "22 совпадения"),
 	})
+}
+
+// A searchable select's status in Russian takes the form of the count's category at every count
+// where Russian's forms turn: many for zero, 5, 11 and 25, one for 1 and 21, and few for 2 and 22
+// (#666).
+func TestUtilsJS_SearchableStatusCountsTheMatchesInRussian(t *testing.T) {
+	// Twenty-five zones. Each threshold's token marks the first that many of them, so the query for
+	// a token matches exactly that many, and "zone" matches all 25.
+	thresholds := []struct {
+		token string
+		count int
+	}{{"qa", 1}, {"qb", 2}, {"qc", 5}, {"qd", 11}, {"qe", 21}, {"qf", 22}}
+	options := []string{"Выберите"}
+	for i := 1; i <= 25; i++ {
+		option := fmt.Sprintf("Europe/Zone %02d", i)
+		for _, threshold := range thresholds {
+			if i <= threshold.count {
+				option += " " + threshold.token
+			}
+		}
+		options = append(options, option)
+	}
+	runPlural(t, map[string]map[string]string{"ru": comboboxStrings("ru")}, []pluralCase{{
+		Kind: "status", CatalogLang: tag("ru"), Strings: "ru", Options: options,
+		Queries: []string{"zzz", "qa", "qb", "qc", "qd", "qe", "qf", "zone"},
+		want: []string{"0 совпадений", "1 совпадение", "2 совпадения", "5 совпадений", "11 совпадений",
+			"21 совпадение", "22 совпадения", "25 совпадений"},
+	}})
 }
