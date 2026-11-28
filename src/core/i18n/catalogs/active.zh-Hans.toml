@@ -911,7 +911,7 @@
 "adminconsole.admin_clients.new.field.display_name" = "显示名称"
 "adminconsole.admin_clients.new.field.display_name_tooltip" = "当 client 的设置显示它时，用户在登录页面和同意页面上看到的名称。"
 "adminconsole.admin_clients.new.flows_legend" = "Client 的用途"
-"adminconsole.admin_clients.new.toggle.auth_code" = "Authorization code（使用 PKCE）"
+"adminconsole.admin_clients.new.toggle.auth_code" = "Authorization code（含 PKCE）"
 "adminconsole.admin_clients.new.toggle.auth_code_hint" = "从 Web 应用、单页应用或移动应用让用户登录。"
 "adminconsole.admin_clients.new.toggle.client_creds" = "Client credentials"
 "adminconsole.admin_clients.new.toggle.client_creds_hint" = "用于机器对机器的调用，例如后端服务在没有用户登录的情况下以自身身份调用 API。"
@@ -946,8 +946,8 @@
 "adminconsole.admin_clients.delete.public" = "公共"
 "adminconsole.admin_clients.delete.confidential" = "机密"
 "adminconsole.admin_clients.delete.col_oauth_flows" = "OAuth2 流程"
-"adminconsole.admin_clients.delete.flows_both" = "Authorization code（使用 PKCE）、client credentials"
-"adminconsole.admin_clients.delete.flows_authcode" = "Authorization code（使用 PKCE）"
+"adminconsole.admin_clients.delete.flows_both" = "Authorization code（含 PKCE）、client credentials"
+"adminconsole.admin_clients.delete.flows_authcode" = "Authorization code（含 PKCE）"
 "adminconsole.admin_clients.delete.flows_clientcreds" = "Client credentials"
 "adminconsole.admin_clients.delete.flows_none" = "无"
 "adminconsole.admin_clients.delete.col_assigned_permissions" = "权限"
@@ -1120,7 +1120,7 @@
 
 # --- Client web origins ----------------------------------------------------
 
-"adminconsole.admin_clients.web_origins.lead" = "如果此 client 在浏览器中运行，并调用 /auth/token、/auth/revoke、/auth/logout 或 /userinfo，请在此注册其源：协议、主机和可选的端口，其后不带任何内容，例如 https://www.example.com 或 https://myapp:8080。"
+"adminconsole.admin_clients.web_origins.lead" = "如果此 client 在浏览器中运行，并调用 /auth/token、/auth/revoke 或 /auth/logout，或调用 /userinfo，请在此注册其源：协议、主机和可选的端口，其后不带任何内容，例如 https://www.example.com 或 https://myapp:8080。"
 "adminconsole.admin_clients.web_origins.field.origin" = "Web 源"
 "adminconsole.admin_clients.web_origins.add_button" = "添加"
 "adminconsole.admin_clients.web_origins.col_authorized" = "Web 源"
@@ -2117,9 +2117,9 @@
 "adminconsole.admin_settings.audit_logs.page_title" = "审计日志记录设置"
 "adminconsole.admin_settings.audit_logs.subtitle" = "审计日志记录"
 "adminconsole.admin_settings.audit_logs.lead" = "审计事件写入何处，以及数据库保留它们多长时间。"
-"adminconsole.admin_settings.audit_logs.field.console_enabled" = "将审计事件写入服务器的输出"
+"adminconsole.admin_settings.audit_logs.field.console_enabled" = "写入服务器的输出"
 "adminconsole.admin_settings.audit_logs.console_enabled_tooltip" = "每个事件都作为一条结构化记录，与其他日志记录一起写入认证服务器的标准错误（stderr），由容器运行时或日志收集器从那里获取。"
-"adminconsole.admin_settings.audit_logs.field.database_enabled" = "将审计事件存储在数据库中"
+"adminconsole.admin_settings.audit_logs.field.database_enabled" = "存储在数据库中"
 "adminconsole.admin_settings.audit_logs.database_enabled_tooltip" = "每个事件都保存在 audit_logs 表中，并显示在“审计日志”页面上。"
 "adminconsole.admin_settings.audit_logs.field.retention_days" = "保留期限（天）"
 "adminconsole.admin_settings.audit_logs.retention_days_tooltip" = "早于此期限的已存储事件将由后台清理删除，最多3650天。0表示永久保留。"
@@ -2211,7 +2211,7 @@
 "handler.otp.clock_ahead" = "您设备的时钟似乎走快了。请检查其日期和时间是否设为自动，然后输入应用显示的验证码。"
 "handler.otp.code_required" = "请输入身份验证器应用中的6位一次性验证码。"
 "handler.otp.incorrect_code" = "验证码不正确。验证码每30秒变化一次，请输入应用当前显示的验证码。"
-"handler.otp.incorrect_recovery_code" = "恢复代码不正确，或已被使用。"
+"handler.otp.incorrect_recovery_code" = "恢复代码无效或已使用。"
 "handler.otp.recovery_code_required" = "请输入您的一个恢复代码。"
 
 # --- Admin resource permissions handler (LocalizedError-backed) --------------

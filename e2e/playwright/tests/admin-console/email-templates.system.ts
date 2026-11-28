@@ -343,6 +343,7 @@ const editedMarkers = [
   { tag: "id", marker: "Diubah" },
   { tag: "ru", marker: "Изменен" },
   { tag: "ja", marker: "編集済み" },
+  { tag: "zh-Hans", marker: "已编辑" },
 ];
 
 // Opens the editor in the console language at the usable width, which a classic scrollbar, where
@@ -379,7 +380,7 @@ async function languageTabsAt(page: Page, consoleLanguage: string, width: number
   );
 }
 
-test("the editor's language tabs, with and without a marker, fit a 320 px phone and a 305 px usable width in English, Indonesian, Russian and Japanese", async ({ page }) => {
+test("the editor's language tabs, with and without a marker, fit a 320 px phone and a 305 px usable width in English, Indonesian, Russian, Japanese and Simplified Chinese", async ({ page }) => {
   leaveWithoutAsking(page);
   const edited = "/admin/settings/email/templates/password_reset_link/pt-BR";
   const check = async (marked: boolean) => {
@@ -387,7 +388,7 @@ test("the editor's language tabs, with and without a marker, fit a 320 px phone 
       for (const { tag, marker } of editedMarkers) {
         await test.step(`${marked ? "an edited" : "no"} language, ${name}, in ${tag}`, async () => {
           const tabs = await languageTabsAt(page, tag, width);
-          expect(tabs.map((tab) => tab.href.split("/").pop())).toEqual(expect.arrayContaining(["en", "pt-BR", "id", "ru", "ja"]));
+          expect(tabs.map((tab) => tab.href.split("/").pop())).toEqual(expect.arrayContaining(["en", "pt-BR", "id", "ru", "ja", "zh-Hans"]));
           expect(tabs.find((tab) => tab.href === edited)?.marker).toBe(marked ? marker : "");
           expect(tabs.filter((tab) => tab.past > 0.5)).toEqual([]);
         });

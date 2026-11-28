@@ -1,6 +1,7 @@
 // Each translation uses the same responsive components as the other catalogs. Exercise its rendered
 // wording at the smallest supported phone width, including tabs, tables, dialogs and refusals, for
 // every row of the table in lib/translations.ts.
+import type { Locator } from "@playwright/test";
 import { addGroupAttribute, addRedirectUri, choose, clientUrl, confirmDialog, groupUrl, legalDocumentUrl, resourceUrl, userUrl } from "../../lib/admin-console";
 import { linksIn, waitForMail } from "../../lib/mailpit";
 import { signInToConsole } from "../../lib/console-user";
@@ -363,4 +364,45 @@ test("A Chinese label does not end in one character alone on a phone", async ({ 
   // Still too long for one line, so the check reads where the label breaks.
   expect(lines.length).toBeGreaterThan(1);
   expect([...lines.at(-1)!].length).toBeGreaterThanOrEqual(2);
+});
+
+// The lines a choice label is drawn on, each the text of one line, read from where each character
+// of its own text sits.
+async function choiceLabelLines(label: Locator) {
+  return label.evaluate((choice) => {
+    const text = choice.firstChild as Text;
+    const drawn: { top: number; text: string }[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const range = document.createRange();
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0) continue;
+      const top = Math.round(rect.top);
+      if (drawn.at(-1)?.top !== top) drawn.push({ top, text: "" });
+      drawn.at(-1)!.text += text.data[i];
+    }
+    return drawn.map((line) => line.text.trim());
+  });
+}
+
+// A label one character too long for a 320 px phone split a word: the audit logging choices read
+// "将审计事件存储在数据 / 库中" and "将审计事件写入服务器的 / 输出", and the new client's flow
+// "Authorization code（使 / 用 PKCE）". They are worded to fit, or to break between words (#663).
+test("Chinese choice labels a phone once split inside a word fit it or break between words", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto(`${env.adminUrl}/admin/settings/audit-logs?ui_locales=zh-Hans`);
+  for (const [id, text] of [["auditLogsInConsoleEnabled", "写入服务器的输出"], ["auditLogsInDatabaseEnabled", "存储在数据库中"]]) {
+    const label = page.locator(`label[for="${id}"] .choice-label`);
+    await expect(label).toHaveText(text);
+    expect(await choiceLabelLines(label), id).toEqual([text]);
+  }
+  await page.goto(`${env.adminUrl}/admin/clients/new?ui_locales=zh-Hans`);
+  const flow = page.locator('label[for="authorizationCodeEnabled"] .choice-label');
+  await expect(flow).toHaveText("Authorization code（含 PKCE）");
+  // Broken between words, never between two Chinese characters or two Latin letters: at the space
+  // before PKCE, or before the parenthesis where a classic scrollbar narrows the page.
+  const lines = await choiceLabelLines(flow);
+  const insideWords = lines.slice(1).filter((line, i) => (/\p{Script=Han}$/u.test(lines[i]) && /^\p{Script=Han}/u.test(line)) || (/[A-Za-z]$/.test(lines[i]) && /^[A-Za-z]/.test(line)));
+  expect(insideWords, lines.join(" / ")).toEqual([]);
 });

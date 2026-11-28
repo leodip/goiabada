@@ -111,7 +111,9 @@ func TestSimplifiedChinese_UserDetailsAndBrandingMenuWording(t *testing.T) {
 // Every list and page that shows a user's subject identifier names it Subject, in Latin script, so
 // the group members' and a permission's users' lists read as the users list does, and the users
 // search names the subject in the same spelling. A client's web origins lead names its endpoint
-// paths with a space on each side, where Chinese meets them.
+// paths with a space on each side, where Chinese meets them. A browser never breaks a line before a
+// slash, so paths joined by 、 alone ran past a 320 px phone's edge as one unbreakable run; the
+// list is split by 或, a spaced word, and no more than two paths stand joined.
 func TestSimplifiedChinese_SubjectAndEndpointPaths(t *testing.T) {
 	ctx := WithLocale(context.Background(), true, "zh-Hans", "en")
 	for _, key := range []string{
@@ -127,6 +129,26 @@ func TestSimplifiedChinese_SubjectAndEndpointPaths(t *testing.T) {
 	}
 	assert.Equal(t, "姓名、电子邮件地址、用户名或 subject", T(ctx, "adminconsole.admin_users.list.search_placeholder"))
 	assert.Equal(t,
-		"如果此 client 在浏览器中运行，并调用 /auth/token、/auth/revoke、/auth/logout 或 /userinfo，请在此注册其源：协议、主机和可选的端口，其后不带任何内容，例如 https://www.example.com 或 https://myapp:8080。",
+		"如果此 client 在浏览器中运行，并调用 /auth/token、/auth/revoke 或 /auth/logout，或调用 /userinfo，请在此注册其源：协议、主机和可选的端口，其后不带任何内容，例如 https://www.example.com 或 https://myapp:8080。",
 		T(ctx, "adminconsole.admin_clients.web_origins.lead"))
+}
+
+// A browser may break a Chinese line between any two characters, so a label or a refusal worded
+// one character too long for a 320 px phone split a word or left a character alone on its last
+// line (#663 decision 7): "将审计事件存储在数据 / 库中", "Authorization code（使 / 用 PKCE）" and
+// "恢复代码不正确，或已被使 / 用。". The audit logging choices drop the subject their page's title
+// already names, the flow's PKCE note is one character shorter, so it breaks at the space before
+// PKCE, and the refusal fits one line.
+func TestSimplifiedChinese_LabelsAndRefusalsWordedForAPhone(t *testing.T) {
+	ctx := WithLocale(context.Background(), true, "zh-Hans", "en")
+	for key, want := range map[string]string{
+		"adminconsole.admin_settings.audit_logs.field.console_enabled":  "写入服务器的输出",
+		"adminconsole.admin_settings.audit_logs.field.database_enabled": "存储在数据库中",
+		"adminconsole.admin_clients.new.toggle.auth_code":               "Authorization code（含 PKCE）",
+		"adminconsole.admin_clients.delete.flows_authcode":              "Authorization code（含 PKCE）",
+		"adminconsole.admin_clients.delete.flows_both":                  "Authorization code（含 PKCE）、client credentials",
+		"handler.otp.incorrect_recovery_code":                           "恢复代码无效或已使用。",
+	} {
+		assert.Equal(t, want, T(ctx, key), key)
+	}
 }
