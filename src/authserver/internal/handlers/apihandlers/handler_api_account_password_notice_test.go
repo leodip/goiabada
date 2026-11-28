@@ -122,6 +122,10 @@ func TestHandleAccountPasswordPut_TellsTheUserAfterTheResponse(t *testing.T) {
 		{"a user who chose Russian, over a German locale", "ru", "de", "ru", "Ваш пароль изменен"},
 		{"a Japanese user", "", "ja-JP", "ja-JP", "パスワードが変更されました"},
 		{"a user who chose Japanese, over a German locale", "ja", "de", "ja", "パスワードが変更されました"},
+		{"a Chinese (China) user", "", "zh-CN", "zh-CN", "您的密码已更改"},
+		{"a Chinese (Singapore) user", "", "zh-SG", "zh-SG", "您的密码已更改"},
+		{"a Chinese (Taiwan) user", "", "zh-TW", "zh-TW", "Your password was changed"},
+		{"a user who chose Simplified Chinese, over a German locale", "zh-Hans", "de", "zh-Hans", "您的密码已更改"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
