@@ -99,3 +99,28 @@ func TestJapanese_UserDetailsAndBrandingMenuWording(t *testing.T) {
 	assert.Equal(t, "ブランディング", T(ctx, "adminconsole.admin_menu.settings_branding"))
 	assert.Equal(t, "ブランディング", T(ctx, "adminconsole.admin_branding.list.title"))
 }
+
+// Every list and page that shows a user's subject identifier names it Subject, in Latin script as
+// the Russian catalog keeps it (#662 decision 4), so the group members' and a permission's users'
+// lists read as the users list does, and the users search names the subject in the same spelling.
+// The page that shows the most kept terms, a client's web origins, writes each endpoint path in
+// 「」, so a narrow page can break the line between them: a run of paths joined by 、 alone has no
+// break opportunity, and at 320 px it pushed the page sideways.
+func TestJapanese_SubjectAndEndpointPaths(t *testing.T) {
+	ctx := WithLocale(context.Background(), true, "ja", "en")
+	for _, key := range []string{
+		"adminconsole.admin_users.list.col_subject",
+		"adminconsole.admin_users.delete.field.subject",
+		"adminconsole.admin_users.details.field.subject",
+		"adminconsole.admin_groups.members.col_subject",
+		"adminconsole.admin_groups.members_add.col_subject",
+		"adminconsole.admin_resources.users_with_permission.col_subject",
+		"adminconsole.admin_resources.users_with_permission_add.col_subject",
+	} {
+		assert.Equal(t, "Subject", T(ctx, key), key)
+	}
+	assert.Equal(t, "名前、メールアドレス、ユーザー名、subject", T(ctx, "adminconsole.admin_users.list.search_placeholder"))
+	assert.Equal(t,
+		"この client がブラウザーで動作し、「/auth/token」「/auth/revoke」「/auth/logout」「/userinfo」を呼び出す場合は、ここにそのオリジンを登録してください。スキーム、ホスト、任意のポートで構成し、その後ろには何も付けません（例：https://www.example.com、https://myapp:8080）。",
+		T(ctx, "adminconsole.admin_clients.web_origins.lead"))
+}

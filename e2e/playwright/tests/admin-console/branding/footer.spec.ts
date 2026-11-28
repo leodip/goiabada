@@ -259,6 +259,7 @@ const otherLanguages = [
   { tag: "id", label: "Privasi", notice: "(terbuka di tab baru)" },
   { tag: "pl", label: "Prywatność", notice: "(otwiera się w nowej karcie)" },
   { tag: "ru", label: "Конфиденциальность", notice: "(открывается в новой вкладке)" },
+  { tag: "ja", label: "プライバシー", notice: "（新しいタブで開きます）" },
 ];
 
 test("a footer link's label in each other built-in language is drawn on a page in that language, and the fallback where it has none", async ({
