@@ -1104,7 +1104,7 @@
 "adminconsole.admin_clients.redirect_uris.added" = "Redirect URI добавлен. Сохраните, чтобы применить изменение."
 "adminconsole.admin_clients.redirect_uris.removed" = "Redirect URI удален. Сохраните, чтобы применить изменение."
 "adminconsole.admin_clients.sign_out_redirect_uris.requires_redirect_flow" = "Redirect URI после выхода нужны для потока authorization code и implicit flow. Чтобы задать их здесь, включите один из них на вкладке «Потоки OAuth2»."
-"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "После выхода пользователь возвращается только на адрес из этого списка, совпадающий точно, включая порт. Redirect URI для выхода не используются."
+"adminconsole.admin_clients.sign_out_redirect_uris.lead" = "После выхода пользователь возвращается только на адрес из этого списка, совпадающий точно, включая порт. При выходе Redirect URI не используются."
 "adminconsole.admin_clients.sign_out_redirect_uris.field.uri" = "Redirect URI после выхода"
 "adminconsole.admin_clients.sign_out_redirect_uris.add_button" = "Добавить"
 "adminconsole.admin_clients.sign_out_redirect_uris.col_authorized" = "Redirect URIs после выхода"
