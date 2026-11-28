@@ -38,7 +38,7 @@ Ask only for what you use: the user sees the list on the consent screen, when th
 | `openid` | `sub`, the user's subject. It also gets your app an ID token, and lets it call `/userinfo`. |
 | `profile` | `name`, `given_name`, `middle_name`, `family_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `gender`, `birthdate`, `zoneinfo`, `locale` and `updated_at` |
 | `email` | `email` and `email_verified` |
-| `address` | `address`, an object with `formatted`, `street_address`, `locality`, `region`, `postal_code` and `country` |
+| `address` | `address`, an object with `street_address`, `locality`, `region`, `postal_code`, `country` and, when the country is set, `formatted` |
 | `phone` | `phone_number` and `phone_number_verified` |
 | `groups` | `groups`, the identifiers of the user's groups |
 | `attributes` | `attributes`, the user's attributes and those of their groups, as keys and values |
