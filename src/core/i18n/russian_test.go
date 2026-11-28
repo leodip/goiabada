@@ -74,3 +74,13 @@ func TestRussian_TheRecipientReadsRussian(t *testing.T) {
 		})
 	}
 }
+
+// The user details page writes clients, a kept English term, in the plural where several are the
+// subject, and the console's menu names the branding page as the page does.
+func TestRussian_UserDetailsAndBrandingMenuWording(t *testing.T) {
+	ctx := WithLocale(context.Background(), true, "ru", "en")
+	assert.Equal(t, "Отключенный пользователь не может войти, а clients не могут обновлять его token.", T(ctx, "adminconsole.admin_users.details.field.enabled_hint"))
+	assert.Equal(t, "Вы отключаете пользователя, поэтому он не сможет войти, а clients не смогут обновлять его token.", T(ctx, "adminconsole.admin_users.details.disable_warning"))
+	assert.Equal(t, "Брендинг", T(ctx, "adminconsole.admin_menu.settings_branding"))
+	assert.Equal(t, "Брендинг", T(ctx, "adminconsole.admin_branding.list.title"))
+}
