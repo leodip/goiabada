@@ -100,6 +100,34 @@ func TestRecoveryCode_AFullWidthCodeSignsIn(t *testing.T) {
 	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.ID), "the code is spent")
 }
 
+// A code typed wholly in full-width mode has full-width hyphens between its groups, and one whose
+// hyphens are typed in kana mode has the long-vowel mark: each is taken out as the hyphen is, and the
+// code signs in. A wrong letter between full-width hyphens is still refused.
+func TestRecoveryCode_ACodeWithJapaneseHyphensSignsIn(t *testing.T) {
+	client, redirectURI := createPublicClientAt(t, record.ACRLevel2Mandatory)
+	_, _, user, password, _ := createLevel2MandatoryUser(t, true)
+	codes := giveRecoveryCodes(t, user.ID)
+
+	for i, hyphen := range []string{"－", "ー"} {
+		httpClient, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password,
+			strings.ReplaceAll(inFullWidth(codes[i]), "-", hyphen))
+		idClaims, _ := finishSignIn(t, httpClient, resp)
+		assert.Equal(t, []interface{}{"pwd", "recovery_code"}, idClaims["amr"], "%q", hyphen)
+	}
+
+	wrong := []rune(codes[2])
+	if wrong[len(wrong)-1] == 'a' {
+		wrong[len(wrong)-1] = 'b'
+	} else {
+		wrong[len(wrong)-1] = 'a'
+	}
+	_, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password,
+		strings.ReplaceAll(inFullWidth(string(wrong)), "-", "－"))
+	assertRecoveryCodeRefused(t, resp)
+
+	assert.Equal(t, 8, unusedRecoveryCodesForTest(t, user.ID), "the two codes that signed in are spent")
+}
+
 func TestAPIAccountOTPPut_Enable_AFullWidthCodeEnables(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 	userID := getAccountUserID(t, accessToken)

@@ -266,8 +266,42 @@ func TestHashRecoveryCode_ReadsFullWidthLettersAndTheDigitsOfAnyScript(t *testin
 		assert.Equal(t, want, HashRecoveryCode(typed), "%q", typed)
 	}
 
-	// The full-width hyphen is not the hyphen, so it is not taken out, and the code is another.
-	assert.NotEqual(t, want, HashRecoveryCode("7kq2－m9xh－4trw－b3np－j6vd－egac"))
 	assert.NotEqual(t, want, HashRecoveryCode("７ｋｑ２-ｍ９ｘｈ-４ｔｒｗ-ｂ３ｎｐ-ｊ６ｖｄ-ｅｇａｂ"),
 		"a wrong letter in full-width is another code")
+}
+
+// A hyphen between a code's groups may be typed as what a Japanese input method writes for the
+// hyphen key, the full-width hyphen-minus in full-width mode and the long-vowel mark, full or half
+// width, in kana mode, or as a dash or minus sign another keyboard or autocorrect writes; each is
+// taken out as the hyphen is. The expected value is the example code's hash above.
+func TestHashRecoveryCode_TakesOutEveryHyphenAPersonMayType(t *testing.T) {
+	const want = "c6fc89366c85e65574ae4e7611c099de58437a2d479455bb7d15876a606c0472"
+
+	for _, hyphen := range []string{
+		"\uFF0D", // full-width hyphen-minus
+		"\u30FC", // katakana-hiragana prolonged sound mark
+		"\uFF70", // half-width katakana-hiragana prolonged sound mark
+		"\u2010", // hyphen
+		"\u2011", // non-breaking hyphen
+		"\u2012", // figure dash
+		"\u2013", // en dash
+		"\u2014", // em dash
+		"\u2015", // horizontal bar
+		"\u2212", // minus sign
+	} {
+		typed := strings.Join([]string{"7kq2", "m9xh", "4trw", "b3np", "j6vd", "egac"}, hyphen)
+		assert.Equal(t, want, HashRecoveryCode(typed), "%q", typed)
+		assert.True(t, IsBlankRecoveryCode(hyphen+" "+hyphen), "%q alone is no code", hyphen)
+	}
+	assert.Equal(t, want, HashRecoveryCode("７ｋｑ２－ｍ９ｘｈ－４ｔｒｗ－ｂ３ｎｐ－ｊ６ｖｄ－ｅｇａｃ"),
+		"a code typed wholly in full-width mode")
+	assert.Equal(t, want, HashRecoveryCode("７ｋｑ２ーｍ９ｘｈー４ｔｒｗーｂ３ｎｐーｊ６ｖｄーｅｇａｃ"),
+		"a code in full-width letters with its hyphens typed in kana mode")
+
+	// Only hyphens are taken out: another mark between the groups, or a wrong letter beside a
+	// full-width hyphen, is another code.
+	assert.NotEqual(t, want, HashRecoveryCode("7kq2_m9xh_4trw_b3np_j6vd_egac"))
+	assert.NotEqual(t, want, HashRecoveryCode("7kq2〜m9xh〜4trw〜b3np〜j6vd〜egac"), "the wave dash is not a hyphen")
+	assert.NotEqual(t, want, HashRecoveryCode("７ｋｑ２－ｍ９ｘｈ－４ｔｒｗ－ｂ３ｎｐ－ｊ６ｖｄ－ｅｇａｂ"),
+		"a wrong letter beside full-width hyphens is another code")
 }
