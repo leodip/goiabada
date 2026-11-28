@@ -71,6 +71,12 @@ test("a short name the administrator types stays as the title changes", async ({
   await expect(page.locator("#shortName")).toHaveValue("terms-of-use-for-partners");
 });
 
+test("a Russian title suggests its short name in Latin letters", async ({ page }) => {
+  await page.goto(`${list}/new`);
+  await page.locator("#title").pressSequentially("Российская политика конфиденциальности");
+  await expect(page.locator("#shortName")).toHaveValue("rossiyskaya-politika-konfidentsialnosti");
+});
+
 test("a document with no kind chosen is refused at the kind, keeping what was typed", async ({ page }) => {
   const shortName = uniqueIdentifier("ld");
   await submitNewLegalDocument(page, { title: "No kind", shortName });
