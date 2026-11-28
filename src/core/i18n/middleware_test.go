@@ -465,7 +465,7 @@ func TestCatalogTag_FollowsWithLocaleAndDefaultsToEnglish(t *testing.T) {
 // English to a guessed language, keeps a regional variant on its language, and still honours a
 // listed second choice (#658).
 func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
-	for _, tag := range []string{"uk", "sr", "bg", "ba", "be", "kk", "ky", "fa", "ja", "nl", "ru", "zh-TW", "zh-Hant", "gl", "eu", "ca", "gsw", "lb", "oc", "co", "ms", "jv", "su", "mr", "gu"} {
+	for _, tag := range []string{"uk", "sr", "bg", "ba", "be", "kk", "ky", "fa", "ja", "nl", "zh-TW", "zh-Hant", "gl", "eu", "ca", "gsw", "lb", "oc", "co", "ms", "jv", "su", "mr", "gu"} {
 		t.Run(tag, func(t *testing.T) {
 			ctx := WithLocale(context.Background(), true, tag)
 			assert.Equal(t, "en", CatalogTag(ctx))
@@ -481,6 +481,7 @@ func TestWithLocale_EnglishWinsOverGuessedLanguages(t *testing.T) {
 		{[]string{"de-CH"}, "de"}, {[]string{"de-AT"}, "de"}, {[]string{"fr-CA"}, "fr"}, {[]string{"it-CH"}, "it"},
 		{[]string{"pt-PT"}, "pt-BR"},
 		{[]string{"in"}, "id"}, {[]string{"id-ID"}, "id"}, {[]string{"ms", "id"}, "id"}, {[]string{"ms,id;q=0.8"}, "id"},
+		{[]string{"ru-RU"}, "ru"}, {[]string{"ru-KZ"}, "ru"}, {[]string{"ru-UA"}, "ru"}, {[]string{"uk", "ru"}, "ru"}, {[]string{"uk,ru;q=0.8"}, "ru"},
 		{[]string{"uk", "de"}, "de"}, {[]string{"gl", "es"}, "es"},
 		{[]string{"uk,de;q=0.8"}, "de"}, {[]string{"gl,es-MX;q=0.8"}, "es"},
 		{[]string{"es;q=0,en;q=0.5"}, "en"},

@@ -104,6 +104,7 @@ var pluralCategories = map[string][]string{
 	"id":    {"other"},
 	"it":    {"one", "other"},
 	"pl":    {"one", "few", "many", "other"},
+	"ru":    {"one", "few", "many", "other"},
 	"pt-BR": {"one", "other"},
 }
 
@@ -320,5 +321,28 @@ func TestCatalog_OtherConceptNamesMatchesOnlyTheOtherNames(t *testing.T) {
 	}
 	for _, v := range []string{"Two-factor authentication", "Your two-factor authentication settings changed", "with the auth server.", "authorization code"} {
 		assert.Emptyf(t, otherConceptNames.FindString(glossaryConceptNames.ReplaceAllString(v, "")), "%q should not match", v)
+	}
+}
+
+// TestCatalog_RussianWritesENeverYo holds the Russian catalog to е (#666 decision 4): a value that
+// spells ё or Ё, though correct Russian, would make the same word read two ways across the pages.
+func TestCatalog_RussianWritesENeverYo(t *testing.T) {
+	for k, v := range loadCatalogFlat(t, "active.ru.toml") {
+		assert.Falsef(t, spellsYo(v), "active.ru.toml: key %q says %q; the Russian catalog writes е, never ё", k, v)
+	}
+}
+
+// spellsYo reports whether s holds ё or Ё, written as one character or as е and its combining
+// diaeresis.
+func spellsYo(s string) bool {
+	return strings.ContainsAny(s, "ёЁ") || strings.Contains(s, "ё") || strings.Contains(s, "Ё")
+}
+
+func TestSpellsYo(t *testing.T) {
+	for _, v := range []string{"Срок истёк.", "ЁЛКА", "Ещё раз", "ёще"} {
+		assert.Truef(t, spellsYo(v), "%q spells ё", v)
+	}
+	for _, v := range []string{"Срок истек.", "Еще раз", "Sign in", "Ее"} {
+		assert.Falsef(t, spellsYo(v), "%q does not spell ё", v)
 	}
 }

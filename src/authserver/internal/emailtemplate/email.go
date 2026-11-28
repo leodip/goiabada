@@ -98,7 +98,7 @@ type Message struct {
 
 // Languages are the built-in languages every email is written in, as the catalogs built into
 // Goiabada are tagged, English first.
-var Languages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR"}
+var Languages = []string{"en", "de", "es", "fr", "id", "it", "pl", "pt-BR", "ru"}
 
 // languageTags are Languages parsed, in the same order, for the matcher.
 var languageTags = func() []language.Tag {

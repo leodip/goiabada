@@ -36,7 +36,7 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Labels: map[string]string{
 				"de": "Datenschutz", "en": "Privacy", "es": "Privacidad",
 				"fr": "Confidentialité", "id": "Privasi", "it": "Riservatezza",
-				"pl": "Prywatność", "pt-BR": "Privacidade",
+				"pl": "Prywatność", "pt-BR": "Privacidade", "ru": "Конфиденциальность",
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Label: longLabel,
 			Labels: map[string]string{
 				"de": longLabel, "en": longLabel, "es": longLabel,
-				"fr": longLabel, "id": longLabel, "it": longLabel, "pl": longLabel, "pt-BR": longLabel,
+				"fr": longLabel, "id": longLabel, "it": longLabel, "pl": longLabel, "pt-BR": longLabel, "ru": longLabel,
 			},
 		},
 		{
@@ -52,7 +52,7 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Label: "Status & \"uptime\"",
 			Labels: map[string]string{
 				"de": "Status", "en": "Status", "es": "Estado",
-				"fr": "État", "id": "Status", "it": "Stato", "pl": "Status", "pt-BR": "Situação",
+				"fr": "État", "id": "Status", "it": "Stato", "pl": "Status", "pt-BR": "Situação", "ru": "Статус",
 			},
 		},
 	}

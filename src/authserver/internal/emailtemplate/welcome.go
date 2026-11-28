@@ -132,5 +132,21 @@ Se tiver problemas para clicar no link, copie e cole o endereço no seu navegado
 Atenciosamente,
 {{app_name}}`,
 		},
+		"ru": {
+			Subject:     "Добро пожаловать!",
+			ButtonLabel: "Войти",
+			Body: `Поздравляем! Ваш аккаунт создан.
+
+Войти можно по ссылке ниже:
+
+{{button}}
+
+{{link}}
+
+Если ссылка не открывается, скопируйте ее и вставьте в адресную строку браузера.
+
+С уважением,
+{{app_name}}`,
+		},
 	},
 }

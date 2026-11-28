@@ -97,5 +97,16 @@ Se você não esperava por isso, entre em contato com o administrador.
 Atenciosamente,
 {{app_name}}`,
 		},
+		"ru": {
+			Subject: "Администратор удалил ваш аккаунт",
+			Body: `Здравствуйте, {{name}}!
+
+Администратор удалил ваш аккаунт в {{app_name}}. Войти в него больше нельзя.
+
+Если вы этого не ожидали, обратитесь к администратору.
+
+С уважением,
+{{app_name}}`,
+		},
 	},
 }

@@ -41,6 +41,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może znać Twoje hasło."},
 		"pt-BR": {"Seu endereço de e-mail foi alterado", "Olá Ana,",
 			"Se não foi você, outra pessoa pode saber a sua senha."},
+		"ru": {"Ваш адрес электронной почты изменен", "Здравствуйте, Ana!",
+			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"password_changed", map[string]noticeText{
 		"en": {"Your password was changed", "Hello Ana,",
@@ -59,6 +61,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może korzystać z Twojego konta."},
 		"pt-BR": {"Sua senha foi alterada", "Olá Ana,",
 			"Se não foi você, outra pessoa pode estar usando a sua conta."},
+		"ru": {"Ваш пароль изменен", "Здравствуйте, Ana!",
+			"Если нет, возможно, вашим аккаунтом пользуется кто-то другой."},
 	}},
 	{"password_changed_by_administrator", map[string]noticeText{
 		"en": {"An administrator changed your password", "Hello Ana,",
@@ -77,6 +81,8 @@ var noticeTexts = []struct {
 			"Jeśli się tego nie spodziewasz, skontaktuj się z administratorem."},
 		"pt-BR": {"Um administrador alterou a sua senha", "Olá Ana,",
 			"Se você não esperava por isso, entre em contato com o administrador."},
+		"ru": {"Администратор изменил ваш пароль", "Здравствуйте, Ana!",
+			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"password_reset", map[string]noticeText{
 		"en": {"Your password was reset", "Hello Ana,",
@@ -95,6 +101,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może mieć dostęp do Twojej poczty e-mail i korzystać z Twojego konta."},
 		"pt-BR": {"Sua senha foi redefinida", "Olá Ana,",
 			"Se não foi você, outra pessoa pode estar lendo o seu e-mail e usando a sua conta."},
+		"ru": {"Ваш пароль сброшен", "Здравствуйте, Ana!",
+			"Если нет, возможно, кто-то другой может читать вашу почту и пользоваться вашим аккаунтом."},
 	}},
 	{"otp_enabled", map[string]noticeText{
 		"en": {"Two-factor authentication was set up", "Hello Ana,",
@@ -113,6 +121,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może znać Twoje hasło."},
 		"pt-BR": {"A autenticação de dois fatores foi configurada", "Olá Ana,",
 			"Se não foi você, outra pessoa pode saber a sua senha."},
+		"ru": {"Двухфакторная аутентификация настроена", "Здравствуйте, Ana!",
+			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled", map[string]noticeText{
 		"en": {"Two-factor authentication was turned off", "Hello Ana,",
@@ -131,6 +141,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może znać Twoje hasło."},
 		"pt-BR": {"A autenticação de dois fatores foi desativada", "Olá Ana,",
 			"Se não foi você, outra pessoa pode saber a sua senha."},
+		"ru": {"Двухфакторная аутентификация отключена", "Здравствуйте, Ana!",
+			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"otp_disabled_by_administrator", map[string]noticeText{
 		"en": {"An administrator turned off your two-factor authentication", "Hello Ana,",
@@ -149,6 +161,8 @@ var noticeTexts = []struct {
 			"Jeśli się tego nie spodziewasz, skontaktuj się z administratorem."},
 		"pt-BR": {"Um administrador desativou a sua autenticação de dois fatores", "Olá Ana,",
 			"Se você não esperava por isso, entre em contato com o administrador."},
+		"ru": {"Администратор отключил вашу двухфакторную аутентификацию", "Здравствуйте, Ana!",
+			"Если вы этого не ожидали, обратитесь к администратору."},
 	}},
 	{"otp_lockout", map[string]noticeText{
 		"en": {"Your authenticator was disabled after too many wrong codes", "Hello Ana,",
@@ -167,6 +181,8 @@ var noticeTexts = []struct {
 			"Te kody można było wpisać dopiero po haśle, więc ktoś inny może znać Twoje hasło."},
 		"pt-BR": {"Seu aplicativo autenticador foi bloqueado após muitos códigos errados", "Olá Ana,",
 			"Esses códigos só podiam ser digitados depois da sua senha, então outra pessoa pode saber a sua senha."},
+		"ru": {"Приложение-аутентификатор отключено из-за слишком большого числа неверных кодов", "Здравствуйте, Ana!",
+			"Эти коды можно было ввести только после пароля, поэтому, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"recovery_code_used", map[string]noticeText{
 		"en": {"A recovery code was used to sign in", "Hello Ana,",
@@ -185,6 +201,8 @@ var noticeTexts = []struct {
 			"Jeśli to nie Ty, ktoś inny może znać Twoje hasło i mieć Twoje kody odzyskiwania."},
 		"pt-BR": {"Um código de recuperação foi usado para entrar", "Olá Ana,",
 			"Se não foi você, outra pessoa pode saber a sua senha e ter os seus códigos de recuperação."},
+		"ru": {"Для входа использован код восстановления", "Здравствуйте, Ana!",
+			"Если это были не вы, возможно, кто-то другой знает ваш пароль и имеет ваши коды восстановления."},
 	}},
 	{"recovery_codes_replaced", map[string]noticeText{
 		"en": {"Your recovery codes were replaced", "Hello Ana,",
@@ -203,6 +221,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny może znać Twoje hasło."},
 		"pt-BR": {"Seus códigos de recuperação foram substituídos", "Olá Ana,",
 			"Se não foi você, outra pessoa pode saber a sua senha."},
+		"ru": {"Ваши коды восстановления заменены", "Здравствуйте, Ana!",
+			"Если нет, возможно, ваш пароль известен кому-то еще."},
 	}},
 	{"account_deleted", map[string]noticeText{
 		"en": {"Your account was deleted", "Hello Ana,",
@@ -221,6 +241,8 @@ var noticeTexts = []struct {
 			"Jeśli nie, ktoś inny znał Twoje hasło."},
 		"pt-BR": {"Sua conta foi excluída", "Olá Ana,",
 			"Se não foi você, outra pessoa sabia a sua senha."},
+		"ru": {"Ваш аккаунт удален", "Здравствуйте, Ana!",
+			"Если нет, значит, ваш пароль был известен кому-то еще."},
 	}},
 	{"account_deleted_by_administrator", map[string]noticeText{
 		"en": {"An administrator deleted your account", "Hello Ana,",
@@ -239,6 +261,8 @@ var noticeTexts = []struct {
 			"Administrator usunął Twoje konto w Acme Portal. Nie możesz się już na nie zalogować."},
 		"pt-BR": {"Um administrador excluiu a sua conta", "Olá Ana,",
 			"Um administrador excluiu a sua conta Acme Portal. Você não pode mais entrar com ela."},
+		"ru": {"Администратор удалил ваш аккаунт", "Здравствуйте, Ana!",
+			"Администратор удалил ваш аккаунт в Acme Portal. Войти в него больше нельзя."},
 	}},
 }
 
@@ -297,6 +321,8 @@ func TestRecoveryCodeUsed_OneWordingForEveryCount(t *testing.T) {
 			"Jeśli nadal masz tę aplikację, wygeneruj nowy zestaw kodów odzyskiwania w ustawieniach konta, aby móc się zalogować, jeśli ją stracisz."},
 		{"pt-BR", "Códigos de recuperação sem uso restantes: %s.",
 			"Se você ainda tem o aplicativo, gere lá um novo conjunto de códigos de recuperação, para poder entrar se perdê-lo."},
+		{"ru", "Осталось неиспользованных кодов восстановления: %s.",
+			"Если приложение у вас еще есть, создайте в настройках аккаунта новый набор кодов восстановления, чтобы сохранить возможность войти, если вы его потеряете."},
 	} {
 		for _, left := range []struct {
 			count int

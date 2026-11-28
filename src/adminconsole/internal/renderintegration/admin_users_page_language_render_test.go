@@ -67,6 +67,7 @@ func TestRender_AdminUserProfile_ThePageLanguageSelect(t *testing.T) {
 		"it||it – italiano (Italian)",
 		"pl||pl – polski (Polish)",
 		"pt-BR||pt-BR – português (Brasil) (Portuguese (Brazil))",
+		"ru||ru – русский (Russian)",
 	}, drawn)
 	assert.Contains(t, out, `<p class="field-hint" id="pageLanguageHint">O idioma do console, das páginas de entrada `+
 		`depois que o usuário digita a senha e dos e-mails enviados ao usuário. Automático usa o idioma que o cliente `+

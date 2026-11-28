@@ -58,5 +58,11 @@ Pozdrawiamy
 
 Ele foi enviado pelas configurações de e-mail para verificar se o envio de e-mails funciona. Se você consegue lê-lo, não precisa fazer mais nada.`,
 		},
+		"ru": {
+			Subject: "{{app_name}} — тестовое письмо",
+			Body: `Это тестовое письмо от {{app_name}}.
+
+Оно отправлено из настроек электронной почты, чтобы проверить, что письма отправляются. Если вы его читаете, больше ничего делать не нужно.`,
+		},
 	},
 }
