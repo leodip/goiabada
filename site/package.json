@@ -13,7 +13,7 @@
   "dependencies": {
     "@astrojs/markdown-satteri": "^0.4.10",
     "@astrojs/starlight": "^0.43.1",
-    "astro": "^7.4.12",
+    "astro": "^7.4.13",
     "hast-util-from-html": "^2.1.0",
     "hast-util-select": "^6.0.4",
     "hast-util-to-mdast": "^10.1.3",
