@@ -259,3 +259,16 @@ func TestRussian_ABrandsEditorCountsItsClientsAndFailingPairs(t *testing.T) {
 		})
 	}
 }
+
+// The home page's administration card is titled Управление, a word a 320 px phone draws on one line,
+// where Администрирование broke in the middle; the user menu keeps Администрирование, which fits.
+func TestRussian_TheHomePageAdminCardTitleFitsAPhone(t *testing.T) {
+	out := renderPage(t, "/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
+		"AuthServerBaseURL": "https://auth.example",
+		"AccountLink":       "/account/profile",
+		"AdminLink":         "/admin/clients",
+	}, nil, "ru", true)
+	assert.Contains(t, out, `<span class="link-row-title">Управление</span>`)
+	assert.Contains(t, out, `<span class="link-row-title">Ваш аккаунт</span>`)
+	assert.NotContains(t, out, "Администрирование")
+}

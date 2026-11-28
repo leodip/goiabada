@@ -640,7 +640,7 @@
 "adminconsole.welcome.discovery_card_body" = "Метаданные сервера аутентификации: его endpoints, поддерживаемые scopes и claims, ключи подписи."
 "adminconsole.welcome.account_card_title" = "Ваш аккаунт"
 "adminconsole.welcome.account_card_body" = "Изменение профиля, адреса электронной почты, пароля и двухфакторной аутентификации."
-"adminconsole.welcome.admin_card_title" = "Администрирование"
+"adminconsole.welcome.admin_card_title" = "Управление"
 "adminconsole.welcome.admin_card_body" = "Управление clients, пользователями и группами, настройка сервера аутентификации."
 "adminconsole.welcome.developers_heading" = "Для разработчиков"
 "adminconsole.welcome.docs_card_title" = "Документация"
