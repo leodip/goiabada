@@ -23,6 +23,28 @@
     {{ end }}
 
     <div class="form-grid">
+      {{/* The name fields in the order the page's catalog names: the family name first where
+           common.name_order is family_first, as a Japanese form asks, and given, middle, family
+           otherwise. The drawn order is the tab order; the fields' names, and so what is posted,
+           do not change (#662 decision 11). Both orders are written out here, not drawn from
+           named templates: the markup guard matches a field's reference to the refusal notice
+           only within the page's own template. Keep each field the same in both. */}}
+      {{ if eq (T $.ctx "common.name_order") "family_first" }}
+      <div class="field">
+        <label class="field-label" for="familyName">{{ T $.ctx "adminconsole.admin_users.profile.field.family_name" }}</label>
+        <input class="control" id="familyName" type="text" name="familyName" value="{{ .user.FamilyName }}" autocomplete="off"{{ if .error }}{{ if eq .errorField "familyName" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="givenName">{{ T $.ctx "adminconsole.admin_users.profile.field.given_name" }}</label>
+        <input class="control" id="givenName" type="text" name="givenName" value="{{ .user.GivenName }}" autocomplete="off"{{ if .error }}{{ if eq .errorField "givenName" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="middleName">{{ T $.ctx "adminconsole.admin_users.profile.field.middle_name" }}</label>
+        <input class="control" id="middleName" type="text" name="middleName" value="{{ .user.MiddleName }}" autocomplete="off"{{ if .error }}{{ if eq .errorField "middleName" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
+      </div>
+      {{ else }}
       <div class="field">
         <label class="field-label" for="givenName">{{ T $.ctx "adminconsole.admin_users.profile.field.given_name" }}</label>
         <input class="control" id="givenName" type="text" name="givenName" value="{{ .user.GivenName }}" autocomplete="off"{{ if .error }}{{ if eq .errorField "givenName" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
@@ -37,6 +59,7 @@
         <label class="field-label" for="familyName">{{ T $.ctx "adminconsole.admin_users.profile.field.family_name" }}</label>
         <input class="control" id="familyName" type="text" name="familyName" value="{{ .user.FamilyName }}" autocomplete="off"{{ if .error }}{{ if eq .errorField "familyName" }} aria-invalid="true" aria-describedby="profile-error" autofocus{{ end }}{{ end }}>
       </div>
+      {{ end }}
 
       <div class="field">
         <label class="field-label" for="nickname">{{ T $.ctx "adminconsole.admin_users.profile.field.nickname" }}</label>

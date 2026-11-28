@@ -9,7 +9,8 @@
 # 確認コード (the verification code sent by email); 二要素認証; 認証サーバー; 管理コンソール;
 # リカバリーコード; 認証アプリ (the set phrase, and the one place アプリ is written); セッション; 同意;
 # 権限; リソース; グループ; 属性; ブランド; 監査ログ; 法的文書; メールテンプレート; 署名鍵; 設定. The
-# name fields are 名 (given name), ミドルネーム (middle name) and 姓 (family name).
+# name fields are 名 (given name), ミドルネーム (middle name) and 姓 (family name), and a form asks for
+# 姓 first: common.name_order is family_first, so it draws 姓, 名, ミドルネーム.
 # Keep token, access token, refresh token, ID token, scope, claim, issuer, client, client secret,
 # redirect URI and endpoint in English, with the flow names (authorization code, client
 # credentials, implicit flow, back-channel logout) and protocol names and identifiers (OAuth,
@@ -67,6 +68,15 @@
 # The nist policy's guidance and what it refuses, after its length (#550 decision 10).
 "password_rules.passphrase_guidance" = "関連のない単語をいくつか組み合わせると、覚えやすく長いパスワードになります。"
 "password_rules.common_and_account_refused" = "よく使われるパスワード、アカウントのメールアドレス、アプリケーション名は使用できません。"
+
+# --- Names -------------------------------------------------------------------
+#
+# Not prose but a format: one of exactly two values, which the console's name
+# forms read to choose the name they ask for first. given_first draws the given,
+# middle and family names in that order; family_first draws the family name,
+# then the given name, then the middle name, for a language whose forms ask for
+# the family name first. Keep one of the two values exactly.
+"common.name_order" = "family_first"
 
 # --- Dates and durations -----------------------------------------------------
 #

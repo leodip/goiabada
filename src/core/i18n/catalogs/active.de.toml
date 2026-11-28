@@ -47,6 +47,15 @@
 "password_rules.passphrase_guidance" = "Einige Wörter ohne Zusammenhang ergeben ein langes Passwort, das Sie sich gut merken können."
 "password_rules.common_and_account_refused" = "Häufig verwendete Passwörter sowie die E-Mail-Adresse des Kontos und der Name der Anwendung sind nicht erlaubt."
 
+# --- Names -------------------------------------------------------------------
+#
+# Not prose but a format: one of exactly two values, which the console's name
+# forms read to choose the name they ask for first. given_first draws the given,
+# middle and family names in that order; family_first draws the family name,
+# then the given name, then the middle name, for a language whose forms ask for
+# the family name first. Keep one of the two values exactly.
+"common.name_order" = "given_first"
+
 # --- Dates and durations -----------------------------------------------------
 #
 # The layout is a Go reference-time layout, translatable because Go formats
