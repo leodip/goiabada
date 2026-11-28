@@ -311,3 +311,28 @@ for (const translation of translations) {
     });
   }
 }
+
+// A browser may break a Japanese line between any two characters, so a title too long for one line
+// at a phone width broke inside a word: the new user setup email's title read "新規ユーザーのセットア /
+// ップ". On a Japanese page a title breaks between phrases (#662 decision 7), which Chromium applies.
+test("A Japanese page title breaks between phrases on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto(`${env.adminUrl}/admin/settings/email/templates/new_user_setup/ja?ui_locales=ja`);
+  const title = page.getByRole("heading", { level: 1 });
+  await expect(title).toHaveText("新規ユーザーのセットアップ");
+  // The title's text, one string for each line it is drawn on, read from where each character sits.
+  const lines = await title.evaluate((heading) => {
+    const text = heading.firstChild as Text;
+    const drawn: { top: number; text: string }[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const range = document.createRange();
+      range.setStart(text, i);
+      range.setEnd(text, i + 1);
+      const top = Math.round(range.getBoundingClientRect().top);
+      if (drawn.at(-1)?.top !== top) drawn.push({ top, text: "" });
+      drawn.at(-1)!.text += text.data[i];
+    }
+    return drawn.map((line) => line.text);
+  });
+  expect(lines).toEqual(["新規ユーザーの", "セットアップ"]);
+});
