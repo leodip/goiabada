@@ -217,16 +217,40 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 	}
 }
 
+// A language whose entry joins a number to its unit with no space writes them joined, in hours and
+// in minutes, in the subject and the body (#663 decision 4). Korean stands in, as a language that
+// writes "30분" and that no built-in entry names yet.
+func TestRender_TheExpiryJoinedAsTheLanguagesEntrySays(t *testing.T) {
+	expiryLanguages["ko"] = expiryNames{"", map[string]expiryUnit{"other": {"분", "시간"}}}
+	t.Cleanup(func() { delete(expiryLanguages, "ko") })
+	for duration, want := range map[time.Duration]string{
+		5 * time.Minute:  "5분",
+		30 * time.Minute: "30분",
+		90 * time.Minute: "90분",
+		time.Hour:        "1시간",
+		24 * time.Hour:   "24시간",
+	} {
+		t.Run(want, func(t *testing.T) {
+			values := testValues
+			values.Expiry = duration
+			rendered, err := everything.Render("ko", Text{Subject: "{{expiry}}", ButtonLabel: "Go", Body: "{{expiry}}"}, values, testLook)
+			require.NoError(t, err)
+			assert.Equal(t, want, rendered.Subject)
+			assert.Equal(t, "<p>"+want+"</p>\n", string(rendered.Body))
+		})
+	}
+}
+
 // Each language's units name exactly the plural categories its whole counts reach, so every count
 // finds its name and no name waits on a count that never comes.
 func TestExpiryUnits_NameEachCategoryTheLanguagesCountsReach(t *testing.T) {
-	require.ElementsMatch(t, Languages, slices.Collect(maps.Keys(expiryUnits)), "every email language has its unit names")
+	require.ElementsMatch(t, Languages, slices.Collect(maps.Keys(expiryLanguages)), "every email language has its unit names")
 	for _, lang := range Languages {
 		reached := map[string]bool{}
 		for count := 0; count <= 1000; count++ {
 			reached[i18n.PluralCategory(lang, count)] = true
 		}
-		units := expiryUnits[lang]
+		units := expiryLanguages[lang].units
 		assert.ElementsMatch(t, slices.Collect(maps.Keys(reached)), slices.Collect(maps.Keys(units)), "%s's unit names", lang)
 		for category, unit := range units {
 			assert.NotEmpty(t, unit.minute, "%s %s minute", lang, category)
